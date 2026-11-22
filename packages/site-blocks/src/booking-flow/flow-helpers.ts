@@ -56,10 +56,10 @@ export function nextFreeStart(
     );
 }
 
-/** "That time has gone. We've chosen the next free one: Sun 20 Sep at 8:00 am." */
+/** "That time has gone. We've chosen the next open one: Sun 20 Sep at 8:00 am." */
 export function nextChosenText(start: BookingStart, zone: string): string {
     const day = dateText(dateIn(start.startAt, zone), true);
-    return `That time has gone. We've chosen the next free one: ${day} at ${timeWords(start.startAt, zone)}.`;
+    return `That time has gone. We've chosen the next open one: ${day} at ${timeWords(start.startAt, zone)}.`;
 }
 
 // ── The header's facts (E6) ─────────────────────────────────────────────

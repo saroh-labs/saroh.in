@@ -76,6 +76,12 @@ export function TypefacePicker({
     const note = (key: string) =>
         key === pairs[0].key ? SYSTEM_NOTE : undefined;
 
+    // The row's quiet line: the pair being tried, else what the pair is.
+    const tried = highlight !== current.key && open;
+    const rowNote = tried
+        ? `Trying ${pairs.find((p) => p.key === highlight)?.name ?? ""} on the page`
+        : note(current.key);
+
     function setOpenAndTry(next: boolean) {
         setOpen(next);
         setSearch("");
@@ -124,20 +130,47 @@ export function TypefacePicker({
         <BrandPicker
             open={open}
             onOpenChange={setOpenAndTry}
-            title="Typeface"
+            title="Fonts"
             className="w-[360px] max-w-[calc(100vw-24px)]"
+            header={
+                <div className="shrink-0 border-b px-3.5 py-2.5">
+                    <b className="block text-sm font-semibold">Fonts</b>
+                    <span className="text-xs text-muted-foreground">
+                        Heading and body, chosen together
+                    </span>
+                </div>
+            }
             trigger={
                 <Button
+                    data-ph-unmask=""
                     type="button"
                     variant="outline"
-                    size="sm"
                     aria-haspopup="listbox"
                     aria-expanded={open}
                     data-typeface-change=""
-                    aria-label={`Change typeface, now ${current.name}`}
+                    aria-label={`Change fonts, now ${current.name}`}
+                    className={cn(
+                        "h-auto min-h-11 w-full justify-start gap-2 rounded-[10px] bg-card px-3 py-2 text-left font-normal",
+                        open && "border-foreground ring-1 ring-foreground",
+                    )}
                 >
-                    Change
-                    <ChevronDown aria-hidden />
+                    <span className="min-w-0 flex-1">
+                        <span
+                            className="block truncate text-base leading-tight"
+                            style={{ fontFamily: face(current.key) }}
+                        >
+                            {current.name}
+                        </span>
+                        {rowNote ? (
+                            <span className="block text-xs text-muted-foreground">
+                                {rowNote}
+                            </span>
+                        ) : null}
+                    </span>
+                    <ChevronDown
+                        aria-hidden
+                        className="size-4 shrink-0 text-muted-foreground"
+                    />
                 </Button>
             }
         >
@@ -157,8 +190,8 @@ export function TypefacePicker({
                         <CommandInput
                             value={search}
                             onValueChange={setSearch}
-                            placeholder="Search typefaces"
-                            aria-label="Search typefaces"
+                            placeholder="Search fonts"
+                            aria-label="Search fonts"
                             className="pr-10 text-sm"
                         />
                         <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border px-1 font-mono text-[0.65625rem] text-muted-foreground">
@@ -167,9 +200,7 @@ export function TypefacePicker({
                     </div>
                 )}
                 <CommandList className="max-h-none min-h-0 flex-1 pb-1.5">
-                    <CommandEmpty>
-                        {noMatchLine("typefaces", search)}
-                    </CommandEmpty>
+                    <CommandEmpty>{noMatchLine("fonts", search)}</CommandEmpty>
                     {free.length > 0 ? (
                         <CommandGroup heading="On your plan">
                             {free.map(item)}
@@ -195,9 +226,8 @@ export function TypefacePicker({
             ) : inSheet ? null : (
                 <PickerFoot>
                     <p>
-                        <Kbd>↑</Kbd> <Kbd>↓</Kbd> try a face on the page ·{" "}
-                        <Kbd>Enter</Kbd> keeps it · <Kbd>Esc</Kbd> puts back{" "}
-                        {current.name}
+                        <Kbd>↑</Kbd> <Kbd>↓</Kbd> tries a pair on the page ·{" "}
+                        <Kbd>Enter</Kbd> keeps it · <Kbd>Esc</Kbd> puts back
                     </p>
                 </PickerFoot>
             )}
@@ -211,28 +241,8 @@ export function TypefacePicker({
                 <div data-typeface-current={current.key}>{picker}</div>
             ) : (
                 <>
-                    <h3 className="label">Typeface</h3>
-                    <div
-                        data-typeface-current={current.key}
-                        // Change drops under a long name in a narrow rail
-                        // rather than cutting the name short.
-                        className="flex flex-wrap items-center justify-end gap-2 rounded-[10px] border bg-card py-2 pl-2.5 pr-2"
-                    >
-                        <div className="min-w-[9rem] flex-1">
-                            <p
-                                className="text-base leading-tight"
-                                style={{ fontFamily: face(current.key) }}
-                            >
-                                {current.name}
-                            </p>
-                            {note(current.key) ? (
-                                <p className="text-[0.71875rem] text-muted-foreground">
-                                    {note(current.key)}
-                                </p>
-                            ) : null}
-                        </div>
-                        {picker}
-                    </div>
+                    <h3 className="text-sm font-semibold">Fonts</h3>
+                    <div data-typeface-current={current.key}>{picker}</div>
                 </>
             )}
             {refused && !open && !inSheet ? (

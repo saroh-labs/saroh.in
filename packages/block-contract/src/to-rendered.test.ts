@@ -22,6 +22,31 @@ describe("toRendered", () => {
     ];
     const resolvePage = pagePathResolver(pages);
 
+    it("resolves a lookbook photo's page link, and leaves a gallery without one untouched", () => {
+        const linked = {
+            images: [
+                { src: "/a.jpg", link: { kind: "page", pageId: "p2" } },
+                { src: "/b.jpg", link: { kind: "product", productId: "x" } },
+                { src: "/c.jpg", link: { kind: "page", pageId: "gone" } },
+            ],
+        };
+        expect(toRendered("gallery", linked, { resolvePage })).toEqual({
+            images: [
+                {
+                    src: "/a.jpg",
+                    link: { kind: "page", pageId: "p2", href: "/about" },
+                },
+                { src: "/b.jpg", link: { kind: "product", productId: "x" } },
+                {
+                    src: "/c.jpg",
+                    link: { kind: "page", pageId: "gone", href: "" },
+                },
+            ],
+        });
+        const plain = { images: [{ src: "/a.jpg" }] };
+        expect(toRendered("gallery", plain, { resolvePage })).toBe(plain);
+    });
+
     it("resolves a hero's nested button to the path publish would write", () => {
         const out = toRendered(
             "hero",

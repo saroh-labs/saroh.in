@@ -49,8 +49,11 @@ export function publishApprovalOf(
 }
 
 /** What the rule does, said beside the owner's switch. */
-export const PUBLISH_APPROVAL_RULE =
-    "Only an approved test release can go live. You can still go live without approval, and it's recorded.";
+/** What the switch does, now that posts wait for approval too (O7). */
+export const PUBLISH_APPROVAL_WHO =
+    "Pages and posts go live once a reviewer, an admin or the owner approves them.";
+
+export const PUBLISH_APPROVAL_RULE = `${PUBLISH_APPROVAL_WHO} You can still go live without approval, and it's recorded.`;
 
 /** What someone who can't change it reads: only the owner can (KTD-11). */
 export function publishApprovalLine(on: boolean): string {

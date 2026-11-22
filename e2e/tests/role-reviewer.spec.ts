@@ -1,12 +1,12 @@
 // @covers accounts:/login app:/ app:/sites app:/sites/[siteId] app:/sites/[siteId]/review app:/contacts app:/settings/billing app:/settings/profile api:sites api:organizations api:capabilities
 import { expect, test } from "@playwright/test";
 
-import { phoneSheet } from "../fixtures/phone-editor";
 import { pressUntil } from "../fixtures/press";
 import {
     expectNoWriteControl,
     onPhone,
     openReviewedSite,
+    reviewSheet,
 } from "../fixtures/reviewer-editor";
 import type { MenuRow } from "../fixtures/roles";
 import {
@@ -100,11 +100,7 @@ test.describe("a Reviewer", () => {
          * verdict is read by every spec on this site.
          */
         if (onPhone(page)) {
-            const sheet = phoneSheet(page, "Your review");
-            await pressUntil(
-                page.getByRole("button", { name: "Review", exact: true }),
-                sheet,
-            );
+            const sheet = await reviewSheet(page);
             await expect(
                 sheet.getByRole("radio", { name: /^Approve/ }),
             ).toBeEnabled();

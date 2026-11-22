@@ -13,6 +13,7 @@ jest.mock("@saroh/database", () => {
                 createMany: jest.fn(),
                 findMany: jest.fn(),
             },
+            user: { findMany: jest.fn() },
             $transaction: jest.fn(),
         },
     };
@@ -34,6 +35,7 @@ const db = prisma as unknown as {
         createMany: jest.Mock;
         findMany: jest.Mock;
     };
+    user: { findMany: jest.Mock };
     $transaction: jest.Mock;
 };
 
@@ -129,6 +131,46 @@ describe("saving a draft against the revision it was read at (#285)", () => {
         });
     });
 
+    it("names who saved it since, by their last edit (C12)", async () => {
+        db.section.findMany.mockResolvedValueOnce([
+            { lastEditedByUserId: "user_2" },
+        ]);
+        db.user.findMany.mockResolvedValue([
+            { id: "user_2", name: "Ritika Sharma", email: "r@example.com" },
+        ]);
+        const error = await service
+            .replaceDraftSections(ctx, "site_1", "page_1", {
+                sections: [HERO],
+                revision: 1,
+            })
+            .catch((e: ConflictException) => e.getResponse());
+
+        expect(error).toMatchObject({ by: "Ritika Sharma", you: false });
+        expect(db.section.findMany.mock.calls[0][0].where).toEqual({
+            pageVersionId: "ver_1",
+            lastEditedByUserId: { not: null },
+        });
+    });
+
+    it("says it was you, in another tab, when your own save is newest (editor audit)", async () => {
+        db.section.findMany.mockResolvedValueOnce([
+            { lastEditedByUserId: "user_1" },
+        ]);
+        db.user.findMany.mockClear();
+        const error = await service
+            .replaceDraftSections(ctx, "site_1", "page_1", {
+                sections: [HERO],
+                revision: 1,
+            })
+            .catch((e: ConflictException) => e.getResponse());
+
+        expect(error).toMatchObject({ by: null, you: true });
+        expect((error as { message: string }).message).toContain(
+            "another tab or window",
+        );
+        expect(db.user.findMany).not.toHaveBeenCalled();
+    });
+
     it("trusts a caller that sends no revision at all", async () => {
         // A client that never read the draft cannot be overwriting an edit it
         // saw, and requiring the field would have broken every caller the day
@@ -222,7 +264,11 @@ describe("a section the save does not change is not re-validated", () => {
             sections: [HERO],
             revision: 3,
         });
-        // Only the read-back after the write, not a lookup before it.
-        expect(db.section.findMany).toHaveBeenCalledTimes(1);
+        // Only who changed what, read inside the write (U7), and the
+        // read-back after it: not a lookup before validating.
+        expect(db.section.findMany).toHaveBeenCalledTimes(2);
+        expect(db.section.findMany.mock.calls[0][0].select).toHaveProperty(
+            "lastEditedByUserId",
+        );
     });
 });

@@ -8,7 +8,7 @@ import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Tip } from "@saroh/ui/tooltip";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { runAction } from "@/lib/api/run-action";
@@ -21,12 +21,31 @@ import {
 } from "@/lib/sites/actions";
 import type { SiteCommentView } from "@/lib/sites/service";
 
+/** The API's bound on the words a note is pinned to (U17a). */
+export const QUOTE_MAX = 500;
+
+/**
+ * The words selected in the post's writing surface (`[data-writing-surface]`),
+ * one line, at most `QUOTE_MAX`; null for a selection anywhere else.
+ */
+export function selectedQuote(sel: Selection | null): string | null {
+    if (!sel || sel.isCollapsed) return null;
+    const node = sel.anchorNode;
+    const el = node instanceof Element ? node : node?.parentElement;
+    if (!el?.closest("[data-writing-surface]")) return null;
+    const text = sel.toString().replace(/\s+/g, " ").trim();
+    return text ? text.slice(0, QUOTE_MAX) : null;
+}
+
 /**
  * The post editor's Feedback panel (DEC-200 U8): what reviewers said about
  * this post, beside it. A Reviewer adds notes and edits or deletes their own
  * open ones (`editable`, decided by the api: R13's approval lock); the
  * owner settles and reopens them. Settled notes are history, behind a
  * toggle, as the site editor's block feedback keeps them.
+ *
+ * Words selected in the post pin the next note to them (`quote`, U17,
+ * `blogdesk/WXWReview`); a pinned note shows the words it is about.
  */
 export function PostFeedback({
     siteId,
@@ -55,6 +74,19 @@ export function PostFeedback({
     const [busy, setBusy] = useState<string | null>(null);
     const [editing, setEditing] = useState<{ id: string; body: string }>();
     const [showSettled, setShowSettled] = useState(false);
+    const [quote, setQuote] = useState<string | null>(null);
+
+    // Selecting words in the post pins the note being written to them;
+    // a click elsewhere (the note's own box) keeps the pin.
+    useEffect(() => {
+        if (!canComment) return;
+        const pick = () => {
+            const words = selectedQuote(document.getSelection());
+            if (words) setQuote(words);
+        };
+        document.addEventListener("selectionchange", pick);
+        return () => document.removeEventListener("selectionchange", pick);
+    }, [canComment]);
 
     const open = comments.filter((c) => c.resolvedAt === null);
     const settled = comments.filter((c) => c.resolvedAt !== null);
@@ -82,7 +114,12 @@ export function PostFeedback({
         const body = draft.trim();
         if (!body) return;
         const res = await runAction(
-            () => createComment(siteId, { postId, body }),
+            () =>
+                createComment(siteId, {
+                    postId,
+                    body,
+                    ...(quote ? { quote } : {}),
+                }),
             { setBusy: setSending },
         );
         if (!res) return;
@@ -91,6 +128,7 @@ export function PostFeedback({
             return;
         }
         setDraft("");
+        setQuote(null);
         showSuccess("Note added.");
         onChanged();
     }
@@ -118,6 +156,11 @@ export function PostFeedback({
                         {formatDate(c.createdAt, zone)}
                     </span>
                 </div>
+                {c.quote ? (
+                    <q className="block rounded-md bg-muted px-2 py-1.5 text-xs text-foreground/80 [quotes:none]">
+                        {c.quote}
+                    </q>
+                ) : null}
                 {isEditing ? (
                     <form
                         onKeyDown={submitOnModEnter}
@@ -292,6 +335,29 @@ export function PostFeedback({
                             onChange={(e) => setDraft(e.target.value)}
                         />
                     </Field>
+                    {quote ? (
+                        <div
+                            data-note-quote=""
+                            className="flex items-start gap-2 rounded-md bg-muted px-2 py-1.5 text-xs text-foreground/80"
+                        >
+                            <q className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                                {quote}
+                            </q>
+                            <Button
+                                type="button"
+                                variant="link"
+                                size="inline"
+                                className="text-xs"
+                                onClick={() => setQuote(null)}
+                            >
+                                Unpin
+                            </Button>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">
+                            Select words in the post to pin feedback to them.
+                        </p>
+                    )}
                     <div>
                         <Tip
                             label={

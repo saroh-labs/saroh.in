@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
@@ -130,19 +132,26 @@ function renderPanel(style: SiteStyle, opts: SiteStyleOptions = options) {
     return onChange;
 }
 
-/** Open the picker behind a colour row (DEC-184), by the row's name. */
+function el(selector: string): HTMLElement {
+    const found = host.querySelector<HTMLElement>(selector);
+    if (!found) throw new Error(`No ${selector}`);
+    return found;
+}
+
+/** Open "Edit each colour", then the picker behind a row (DEC-184). */
 function openRow(label: string) {
+    if (!host.querySelector("[data-colour-rows]")) {
+        click(el("[data-edit-colours]"));
+    }
     const row = host.querySelector<HTMLElement>(`[data-colour-row="${label}"]`);
     if (!row) throw new Error(`No row "${label}"`);
     act(() => row.click());
 }
 
-/** A radio in the open picker by its accessible name: its label, else its words. */
-function radio(name: string): HTMLElement {
+/** A radio by its accessible name, in the open picker or the panel. */
+function radio(name: string, scope = '[data-brand-picker][data-state="open"]') {
     const found = Array.from(
-        document.querySelectorAll<HTMLElement>(
-            '[data-brand-picker][data-state="open"] [role="radio"]',
-        ),
+        document.querySelectorAll<HTMLElement>(`${scope} [role="radio"]`),
     ).find(
         (el) =>
             el.getAttribute("aria-label") === name ||
@@ -151,6 +160,8 @@ function radio(name: string): HTMLElement {
     if (!found) throw new Error(`No radio "${name}"`);
     return found;
 }
+/** A colourway chip in the Colours group (U24b). */
+const chip = (name: string) => radio(name, '[data-brand-group="Colours"]');
 
 const group = (name: string) =>
     document.querySelector(`[role="radiogroup"][aria-label="${name}"]`);
@@ -162,31 +173,34 @@ function click(el: HTMLElement) {
 describe("StylePanel colourways", () => {
     it("offers the template's colourways by name, the current one chosen", () => {
         renderPanel(GREEN.style);
-        // The row says which is in force before anything opens.
-        expect(
-            host.querySelector('[data-colour-row="Colourway"]')?.textContent,
-        ).toContain("Green");
-        openRow("Colourway");
-        const green = radio("Green");
-        expect(group("Colourway")?.contains(green)).toBe(true);
+        const green = chip("Green");
+        expect(group("Colours")?.contains(green)).toBe(true);
         expect(green.getAttribute("aria-checked")).toBe("true");
-        expect(radio("Oxblood").getAttribute("aria-checked")).toBe("false");
+        expect(chip("Oxblood").getAttribute("aria-checked")).toBe("false");
+        expect(chip("Your own").getAttribute("aria-checked")).toBe("false");
         expect(host.textContent).toContain(
-            "The Green colourway uses your template's own colours.",
+            "The Green colours are your template's own.",
         );
     });
 
-    it("puts the style in a colourway, keeping the merchant's spacing", () => {
+    it("puts the style in a colourway, keeping any stored spacing", () => {
         const moved = {
             ...GREEN.style,
             scalars: { gridGap: 4, pageMargin: 20 },
         };
         const onChange = renderPanel(moved);
-        openRow("Colourway");
-        click(radio("Oxblood"));
+        click(chip("Oxblood"));
         const next = onChange.mock.calls[0][0] as SiteStyle;
         expect(next.palette?.accent).toBe("#4F2927");
         expect(next.scalars).toEqual({ gridGap: 4, pageMargin: 20 });
+    });
+
+    it("leaves the colourway for the rows' colours with Your own", () => {
+        const onChange = renderPanel(GREEN.style);
+        click(chip("Your own"));
+        const next = onChange.mock.calls[0][0] as SiteStyle;
+        expect(next).not.toHaveProperty("palette");
+        expect(next).not.toHaveProperty("type");
     });
 
     it("leaves the palette when a swatch is chosen", () => {
@@ -200,26 +214,121 @@ describe("StylePanel colourways", () => {
 
     it("shows no row swatch as chosen while a palette is on", () => {
         renderPanel(GREEN.style);
-        // The row names the template's colour, not a swatch it isn't.
+        openRow("Accent");
+        // The row names where the colour comes from, not a swatch it isn't.
         expect(
             host.querySelector('[data-colour-row="Accent"]')?.textContent,
-        ).toContain("Template's own");
-        openRow("Accent");
+        ).toContain("From your colours");
         expect(radio("Clay").getAttribute("aria-checked")).toBe("false");
-    });
-
-    it("shows a template's hairline gap truly on the slider", () => {
-        renderPanel(GREEN.style);
-        const slider = host.querySelector<HTMLInputElement>("#style-gridGap");
-        if (!slider) throw new Error("no slider");
-        expect(slider.min).toBe("1");
-        expect(slider.value).toBe("1");
     });
 
     it("offers no colourways for a site without a template", () => {
         renderPanel({ colours, scalars }, { ...options, colourways: [] });
-        expect(group("Colourway")).toBeNull();
-        expect(host.querySelector('[data-colour-row="Colourway"]')).toBeNull();
+        expect(group("Colours")).toBeNull();
+    });
+});
+
+describe("one Brand panel (U24b)", () => {
+    it("draws no slider anywhere, stored spacing or not", () => {
+        renderPanel(GREEN.style);
+        expect(host.querySelector('input[type="range"]')).toBeNull();
+        expect(host.textContent).not.toContain("Spacing and shape");
+    });
+
+    it("says where a change goes", () => {
+        renderPanel(GREEN.style);
+        expect(host.querySelector("[data-style-save-line]")?.textContent).toBe(
+            "Saved · goes live when you publish",
+        );
+    });
+
+    it("makes the colours from one brand colour, and saves it with them", () => {
+        const onChange = renderPanel(GREEN.style);
+        click(el("[data-brand-colour-open]"));
+        const input = document.querySelector<HTMLInputElement>(
+            "[data-brand-colour-input]",
+        );
+        if (!input) throw new Error("No brand colour field");
+        act(() => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )?.set?.call(input, "#E8A0B4");
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        expect(document.body.textContent).toContain(
+            "too light for white words or small text",
+        );
+        const use = Array.from(document.querySelectorAll("button")).find(
+            (b) => b.textContent === "Use these colours",
+        );
+        click(use as HTMLElement);
+        const next = onChange.mock.calls[0][0] as SiteStyle;
+        expect(next.brandColour).toBe("#E8A0B4");
+        expect(next.palette?.bg).toBeDefined();
+        // A colourway's type scale goes with the colourway.
+        expect(next).not.toHaveProperty("type");
+    });
+
+    it("counts the plan's part of Brand from the rules, never from words in the code", () => {
+        const paidPairs = new Set(["editorial"]);
+        const rules = {
+            isPaid: (kind: string, id: string) =>
+                kind === "fontPair" ? paidPairs.has(id) : kind === "look",
+            refuses: (kind: string, id: string) =>
+                kind === "fontPair" ? paidPairs.has(id) : kind === "look",
+        };
+        act(() =>
+            root.render(
+                <StylePanel
+                    style={GREEN.style}
+                    options={{
+                        ...options,
+                        fontPairs: [
+                            { key: "system", name: "System" },
+                            { key: "serif", name: "Serif" },
+                            { key: "editorial", name: "Editorial" },
+                        ],
+                    }}
+                    onChange={vi.fn()}
+                    onReset={vi.fn()}
+                    saving={false}
+                    rules={rules}
+                />,
+            ),
+        );
+        const fonts = host.querySelector('[data-plan-line="Fonts"]');
+        expect(fonts?.textContent).toContain("2 pairs. 1 more on paid plans");
+        expect(fonts?.textContent).toContain("2 of 3");
+        // Change the catalogue, and the card follows.
+        paidPairs.add("serif");
+        act(() =>
+            root.render(
+                <StylePanel
+                    style={GREEN.style}
+                    options={{
+                        ...options,
+                        fontPairs: [
+                            { key: "system", name: "System" },
+                            { key: "serif", name: "Serif" },
+                            { key: "editorial", name: "Editorial" },
+                        ],
+                    }}
+                    onChange={vi.fn()}
+                    onReset={vi.fn()}
+                    saving={false}
+                    rules={rules}
+                />,
+            ),
+        );
+        expect(
+            host.querySelector('[data-plan-line="Fonts"]')?.textContent,
+        ).toContain("1 of 3");
+    });
+
+    it("draws no plan card when the plan refuses nothing", () => {
+        renderPanel(GREEN.style);
+        expect(host.querySelector("[data-plan-summary]")).toBeNull();
     });
 });
 
@@ -245,8 +354,8 @@ describe("the preview's resolver", () => {
     });
 });
 
-describe("StylePanel on a phone", () => {
-    it("gives the Template row its own first tab, not a Look tab (board TPLEditorPhone)", () => {
+describe("StylePanel on a phone (WXBBrandPhone)", () => {
+    it("shows one group at a time, opening on Colours, the template in Look", () => {
         act(() =>
             root.render(
                 <StylePanel
@@ -263,8 +372,72 @@ describe("StylePanel on a phone", () => {
         const tabs = Array.from(
             host.querySelectorAll<HTMLElement>('[role="tab"]'),
         ).map((t) => t.textContent.trim());
-        // No look to offer: no Look tab, and the sheet opens on Template.
-        expect(tabs).toEqual(["Template", "Colour", "Spacing"]);
-        expect(host.querySelector("[data-row]")).not.toBeNull();
+        expect(tabs).toEqual(["Look", "Colours", "Buttons and shapes"]);
+        expect(
+            host.querySelector('[role="tab"][aria-selected="true"]')
+                ?.textContent,
+        ).toBe("Colours");
+        expect(host.textContent).toContain("Colours from my brand colour");
+        expect(host.querySelector("[data-style-save-line]")?.textContent).toBe(
+            "Saved · goes live when you publish",
+        );
+    });
+});
+
+describe("Buttons and shapes (DEC-237)", () => {
+    it("opens the list from its row on a desk and saves a pick", () => {
+        const onChange = renderPanel({ ...GREEN.style, look: "folio" });
+        const open = host.querySelector<HTMLElement>("[data-components-open]");
+        expect(open?.textContent).toContain("Folio’s defaults · on every plan");
+        act(() => open?.click());
+        const pick = document.querySelector<HTMLElement>(
+            '[data-brand-picker][data-state="open"] [data-component-row="cards"] [data-component-option="raised"]',
+        );
+        act(() => pick?.click());
+        const next = onChange.mock.calls[0][0] as SiteStyle;
+        expect(next.components).toEqual({ cards: "raised" });
+        expect(next.look).toBe("folio");
+    });
+
+    it("is a tab of its own in a phone's Brand sheet", () => {
+        act(() =>
+            root.render(
+                <StylePanel
+                    style={GREEN.style}
+                    options={options}
+                    onChange={vi.fn()}
+                    onReset={vi.fn()}
+                    saving={false}
+                    phoneTabs
+                />,
+            ),
+        );
+        const tab = Array.from(
+            host.querySelectorAll<HTMLElement>('[role="tab"]'),
+        ).find((t) => t.textContent === "Buttons and shapes");
+        expect(tab).toBeDefined();
+        act(() => {
+            tab?.dispatchEvent(
+                new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+            );
+            tab?.click();
+        });
+        expect(host.querySelector("[data-component-list]")).not.toBeNull();
+        expect(host.querySelector("[data-components-open]")).toBeNull();
+    });
+});
+
+describe("no sliders in Brand (U24b, RULES §3)", () => {
+    it("has no range input in any of its files", () => {
+        const dir = __dirname;
+        const sources = readdirSync(dir).filter(
+            (f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"),
+        );
+        expect(sources.length).toBeGreaterThan(5);
+        for (const file of sources) {
+            expect(readFileSync(join(dir, file), "utf8"), file).not.toMatch(
+                /type=["']range["']/,
+            );
+        }
     });
 });

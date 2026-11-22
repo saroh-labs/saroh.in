@@ -17,7 +17,7 @@ import { urls } from "../playwright.config";
  *   browser with JavaScript off) carries no live value: every live fact is
  *   "loading", with no time and no count, and "See times" is the way in.
  *   Two visitors get the same live regions.
- * - Fresh: "Next free", the time and a count of 5 or fewer.
+ * - Fresh: "Next open", the time and a count of 5 or fewer.
  * - Couldn't load: the page still renders, "See times" is in the first
  *   screen, there is no "0 places", and nothing shifted (CLS ≤ 0.1).
  * - Slow: the slot keeps its height while it waits; CLS ≤ 0.1.
@@ -186,7 +186,7 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
                     expect(html).not.toContain("data-live-count");
                     expect(html).not.toMatch(/places? left|Last place/);
                     expect(html).not.toMatch(/Checked \d/);
-                    expect(html).not.toMatch(/Next free: /);
+                    expect(html).not.toMatch(/Next open: /);
                 }
 
                 // A browser with JavaScript off sees "See times" and no time.
@@ -416,7 +416,7 @@ test.describe("live facts on cached pages", { tag: "@serial" }, () => {
                 );
                 const bar = page.locator('[data-site-chrome-bar="book"]');
                 await expect(bar).toBeVisible({ timeout: 10_000 });
-                await expect(bar).toContainText("Next free: today, 6:00 pm");
+                await expect(bar).toContainText("Next open: today, 6:00 pm");
                 // One fixed bar: nothing else holds the foot.
                 await expect(
                     page.locator("[data-site-chrome-bar]"),

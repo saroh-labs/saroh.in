@@ -119,7 +119,7 @@ const BAKERY_SCALARS = {
 export const BAKERY_FOOTER_LINE =
     "Your street and area — and the day you close";
 
-export const bakeryTemplate: TemplateManifest = {
+export const bakeryTemplateV1: TemplateManifest = {
     id: BAKERY_TEMPLATE_ID,
     version: 1,
     name: "Bakery",
@@ -285,4 +285,16 @@ export const BAKERY_GALLERY_SAMPLE = {
         ],
         sign: "— Priya, who mixes",
     },
+    /** v2's hero (board TB): the line and the pickup panel's words. */
+    lede: "A small bakery on Hill Road. We mill our own wheat, ferment overnight, and bake what we can sell in a day.",
+    pickup: {
+        orderBy: "Order by 8pm, collect tomorrow from 7am",
+        where: "Pick up at 14 Hill Road, Bandra West",
+    },
+    /** v2's `/order` band, point by point. */
+    order: [
+        "Order by 8pm and we bake it for the morning.",
+        "From 7am at 14 Hill Road. Give your name at the counter.",
+        "Sold out today means it can be pre-ordered for the next bake.",
+    ],
 } as const;

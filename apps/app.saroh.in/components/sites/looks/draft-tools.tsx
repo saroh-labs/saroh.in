@@ -24,7 +24,8 @@ import type { StarterContentActions } from "./starter-content-actions";
 import { useDraftVersions } from "./use-draft-versions";
 
 /**
- * Under the looks (DEC-182, amended 22 Oct 2026): "Bring in my details",
+ * Brand's Versions (U24b; DEC-182, amended 22 Oct 2026): one button at
+ * the panel's foot opening Previous versions, with "Bring in my details",
  * which fills a starter's sample words with the business's own at any
  * time, and Previous versions, the draft as it was before each starter
  * copy, fill, roll back or section brought in, to roll back to or bring a
@@ -53,38 +54,19 @@ export function DraftTools({
     }
 
     return (
-        <div className="space-y-1.5" data-draft-tools="">
-            <div className="flex flex-wrap gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={blocked}
-                    busy={filling}
-                    busyLabel="Bringing in…"
-                    data-fill-details=""
-                    onClick={() => void fill()}
-                >
-                    {FILL_DETAILS_LABEL}
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    data-draft-versions-open=""
-                    onClick={() => {
-                        setOpen(true);
-                        void versions.load();
-                    }}
-                >
-                    Previous versions
-                </Button>
-            </div>
-            {starter.blocked ? (
-                <p role="status" className="text-xs text-muted-foreground">
-                    {starter.blocked}
-                </p>
-            ) : null}
+        <div data-draft-tools="">
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-draft-versions-open=""
+                onClick={() => {
+                    setOpen(true);
+                    void versions.load();
+                }}
+            >
+                Versions
+            </Button>
             <Sheet open={open} onOpenChange={setOpen}>
                 <SheetContent
                     side={narrow ? "bottom" : "right"}
@@ -99,6 +81,28 @@ export function DraftTools({
                             Your draft before each change, kept for as long as
                             the site is. Nothing goes live until you publish.
                         </SheetDescription>
+                    </div>
+                    <div className="space-y-1.5 border-b px-4 py-3">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={blocked}
+                            busy={filling}
+                            busyLabel="Bringing in…"
+                            data-fill-details=""
+                            onClick={() => void fill()}
+                        >
+                            {FILL_DETAILS_LABEL}
+                        </Button>
+                        {starter.blocked ? (
+                            <p
+                                role="status"
+                                className="text-xs text-muted-foreground"
+                            >
+                                {starter.blocked}
+                            </p>
+                        ) : null}
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
                         <VersionList

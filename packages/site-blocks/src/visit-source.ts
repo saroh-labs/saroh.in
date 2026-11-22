@@ -25,6 +25,11 @@
  *   placed it. Paid is the visit's own fourth step, sent by the order's
  *   confirmation page after a successful online payment, with the group
  *   and label only, never the order or its amount.
+ * - **Started says which page it began on** (DEC-235): `started` alone
+ *   carries the path of the last site page the visit saw before the booking
+ *   page or the checkout (`sitePagePathOf`: no query, never a private page),
+ *   so a page's results can count it. The other steps carry no path. A visit
+ *   that landed on the booking page itself has no such page and sends none.
  * - **Each step is sent at most once per visit**: the visit began, it
  *   looked at a product or the booking page, it started a checkout, it
  *   paid. The page-view beacon starts the visit, so a browser that asks
@@ -41,6 +46,8 @@
  * site's layout and the checkout in this package, which import the same
  * file (`@saroh/site-blocks/visit-source`).
  */
+
+import { sitePagePathOf } from "@saroh/block-contract";
 
 /** The five groups. */
 export type VisitSource =
@@ -192,10 +199,19 @@ export function classifyVisit(input: {
 interface Visit extends VisitOrigin {
     lastSeen: number;
     sent: Set<VisitStep>;
+    /** The last site page seen other than the booking page, or null. */
+    page: string | null;
 }
 
-/** Sends one step; registered by the site's beacon on a live host only. */
-export type VisitSender = (step: VisitStep, origin: VisitOrigin) => void;
+/**
+ * Sends one step; registered by the site's beacon on a live host only.
+ * `path` is the page a start began on (DEC-235), null for every other step.
+ */
+export type VisitSender = (
+    step: VisitStep,
+    origin: VisitOrigin,
+    path: string | null,
+) => void;
 
 let visit: Visit | null = null;
 let sender: VisitSender | null = null;
@@ -227,18 +243,37 @@ export function seeVisitPage(
     const current = live(now);
     if (current) {
         current.lastSeen = now;
+        current.page = startPageOf(page.path) ?? current.page;
         return originOf(current);
     }
     const origin = classifyVisit(visit ? { ...page, referrer: "" } : page);
-    visit = { ...origin, lastSeen: now, sent: new Set() };
+    visit = {
+        ...origin,
+        lastSeen: now,
+        sent: new Set(),
+        page: startPageOf(page.path),
+    };
     sendOnce(visit, "visit");
     return origin;
+}
+
+/**
+ * A page a start may say it began on: a site page's path, never the
+ * booking page (the start happens there; the page before it is the one
+ * that sent the visitor).
+ */
+function startPageOf(path: string | undefined): string | null {
+    const kept = sitePagePathOf(path);
+    if (kept === null) return null;
+    return kept === BOOKING_PATH || kept.startsWith(`${BOOKING_PATH}/`)
+        ? null
+        : kept;
 }
 
 function sendOnce(v: Visit, step: VisitStep): boolean {
     if (v.sent.has(step) || !sender) return false;
     v.sent.add(step);
-    sender(step, originOf(v));
+    sender(step, originOf(v), step === "started" ? v.page : null);
     return true;
 }
 

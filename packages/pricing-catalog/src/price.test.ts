@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    chargedYearlyPaise,
     formatInr,
     formatMinor,
     gstPaise,
     monthlyEquivalentPaise,
     planPricePaise,
+    regularYearlyPaise,
     taxPaise,
     withGstPaise,
     withTaxPaise,
     yearlyPaise,
+    yearlySavePercent,
+    yearlySwitchLabel,
 } from "./price";
 
 // The rupee sign, built from its code point so no file but the seed spells it.
@@ -51,6 +55,50 @@ describe("catalogue money", () => {
                 "month",
             ),
         ).toBe(11_100);
+    });
+
+    it("charges a year at the plan's yearly offer when it has one (DEC-239)", () => {
+        const yearly = { yearly: { on: true, paid: 9 } };
+        const plain = { pricePaise: 11_100 };
+        const offered = { pricePaise: 11_100, yearlyOfferPaise: 77_700 };
+        expect(regularYearlyPaise(yearly, plain)).toBe(99_900);
+        expect(chargedYearlyPaise(yearly, plain)).toBe(99_900);
+        expect(regularYearlyPaise(yearly, offered)).toBe(99_900);
+        expect(chargedYearlyPaise(yearly, offered)).toBe(77_700);
+        expect(planPricePaise(yearly, offered, "year")).toBe(77_700);
+        expect(planPricePaise(yearly, offered, "month")).toBe(11_100);
+    });
+
+    it("says the best yearly saving, rounded down, only with an offer (DEC-239)", () => {
+        const c = (offerB?: number, offerC?: number) => ({
+            yearly: { on: true, paid: 10 },
+            plans: [
+                { id: "a", name: "A", pricePaise: 0, retired: false },
+                {
+                    id: "b",
+                    name: "B",
+                    pricePaise: 10_000,
+                    retired: false,
+                    yearlyOfferPaise: offerB,
+                },
+                {
+                    id: "c",
+                    name: "C",
+                    pricePaise: 30_000,
+                    retired: false,
+                    yearlyOfferPaise: offerC,
+                },
+            ],
+        });
+        expect(yearlySavePercent(c() as never)).toBeNull();
+        expect(yearlySwitchLabel(c() as never)).toBe("Yearly · 2 months free");
+        // B: 1 - 85,000 / 120,000 = 29.16…% → 29.
+        expect(yearlySavePercent(c(85_000) as never)).toBe(29);
+        // C saves more: 1 - 234,000 / 360,000 = 35% exactly.
+        expect(yearlySavePercent(c(85_000, 234_000) as never)).toBe(35);
+        expect(yearlySwitchLabel(c(85_000, 234_000) as never)).toBe(
+            "Yearly · save up to 35%",
+        );
     });
 
     it("formats rupees the Indian way, with paise only when there are some", () => {

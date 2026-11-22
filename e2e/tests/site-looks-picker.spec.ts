@@ -2,7 +2,12 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { brandTab, lookGallery, openFromPill } from "../fixtures/phone-editor";
+import {
+    brandTab,
+    lookGallery,
+    openDeskBrand,
+    openFromPill,
+} from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -29,18 +34,19 @@ interface SiteView {
     liveLook?: string | null;
 }
 
-/** Website › Style: the rail's Brand tab on a desk, its pill on a phone. */
-async function openBrand(page: Page, phone: boolean) {
+/**
+ * Website › Style: the rail's Brand tab on a desk, its pill on a phone,
+ * there on its Look tab unless `look` is false (no looks, no Look tab).
+ */
+async function openBrand(page: Page, phone: boolean, look = true) {
     if (phone) {
-        // The pill's Brand, in its sheet (DEC-185).
-        await openFromPill(page, "Brand");
+        // The pill's Brand, in its sheet (DEC-185): it opens on Colours
+        // (U24b), so the looks are its Look tab.
+        if (look) await brandTab(page, "Look");
+        else await openFromPill(page, "Brand");
         return;
     }
-    const brand = page.getByRole("tab", { name: "Brand" });
-    await expect(brand).toBeVisible({ timeout: 30_000 });
-    if ((await brand.getAttribute("aria-selected")) !== "true") {
-        await brand.click();
-    }
+    await openDeskBrand(page);
 }
 
 /** The look in force, as the Brand tab's Look card says it (DEC-184). */
@@ -108,9 +114,9 @@ test.describe("the Look row", { tag: "@serial" }, () => {
 
             // Quiet: drawn on the canvas at once, saved to the draft.
             await (await choice("quiet")).click();
-            // Every other control stays: beside the card on a desk, the
-            // gallery having closed; in the Type tab on a phone (DEC-185).
-            if (phone) await brandTab(page, "Type");
+            // Every other control stays: below the looks on a desk; in
+            // the Fonts tab on a phone (U24b).
+            if (phone) await brandTab(page, "Fonts");
             await expect(page.locator("[data-typeface-current]")).toBeVisible();
             if (phone) await brandTab(page, "Look");
             await expect(lookCard(page)).toHaveAttribute(
@@ -158,7 +164,7 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             );
             await expect(
                 page.getByText(
-                    "Not published yet. Your site is Quiet until you publish.",
+                    "Not live yet. Your site stays Quiet until you publish.",
                 ),
             ).toBeVisible();
             await expect.poll(() => canvasLook(page)).toBeNull();
@@ -219,12 +225,8 @@ test.describe("the Look row", { tag: "@serial" }, () => {
 
             await preview.getByRole("button", { name: "Close" }).last().click();
             await expect(preview).toHaveCount(0);
-            // Back where it was opened: Change on a desk, where the gallery
-            // made way for the dialog; the look's own Preview in a phone's
-            // Look tab (DEC-185).
-            await expect(
-                phone ? open : page.locator("[data-look-change]"),
-            ).toBeFocused();
+            // Back on the look's own Preview that opened it (U24b).
+            await expect(open).toBeFocused();
 
             // Nothing chosen and nothing saved: still Classic.
             await expect(lookCard(page)).toHaveAttribute(
@@ -252,10 +254,10 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             await useSession(page, "owner");
             await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
             await page.goto(`${urls.APP_URL}/sites/${look.siteId}`);
-            await openBrand(page, phone);
-            // A phone's sheet opens on its first tab, Template (DEC-216):
-            // the faces are the Type tab.
-            if (phone) await brandTab(page, "Type");
+            await openBrand(page, phone, false);
+            // A phone's sheet opens on Colours (U24b): the faces are the
+            // Fonts tab.
+            if (phone) await brandTab(page, "Fonts");
             await expect(page.locator("[data-typeface-current]")).toBeVisible();
             await expect(lookCard(page)).toHaveCount(0);
         } finally {

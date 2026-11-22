@@ -8,6 +8,8 @@ import { pausedOriginOf, pausedTestOrigin } from "@/lib/domain-paused";
 import { journalFeed } from "@/lib/journal-feed";
 import { modulePageStatesOf } from "@/lib/module-pages";
 import { dontCachePage } from "@/lib/page-cache/site-rules";
+import { withRelay } from "@/lib/relay-headers";
+import { safeRequestPath } from "@/lib/request-path";
 import type { SiteHostKind } from "@/lib/site-host-mode";
 import { classifySiteHost, normaliseSiteHost } from "@/lib/site-host-mode";
 import type { SiteIcon } from "@/lib/site-icon";
@@ -67,6 +69,14 @@ export interface PublicationPage {
      * before module pages (`lib/module-pages.ts`).
      */
     kind?: string;
+    /**
+     * The page's own Google title, Google text, share image and "Show on
+     * Google" off (KTD-7). Only those set travel; absent, the site's stand.
+     */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    shareImageUrl?: string | null;
+    noindex?: boolean;
 }
 
 /**
@@ -156,6 +166,11 @@ export interface PublicationSite {
 export interface PublicationSnapshot {
     site: PublicationSite;
     pages: PublicationPage[];
+    /**
+     * Old page links that forward to a page of this publication (KTD-3).
+     * Absent on a site with none, and on every snapshot before them.
+     */
+    redirects?: { from: string; to: string }[];
     publishedAt: string;
 }
 
@@ -358,6 +373,73 @@ export function findPageByPath(
     const wanted = normalizePath(requestPath);
     if (wanted === "/") return findHomePage(snapshot);
     return snapshot.pages.find((p) => normalizePath(p.path) === wanted) ?? null;
+}
+
+/**
+ * Where an old page link forwards (KTD-3), or null.
+ *
+ * A live page at the path always wins. The target is a path on this site:
+ * one that could leave it (`//evil.com`, a full URL) or points back at
+ * itself is ignored, and the visitor gets the 404 they would have.
+ */
+export function findRedirect(
+    snapshot: PublicationSnapshot,
+    requestPath: string,
+): string | null {
+    const wanted = normalizePath(requestPath);
+    if (wanted === "/" || findPageByPath(snapshot, wanted)) return null;
+    const redirects = Array.isArray(snapshot.redirects)
+        ? snapshot.redirects
+        : [];
+    const to = redirects.find(
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- a snapshot is stored JSON
+        (r) => typeof r?.from === "string" && normalizePath(r.from) === wanted,
+    )?.to;
+    if (typeof to !== "string" || safeRequestPath(to) !== to) return null;
+    return normalizePath(to) === wanted ? null : to;
+}
+
+/** `path` with the query a visitor asked with, so `?ref=ig` survives a forward. */
+export function withQuery(
+    path: string,
+    searchParams: Record<string, string | string[] | undefined>,
+): string {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(searchParams)) {
+        for (const one of [value].flat()) {
+            if (one !== undefined) query.append(key, one);
+        }
+    }
+    const search = query.toString();
+    return search ? `${path}?${search}` : path;
+}
+
+/**
+ * A page's head (KTD-7): its own Google title, text and share image, each
+ * else the site's; `title` is undefined when the page wrote none, so the
+ * caller keeps its own fallback. "Show on Google" off is a robots noindex.
+ */
+export function pageHead(page: PublicationPage, site: PublicationSite) {
+    // An empty string is "not written", the same as none.
+    const own = (text: string | null | undefined) =>
+        text?.trim() ? text.trim() : undefined;
+    const image = own(page.shareImageUrl);
+    return {
+        title: own(page.seoTitle),
+        description: own(page.seoDescription) ?? own(site.seoDescription),
+        images: image ? [image] : shareImages(site),
+        robots: page.noindex ? { index: false, follow: true } : undefined,
+    };
+}
+
+/** Whether a page set any head field of its own. */
+export function hasOwnHead(page: PublicationPage): boolean {
+    return (
+        page.noindex === true ||
+        [page.seoTitle, page.seoDescription, page.shareImageUrl].some((text) =>
+            Boolean(text?.trim()),
+        )
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -591,6 +673,12 @@ export interface PublishedPost {
     /** Sanitized at publish, like richText and the footer. */
     content: string;
     image?: string | null;
+    /** The cover's description (U17a); absent on posts published before. */
+    imageAlt?: string | null;
+    /** The post's own Google title, Google text and share image (U17a). */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    shareImageUrl?: string | null;
     featured?: boolean;
     category?: { name: string; slug: string } | null;
     author?: string | null;
@@ -629,7 +717,8 @@ export const readPublishedPosts = cache(async function readPublishedPosts(
     try {
         res = await fetch(`${API_URL}/public/sites/${siteId}/posts`, {
             cache: "no-store",
-            headers: { accept: "application/json" },
+            // The API limits each visitor (02 W6): name them, not this server.
+            headers: await withRelay({ accept: "application/json" }),
             signal: serverReadSignal(),
         });
     } catch {
@@ -710,7 +799,7 @@ export const getPublishedPost = cache(async function getPublishedPost(
             `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
             {
                 cache: "no-store",
-                headers: { accept: "application/json" },
+                headers: await withRelay({ accept: "application/json" }),
                 signal: serverReadSignal(),
             },
         );

@@ -3,7 +3,6 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind, stamp as ownStamp } from "../fixtures/own-data";
-import { openMore } from "../fixtures/phone-editor";
 import { pressUntil } from "../fixtures/press";
 import {
     approve,
@@ -12,10 +11,12 @@ import {
     expectNoWriteControl,
     noteBoxForFirstBlock,
     onPhone,
+    openPhoneMenu,
     openReviewedSite,
     openTestReleases,
 } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import {
     demoReviewer,
     demoUser,
@@ -133,16 +134,23 @@ test.describe("a reviewer", () => {
         // The editor itself (DEC-200), not the old reading screen.
         expect(new URL(page.url()).pathname).toBe(`/sites/${id}`);
         if (onPhone(page)) {
-            // The phone bar's Review, where Publish sits for an owner.
+            // The verdict where Publish sits for an owner: today's bar's
+            // Review, or with the Website area on the reader bar under a
+            // "Read only" line (`fix/WXNStates`).
             await expect(
-                page.getByRole("button", { name: "Review", exact: true }),
+                page
+                    .getByRole("button", { name: "Review", exact: true })
+                    .or(page.locator("[data-reader-bar]")),
             ).toBeVisible();
             await expect(
-                page.getByRole("button", { name: /^Feedback, / }),
+                page
+                    .getByRole("button", { name: /^Feedback, / })
+                    .or(page.locator("[data-read-only-line]")),
             ).toBeVisible();
         } else {
+            // "Read only" with the Website area on (`fix/WXMReviewer`).
             await expect(page.locator("[data-reviewing]")).toHaveText(
-                "Reviewing · you can’t change anything",
+                /^(Reviewing · you can’t change anything|Read only)$/,
             );
         }
 
@@ -287,8 +295,14 @@ test.describe("a reviewer", () => {
         );
         try {
             await page.goto(`${urls.APP_URL}/sites/${siteId}/posts/${post.id}`);
+            // "Read only" in the Website area's post editor (WXYStates).
             await expect(
-                page.getByText("Reviewing · you can't change anything"),
+                page
+                    .getByText("Reviewing · you can't change anything")
+                    .or(page.locator("[data-reviewing]"))
+                    .or(page.getByText("Read only", { exact: true }))
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible({ timeout: 30_000 });
             await expect(
                 page.getByRole("textbox", { name: "Post title" }),
@@ -301,7 +315,21 @@ test.describe("a reviewer", () => {
 
             // Feedback is open for a Reviewer; the note is on the post.
             const note = `The second paragraph repeats the first — ${ownStamp(testInfo)}`;
-            await page.getByLabel(`Add a note on ${title}`).fill(note);
+            const box = page.getByLabel(`Add a note on ${title}`);
+            if (onPhone(page) && !(await box.isVisible())) {
+                // The Website area's phone post editor: Feedback is a
+                // sheet, from ⋯ More's "This post" (`blogphone/WXYMore`).
+                const more = page.getByRole("dialog", { name: "This post" });
+                await pressUntil(
+                    page.getByRole("button", { name: /^More: preview/ }),
+                    more,
+                );
+                await pressUntil(
+                    more.getByRole("button", { name: /^Feedback/ }),
+                    box,
+                );
+            }
+            await box.fill(note);
             await page.getByRole("button", { name: "Add note" }).click();
             await expect(page.getByText(note)).toBeVisible({ timeout: 30_000 });
         } finally {
@@ -382,22 +410,34 @@ test.describe("a shared preview link", () => {
     }) => {
         await signIn(page, demoUser);
         await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
-        // Website opens on the business's one site (ADR-006), and the Pages
-        // tab's action opens it in the editor.
-        await page.goto(`${urls.APP_URL}/sites`);
-        await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-        await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
-            timeout: 30_000,
-        });
-        await page.getByRole("link", { name: "Open editor" }).click();
-        await page.waitForURL(/\/sites\/[^/]+$/, { timeout: 30_000 });
+        // Website opens on the business's one site (ADR-006), in the editor.
+        await openReviewedSite(page);
 
-        // Review lives in the inspector's Feedback tab since #340. On a
-        // phone the inspector is a sheet, opened on Feedback from ⋯ More
-        // (DEC-185).
-        if ((page.viewportSize()?.width ?? 1440) < 760) {
+        if (await websiteAreaOn(page)) {
+            // The Website area: More's Share a preview link opens the whole
+            // site's Feedback (UX-068), on a phone from the page menu (U49).
+            if (onPhone(page)) {
+                await (
+                    await openPhoneMenu(page)
+                )
+                    .getByRole("button", { name: "Share a preview link" })
+                    .click();
+            } else {
+                const item = page.getByRole("menuitem", {
+                    name: "Share a preview link",
+                });
+                await pressUntil(
+                    page.getByRole("button", { name: /^More: find/ }),
+                    item,
+                );
+                await item.click();
+            }
+        } else if (onPhone(page)) {
+            // Review lives in the inspector's Feedback tab since #340. On a
+            // phone the inspector is a sheet, opened on Feedback from ⋯ More
+            // (DEC-185).
             await (
-                await openMore(page)
+                await openPhoneMenu(page)
             )
                 .getByRole("button", { name: /^Feedback/ })
                 .click();
@@ -409,10 +449,13 @@ test.describe("a shared preview link", () => {
         }
         // With a block selected, Feedback opens on that block; preview links
         // are part of the whole site's review.
-        await page.getByRole("radio", { name: /^Whole site/ }).click();
-        await page
+        const whole = page.getByRole("radio", { name: /^Whole site/ });
+        const create = page
             .getByRole("button", { name: /^(Create link|New link)$/ })
-            .click();
+            .filter({ visible: true });
+        await expect(create.or(whole).first()).toBeVisible({ timeout: 30_000 });
+        if (await whole.isVisible()) await whole.click();
+        await create.click();
 
         // The address is shown ONCE, when the link is made — the server keeps
         // a hash, not the token — so it has to be read here or not at all.
@@ -460,7 +503,7 @@ test.describe("a shared preview link", () => {
  * and puts it back. The release is the test's own, stamped, and discarded
  * at the end.
  */
-test.describe("a reviewer and a test release", () => {
+test.describe("a reviewer and a test link", () => {
     test(
         "approves the release, and the editor's row reads Approved",
         { tag: "@serial" },
@@ -583,7 +626,7 @@ test.describe("a reviewer and a test release", () => {
                     .click();
                 await expect(
                     page.locator("[data-release-verdict]"),
-                ).toContainText("approved this test release.");
+                ).toContainText("approved this test link.");
                 // The draft's own review is as it was.
                 const after = await draftReview();
                 expect(after.latestApproval).toEqual(before.latestApproval);
@@ -596,26 +639,9 @@ test.describe("a reviewer and a test release", () => {
                 // The release still reads Approved, in the editor's panel.
                 await owner.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
                 await owner.goto(`${urls.APP_URL}/sites/${siteId}`);
-                // The editor redraws its top bar while it settles, so the
-                // menu is opened until the panel shows, as T11's spec does.
-                const releasesPanel = owner.getByRole("dialog", {
-                    name: "Test releases",
-                });
-                await expect(async () => {
-                    if (!(await releasesPanel.isVisible())) {
-                        await owner
-                            .getByRole("button", {
-                                name: "More test release actions",
-                            })
-                            .click({ timeout: 2_000 });
-                        await owner
-                            .getByRole("menuitem", { name: /^Test releases/ })
-                            .click({ timeout: 2_000 });
-                    }
-                    await expect(releasesPanel).toBeVisible({
-                        timeout: 2_000,
-                    });
-                }).toPass({ timeout: 30_000 });
+                // Opened until the panel shows: the editor redraws its top
+                // bar while it settles.
+                const releasesPanel = await openTestReleases(owner);
                 const row = releasesPanel.getByRole("listitem", { name });
                 await expect(row).toContainText(/Approved by /);
                 await expect(row).toContainText("Your draft has changed since");

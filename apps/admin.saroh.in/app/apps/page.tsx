@@ -3,7 +3,6 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { ArrowUpRight } from "lucide-react";
 import { headers } from "next/headers";
 
-import { AdminShell } from "@/components/admin-shell";
 import { requireStaff } from "@/lib/console";
 import { sarohApps, sarohAppUrl } from "@/lib/saroh-apps";
 
@@ -18,11 +17,10 @@ export const metadata = { title: "Saroh's apps" };
 export default async function AppsPage() {
     const gate = await requireStaff();
     if (!gate.ok) return gate.screen;
-    const { staff } = gate;
     const host = (await headers()).get("host");
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Saroh's apps"]}
@@ -53,6 +51,6 @@ export default async function AppsPage() {
                     ))}
                 </ul>
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

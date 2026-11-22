@@ -765,6 +765,8 @@ export function navGroupsWithSites(
      * is not offered a row that ends in a refusal.
      */
     actions: readonly string[] | null = null,
+    /** The Website area switch, as the api said (DEC-240). */
+    websiteArea = false,
 ): NavGroup[] {
     const actor = { role, actions };
     /*
@@ -778,8 +780,19 @@ export function navGroupsWithSites(
      * rail that lists it promises otherwise.
      */
     const mayAuthor = navCan(actor, "section:write");
-    const rowsFor = (siteId: string): NavChild[] =>
-        mayAuthor
+    // The Website area's Overview first while it is on (plan 2026-11-18-001).
+    const overview = (siteId: string): NavChild[] =>
+        websiteArea
+            ? [
+                  {
+                      href: `${WEBSITE_HREF}/${siteId}/overview`,
+                      label: "Overview",
+                  },
+              ]
+            : [];
+    const rowsFor = (siteId: string): NavChild[] => [
+        ...overview(siteId),
+        ...(mayAuthor
             ? [
                   // Pages lists them, the editor is where they are worked on
                   // — the route that has no rail of its own — Posts is its
@@ -797,7 +810,8 @@ export function navGroupsWithSites(
                   // A Reviewer reviews in the editor, read-only (DEC-200).
                   { href: `${WEBSITE_HREF}/${siteId}`, label: "Review" },
                   { href: `${WEBSITE_HREF}/${siteId}/posts`, label: "Posts" },
-              ];
+              ]),
+    ];
 
     return groups.map((group) => ({
         ...group,
@@ -1000,6 +1014,7 @@ export function navFor({
     storefronts,
     stockTracked,
     kind,
+    websiteArea,
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
@@ -1038,11 +1053,19 @@ export function navFor({
      * kind). Absent: every row, as for a business.
      */
     kind?: unknown;
+    /** The Website area switch (DEC-240): its sites' Overview row. */
+    websiteArea?: boolean;
 }): NavGroup[] {
     const tracked = filterNavGroupsByRole(
         filterNavGroups(
             sites
-                ? navGroupsWithSites(NAV_GROUPS, sites, role, actions)
+                ? navGroupsWithSites(
+                      NAV_GROUPS,
+                      sites,
+                      role,
+                      actions,
+                      websiteArea,
+                  )
                 : NAV_GROUPS,
             moduleKeys,
         ),

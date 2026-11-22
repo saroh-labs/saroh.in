@@ -246,14 +246,66 @@ export class PublicBookingsService {
         return publicDays(serviceId, now, undefined, ask);
     }
 
+    /**
+     * {@link publicDays} as a site asks for it: only a service of the site's
+     * own business (07 B-L2). Any other is a 404, like a service gone.
+     */
+    async siteServiceDays(
+        siteId: string,
+        serviceId: string,
+        now: Date = new Date(),
+        ask: PublicDaysAsk = {},
+    ): Promise<PublicDays> {
+        await this.siteOwnsService(siteId, serviceId);
+        return this.publicDays(serviceId, now, ask);
+    }
+
+    /** {@link publicAvailability} as a site asks for it: its own business's service only. */
+    async siteAvailability(
+        siteId: string,
+        serviceId: string,
+        fromISO: string,
+        toISO: string,
+        staffId?: string,
+    ): Promise<AvailableSlot[]> {
+        await this.siteOwnsService(siteId, serviceId);
+        return this.publicAvailability(serviceId, fromISO, toISO, staffId);
+    }
+
+    /** {@link publicServiceStaff} as a site asks for it: its own business's service only. */
+    async siteServiceStaff(
+        siteId: string,
+        serviceId: string,
+    ): Promise<PublicStaff[]> {
+        await this.siteOwnsService(siteId, serviceId);
+        return this.publicServiceStaff(serviceId);
+    }
+
+    /** 404 unless the service is the site's own business's (07 B-L2). */
+    private async siteOwnsService(
+        siteId: string,
+        serviceId: string,
+    ): Promise<void> {
+        const own = await prisma.service.findFirst({
+            where: {
+                id: serviceId,
+                organization: {
+                    sites: { some: { id: siteId, deletedAt: null } },
+                },
+            },
+            select: { id: true },
+        });
+        if (!own) throw new NotFoundException("Service not found");
+    }
+
     /** What a site's booking page opens with — see {@link publicBookingPage}. */
     publicBookingPage(siteId: string): Promise<PublicBookingPage> {
         return publicBookingPage(siteId);
     }
 
     /** The website's services list (#255) — see {@link publicServices}. */
-    publicServices(ids: string[]): Promise<PublicService[]> {
-        return publicServices(ids);
+    publicServices(siteId: string, ids: string[]): Promise<PublicService[]> {
+        return publicServices(siteId, ids);
     }
 
     /**

@@ -114,6 +114,7 @@ const WRITES: Record<string, () => Promise<unknown>> = {
     leaveLine: () => bookings.leaveLine("svc_1", AT),
     updateAccountDetails: () =>
         me.updateAccountDetails({ name: "Asha", phone: "" }),
+    updateAccountGstin: () => me.updateAccountGstin("29AAAAA0000A1ZY"),
     requestEmailChangeCode: () => me.requestEmailChangeCode("new@example.in"),
     confirmEmailChange: () => me.confirmEmailChange("new@example.in", "123456"),
     requestPhoneAddCode: () => me.requestPhoneAddCode("+91 98450 12345"),

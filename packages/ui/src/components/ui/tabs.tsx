@@ -2,10 +2,12 @@
 
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import Link from "next/link";
+
 import * as React from "react";
 import { cn } from "../../lib/utils";
 import type { CountTone } from "./count-badge";
 import { CountBadge } from "./count-badge";
+import { LinkPending } from "./link-pending";
 import { ScrollX } from "./scroll-x";
 
 /*
@@ -158,9 +160,10 @@ export function TabStrip<V extends string = string>({
                         href={t.href ?? "#"}
                         scroll={false}
                         aria-current={on ? "page" : undefined}
-                        className={cls}
+                        className={cn(cls, "relative")}
                     >
                         {body(t, on)}
+                        <LinkPending />
                     </Link>
                 ) : (
                     <button

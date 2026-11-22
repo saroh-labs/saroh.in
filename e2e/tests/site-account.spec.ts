@@ -221,4 +221,50 @@ test.describe("the account area (A5)", () => {
             page.getByRole("banner").getByRole("button", { name: "Sign in" }),
         ).toBeVisible();
     });
+
+    test("one account design (DEC-229): a side menu on a desk, the bar on a phone, and a new customer's Home is the welcome alone", async ({
+        page,
+    }) => {
+        const email = `u13-${Date.now()}@example.in`;
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.goto(`${SITE}/account`);
+        await page.getByRole("button", { name: "Sign in" }).first().click();
+        await signInOnSheet(page, email);
+        await expect(page).toHaveURL(/\/account$/);
+
+        // Nothing yet: only the welcome, with the ways to book or order.
+        const main = page.getByRole("main");
+        await expect(main.getByRole("heading", { level: 2 })).toHaveText([
+            "Nothing here yet",
+        ]);
+        await expect(
+            page.getByRole("group", { name: "Waiting on you" }),
+        ).toHaveCount(0);
+
+        // Desk: the one Account nav is a column beside the page.
+        const menu = page.getByRole("navigation", { name: "Account" });
+        await expect(menu.getByRole("link", { name: "Home" })).toHaveAttribute(
+            "aria-current",
+            "page",
+        );
+        await expect(
+            menu.getByRole("link", { name: "Back to the site" }),
+        ).toBeVisible();
+        const side = await menu.boundingBox();
+        const body = await main.boundingBox();
+        expect(side && body && side.x + side.width <= body.x).toBe(true);
+        await menu.getByRole("link", { name: "Your details" }).click();
+        await expect(page).toHaveURL(/\/account\/me$/);
+        await expect(
+            menu.getByRole("link", { name: "Your details" }),
+        ).toHaveAttribute("aria-current", "page");
+
+        // Phone: the same nav is the bar at the foot, no way back in it.
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(
+            menu.getByRole("link", { name: "Back to the site" }),
+        ).toBeHidden();
+        const bar = await menu.boundingBox();
+        expect(bar && bar.y + bar.height).toBeGreaterThan(800);
+    });
 });

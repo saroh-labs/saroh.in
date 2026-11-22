@@ -3,6 +3,11 @@ import { Toaster } from "@saroh/ui/sonner";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { headers } from "next/headers";
+
+import { AdminShell } from "@/components/admin-shell";
+import type { StaffIdentity } from "@/lib/control-plane";
+import { getStaffIdentity } from "@/lib/control-plane";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
 // build never fetches fonts from a network: Geist for all UI, body copy,
@@ -46,11 +51,23 @@ export const metadata: Metadata = {
     robots: { index: false, follow: false },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    // The console's frame (bar, search, rail) lives here, above every
+    // page, so moving between screens never blanks it (owner, 21 Nov;
+    // `frontend-data-and-state.md` → Loading inside a screen). A layout
+    // keeps its state across navigation; the pages under it only gate.
+    // Not staff, or the API unwell: no frame, and the page under it says
+    // why (`requireStaff`, `app/error.tsx`).
+    const staff = await getStaffIdentity().catch(
+        (): StaffIdentity | null => null,
+    );
+    // This request's script nonce (the middleware's CSP, `withPrivateApp`),
+    // for the theme's script.
+    const nonce = (await headers()).get("x-nonce") ?? undefined;
     return (
         // `suppressHydrationWarning`: next-themes writes the class on <html>
         // before React hydrates, which is the point of it.
@@ -69,8 +86,13 @@ export default function RootLayout({
                     defaultTheme="dark"
                     enableSystem={false}
                     disableTransitionOnChange
+                    nonce={nonce}
                 >
-                    {children}
+                    {staff ? (
+                        <AdminShell staff={staff}>{children}</AdminShell>
+                    ) : (
+                        children
+                    )}
                     {/* The one toaster (`@saroh/ui/toast`): a change's
                         confirmation and its Undo, as Releases says them. */}
                     <Toaster />

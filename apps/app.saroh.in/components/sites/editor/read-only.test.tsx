@@ -28,8 +28,18 @@ import type {
 } from "@/lib/sites/service";
 import type { SiteStyleOptions } from "@/lib/sites/style";
 import type { TestRelease } from "@/lib/sites/test-releases";
+import { showUndo } from "@saroh/ui/toast";
+
+import { EditorAskAiProvider } from "@/components/ask-ai/editor-ask-ai";
+import { typeInto } from "./phone/text-sheet";
 import { SiteEditor } from "./site-editor";
 import { useEditorDraft } from "./use-editor-draft";
+
+// The Website area's switch (KTD-E1): off unless a test turns it on.
+const area = vi.hoisted(() => ({ on: false }));
+vi.mock("@/components/sites/website-area", () => ({
+    useWebsiteArea: () => area.on,
+}));
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
@@ -130,6 +140,67 @@ vi.mock("@/lib/api/http", () => ({
     mutate: vi.fn(),
 }));
 vi.mock("@/lib/forms/actions", () => ({ ensureFormForSection: vi.fn() }));
+// Rail › History's reads (U46b); its Undo is a write, a spy that must
+// stay unpressed in every test here.
+const revertChange = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sites/change-revert-actions", () => ({ revertChange }));
+vi.mock("@/lib/sites/changes-read", () => ({
+    readSiteChanges: vi.fn(() =>
+        Promise.resolve({
+            siteId: "site",
+            livePublishedAt: "2026-11-14T12:00:00.000Z",
+            count: 1,
+            units: [
+                {
+                    key: "section:p-home:s1",
+                    kind: "section",
+                    change: "changed",
+                    label: "Changed · Top of the page",
+                    where: "Home",
+                    pageId: "p-home",
+                    fingerprint: "f",
+                    editedBy: null,
+                    editedAt: null,
+                    requires: [],
+                    approval: {
+                        state: "not-needed",
+                        voided: false,
+                        approvers: [],
+                    },
+                },
+            ],
+            groups: [
+                {
+                    userId: null,
+                    name: null,
+                    you: false,
+                    units: ["section:p-home:s1"],
+                },
+            ],
+            posts: [],
+            approvalRequired: false,
+        }),
+    ),
+}));
+vi.mock("@/lib/sites/history-read", () => ({
+    readVersions: vi.fn(() =>
+        Promise.resolve([
+            {
+                id: "pub-1",
+                publishedAt: "2026-11-14T12:00:00.000Z",
+                publishedByUserId: null,
+                publishedBy: "Sample Owner",
+                templateId: "t",
+                templateVersion: 1,
+                isCurrent: true,
+                bypass: null,
+                reviewRoute: null,
+            },
+        ]),
+    ),
+    readVersion: vi.fn(() => Promise.resolve(null)),
+    readChangesAgainst: vi.fn(() => Promise.resolve(null)),
+}));
 vi.mock("@/lib/services/actions", () => ({
     listServicesForPicker: vi.fn(() =>
         Promise.resolve({ ok: true, services: [] }),
@@ -275,9 +346,9 @@ const ALLOWED: RegExp[] = [
     /^Make the sheet (taller|shorter)$/,
     // Selecting a block, the header or the footer, in the list or on the page.
     /^(Header|Footer)(, on every page.*)?$/,
-    /^Hero block, \d+ of \d+(, selected)?$/,
+    /^Top of the page section, \d+ of \d+(, selected)?$/,
     /^(Welcome in|Our story)$/,
-    /^Hero(Welcome in|Our story)/,
+    /^Top of the page(Welcome in|Our story)/,
     /^(Header|Footer)On every page/,
     /open on this block\. Read the feedback$/,
     // Reading notes: go to one, show the settled ones.
@@ -300,8 +371,38 @@ const ALLOWED: RegExp[] = [
     /^Feedback, \d+ open notes?$/,
     /^(See the notes|Show all|Try again)$/,
     // Test releases: the list, and each one's own review page (a link).
-    /^Test releases( · )?\d*$/,
+    /^Test links( · )?\d*$/,
     /^Show (all \d+|fewer)$/,
+    // The new desk shell (U46): the rail, the Pages tree, More and its
+    // looking-only items.
+    /^Pages$/,
+    /^More: find \(Command K\)/,
+    // The canvas bar's width and zoom (owner, 21 Nov): looking is allowed.
+    /^(Zoom out|Zoom in|Zoom: (\d+%|Fit)\. Choose a zoom)$/,
+    /^(Home\/|About\/about)$/,
+    /^Our storyHidden$/,
+    /^(Desk|Tablet|Phone|Fit|\d+%)$/,
+    /^Page settings$/,
+    /^Test links\d*$/,
+    /^Theme: switch to (light|dark)$/,
+    // The new inspector (U47): its tabs, and the whole site's notes.
+    /^(Content|Style|Visibility)$/,
+    /^All notes on this site$/,
+    // The one phone editor (U49): the page picker, the Sections sheet's
+    // rows and pinned header and footer, and a reader's way to Brand.
+    /^Page: .+\. Choose another page or change its settings$/,
+    /^(Welcome in|Our story)(Top of the page|Hidden when published)$/,
+    /^Open the (header|footer)$/,
+    /^(Sections on this page|Done)$/,
+    // Preview at three sizes (U46f): which sizes, and scrolling together.
+    /^(All three|Desktop|Tablet|Phone|Scroll together)$/,
+    // Find (U46c): opening it, its box, and what a reader finds there:
+    // the page's sections, the header and footer, the other pages.
+    /^Find⌘K$/,
+    /^Find or do anything$/,
+    /^(Welcome in|Our story) section/,
+    /^(Header|Footer)On every page/,
+    /^About\/about/,
 ];
 
 /** The page's options in the page picker: switching page writes nothing. */
@@ -321,6 +422,7 @@ const CONTROLS = [
     "[role=switch]",
     "[role=slider]",
     "[role=menuitem]",
+    "[role=menuitemradio]",
     "[role=separator]",
     "[draggable=true]",
     "[contenteditable]",
@@ -351,12 +453,16 @@ function writeControls(): string[] {
     for (const frame of Array.from(document.querySelectorAll("iframe"))) {
         if (frame.contentDocument) docs.push(frame.contentDocument);
     }
-    return docs
-        .flatMap((d) => Array.from(d.querySelectorAll(CONTROLS)))
-        .filter(isEnabled)
-        .filter((el) => !isPageOption(el))
-        .map(nameOf)
-        .filter((name) => !ALLOWED.some((ok) => ok.test(name)));
+    return (
+        docs
+            .flatMap((d) => Array.from(d.querySelectorAll(CONTROLS)))
+            .filter(isEnabled)
+            .filter((el) => !isPageOption(el))
+            // A menu's divider is drawn, not pressed.
+            .filter((el) => !el.matches("[role=menu] [role=separator]"))
+            .map(nameOf)
+            .filter((name) => !ALLOWED.some((ok) => ok.test(name)))
+    );
 }
 
 let root: Root;
@@ -364,7 +470,11 @@ let host: HTMLDivElement;
 let site = 0;
 type Props = Parameters<typeof SiteEditor>[0];
 
-function render(overrides: Partial<Props> = {}) {
+function render(
+    overrides: Partial<Props> = {},
+    /** Ask AI's editor provider around it, as the editor layout mounts it. */
+    withAskAi = false,
+) {
     site += 1;
     const props: Props = {
         siteId: `site-${site}`,
@@ -400,7 +510,36 @@ function render(overrides: Partial<Props> = {}) {
         reloadDraft: vi.fn(),
         ...overrides,
     };
-    act(() => root.render(<SiteEditor {...props} />));
+    const editor = <SiteEditor {...props} />;
+    act(() =>
+        root.render(
+            withAskAi ? (
+                <EditorAskAiProvider
+                    state={{
+                        available: true,
+                        reason: null,
+                        upgradeTo: null,
+                        usage: {
+                            used: 1,
+                            limit: 100,
+                            resetsAt: "2026-12-14T00:00:00.000Z",
+                        },
+                        requestMore: true,
+                        ownerName: null,
+                        businessOn: true,
+                        canSwitch: false,
+                        language: "MATCH",
+                    }}
+                    businessName="Flour & Ferment"
+                    zone="Asia/Kolkata"
+                >
+                    {editor}
+                </EditorAskAiProvider>
+            ) : (
+                editor
+            ),
+        ),
+    );
     return props;
 }
 
@@ -482,6 +621,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+    area.on = false;
     // Long enough for any autosave (1.5s) to have fired, had it been armed.
     await act(async () => {
         vi.advanceTimersByTime(5000);
@@ -490,6 +630,7 @@ afterEach(async () => {
     for (const spy of [
         ...Object.values(writes),
         ...Object.values(releaseWrites),
+        revertChange,
     ]) {
         expect(spy).not.toHaveBeenCalled();
     }
@@ -514,7 +655,7 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
             "Add",
             "Publish",
             "Share",
-            "Test release",
+            "Test link",
             "Remove",
             "Move block up",
             "Move block down",
@@ -587,12 +728,12 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
         );
     });
 
-    it("test releases: each one's review, nothing to make, share or put live", () => {
+    it("test links: each one's review, nothing to make, share or put live", () => {
         render();
-        click(button("Test releases · 1"));
-        expectReadOnly("desk, test releases");
+        click(button("Test links · 1"));
+        expectReadOnly("desk, test links");
         for (const gone of [
-            "Make a test release",
+            "Make a test link",
             "Open",
             "Go live…",
             "Schedule…",
@@ -619,7 +760,7 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
         click(button("Blocks"));
         expectReadOnly("phone, Blocks sheet");
         expect($("[aria-label^='Move ']")).toBeNull();
-        click(button(/^HeroWelcome in/));
+        click(button(/^Top of the pageWelcome in/));
         expectReadOnly("phone, a block's sheet");
         click(button("Close the block panel"));
         // Brand is a tab in the Blocks sheet, not on the pill (U5).
@@ -702,7 +843,9 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         );
         // The composer names the block.
         expect(document.querySelector("label")?.textContent).toBeDefined();
-        expect(document.body.textContent).toContain("Add a note on Hero");
+        expect(document.body.textContent).toContain(
+            "Add a note on Top of the page",
+        );
     });
 
     it("a reader who may only read is offered no note box and no verdict", async () => {
@@ -710,7 +853,9 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         await flush();
         expect(has("Ask for changes")).toBe(false);
         expect(has("Approve")).toBe(false);
-        expect(document.body.textContent).not.toContain("Add a note on Hero");
+        expect(document.body.textContent).not.toContain(
+            "Add a note on Top of the page",
+        );
         // Reading stays: the tag and the Feedback tab are still there.
         expect($("[data-reviewing]")).not.toBeNull();
     });
@@ -727,7 +872,9 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         render({ reviewCan: { comment: true, approve: false } });
         await flush();
         expect(has("Approve")).toBe(false);
-        expect(document.body.textContent).toContain("Add a note on Hero");
+        expect(document.body.textContent).toContain(
+            "Add a note on Top of the page",
+        );
     });
 
     it("the request line, from the review state", () => {
@@ -872,7 +1019,9 @@ describe("a Reviewer on a phone (DEC-200, U5)", () => {
         click(onCanvas(0));
         expect(onCanvas(0).getAttribute("aria-pressed")).toBe("true");
         // The sheet names the block, on its Feedback (RVD1Phone).
-        expect(sheet("Hero")).toContain("Add a note on Hero");
+        expect(sheet("Top of the page")).toContain(
+            "Add a note on Top of the page",
+        );
         // Even after the Block tab was looked at.
         click(button("Block"));
         click(button("Close the block panel"));
@@ -886,7 +1035,7 @@ describe("a Reviewer on a phone (DEC-200, U5)", () => {
         expect(sheet("Blocks on Home")).not.toBeNull();
         const scrolled = vi.fn();
         Element.prototype.scrollTo = scrolled;
-        click(button(/^HeroWelcome in/));
+        click(button(/^Top of the pageWelcome in/));
         act(() => {
             vi.advanceTimersByTime(20);
         });
@@ -980,7 +1129,7 @@ describe("the same editor, editable (owner regression)", () => {
             "Add",
             "Publish",
             "In review",
-            "Test release",
+            "Test link",
             "Remove",
         ]) {
             expect(has(kept), kept).toBe(true);
@@ -1025,9 +1174,9 @@ describe("the top bar's status for a Reviewer (U6)", () => {
         expect(status()).not.toMatch(/look at|Not published ·|change/i);
     });
 
-    it("says Not published yet for a site never published", () => {
+    it("says Not live yet for a site never published", () => {
         render({ neverPublished: true, publishedAt: null });
-        expect(status()).toContain("Not published yet");
+        expect(status()).toContain("Not live yet");
     });
 
     it("leaves the owner's readout alone", () => {
@@ -1067,5 +1216,960 @@ describe("the draft hook in no-save mode", () => {
             await Promise.resolve();
         });
         // afterEach: saveDraftSections was never called.
+    });
+});
+
+/** The open menu's item with this name. */
+function menuItem(name: string): HTMLElement {
+    const hit = Array.from(
+        document.querySelectorAll<HTMLElement>(
+            "[role=menuitem],[role=menuitemradio]",
+        ),
+    ).find((el) => nameOf(el) === name);
+    if (!hit) throw new Error(`No menu item ${name}`);
+    return hit;
+}
+
+/** Open a Radix menu from its trigger, as a keyboard does. */
+function openMenu(trigger: HTMLElement) {
+    act(() => {
+        trigger.focus();
+        trigger.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+        );
+    });
+}
+const menuItems = () =>
+    Array.from(
+        document.querySelectorAll<HTMLElement>(
+            "[role=menuitem],[role=menuitemradio]",
+        ),
+    ).map((el) => nameOf(el));
+
+describe("the desk shell with the Website area on (U46)", () => {
+    beforeEach(() => {
+        area.on = true;
+        atWidth(1920);
+    });
+
+    it("a reader: Read only, Preview, More and the verdict; nothing that writes", () => {
+        render();
+        expectReadOnly("shell, reader, Pages tab");
+        expect($("[data-reviewing]")?.textContent).toBe("Read only");
+        for (const gone of [
+            "Undo",
+            "Ask AI",
+            "Publish",
+            "Add section",
+            "Add a page",
+            "Add",
+            "History",
+        ]) {
+            expect(has(gone), gone).toBe(false);
+        }
+        expect($("[data-status-chip]")).toBeNull();
+        expect($("[draggable=true]")).toBeNull();
+        // The rail is Pages · Brand · Feedback (fix/WXMReviewer).
+        const trail = $("[data-editor-trail]");
+        expect(
+            Array.from(trail?.querySelectorAll("button") ?? []).map(
+                (b) => b.firstChild?.nextSibling?.textContent,
+            ),
+        ).toEqual(["Pages", "Brand", "Feedback"]);
+        expect(has("Approve")).toBe(true);
+        expect(has("Ask for changes")).toBe(true);
+        expect(
+            $("[data-pages-tree]")?.textContent.includes(
+                "Nothing else changes.",
+            ),
+        ).toBe(true);
+    });
+
+    it("a reader's More and canvas bar: how the page is shown and test links, nothing that writes", () => {
+        render();
+        // Width and zoom are on the canvas bar; looking is allowed.
+        click(button("Tablet"));
+        click(button("Zoom out"));
+        expect(button(/^Zoom: 75%/)).toBeTruthy();
+        openMenu(button(/^More: find/));
+        const items = menuItems();
+        expect(items).toEqual(expect.arrayContaining(["Page settings"]));
+        for (const gone of [
+            "Redo",
+            "Share a test link",
+            "Ask a teammate to review",
+            "Withdraw the review request",
+            "Share a preview link",
+            "History",
+        ]) {
+            expect(items, gone).not.toContain(gone);
+        }
+        expectReadOnly("shell, reader, More open");
+    });
+
+    it("a reader's Find: only On this site, and no photo sheet (U46c, U46d)", () => {
+        render();
+        key("k", { metaKey: true });
+        const find = $("[data-editor-find]");
+        expect(find).not.toBeNull();
+        const headings = Array.from(
+            document.querySelectorAll("[cmdk-group-heading]"),
+        ).map((h) => h.textContent);
+        expect(headings).toEqual(["On this site"]);
+        expect(find?.textContent).toContain("Welcome in section");
+        expect(find?.textContent).not.toContain("Page settings");
+        expect(has(/^Replace, focus and describe/)).toBe(false);
+        expectReadOnly("shell, reader, Find open");
+    });
+
+    it("a reader who may not approve has no verdict", () => {
+        render({ reviewCan: { comment: true, approve: false } });
+        expect(has("Approve")).toBe(false);
+        expect(has("Ask for changes")).toBe(false);
+    });
+
+    it("Preview at three sizes: nothing that writes (U46f)", () => {
+        render();
+        click(button("Preview"));
+        expect($("[data-preview-frames]")).not.toBeNull();
+        expect(has("Share a test link")).toBe(false);
+        expectReadOnly("shell, reader, Preview at three sizes");
+    });
+
+    it("the rail's Brand and Feedback stay readable", () => {
+        render();
+        click(button("Brand"));
+        expectReadOnly("shell, reader, Brand");
+        click(button(/^Feedback\d*$/));
+        expect($("[data-left-panel=feedback]")).not.toBeNull();
+        expectReadOnly("shell, reader, Feedback");
+    });
+});
+
+describe("the desk shell for an owner (U46)", () => {
+    beforeEach(() => {
+        area.on = true;
+        atWidth(1920);
+    });
+    const owner: Partial<Props> = {
+        readOnly: false,
+        canUpdateSite: true,
+        canPublish: true,
+        askAi: true,
+        initialPendingChanges: 2,
+        initialPendingSiteChanges: [],
+    };
+
+    it("the bar is Website, page, Undo, Redo, the chip, Preview, More, Publish", () => {
+        render(owner);
+        const bar = $("[data-editor-bar]");
+        const names = Array.from(
+            bar?.querySelectorAll<HTMLElement>("a,button") ?? [],
+        ).map((el) => (el.matches("[data-status-chip]") ? "chip" : nameOf(el)));
+        expect(names).toEqual([
+            "Back to Website",
+            "Page: Home. Choose another page to edit",
+            "Undo",
+            "Redo",
+            "chip",
+            "Preview",
+            expect.stringMatching(/^More: find/),
+            "Publish",
+        ]);
+        expect($("[data-status-chip]")?.textContent).toBe(
+            "Live · 2 changes waiting",
+        );
+        // None of the old bar's controls sit on it any more.
+        for (const gone of ["Share", "In review", "Test link", "Zoom"]) {
+            expect(has(gone), gone).toBe(false);
+        }
+    });
+
+    it("everything that left the bar is in More, the canvas bar or beside Undo (00-universal §15)", () => {
+        render(owner);
+        const canvasBar = $("[data-canvas-bar]");
+        for (const name of ["Desk", "Tablet", "Phone", "Zoom out", "Zoom in"]) {
+            expect(
+                canvasBar?.querySelector(`[aria-label="${name}"]`),
+                name,
+            ).not.toBeNull();
+        }
+        expect(button("Redo")).toBeTruthy();
+        openMenu(button(/^More: find/));
+        expect(menuItems()).toEqual(
+            expect.arrayContaining([
+                "Page settings",
+                "Share a test link",
+                "Test links1",
+                // REVIEW is pending in this file's fixture.
+                "Withdraw the review request",
+                "Share a preview link",
+                "History",
+                "Feedback1",
+                expect.stringMatching(/^Theme: switch to/),
+            ]),
+        );
+    });
+
+    it("the canvas bar's width switch and zoom change the page shown", () => {
+        render(owner);
+        const on = () =>
+            $(
+                "[data-canvas-bar] [role=radio][aria-checked=true]",
+            )?.getAttribute("aria-label");
+        expect(on()).toBe("Desk");
+        click(button("Tablet"));
+        expect(on()).toBe("Tablet");
+        click(button("Zoom out"));
+        click(button("Zoom out"));
+        expect(button(/^Zoom: 50%/)).toBeTruthy();
+        expect(button("Zoom out").hasAttribute("disabled")).toBe(true);
+        openMenu(button(/^Zoom: 50%/));
+        click(menuItem("Fit"));
+        expect(button(/^Zoom: Fit/)).toBeTruthy();
+    });
+
+    it("More › Share a preview link opens the rail's Feedback", () => {
+        render(owner);
+        openMenu(button(/^More: find/));
+        click(menuItem("Share a preview link"));
+        expect($("[data-left-panel=feedback]")).not.toBeNull();
+    });
+
+    it("the rail is Pages · Add · Brand · History · Feedback, and the tree lists the page's sections", () => {
+        render(owner);
+        expect(
+            Array.from(
+                $("[data-editor-trail]")?.querySelectorAll("button") ?? [],
+            ).map((b) => b.firstChild?.nextSibling?.textContent),
+        ).toEqual(["Pages", "Add", "Brand", "History", "Feedback"]);
+        const tree = $("[data-pages-tree]");
+        expect(tree?.textContent).toContain("On every page");
+        expect(tree?.textContent).toContain("Welcome in");
+        expect(tree?.textContent).toContain("Our storyHidden");
+        expect(has("Add section")).toBe(true);
+        expect($("[draggable=true]")).not.toBeNull();
+        click(button("Add section"));
+        expect($("[data-left-panel=add]")).not.toBeNull();
+    });
+
+    it("Undo waits for something to undo; Redo puts it back", () => {
+        render(owner);
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(true);
+        // Delete the selected section from its canvas toolbar (U47).
+        click(button("Welcome in"));
+        click(button("Delete"));
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(false);
+        click(button("Undo"));
+        expect($("[data-pages-tree]")?.textContent).toContain("Welcome in");
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("a phone draws the one phone editor (U49), not the desk shell", () => {
+        atWidth(390);
+        render(owner);
+        expect($("[data-editor-trail]")).toBeNull();
+        expect($("[data-phone-bar]")).not.toBeNull();
+        expect($("[data-edit-pill]")).toBeNull();
+    });
+
+    it("Rail › History: the waiting change with Undo, the versions, and Versions kept (U46b)", async () => {
+        render(owner);
+        click(button("History"));
+        await act(async () => {
+            await Promise.resolve();
+        });
+        const panel = $("[data-history-panel]");
+        // No recorded editor: a neutral row, no made-up person (no avatar).
+        expect(panel?.textContent).toContain("Changed Top of the page");
+        expect(panel?.textContent).toContain("changed earlier");
+        expect(panel?.textContent).not.toContain("Earlier changes");
+        expect(has("Undo")).toBe(true);
+        expect(panel?.textContent).toContain("Live now");
+        expect(panel?.querySelector("a[href$='/versions']")?.textContent).toBe(
+            "See all versions",
+        );
+    });
+
+    it("Preview draws the page at three sizes; Back to editing keeps the selection (U46f)", () => {
+        render(owner);
+        click(button("Welcome in"));
+        click(button("Preview"));
+        expect(
+            Array.from(document.querySelectorAll("[data-preview-frame]")).map(
+                (f) => f.getAttribute("data-preview-frame"),
+            ),
+        ).toEqual(["desktop", "tablet", "phone"]);
+        expect(has("Share a test link")).toBe(true);
+        click(button("Back to editing"));
+        expect($("[data-preview-frames]")).toBeNull();
+        expect($("aside[aria-label=Inspector] h2")?.textContent).toBe(
+            "Welcome in",
+        );
+    });
+
+    it("off: today's chrome, unchanged", () => {
+        area.on = false;
+        render(owner);
+        expect($("[data-editor-trail]")).toBeNull();
+        expect(has("Test link")).toBe(true);
+        expect(has("In review")).toBe(true);
+        expect($("[data-status-chip]")).toBeNull();
+    });
+});
+
+describe("the inspector with the Website area on (U47)", () => {
+    beforeEach(() => {
+        area.on = true;
+        atWidth(1920);
+    });
+    const owner: Partial<Props> = {
+        readOnly: false,
+        canUpdateSite: true,
+        canPublish: true,
+        initialPendingChanges: 0,
+        initialPendingSiteChanges: [],
+    };
+    const inspector = () => $("aside[aria-label=Inspector]");
+    const tree = () => $("[data-pages-tree]")?.textContent ?? "";
+
+    it("a reader: the selected section's tabs read, nothing writes, no toolbar", () => {
+        render();
+        click(button("Welcome in"));
+        for (const tab of ["Content", "Style", "Visibility", /^Feedback/]) {
+            click(button(tab));
+            expectReadOnly(`shell, reader, ${String(tab)} tab`);
+        }
+        expect($("[data-section-toolbar]")).toBeNull();
+    });
+
+    it("nothing selected: the page, its settings card and its checks", () => {
+        render(owner);
+        // The first section opens selected; Close leaves the page at rest.
+        click(button("Close, nothing selected"));
+        expect(inspector()?.textContent).toContain("Page · Nothing selected");
+        expect($("[data-page-at-rest]")?.textContent).toContain(
+            "Who can see itPublic · anyone with the link",
+        );
+        expect($("[data-pre-publish-checks]")).not.toBeNull();
+        expect(inspector()?.textContent).toContain(
+            "Opens Page settings, the same one as Website › Pages.",
+        );
+    });
+
+    it("a section: its name, kind and place, Content first, and every old control", () => {
+        render(owner);
+        click(button("Welcome in"));
+        expect(inspector()?.querySelector("h2")?.textContent).toBe(
+            "Welcome in",
+        );
+        expect(inspector()?.textContent).toContain(
+            "Top of the page · section 1 of 2",
+        );
+        expect(button("Content").getAttribute("aria-selected")).toBe("true");
+        // The canvas toolbar holds what the old inspector's foot did.
+        for (const kept of ["Move", "Duplicate", "Hide on phone", "Delete"]) {
+            expect(has(kept), kept).toBe(true);
+        }
+        click(button("Visibility"));
+        expect(inspector()?.textContent).toContain("Hidden when published");
+    });
+
+    it("Style: spacing is one change from the look, and Reset takes it back", () => {
+        render(owner);
+        click(button("Welcome in"));
+        click(button("Style"));
+        expect($("[data-style-changes]")).toBeNull();
+        click(button("Airy"));
+        expect($("[data-style-changes]")?.textContent).toContain(
+            "1 change from the site look",
+        );
+        click(button(/^Reset to /));
+        expect($("[data-style-changes]")).toBeNull();
+    });
+
+    it("Duplicate puts a copy below, and Undo takes it away", () => {
+        render(owner);
+        click(button("Welcome in"));
+        click(button("Duplicate"));
+        expect(tree().match(/Welcome in/g)).toHaveLength(2);
+        expect(inspector()?.textContent).toContain(
+            "Top of the page · section 2 of 3",
+        );
+        click(button("Undo"));
+        expect(tree().match(/Welcome in/g)).toHaveLength(1);
+    });
+
+    it("Hide on phone marks the tree row, with Undo", () => {
+        render(owner);
+        click(button("Welcome in"));
+        click(button("Hide on phone"));
+        expect(tree()).toContain("Hidden on phone");
+        click(button("Undo"));
+        expect(tree()).not.toContain("Hidden on phone");
+    });
+
+    /** The selected section's words on the canvas, marked by site-blocks. */
+    const onPage = (field: string) =>
+        $(`[data-block-index] [data-edit-field=${field}]`);
+    const headingInput = () =>
+        Array.from(
+            inspector()?.querySelectorAll<HTMLInputElement>("input") ?? [],
+        ).find((i) => i.value.startsWith("Welcome"));
+
+    it("typing on the page is the inspector's field, and Esc puts it back (U47d)", () => {
+        render(owner);
+        // Not selected: the words are only drawn.
+        click(button("Close, nothing selected"));
+        expect(onPage("heading")).toBeNull();
+        click(button("Welcome in"));
+        const words = onPage("heading");
+        if (!words) throw new Error("No heading to type in");
+        expect(words.textContent).toBe("Welcome in");
+        act(() => words.focus());
+        act(() => {
+            words.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+            words.textContent = "Welcome back";
+            words.dispatchEvent(new InputEvent("input", { bubbles: true }));
+        });
+        // One draft field, two inputs.
+        expect(headingInput()?.value).toBe("Welcome back");
+        key("Escape");
+        expect(headingInput()?.value).toBe("Welcome in");
+        expect(words.textContent).toBe("Welcome in");
+    });
+
+    it("a reader cannot type on the page (U47d, DEC-200)", () => {
+        render();
+        click(button("Welcome in"));
+        expect(onPage("heading")).toBeNull();
+        expect($("[data-block-index] [contenteditable]")).toBeNull();
+        expectReadOnly("shell, reader, the selected section's words");
+    });
+
+    it("the header: on every page, with the banner over the canvas", () => {
+        render(owner);
+        click(button(/^Header/));
+        expect(inspector()?.textContent).toContain("On every page · 2 pages");
+        expect($("[data-everywhere-banner]")?.textContent).toContain(
+            "Changes here show on all 2 pages · Home and About",
+        );
+        click(button("Back to this page's sections"));
+        expect($("[data-everywhere-banner]")).toBeNull();
+    });
+});
+
+describe("the one phone editor (U49)", () => {
+    beforeEach(() => {
+        area.on = true;
+        atWidth(390);
+    });
+    const owner: Partial<Props> = {
+        readOnly: false,
+        canUpdateSite: true,
+        canPublish: true,
+        askAi: true,
+        initialPendingChanges: 2,
+        initialPendingSiteChanges: [],
+    };
+    const FAQ: Section = {
+        key: "s3",
+        type: "faq",
+        contractVersion: 1,
+        content: {
+            heading: "Questions",
+            intro: "Ask us anything",
+            items: [{ question: "Open Sundays?", answer: "Yes, till noon." }],
+        },
+    };
+    const names = (sel: string) =>
+        Array.from(
+            document.querySelectorAll<HTMLElement>(`${sel} a,${sel} button`),
+        ).map(nameOf);
+    const sectionSheet = () => $("[data-section-sheet]");
+    const tapSection = (index: number) => {
+        const block = $(`[data-block-index='${index}'] > button[aria-pressed]`);
+        if (!block) throw new Error(`No section ${index} on the canvas`);
+        click(block);
+    };
+    /** The toast's Undo (the phone has no Undo icon). */
+    const undoFromToast = () => {
+        const call = vi.mocked(showUndo).mock.calls.at(-1);
+        act(() => (call?.[1] as () => void)());
+    };
+
+    it("one top bar, one bar: Sections · Add · Brand · Publish with the chip's count", () => {
+        render(owner);
+        expect(names("[data-editor-bar]")).toEqual([
+            "Back to Website",
+            "Page: Home. Choose another page or change its settings",
+            "Ask AI",
+            "Preview",
+        ]);
+        expect(names("[data-phone-bar]")).toEqual([
+            "Sections",
+            "Add",
+            "Brand",
+            "Publish: 2 changes waiting",
+        ]);
+        expect($("[data-publish-count]")?.textContent).toBe("2");
+        // Only one phone editor (00-universal §15): no pill, no second bar.
+        expect($("[data-edit-pill]")).toBeNull();
+        expect(
+            document.querySelectorAll("nav[aria-label=Editor]"),
+        ).toHaveLength(1);
+        expect(has("Blocks")).toBe(false);
+    });
+
+    it("the first visit's hint goes for good with Got it", () => {
+        window.localStorage.removeItem("saroh.editor.phone-hint-seen");
+        render(owner);
+        expect($("[data-first-hint]")?.textContent).toContain(
+            "Tap any part of the page to change it. Shown once.",
+        );
+        click(button("Got it"));
+        expect($("[data-first-hint]")).toBeNull();
+        expect(
+            window.localStorage.getItem("saroh.editor.phone-hint-seen"),
+        ).toBe("1");
+    });
+
+    it("a tapped section opens its sheet: actions, the four tabs, Cancel and Save", () => {
+        render(owner);
+        tapSection(0);
+        const sheet = sectionSheet();
+        expect(sheet).not.toBeNull();
+        expect(document.body.textContent).toContain(
+            "Top of the page · section 1 of 2",
+        );
+        expect(
+            Array.from(
+                document.querySelectorAll(
+                    "[aria-label='Section actions'] button",
+                ),
+            ).map(nameOf),
+        ).toEqual(["Move", "Duplicate", "Hide here", "Delete", "Ask AI"]);
+        for (const tab of ["Content", "Style", "Visibility", /^Feedback/]) {
+            expect(has(tab), String(tab)).toBe(true);
+        }
+        // Before Save, never "Saved" (editor audit, 21 Nov).
+        expect($("[data-save-footer]")?.textContent).toContain(
+            "Goes live when you publish",
+        );
+        expect($("[data-save-footer]")?.textContent).not.toContain("Saved");
+        expect(has("Cancel")).toBe(true);
+        click(button("Visibility"));
+        expect(sheet?.textContent).toContain("Hidden when published");
+        click(button("Save"));
+        expect(sectionSheet()).toBeNull();
+        // The old phone's toolbar on a tapped block is gone.
+        expect(has(/^Move .* (up|down)$/)).toBe(false);
+    });
+
+    it("Duplicate and Hide here act at once with the toast's Undo", () => {
+        render(owner);
+        tapSection(0);
+        click(button("Duplicate"));
+        expect(document.body.textContent).toContain(
+            "Top of the page · section 2 of 3",
+        );
+        undoFromToast();
+        expect(document.body.textContent).toContain(
+            "Top of the page · section 1 of 2",
+        );
+        click(button("Hide here"));
+        expect(button("Show here").getAttribute("aria-pressed")).toBe("true");
+        undoFromToast();
+        expect(has("Hide here")).toBe(true);
+    });
+
+    it("Move opens Sections: pinned header and footer, Up and Down with Undo", () => {
+        render(owner);
+        tapSection(0);
+        click(button("Move"));
+        const list = () => $("[data-sections-sheet]");
+        expect(list()?.textContent).toContain(
+            "HeaderOn every page · stays at the top",
+        );
+        expect(list()?.textContent).toContain(
+            "FooterOn every page · stays at the bottom",
+        );
+        expect(
+            (button("Move Welcome in up") as HTMLButtonElement).disabled,
+        ).toBe(true);
+        click(button("Move Welcome in down"));
+        expect(list()?.textContent.indexOf("Our story")).toBeLessThan(
+            list()?.textContent.indexOf("Welcome in") ?? -1,
+        );
+        expect(vi.mocked(showUndo).mock.calls.at(-1)?.[0]).toBe(
+            "Top of the page moved down",
+        );
+        undoFromToast();
+        // Undo selects the section again, so its sheet is what shows.
+        expect(document.body.textContent).toContain(
+            "Top of the page · section 1 of 2",
+        );
+        click(button("Sections"));
+        expect(list()?.textContent.indexOf("Welcome in")).toBeLessThan(
+            list()?.textContent.indexOf("Our story") ?? -1,
+        );
+        expect(has("Add a section")).toBe(true);
+        click(button("Done"));
+        expect(list()).toBeNull();
+    });
+
+    it("a long text field opens full screen with its word count; Cancel on the section puts it back", () => {
+        render({ ...owner, initialSections: [...SECTIONS, FAQ] });
+        tapSection(2);
+        const intro = Array.from(
+            document.querySelectorAll<HTMLTextAreaElement>(
+                "[data-section-sheet] textarea",
+            ),
+        ).find((t) => t.value === "Ask us anything");
+        if (!intro) throw new Error("No Intro field");
+        act(() => intro.focus());
+        const big = document.getElementById(
+            "phone-text-sheet",
+        ) as HTMLTextAreaElement | null;
+        expect(big?.value).toBe("Ask us anything");
+        expect(document.body.textContent).toContain("Questions · Intro");
+        expect(document.body.textContent).toContain("3 words");
+        if (!big) return;
+        act(() => typeInto(big, "Ask us anything at all"));
+        expect(document.body.textContent).toContain("5 words");
+        const save = Array.from(
+            document.querySelectorAll<HTMLElement>(
+                "[data-editor-sheet=Intro] button",
+            ),
+        ).find((b) => b.textContent === "Save");
+        if (!save) throw new Error("No Save on the text sheet");
+        click(save);
+        expect(document.getElementById("phone-text-sheet")).toBeNull();
+        expect(intro.value).toBe("Ask us anything at all");
+        // Cancel: the section as it was when its sheet opened.
+        click(button("Cancel"));
+        tapSection(2);
+        expect(
+            Array.from(
+                document.querySelectorAll<HTMLTextAreaElement>(
+                    "[data-section-sheet] textarea",
+                ),
+            ).some((t) => t.value === "Ask us anything"),
+        ).toBe(true);
+    });
+
+    it("the page picker holds the pages and what the old bar's More held", () => {
+        render(owner);
+        click(button(/^Page: Home/));
+        for (const kept of [
+            /^Settings for Home/,
+            // REVIEW is pending: Withdraw stands where Ask would.
+            /^Withdraw the review request/,
+            /^Share a preview link/,
+            /^Make a test link/,
+            /^Preview/,
+            /^Feedback/,
+            /^(Light|Dark)/,
+        ]) {
+            expect(has(kept), String(kept)).toBe(true);
+        }
+    });
+
+    it("Add and Brand open their sheets; Publish opens the Publish sheet", () => {
+        render(owner);
+        click(button("Add"));
+        expect($("[data-editor-sheet=Add]")).not.toBeNull();
+        click(button("Close Add"));
+        click(button("Brand"));
+        expect($("[data-editor-sheet=Brand]")).not.toBeNull();
+        click(button("Close Brand"));
+        click(button("Publish: 2 changes waiting"));
+        expect(
+            button("Publish: 2 changes waiting").getAttribute("aria-current"),
+        ).toBe("true");
+    });
+
+    it("a reader: the verdict takes the bar's place, nothing writes", () => {
+        render();
+        expect($("[data-phone-bar]")).toBeNull();
+        expect($("[data-read-only-line]")?.textContent).toBe(
+            "Read only. You can leave notes.",
+        );
+        expect(has("Approve")).toBe(true);
+        expect(has("Ask for changes")).toBe(true);
+        expectReadOnly("phone editor, reader");
+        tapSection(0);
+        expectReadOnly("phone editor, reader, a section's sheet");
+        expect($("[aria-label='Section actions']")).toBeNull();
+        click(button("Close the section"));
+        click(button(/^Page: Home/));
+        expectReadOnly("phone editor, reader, page picker");
+        click(button("Sections on this page"));
+        expectReadOnly("phone editor, reader, Sections");
+        expect(has(/^Drag to move/)).toBe(false);
+        click(button("Done"));
+        click(button("Approve"));
+        expectReadOnly("phone editor, reader, review sheet");
+    });
+
+    it("a reader who may not approve has no verdict bar", () => {
+        render({ reviewCan: { comment: true, approve: false } });
+        expect($("[data-reader-bar]")).toBeNull();
+        expect(has("Approve")).toBe(false);
+    });
+
+    it("off: today's phone, pill and all", () => {
+        area.on = false;
+        render(owner);
+        expect($("[data-edit-pill]")).not.toBeNull();
+        expect($("[data-phone-bar]")).toBeNull();
+    });
+});
+
+/**
+ * The plan's "Capabilities kept" table (U51, 00-universal §15), row by row,
+ * for what the earlier units' cases don't already reach: every control
+ * the editor had stays reachable with the Website area on, desk and phone.
+ * The other rows are asserted above, each where its unit built it: the
+ * bar and More (U46), the rail and the tree, History, Preview (U46b/f),
+ * the inspector's tabs and toolbar (U47), the phone bar, its sheets and
+ * the page picker sheet (U49).
+ */
+describe("the capability table, row by row (U51)", () => {
+    const owner: Partial<Props> = {
+        readOnly: false,
+        canUpdateSite: true,
+        canPublish: true,
+        askAi: true,
+        initialPendingChanges: 2,
+        initialPendingSiteChanges: [],
+        siteIcon: {
+            siteId: "site",
+            siteName: "Flour & Ferment",
+            saved: { own: null, businessLogoUrl: null },
+        },
+    };
+    beforeEach(() => {
+        area.on = true;
+    });
+    const sheetTitled = (title: string) =>
+        Array.from(document.querySelectorAll("[role=dialog] h2")).some(
+            (h) => h.textContent === title,
+        );
+
+    describe("desk (1920)", () => {
+        beforeEach(() => atWidth(1920));
+
+        it("the page picker: switch page, Page settings, Add a page", () => {
+            render(owner);
+            click(button("Page: Home. Choose another page to edit"));
+            expect(has(/^Settings for Home/)).toBe(true);
+            expect(has("Add a page")).toBe(true);
+            expect(has(/About/)).toBe(true);
+        });
+
+        it("the Pages tree's Add a page opens Add's own sheet (U46e)", () => {
+            render(owner);
+            const add = Array.from(
+                document.querySelectorAll<HTMLElement>(
+                    "[data-pages-tree] button",
+                ),
+            ).find((b) => nameOf(b) === "Add a page");
+            if (!add) throw new Error("No Add a page in the tree");
+            click(add);
+            expect(sheetTitled("Add a page")).toBe(true);
+        });
+
+        it("Rail › Add › Add a page opens the same sheet", () => {
+            render(owner);
+            click(button("Add"));
+            click(button("Blank page"));
+            expect(sheetTitled("Add a page")).toBe(true);
+        });
+
+        it("Brand: Logo and tab icon in the panel, the aside where the inspector is", () => {
+            render(owner);
+            click(button("Brand"));
+            expect($("[data-brand-panel]")?.textContent).toContain(
+                "Logo and tab icon",
+            );
+            // `BrandAside` once, in the inspector's place (U24b).
+            expect(
+                document.querySelectorAll("[data-brand-aside]"),
+            ).toHaveLength(1);
+            expect(
+                $("[data-inspector-frame] [data-brand-aside]"),
+            ).not.toBeNull();
+        });
+
+        it("the right column is Edit · Ask AI; every Ask AI entry opens its tab (owner, 21 Nov)", () => {
+            render(owner, true);
+            const tab = () =>
+                $("[data-right-column]")?.getAttribute("data-right-column");
+            const about = () =>
+                $("#right-ask")?.textContent.match(/About: [^L]*/)?.[0];
+            const tabEl = (id: string) => {
+                const el = $(id);
+                if (!el) throw new Error(`No ${id}`);
+                return el;
+            };
+            const editTab = () => tabEl("#right-column-edit");
+            const askTab = () => tabEl("#right-column-ask");
+            expect(editTab().textContent).toBe("Edit");
+            expect(askTab().textContent).toBe("Ask AI");
+            expect(tab()).toBe("edit");
+            // No Ask AI on the top bar at the desk any more.
+            expect($("[data-editor-bar]")?.textContent.includes("Ask AI")).toBe(
+                false,
+            );
+            // The tab with nothing chosen: the page.
+            const close = document.querySelector<HTMLElement>(
+                "[aria-label='Close, nothing selected']",
+            );
+            if (close) click(close);
+            click(askTab());
+            expect(tab()).toBe("ask");
+            expect($("#right-ask")?.textContent).toContain(
+                "Looking at your Home page in the editor.",
+            );
+            // ⌘J goes back and forth.
+            key("j", { metaKey: true });
+            expect(tab()).toBe("edit");
+            key("j", { metaKey: true });
+            expect(tab()).toBe("ask");
+            // Choosing a section keeps Ask AI open, about that section.
+            const block = $("[data-block-index='0'] > button[aria-pressed]");
+            if (!block) throw new Error("No section 0 on the canvas");
+            click(block);
+            expect(tab()).toBe("ask");
+            expect(about()).toContain("Home · Top of the page");
+            // Edit goes back; the section toolbar's Ask AI comes again.
+            click(editTab());
+            expect(tab()).toBe("edit");
+            const toolbar = $("[aria-label$=' actions']");
+            const ask = Array.from(
+                toolbar?.querySelectorAll<HTMLElement>("button") ?? [],
+            ).find((b) => nameOf(b) === "Ask AI");
+            if (!ask) throw new Error("No Ask AI on the section toolbar");
+            click(ask);
+            expect(tab()).toBe("ask");
+            expect(about()).toContain("Home · Top of the page");
+        });
+
+        it("a reader has no Ask AI tab", () => {
+            render({}, true);
+            expect($("[data-right-column]")).toBeNull();
+            expect(has("Ask AI")).toBe(false);
+        });
+
+        it("the dividers still resize both panels", () => {
+            render(owner);
+            for (const label of [
+                "Resize the block list",
+                "Resize the inspector",
+            ]) {
+                expect(
+                    document.querySelector(`[aria-label="${label}"]`),
+                    label,
+                ).not.toBeNull();
+            }
+        });
+
+        it("the chip's number is Overview's: the API's change units (KTD-E3)", () => {
+            render({ ...owner, initialPendingUnits: 3 });
+            expect($("[data-status-chip]")?.textContent).toBe(
+                "Live · 3 changes waiting",
+            );
+        });
+    });
+
+    describe("phone (390)", () => {
+        beforeEach(() => atWidth(390));
+
+        it("Add sheet › A page opens Add a page", () => {
+            render(owner);
+            click(button("Add"));
+            click(button("Blank page"));
+            expect(sheetTitled("Add a page")).toBe(true);
+        });
+
+        it("Brand sheet: Logo and tab icon is a group", () => {
+            render(owner);
+            click(button("Brand"));
+            expect(has("Logo")).toBe(true);
+        });
+
+        it("the Publish badge is the chip's number (KTD-E3)", () => {
+            render({ ...owner, initialPendingUnits: 3 });
+            expect($("[data-publish-count]")?.textContent).toBe("3");
+        });
+    });
+});
+
+/**
+ * The frame stays from page to page (`?page=`): the editor gets the next
+ * page's props without being remounted, and every capability above holds
+ * on the page it lands on, for a reader and an owner alike.
+ */
+describe("from page to page, the same editor (the frame stays)", () => {
+    const about = [
+        {
+            key: "a1",
+            type: "hero",
+            contractVersion: 1,
+            // A heading the read-only allow-list already knows.
+            content: { heading: "Our story" },
+        },
+    ] as Props["initialSections"];
+    // The next page's props, as the server hands them after `?page=`.
+    const openAbout = (props: Props) =>
+        act(() =>
+            root.render(
+                <SiteEditor
+                    {...props}
+                    pageId="p-about"
+                    initialSections={about}
+                />,
+            ),
+        );
+
+    it("a reader stays read-only on the next page, and it counts as read", () => {
+        const props = render();
+        const crumbs = $("nav[aria-label=Breadcrumb]");
+        openAbout(props);
+        expect($("nav[aria-label=Breadcrumb]")).toBe(crumbs);
+        expect(has("Welcome in")).toBe(false);
+        expect(has("Our story")).toBe(true);
+        expectReadOnly("desk, after another page opened");
+        expect(actions.recordPageView).toHaveBeenLastCalledWith(
+            props.siteId,
+            "p-about",
+        );
+    });
+
+    it("an owner's desk shell keeps its rail tab and every write control; Undo starts empty", () => {
+        area.on = true;
+        atWidth(1920);
+        const props = render({
+            readOnly: false,
+            canUpdateSite: true,
+            canPublish: true,
+        });
+        const trail = $("[data-editor-trail]");
+        click(button("Welcome in"));
+        click(button("Delete"));
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(false);
+        click(button("History"));
+        openAbout(props);
+        // The same rail, still on History.
+        expect($("[data-editor-trail]")).toBe(trail);
+        expect($("[data-left-panel=history]")).not.toBeNull();
+        // About's Undo history is About's: nothing yet.
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(true);
+        expect(writeControls().length).toBeGreaterThan(0);
+        expect(has("Publish")).toBe(true);
+        click(button("Pages"));
+        expect($("[data-pages-tree]")?.textContent).toContain("Our story");
+        expect($("[data-pages-tree]")?.textContent).not.toContain("Welcome in");
     });
 });

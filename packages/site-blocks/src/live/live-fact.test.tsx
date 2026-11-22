@@ -472,7 +472,7 @@ describe("the hero's Next free", () => {
             />,
         );
         const box = theFact();
-        expect(box.textContent).toContain("Next free");
+        expect(box.textContent).toContain("Next open");
         expect(box.textContent).toContain("Hatha yoga");
         expect(box.textContent).toContain("tomorrow, 7:00 am");
         expect(box.textContent).toContain("3 places left");
@@ -646,7 +646,7 @@ describe("the Book bar's Next free", () => {
     it("says the next free time while it can", () => {
         render(<BarNextFree read={fresh()} />);
         expect(
-            screen.getByText("Next free: tomorrow, 7:00 am"),
+            screen.getByText("Next open: tomorrow, 7:00 am"),
         ).toBeInTheDocument();
     });
 

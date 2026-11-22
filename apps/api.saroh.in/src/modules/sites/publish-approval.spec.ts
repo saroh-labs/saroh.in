@@ -3,7 +3,7 @@
 jest.mock("@saroh/database", () => ({ prisma: {} }));
 
 import { planMeter } from "../billing/metering.service";
-import { approvalApplies } from "./publish-approval";
+import { approvalApplies, changesAwaitApproval } from "./publish-approval";
 
 describe("approvalApplies (DEC-103)", () => {
     afterEach(() => jest.restoreAllMocks());
@@ -23,5 +23,15 @@ describe("approvalApplies (DEC-103)", () => {
         const included = jest.spyOn(planMeter, "isIncluded");
         await expect(approvalApplies("org_1", false)).resolves.toBe(false);
         expect(included).not.toHaveBeenCalled();
+    });
+});
+
+describe("changesAwaitApproval (DEC-226, U9)", () => {
+    it("is the APPROVAL_REQUIRED 409 the app reads, naming the changes", () => {
+        const e = changesAwaitApproval(["site:footer"]);
+        expect(e.getStatus()).toBe(409);
+        expect(e.getResponse()).toMatchObject({
+            details: { code: "APPROVAL_REQUIRED", units: ["site:footer"] },
+        });
     });
 });

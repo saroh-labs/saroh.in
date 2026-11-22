@@ -548,3 +548,103 @@ describe("previous versions of the draft (DEC-182, 22 Oct)", () => {
         ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });
+
+describe("who changed the draft (KTD-4, R2 21 Nov 2026)", () => {
+    async function teammate(
+        organizationId: string,
+    ): Promise<OrganizationContext> {
+        const user = await prisma.user.create({
+            data: { email: `${uniq("ritika")}@example.com`, name: "Ritika" },
+        });
+        await prisma.membership.create({
+            data: { organizationId, userId: user.id, role: "MEMBER" },
+        });
+        return {
+            organizationId,
+            userId: user.id,
+            role: "MEMBER",
+            actions: new Set(["site:read", "site:update", "section:write"]),
+        };
+    }
+    const stampsOf = async (pageId: string) =>
+        (
+            await prisma.pageVersion.findFirstOrThrow({
+                where: { pageId, status: "DRAFT" },
+                orderBy: { createdAt: "desc" },
+                select: {
+                    sections: {
+                        orderBy: { order: "asc" },
+                        select: { key: true, lastEditedByUserId: true },
+                    },
+                },
+            })
+        ).sections;
+    const editorsOf = async (siteId: string) =>
+        ((
+            await prisma.site.findUniqueOrThrow({
+                where: { id: siteId },
+                select: { draftEditors: true },
+            })
+        ).draftEditors ?? {}) as Record<string, { userId: string }>;
+
+    it("stamps the starter copy, Bring in my details, Undo and a roll back with whoever ran each", async () => {
+        const { owner, siteId, homeId } = await business("pro");
+        const ritika = await teammate(owner.organizationId);
+
+        const copied = await asOrg(ritika, () =>
+            copyStarterContent(ritika, siteId, "live"),
+        );
+        expect(
+            (await stampsOf(homeId)).map((s) => s.lastEditedByUserId),
+        ).not.toContain(null);
+        expect(
+            new Set((await stampsOf(homeId)).map((s) => s.lastEditedByUserId)),
+        ).toEqual(new Set([ritika.userId]));
+        let editors = await editorsOf(siteId);
+        expect(editors["site:style"]?.userId).toBe(ritika.userId);
+        expect(editors[`section:${homeId}:own-/`]?.userId).toBe(ritika.userId);
+        const made = await prisma.page.findMany({
+            where: { siteId, title: { in: copied.created } },
+            select: { settingsEditedByUserId: true },
+        });
+        for (const p of made)
+            expect(p.settingsEditedByUserId).toBe(ritika.userId);
+
+        // The owner brings in the details: what changed is the owner's.
+        await staff(owner.organizationId);
+        const filled = await asOrg(owner, () => fillDetails(owner, siteId));
+        expect(
+            (await stampsOf(homeId)).map((s) => s.lastEditedByUserId),
+        ).toContain(owner.userId);
+
+        // Ritika undoes it: the words she put back are hers again, and a
+        // style nobody changed keeps its stamp.
+        await asOrg(ritika, () =>
+            undoStarterContent(ritika, siteId, filled.snapshotId ?? ""),
+        );
+        expect(
+            (await stampsOf(homeId)).map((s) => s.lastEditedByUserId),
+        ).not.toContain(owner.userId);
+        expect((await editorsOf(siteId))["site:style"]?.userId).toBe(
+            ritika.userId,
+        );
+
+        // The owner rolls back to before the copy: the page, the removed
+        // sections and the style are the owner's.
+        await asOrg(owner, () =>
+            rollbackDraft(owner, siteId, copied.snapshotId),
+        );
+        expect(
+            (await stampsOf(homeId)).map((s) => s.lastEditedByUserId),
+        ).toEqual([owner.userId]);
+        editors = await editorsOf(siteId);
+        expect(editors["site:style"]?.userId).toBe(owner.userId);
+        const removed = Object.entries(editors).filter(
+            ([k, v]) =>
+                k.startsWith(`section:${homeId}:`) &&
+                !k.endsWith(":own-/") &&
+                v.userId === owner.userId,
+        );
+        expect(removed.length).toBeGreaterThan(0);
+    });
+});

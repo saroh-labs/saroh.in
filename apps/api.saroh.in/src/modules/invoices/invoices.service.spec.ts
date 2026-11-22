@@ -197,6 +197,7 @@ beforeEach(() => {
         firstName: "Asha",
         lastName: "Rao",
         email: "asha@example.com",
+        organization: { edition: "INDIA" },
     });
     db.invoice.updateMany!.mockResolvedValue({ count: 1 });
     // Row locks find nothing unless a test says so.

@@ -445,6 +445,15 @@ the Privacy Policy states both.
   that starts before the 400-day cutoff (`pastRetention`), since what is
   left of it would shrink its rollup. It logs counts only. A business
   on legal hold keeps its events until the hold is lifted (DEC-122).
+  The same run prunes blog posts' revisions
+  (`content/post-revision-retention.ts`, 21 Nov 2026): each post keeps its
+  newest 200 autosave, Ask AI and restore revisions and every `sent`,
+  `approved` and `published` one, at most 500 posts a run, counted and
+  caught on its own; a held business keeps them all.
+- **`analytics.aggregate`** reads a day in pages of 5,000 events, and keeps
+  a `path` breakdown only for a path that is one of the event's site's
+  pages (21 Nov 2026), so the rows a day writes are bounded by the pages,
+  not by what visitors send.
 
 ## Custom-domain re-check — **Current** (#860)
 
@@ -920,6 +929,22 @@ the Privacy Policy states both.
   whatever they chose.
 - A queued job still runs with `SITE_TEST_RELEASES` off (KTD-16): it is a
   go-live the merchant was told would happen.
+
+## Scheduled post — **Current** (editor redesign U17a)
+
+- **`post.go_live`** is Publish post › Later (`content/post-go-live.handler.ts`).
+  Scheduling writes `Post.scheduledAt`, `scheduledByUserId` and one PENDING
+  job (`runAt` = the instant, payload `{ postId, at }`) on one transaction
+  (`content/post-schedule.ts`); moving it drops the waiting job first.
+- **The post's row is the lock** (`FOR UPDATE` in `publishPostInTx`, taken
+  after the plan meter's advisory lock). A run whose `scheduledAt` no longer
+  equals its `at` (moved, cancelled, published or taken off by hand) does
+  nothing, so two runs for one instant publish once.
+- It publishes the draft as it is then, as the person who scheduled it.
+  A clear no-go (they left, can't write sections, the plan paused the post
+  or has no room) clears the schedule and writes a `not_published`
+  revision with the reason, and never retries; the last failed attempt
+  records the same. Nobody is alerted yet (History shows it).
 
 ## Site page cache — **Current** (#863)
 

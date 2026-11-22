@@ -1,5 +1,7 @@
+import { contentSecurityPolicy } from "@saroh/auth/security-headers";
 import { describe, expect, it } from "vitest";
 
+import cspSources from "../csp-sources.cjs";
 import nextConfig from "../next.config.mjs";
 
 /** What every page gets (pentest, 29 Oct 2026), one directive's sources by name. */
@@ -11,7 +13,9 @@ async function pagePolicies() {
             .flatMap((rule) => rule.headers)
             .map((h) => [h.key.toLowerCase(), h.value]),
     );
-    const csp = sent.get("content-security-policy-report-only") ?? "";
+    // Enforced per request by the middleware with a nonce (DEC-244), built
+    // from the same sources the middleware uses.
+    const csp = contentSecurityPolicy({ ...cspSources, nonce: "test" });
     const sources = (name: string) =>
         csp
             .split("; ")

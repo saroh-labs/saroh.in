@@ -144,9 +144,9 @@
   the merchant's Section padding, two plain sections in a row sit half a
   padding apart); a focus outline in the ground's own text colour for any
   link or button without a designed ring; the accent as the selection
-  colour; and a section's entrance on scroll (`animation-timeline: view()`
-  behind `@supports`, screens and no-preference only, never on a scoped
-  theme). Base rules are `:where(<scope>) h2`, so **a block's utility class
+  colour. No section waits for a scroll to appear (U8, 18 Nov 2026: the
+  scroll-linked entrance left sections at opacity 0 in captures and
+  print). Base rules are `:where(<scope>) h2`, so **a block's utility class
   always wins**; a new base rule is written the same way. The scope is the
   marks `data-site-section`, `data-site-header`, `data-site-footer` and
   `data-site-page`; a block that paints its own full-width ground (hero,
@@ -553,7 +553,7 @@
       words in it included, a quiet "Clear filters" ends the row
       (`onClear`).
     - **At most ONE chip: `AttentionToggle`.** An on/off filter for what
-      needs the merchant now ("Needs you 4", "Needs attention") may sit
+      needs the merchant now ("Needs you 4", "Needs attention", Website › Pages' "Needs fixing") may sit
       in the row after the dropdowns, its count in the attention tone
       while it is above zero. It is a one-press shortcut: one per list,
       never on a row of its own. A filter that mixes two ideas splits:

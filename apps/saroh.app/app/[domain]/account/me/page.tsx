@@ -30,6 +30,7 @@ import {
     requestPhoneAddCode,
     saveEmailChoice,
     updateAccountDetails,
+    updateAccountGstin,
 } from "./actions";
 
 /**
@@ -76,6 +77,7 @@ export default async function MePage() {
             }
             api={{
                 updateDetails: updateAccountDetails,
+                saveGstin: updateAccountGstin,
                 emailChange: {
                     requestCode: requestEmailChangeCode,
                     verifyCode: confirmEmailChange,

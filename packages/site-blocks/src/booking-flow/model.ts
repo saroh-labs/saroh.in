@@ -149,7 +149,7 @@ export interface BookingDay {
     starts: BookingStart[];
 }
 
-/** One service's two weeks: `GET /public/services/:id/days`. */
+/** One service's two weeks: `GET /public/sites/:siteId/services/:id/days`. */
 export interface BookingDays {
     timezone: string;
     kind: "one" | "class";

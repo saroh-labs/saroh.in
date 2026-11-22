@@ -35,6 +35,7 @@ const RichTextEditor = dynamic(
 );
 
 import { OptionSwitch } from "@/components/sites/section-fields/option-switch";
+import { PhoneTextField } from "@/components/sites/section-fields/phone-text-field";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
 import type { RichTextContent } from "@/lib/sites/service";
 import { TextPhotoFields } from "./text-photo";
@@ -59,7 +60,7 @@ export function RichTextFields({
         onChange({ ...section, content: { ...c, ...next } });
     return (
         <div className="grid gap-3">
-            <Field label="Format">
+            <Field label="Written as">
                 <Select
                     value={c.format}
                     onValueChange={(v) =>
@@ -72,8 +73,8 @@ export function RichTextFields({
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="html">HTML</SelectItem>
-                        <SelectItem value="markdown">Markdown</SelectItem>
+                        <SelectItem value="html">Formatted text</SelectItem>
+                        <SelectItem value="markdown">Plain text</SelectItem>
                     </SelectContent>
                 </Select>
             </Field>
@@ -93,6 +94,34 @@ export function RichTextFields({
                     />
                 )}
             </Field>
+            <PhoneTextField
+                label="Content"
+                value={c.phoneBody}
+                fallback=""
+                searchHint
+                onChange={(phoneBody) => patch({ phoneBody })}
+            >
+                <Field
+                    label="Content, on phone"
+                    hint="Empty: phone shows the content above."
+                >
+                    {c.format === "html" ? (
+                        <RichTextEditor
+                            value={c.phoneBody ?? ""}
+                            onChange={(phoneBody) => patch({ phoneBody })}
+                            placeholder="A shorter version for a phone…"
+                        />
+                    ) : (
+                        <Textarea
+                            value={c.phoneBody ?? ""}
+                            onChange={(e) =>
+                                patch({ phoneBody: e.target.value })
+                            }
+                            rows={4}
+                        />
+                    )}
+                </Field>
+            </PhoneTextField>
             <TextPhotoFields
                 value={{ image: c.image, imageSide: c.imageSide }}
                 brief={c.imageBrief}

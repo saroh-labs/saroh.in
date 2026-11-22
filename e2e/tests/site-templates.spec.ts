@@ -121,13 +121,13 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
         if (id === undefined) throw new Error(`no site id in ${page.url()}`);
         await expect(
             page
-                .getByRole("button", { name: /^Projects block, 2 of 3/ })
+                .getByRole("button", { name: /^Projects section, 2 of 3/ })
                 .filter({ visible: true })
                 .first(),
         ).toBeVisible({ timeout: 30_000 });
         await expect(
             page
-                .getByRole("button", { name: /^Enquiry form block, 3 of 3/ })
+                .getByRole("button", { name: /^Enquiry form section, 3 of 3/ })
                 .filter({ visible: true })
                 .first(),
         ).toBeVisible();

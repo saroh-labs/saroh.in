@@ -8,6 +8,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SiteEditorProps } from "@/components/sites/editor/site-editor-props";
 
 vi.mock("@/lib/session", () => ({ requireSession: () => Promise.resolve() }));
+vi.mock("@/lib/organizations/settings-service", () => ({
+    readSiteContact: () => Promise.resolve(null),
+}));
 const notFound = vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
 });

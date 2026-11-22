@@ -2,13 +2,19 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { lookGallery, openFromPill, typefaces } from "../fixtures/phone-editor";
+import {
+    lookGallery,
+    openDeskBrand,
+    openFromPill,
+    typefaces,
+} from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import {
     grantNorthwindThemes,
     overrideNorthwindFlag,
     setNorthwindLook,
 } from "../fixtures/site-look";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
@@ -24,7 +30,9 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  *   is saved, and the API refuses the same save;
  * - a typeface the catalogue doesn't make free is refused the same way;
  * - with `themes` granted to Northwind (a module override, as staff give
- *   it on its admin page, ended after), Quiet is taken and saved.
+ *   it on its admin page, ended after), Quiet is unmarked, taken and saved;
+ * - component styles (DEC-237) are free on every plan: Cards → Flat saves
+ *   on a plan without `themes`, with no refusal.
  *
  * Which styles are free is the live catalogue's (`freeStyles`), and
  * whether the plan opens the rest is Northwind's plan: the spec reads both
@@ -36,7 +44,11 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  */
 
 interface SiteView {
-    style: { look?: string; fontPair?: string };
+    style: {
+        look?: string;
+        fontPair?: string;
+        components?: Record<string, string>;
+    };
     styleOptions: { fontPairs?: { key: string; name: string }[] };
     styleAccess?: {
         free: { looks: string[]; fontPairs: string[] };
@@ -50,11 +62,7 @@ async function openBrand(page: Page, phone: boolean) {
         await openFromPill(page, "Brand");
         return;
     }
-    const brand = page.getByRole("tab", { name: "Brand" });
-    await expect(brand).toBeVisible({ timeout: 30_000 });
-    if ((await brand.getAttribute("aria-selected")) !== "true") {
-        await brand.click();
-    }
+    await openDeskBrand(page);
 }
 
 /** Northwind's editor on its site, Brand open, on the page's own clock. */
@@ -68,7 +76,7 @@ async function openEditor(page: Page, siteId: string, phone: boolean) {
     await openBrand(page, phone);
 }
 
-/** The looks' gallery behind the Look card's Change (DEC-184). */
+/** The look cards in Brand (U24b). */
 async function gallery(page: Page) {
     const looks = await lookGallery(
         page,
@@ -133,23 +141,16 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             const classic = looks.locator('[data-look-choice="classic"]');
             const quiet = looks.locator('[data-look-choice="quiet"]');
             await expect(classic).toHaveAttribute("aria-checked", "true");
-            // One "Paid plans" mark for the group, in the gallery's foot.
-            await expect(classic).not.toContainText("Paid plans");
-            await expect(looks).toContainText(/Paid plans.*Quiet/);
+            // Each paid card says so under its name (U24b).
+            await expect(classic).not.toContainText("paid plans");
+            await expect(quiet).toContainText("paid plans");
 
             await quiet.click();
-            // Refused: the gallery stays open, Classic chosen, the line in
-            // its foot.
+            // Refused in place: Classic stays chosen, one line under the
+            // cards says why.
             await expect(quiet).toHaveAttribute("aria-checked", "false");
             await expect(classic).toHaveAttribute("aria-checked", "true");
             const line = page.locator("[data-paid-refusal]");
-            await expect(line).toHaveCount(1);
-            await expect(looks.locator("[data-paid-refusal]")).toContainText(
-                "Quiet comes with a paid plan",
-            );
-            // Closed, the same line sits under the Look card.
-            await page.keyboard.press("Escape");
-            await expect(looks).toHaveCount(0);
             await expect(line).toHaveCount(1);
             await expect(line).toContainText("Quiet comes with a paid plan");
             await expect(lookCard(page)).toHaveAttribute(
@@ -250,12 +251,17 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             await openEditor(page, look.siteId, phone);
             const looks = await gallery(page);
             const quiet = looks.locator('[data-look-choice="quiet"]');
-            // Still marked: a paid look is marked on every plan.
-            await expect(looks).toContainText(/Paid plans.*Quiet/);
+            // Not marked: "Paid plans" is said only where the plan leaves a
+            // style off (the 21 Nov editor audit, 057a986f3).
+            await expect(looks).toContainText("Quiet");
+            await expect(looks).not.toContainText(/paid plans/i);
             await quiet.click();
             // Taken: the card says Quiet. A desk's gallery closes; a phone's
-            // Look tab is the gallery, and stays (DEC-185).
-            if (!phone) await expect(looks).toHaveCount(0);
+            // Look tab is the gallery, and stays (DEC-185), as the Website
+            // area's desk cards in Brand do (U24b).
+            if (!phone && !(await websiteAreaOn(page))) {
+                await expect(looks).toHaveCount(0);
+            }
             await expect(lookCard(page)).toHaveAttribute(
                 "data-look-current",
                 "quiet",
@@ -275,6 +281,56 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
                 .toBe("quiet");
         } finally {
             await themes.restore();
+            await enforced.restore();
+            await look.restore();
+        }
+    });
+
+    test("saves a component style on any plan (DEC-237)", async ({
+        browser,
+        page,
+    }, testInfo) => {
+        test.setTimeout(150_000);
+        const phone = testInfo.project.name.startsWith("phone");
+        const look = await setNorthwindLook(browser, null, testInfo);
+        const enforced = await overrideNorthwindFlag(
+            browser,
+            "PLAN_ENFORCEMENT",
+            testInfo,
+        );
+        try {
+            await openEditor(page, look.siteId, phone);
+            if (phone) {
+                // "Buttons and shapes" with the Website area (U24b).
+                await page
+                    .getByRole("tab", {
+                        name: /^(Components|Buttons and shapes)$/,
+                    })
+                    .click();
+            } else {
+                await page.locator("[data-components-open]").click();
+            }
+            const cards = page.locator('[data-component-row="cards"]');
+            await expect(cards).toContainText("Cards");
+            await cards.locator('[data-component-option="flat"]').click();
+            await expect(
+                cards.locator('[data-component-option="flat"]'),
+            ).toHaveAttribute("aria-checked", "true");
+            await expect(cards).toContainText("Changed from Classic");
+            await expect(page.locator("[data-paid-refusal]")).toHaveCount(0);
+            await page.clock.runFor(1_000);
+            await expect
+                .poll(
+                    async () =>
+                        (
+                            await look.owner.get<SiteView>(
+                                `/sites/${look.siteId}`,
+                            )
+                        ).style.components,
+                    { timeout: 15_000 },
+                )
+                .toEqual({ cards: "flat" });
+        } finally {
             await enforced.restore();
             await look.restore();
         }

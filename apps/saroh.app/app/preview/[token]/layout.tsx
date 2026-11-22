@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
@@ -116,8 +117,6 @@ export default async function PreviewLayout({
                 name={snapshot.site.name}
                 // The header's menu again at the foot, as the live site
                 // lists it, every link kept inside the preview.
-                navigation={navigation}
-                modules={modules}
                 basePath={base}
             />
             {/* A preview has no main action, so no Book bar: this keeps the
@@ -125,7 +124,10 @@ export default async function PreviewLayout({
             {look ? (
                 <StickyActions look={look} action={null} basePath={base} />
             ) : null}
-            <KeepLinksInside base={base} />
+            <KeepLinksInside
+                base={base}
+                nonce={(await headers()).get("x-nonce") ?? undefined}
+            />
         </div>
     );
 }
@@ -169,10 +171,12 @@ function PreviewBar({
     );
 }
 
-/** The click handler in `lib/preview-links.ts` (UX-069), given the base. */
-function KeepLinksInside({ base }: { base: string }) {
+/** The click handler in `lib/preview-links.ts` (UX-069), given the base and the page's nonce. */
+function KeepLinksInside({ base, nonce }: { base: string; nonce?: string }) {
     return (
         <script
+            // This request's nonce (`lib/csp.ts`), or the policy blocks it.
+            nonce={nonce}
             data-preview-base={base}
             dangerouslySetInnerHTML={{ __html: KEEP_LINKS_INSIDE }}
         />

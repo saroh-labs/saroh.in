@@ -659,7 +659,10 @@ export async function onlineBookingsPaused(
  * Returned in the order asked for, which is the order the merchant set.
  * Unknown ids are dropped, never an error: the page must degrade, not 404.
  */
-export async function publicServices(ids: string[]): Promise<PublicService[]> {
+export async function publicServices(
+    siteId: string,
+    ids: string[],
+): Promise<PublicService[]> {
     if (ids.length === 0) return [];
     const rows = await prisma.service.findMany({
         where: {
@@ -671,7 +674,13 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
             // The same rule public booking closes on (#327), so a list
             // never offers a service its booking block would refuse.
             // Offline with a deleted business's site (#921).
-            organization: { ...APPOINTMENTS_OPEN, ...SITE_ONLINE_ORGANIZATION },
+            // Only the site's own business (07 B-L2): a section naming another
+            // business's service must not draw its name and price here.
+            organization: {
+                ...APPOINTMENTS_OPEN,
+                ...SITE_ONLINE_ORGANIZATION,
+                sites: { some: { id: siteId, deletedAt: null } },
+            },
             // Nothing to book yet (UX-024): no hours, nobody to take it.
             ...HAS_BOOKABLE_HOURS,
         },
@@ -687,7 +696,7 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
             gstPriceMode: true,
         },
     });
-    // The ids come from one site's section, so this is one business.
+    // Scoped to the site above, so this is one business.
     const terms = new Map<string, PriceTerms>();
     for (const organizationId of new Set(rows.map((r) => r.organizationId))) {
         terms.set(organizationId, await loadPriceTerms(prisma, organizationId));

@@ -19,12 +19,15 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import {
+    ApproveChangesDto,
+    AskForChangesDto,
     CreateApprovalDto,
     CreateCommentDto,
     CreatePageDto,
     CreatePreviewLinkDto,
     CreateSiteFromTemplateDto,
     GoLiveOptionsDto,
+    PublishOptionsDto,
     RequestReviewDto,
     ReviewTargetQueryDto,
     SetCommentResolvedDto,
@@ -37,6 +40,7 @@ import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
 import type { CatalogueTemplate } from "./template-catalogue";
 import { templateCatalogue } from "./template-catalogue";
+import { WebsiteAreaSwitchGuard } from "./website-area-switch";
 
 /**
  * Site endpoints for an Organization (S2-003), scoped to
@@ -99,6 +103,58 @@ export class SitesController {
         @Param("siteId") siteId: string,
     ) {
         return this.sites.getSite(ctx, siteId);
+    }
+
+    /**
+     * What publishing would change, one unit each, by who changed it
+     * (change units, U7). `site:read`, reviewer-scoped in the service.
+     */
+    @Get(":siteId/changes")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    changes(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        // History's Compare (U47a): the units between that version and the draft.
+        @Query("against") against?: string,
+    ) {
+        return this.sites.getChanges(ctx, siteId, against);
+    }
+
+    /**
+     * Approve waiting changes (DEC-226, U9). `site:approve`: a reviewer of
+     * this site, an admin or the owner; 403 on a change the caller made.
+     */
+    @Post(":siteId/changes/approve")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    @HttpCode(200)
+    approveChanges(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: ApproveChangesDto,
+    ) {
+        return this.sites.recordChangeVerdict(ctx, siteId, {
+            units: dto.units,
+            outcome: "APPROVED",
+        });
+    }
+
+    /**
+     * Ask for changes on waiting changes, with a reason (UX-043, U9); tells
+     * whoever made them. Same rules as approving.
+     */
+    @Post(":siteId/changes/ask")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    @HttpCode(200)
+    askForChanges(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: AskForChangesDto,
+    ) {
+        return this.sites.recordChangeVerdict(ctx, siteId, {
+            units: dto.units,
+            outcome: "CHANGES_REQUESTED",
+            reason: dto.reason,
+        });
     }
 
     /**
@@ -293,6 +349,20 @@ export class SitesController {
     }
 
     /**
+     * Copy a page's draft under `<link>-copy`, hidden and out of the menu
+     * (website area U5). Requires `site:update`.
+     */
+    @Post(":siteId/pages/:pageId/duplicate")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    duplicatePage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+    ) {
+        return this.sites.duplicatePage(ctx, siteId, pageId);
+    }
+
+    /**
      * Delete a page and its versions/sections. Requires `site:update`. The home
      * page cannot be deleted.
      */
@@ -460,15 +530,19 @@ export class SitesController {
      * Publish the site: snapshot its pages' current drafts into a new immutable
      * Publication (sanitizing rich fields) and repoint the live pointer.
      * Requires `site:publish`. With "Publishing needs approval" on, 409
-     * unless an owner sends `override` (DEC-071, R10).
+     * unless an owner sends `override` (DEC-071, R10). `leaveOut` keeps
+     * named changes in the draft and live as they are (U8).
      */
     @Post(":siteId/publish")
     @HttpCode(200)
     publish(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
-        @Body() dto: GoLiveOptionsDto,
+        @Body() dto: PublishOptionsDto,
     ) {
-        return this.sites.publishSite(ctx, siteId, { override: dto.override });
+        return this.sites.publishSite(ctx, siteId, {
+            override: dto.override,
+            leaveOut: dto.leaveOut,
+        });
     }
 }

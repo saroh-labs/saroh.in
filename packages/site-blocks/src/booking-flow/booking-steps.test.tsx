@@ -312,7 +312,14 @@ async function serviceThenPersonThenTime() {
 describe("the step in the address (U9)", () => {
     it("moves service → person → time as history entries, with no server render", async () => {
         serveAll();
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         // As the page opens, nothing is written: the address is the server's.
         expect(window.location.search).toBe("");
         await serviceThenPersonThenTime();
@@ -331,7 +338,14 @@ describe("the step in the address (U9)", () => {
 
     it("Back returns to the person step with the service kept, and Forward chooses the time again", async () => {
         serveAll();
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await serviceThenPersonThenTime();
         // Something typed on the page survives every step: no remount.
         fireEvent.change(screen.getByLabelText("Phone (optional)"), {
@@ -386,6 +400,7 @@ describe("the step in the address (U9)", () => {
         serveAll();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -404,7 +419,14 @@ describe("the step in the address (U9)", () => {
 
     it("never puts a note, a phone, an email or a payment token in the address", async () => {
         const hold = serveAll(undefined, true);
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await serviceThenPersonThenTime();
         fireEvent.change(screen.getByLabelText("Phone (optional)"), {
             target: { value: "98450 12345" },
@@ -428,7 +450,14 @@ describe("the step in the address (U9)", () => {
 describe("a pay-now hold through Back and Forward (U9)", () => {
     async function holding() {
         const hold = serveAll(undefined, true);
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await serviceThenPersonThenTime();
         vi.useFakeTimers({ shouldAdvanceTime: true });
         fireEvent.click(
@@ -539,6 +568,7 @@ describe("a link, or a reload, on a step (U9)", () => {
         serveAll();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -556,7 +586,7 @@ describe("a link, or a reload, on a step (U9)", () => {
         ).toBeVisible();
         // The person's own times were read.
         expect(calls[0]?.url).toBe(
-            `${API}/public/services/svc_pt/days?staffId=staff_ritu`,
+            `${API}/public/sites/site_1/services/svc_pt/days?staffId=staff_ritu`,
         );
         expect(
             screen.getByRole("heading", { name: "Your details" }),
@@ -574,6 +604,7 @@ describe("a link, or a reload, on a step (U9)", () => {
         serveAll();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -603,6 +634,7 @@ describe("a link, or a reload, on a step (U9)", () => {
         serveAll();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -623,6 +655,7 @@ describe("a link, or a reload, on a step (U9)", () => {
         serveAll();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -683,6 +716,7 @@ describe("Classic folds each answer to a row with Edit (owner, 4 Nov)", () => {
         });
         render(
             <BookingFlow
+                siteId="site_1"
                 page={page}
                 apiUrl={API}
                 account={account()}
@@ -692,7 +726,9 @@ describe("Classic folds each answer to a row with Edit (owner, 4 Nov)", () => {
     }
     async function toSeven() {
         fireEvent.click(radio(/Personal training/));
-        fireEvent.click(await screen.findByRole("radio", { name: SUN }));
+        fireEvent.click(
+            await screen.findByRole("radio", { name: SUN }, { timeout: 5_000 }),
+        );
         fireEvent.click(radio(SEVEN));
     }
 
@@ -705,7 +741,8 @@ describe("Classic folds each answer to a row with Edit (owner, 4 Nov)", () => {
         expect(document.activeElement).toBe(rowOf(edit));
         expect(screen.queryByRole("radio", { name: /HIIT class/ })).toBeNull();
 
-        await screen.findByRole("radio", { name: SUN });
+        // The days load after the fold; a busy gate run can take past 1 s.
+        await screen.findByRole("radio", { name: SUN }, { timeout: 5_000 });
         fireEvent.click(radio(SUN));
         fireEvent.click(radio(SEVEN));
         expect(
@@ -855,6 +892,7 @@ describe("the booked step (U9)", () => {
     const atDone = (booked: BookingLookup) =>
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -899,7 +937,14 @@ describe("the booked step (U9)", () => {
 
     it("booked here: the address names it, Back leaves it, and Forward shows it again", async () => {
         serveAll();
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await serviceThenPersonThenTime();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(screen.getByRole("button", { name: /^Book/ }));

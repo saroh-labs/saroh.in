@@ -16,7 +16,7 @@ import {
     STUDIO_PROJECT_BRIEFS,
     STUDIO_TEMPLATE_ID,
     studioHasEmail,
-    studioTemplate,
+    studioTemplateV1,
 } from "./studio";
 
 /** Every string anywhere in a section's content, however deeply nested. */
@@ -51,19 +51,20 @@ const profiles: [string, TemplateContext][] = [
 ];
 
 function home(ctx: TemplateContext) {
-    return instantiateTemplate(studioTemplate, ctx).pages[0];
+    return instantiateTemplate(studioTemplateV1, ctx).pages[0];
 }
 
 describe("studio@1, the gallery's Portfolio (U10)", () => {
-    it("is registered as the latest studio and offered in the picker", () => {
-        expect(studioTemplate.id).toBe(STUDIO_TEMPLATE_ID);
-        expect(studioTemplate.version).toBe(1);
-        expect(getTemplate("studio")).toBe(studioTemplate);
-        expect(listTemplates()).toContain(studioTemplate);
+    it("stays registered as version 1 for the sites made from it (KD10)", () => {
+        expect(studioTemplateV1.id).toBe(STUDIO_TEMPLATE_ID);
+        expect(studioTemplateV1.version).toBe(1);
+        expect(getTemplate("studio", 1)).toBe(studioTemplateV1);
+        // A new site starts on version 2 (U9); version 1 is no longer offered.
+        expect(listTemplates()).not.toContain(studioTemplateV1);
     });
 
     it("carries the gallery's facts: a portfolio for creators, on the Website and CRM", () => {
-        expect(studioTemplate).toMatchObject({
+        expect(studioTemplateV1).toMatchObject({
             name: "Studio",
             slug: "studio",
             kinds: ["creator"],
@@ -74,12 +75,12 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
     });
 
     it("has the design's two colourways, Mono first, in Archivo alone", () => {
-        const styles = studioTemplate.styles ?? [];
+        const styles = studioTemplateV1.styles ?? [];
         expect(styles.map((s) => [s.id, s.name])).toEqual([
             ["mono", "Mono"],
             ["ivory", "Ivory"],
         ]);
-        expect(templateStylePreset(studioTemplate)?.id).toBe("mono");
+        expect(templateStylePreset(studioTemplateV1)?.id).toBe("mono");
         for (const s of styles) {
             expect(isFontPairKey(s.style.fontPair)).toBe(true);
             expect(s.style.fontPair).toBe("archivo");
@@ -92,7 +93,7 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
     });
 
     it("draws the design's exact colours, with no coloured accent: the accent is the ink", () => {
-        const [mono, ivory] = studioTemplate.styles ?? [];
+        const [mono, ivory] = studioTemplateV1.styles ?? [];
         expect(mono.style.palette).toMatchObject({
             bg: "#F7F7F6",
             surface: "#E8E8E6",
@@ -118,7 +119,7 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
     });
 
     it("sets a 1320px frame with 3px between photographs", () => {
-        for (const preset of studioTemplate.styles ?? []) {
+        for (const preset of studioTemplateV1.styles ?? []) {
             expect(preset.style.type).toMatchObject({
                 contentWidth: 1320,
                 labelStyle: "eyebrow",
@@ -134,7 +135,7 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
             { label: "Studio", href: "/#studio" },
             { label: "Contact", href: "/#contact" },
         ]);
-        expect(studioTemplate.footer).toEqual({
+        expect(studioTemplateV1.footer).toEqual({
             line: "Your studio's street and city",
             layout: "left",
         });
@@ -143,7 +144,7 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
     it.each(profiles)(
         "instantiates and every section passes the contract, for %s",
         (_label, ctx) => {
-            const { pages } = instantiateTemplate(studioTemplate, ctx);
+            const { pages } = instantiateTemplate(studioTemplateV1, ctx);
             expect(pages).toHaveLength(1);
             for (const section of pages[0].sections) {
                 expect(

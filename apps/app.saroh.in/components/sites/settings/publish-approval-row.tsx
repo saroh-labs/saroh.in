@@ -11,6 +11,7 @@ import { setPublishNeedsApproval } from "@/lib/sites/actions";
 import type { PublishApproval } from "@/lib/sites/publish-approval";
 import {
     PUBLISH_APPROVAL_RULE,
+    PUBLISH_APPROVAL_WHO,
     publishApprovalLine,
 } from "@/lib/sites/publish-approval";
 import { Row, Section } from "@saroh/ui/settings-rows";
@@ -89,7 +90,7 @@ export function PublishApprovalSection({
                         <div>{publishApprovalLine(on)}</div>
                         {on ? (
                             <div className="text-xs text-muted-foreground">
-                                Only an approved test release can go live.
+                                {PUBLISH_APPROVAL_WHO}
                             </div>
                         ) : null}
                     </div>

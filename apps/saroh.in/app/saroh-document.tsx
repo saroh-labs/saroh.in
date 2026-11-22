@@ -1,0 +1,148 @@
+import "@saroh/marketing/tokens.css";
+import "@saroh/ui/globals.css";
+import type { Metadata } from "next";
+import localFont from "next/font/local";
+import "./site.css";
+
+import { home } from "@/content/home";
+import { shownLegal } from "@/content/resources";
+import { pageTitle, SITE_NAME, SITE_URL } from "@/lib/seo";
+
+import { asksConsent } from "@/lib/ga";
+import { resourcesContext } from "@/lib/resources-context";
+import { siteTagConfig } from "@/lib/site-tag-config";
+
+import { ReferralKeeper } from "./referral-keeper";
+import { SiteTags } from "./site-tags";
+
+// The brand's product faces, self-hosted (latin subset, variable) so the
+// build never fetches fonts from a network: Geist for all UI, body copy,
+// labels and eyebrows; Space Grotesk for display through H3, money and large
+// figures (never body copy); JetBrains Mono only where a value is measured
+// (the waitlist's opening date).
+// Geist limited to 400–700, the weights the site uses (29 KB to 21 KB), cut
+// from packages/ui's variable file with fontTools:
+// `instancer.instantiateVariableFont(font, {"wght": (400, 700)})`.
+const fontSans = localFont({
+    src: "./fonts/Geist-latin-400-700.woff2",
+    weight: "400 700",
+    style: "normal",
+    display: "swap",
+    variable: "--font-sans",
+});
+
+const fontDisplay = localFont({
+    src: "../../../packages/ui/fonts/SpaceGrotesk-latin.woff2",
+    weight: "300 700",
+    style: "normal",
+    display: "swap",
+    variable: "--font-display",
+});
+
+// Weight 400 only, cut from packages/ui's variable file (40 KB to 21 KB) with
+// fontTools: `instancer.instantiateVariableFont(font, {"wght": 400})`. Every
+// mono line on the site is regular weight (breadcrumbs, step numbers, dates).
+const fontMono = localFont({
+    src: "./fonts/JetBrainsMono-latin-400.woff2",
+    weight: "400",
+    style: "normal",
+    display: "swap",
+    variable: "--font-mono",
+    preload: false,
+});
+
+// Plus Jakarta Sans 600, the wordmark's face (plan U18). The logo itself is
+// the outlined <Wordmark>, never re-typed; this face sets the one piece of
+// live text the Marketing Site V2 design gives it, the phone menu's "Menu"
+// title. Not preloaded: a browser only fetches it when that sheet opens.
+const fontWordmark = localFont({
+    src: "./fonts/PlusJakartaSans-latin.woff2",
+    weight: "600",
+    style: "normal",
+    display: "swap",
+    variable: "--font-wordmark",
+    preload: false,
+});
+
+// Every page sets its own title, description, canonical and share tags
+// (`lib/seo.ts`). These are the fallbacks for a page that sets none, such as
+// the 404: Home's words, and no canonical, so a missing page never claims
+// another's address.
+const FALLBACK_TITLE = pageTitle(home.seoTitle);
+
+export const sarohMetadata: Metadata = {
+    // The site is served at www (saroh.in redirects there), so every
+    // canonical and share link names www: one host for search engines.
+    metadataBase: new URL(SITE_URL),
+    title: FALLBACK_TITLE,
+    description: home.seoDescription,
+    openGraph: {
+        type: "website",
+        siteName: SITE_NAME,
+        locale: "en_IN",
+        title: FALLBACK_TITLE,
+        description: home.seoDescription,
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: FALLBACK_TITLE,
+        description: home.seoDescription,
+    },
+};
+
+/**
+ * The site is static: every page is built at deploy time and served as a
+ * file, with no regeneration at request time (Cloudflare Workers can neither
+ * read `content/` nor compile MDX while serving). So a page dated for a day
+ * (Help, the QR code maker, the launch entry: `publishOn`) appears with the
+ * first deploy made on or after that day, and not before: nothing rebuilds
+ * the site on a schedule (owner, 9 Oct 2026), and the owner starts each
+ * deploy. Published pricing or a launch offer arrives with the build a
+ * publish starts (KTD-10). The day early access opens is in
+ * `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`.
+ *
+ * `lang="en-IN"`: Indian English, as the share tags already say (`en_IN`).
+ */
+
+/**
+ * The document every Saroh page shares: fonts, the tags and the recorder
+ * behind the cookie notice (`site-tags.tsx`), the referral code a visitor
+ * arrived with (`referral-keeper.tsx`) and the light-only scheme.
+ *
+ * It is not `app/layout.tsx` (plan 2026-11-18-001 KD11): each route group
+ * is its own root layout and draws this, so the website library's block
+ * previews (`(library-preview)`) can be a merchant's bare page with no
+ * Saroh tokens, fonts or tags. The groups: `(site)` the Marketing Site V2
+ * pages, `(standalone)` the waitlist and the sign-up hand-off, `(preview)`
+ * the pricing draft; `global-not-found.tsx` draws it for an address with no
+ * page. Each layout exports {@link sarohMetadata} as its `metadata`.
+ *
+ * Light only (owner, 2026-10-03): no theme provider, no dark class, no
+ * toggle; `color-scheme: light` is set here and in site.css.
+ */
+export function SarohDocument({ children }: { children: React.ReactNode }) {
+    const privacy = shownLegal(resourcesContext()).find(
+        (p) => p.id === "privacy",
+    );
+    const tags = siteTagConfig();
+    return (
+        <html lang="en-IN" style={{ colorScheme: "light" }}>
+            <body
+                className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} ${fontWordmark.variable} font-sans antialiased`}
+            >
+                {/* With nothing to ask about, it would do nothing: not sent. */}
+                {asksConsent(tags) ? (
+                    <SiteTags config={tags} privacyHref={privacy?.href} />
+                ) : null}
+                <ReferralKeeper />
+                <a
+                    href="#main"
+                    className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[90] focus:rounded-lg focus:bg-foreground focus:px-[13px] focus:py-[9px] focus:text-[13px] focus:text-background"
+                >
+                    Skip to content
+                </a>
+                {children}
+            </body>
+        </html>
+    );
+}

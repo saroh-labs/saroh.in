@@ -92,6 +92,48 @@ describe("sanitizeRichHtml", () => {
     });
 });
 
+describe("post embeds (U15b)", () => {
+    const card = '<div data-embed="service" data-id="svc_1-a"></div>';
+
+    it("keeps a service or product card exactly as the editor writes it", () => {
+        expect(sanitizeRichHtml(card)).toBe(card);
+        const product = '<div data-embed="product" data-id="prod1"></div>';
+        expect(sanitizeRichHtml(product)).toBe(product);
+    });
+
+    it("strips every other attribute from a card, and keeps its order", () => {
+        expect(
+            sanitizeRichHtml(
+                '<div data-id="svc1" onclick="x()" style="position:fixed" data-price="1" data-embed="service"></div>',
+            ),
+        ).toBe('<div data-embed="service" data-id="svc1"></div>');
+    });
+
+    it("strips a card of an unknown kind or with a bad id", () => {
+        for (const bad of [
+            '<div data-embed="iframe" data-id="svc1"></div>',
+            '<div data-embed="service" data-id="a b"></div>',
+            '<div data-embed="service" data-id="&quot;&gt;&lt;script&gt;"></div>',
+            '<div data-embed="service"></div>',
+            '<div data-id="svc1"></div>',
+            '<span data-embed="service" data-id="svc1"></span>',
+        ]) {
+            expect(sanitizeRichHtml(bad)).not.toMatch(/data-embed|data-id/);
+        }
+    });
+
+    it("is idempotent on a card", () => {
+        const once = sanitizeRichHtml(`<p>Before</p>${card}<p>After</p>`);
+        expect(sanitizeRichHtml(once)).toBe(once);
+    });
+
+    it("leaves a post sanitized before cards existed unchanged", () => {
+        const old =
+            '<h2>Before you come</h2><p>Bring <strong>two</strong> photos.</p><div style="text-align:center">Centred</div><ul><li><p>A clean face</p></li></ul><blockquote><p>Calm</p></blockquote><p><a target="_blank" rel="noopener noreferrer" href="https://northwind.test">Read</a></p>';
+        expect(sanitizeRichHtml(old)).toBe(old);
+    });
+});
+
 describe("sanitizeSectionContent", () => {
     it("cleans only the contract's flagged fields, and never mutates the input", () => {
         const input = {

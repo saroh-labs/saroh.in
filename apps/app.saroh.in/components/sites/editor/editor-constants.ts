@@ -1,37 +1,24 @@
 import type { Section, SectionType } from "@/lib/sites/service";
+import type { BlockFamily } from "@saroh/block-contract";
+import {
+    blockFamilies,
+    blockHeading,
+    blockSearchText,
+    SECTION_TYPES,
+} from "@saroh/block-contract";
 
 /**
  * The editor's fixed vocabulary — what each block is called, the order the
  * picker offers them in, and the preview's device and zoom steps.
  *
- * Split out of `site-editor.tsx` (#260). `SECTION_LABELS` keeps its
- * `Record<SectionType, string>` annotation on purpose: it is what makes a block
- * type added without a label a compile error, and the reason a forgotten
- * section type has never silently shipped.
+ * Split out of `site-editor.tsx` (#260). `SECTION_LABELS` is the contract's
+ * `blockHeading` for every section type, so it stays in step with
+ * `BLOCK_META` ("Highlights", "Visit us · Hours"; KD5) and a new type gets a
+ * label the moment the contract has one.
  */
-
-export const SECTION_LABELS: Record<SectionType, string> = {
-    hero: "Hero",
-    richText: "Rich text",
-    cta: "Call to action",
-    gallery: "Gallery",
-    enquiry: "Enquiry form",
-    booking: "Booking",
-    features: "Features",
-    faq: "FAQ",
-    testimonials: "Testimonials",
-    contact: "Contact",
-    servicesList: "Services",
-    visitUs: "Visit us",
-    journal: "Journal",
-    plans: "Plans",
-    packs: "Class packs",
-    productGrid: "Product grid",
-    projects: "Projects",
-    timetable: "Timetable",
-    hours: "Opening hours",
-    person: "Person",
-};
+export const SECTION_LABELS = Object.fromEntries(
+    SECTION_TYPES.map((t) => [t, blockHeading(t)]),
+) as Record<SectionType, string>;
 
 /**
  * One line per block for the Add-section picker (#267), in a merchant's words.
@@ -128,10 +115,10 @@ export const SECTION_ORDER: SectionType[] = [
     "features",
     "faq",
     "testimonials",
-    "contact",
     "servicesList",
     "visitUs",
     "hours",
+    "contact",
     "timetable",
     "journal",
     "plans",
@@ -166,6 +153,28 @@ export function addableSections(
         (t) =>
             (shopOpen || !SHOP_BLOCKS.includes(t)) &&
             (packsOpen || !PACKS_BLOCKS.includes(t)),
+    );
+}
+
+/**
+ * The Add block entries: one per family with its layouts (KD5), filtered by
+ * a search over each layout's name, old names and line. A layout matched on
+ * its own ("contact") comes back as its family with just that layout.
+ */
+export function addableFamilies(
+    shopOpen: boolean,
+    packsOpen = false,
+    query = "",
+): BlockFamily[] {
+    const q = query.trim().toLowerCase();
+    return blockFamilies(
+        addableSections(shopOpen, packsOpen).filter(
+            (t) =>
+                q === "" ||
+                `${blockSearchText(t)} ${SECTION_HINTS[t].toLowerCase()}`.includes(
+                    q,
+                ),
+        ),
     );
 }
 

@@ -8,6 +8,7 @@ import {
     CalendarNothing,
 } from "@/components/calendar/calendar-nothing";
 import { PageContainer } from "@/components/shared/page/page-container";
+import { ScreenPending } from "@/components/shared/page/screen-pending";
 import { calendarMonthPage, calendarWeekPage } from "@/lib/ask-ai/page-hints";
 import {
     calendarLocked,
@@ -146,18 +147,20 @@ export default async function CalendarPage({
                 />
             ) : null}
             {data ? (
-                <BusinessCalendar
-                    // A new month starts with its own day picked and every
-                    // layer on.
-                    key={data.month}
-                    data={data}
-                    today={todayIn(data.timezone)}
-                    thisMonth={monthNow(data.timezone)}
-                    can={can}
-                    // A key crossed into this month on this day (E28).
-                    day={typeof day === "string" ? day : undefined}
-                    team={person}
-                />
+                <ScreenPending>
+                    <BusinessCalendar
+                        // A new month starts with its own day picked and every
+                        // layer on.
+                        key={data.month}
+                        data={data}
+                        today={todayIn(data.timezone)}
+                        thisMonth={monthNow(data.timezone)}
+                        can={can}
+                        // A key crossed into this month on this day (E28).
+                        day={typeof day === "string" ? day : undefined}
+                        team={person}
+                    />
+                </ScreenPending>
             ) : (
                 <CalendarNothing />
             )}
@@ -218,17 +221,19 @@ async function CalendarWeek({
         <PageContainer width="full">
             {/* What Ask AI offers on this week, counted from it (AF 2). */}
             <AskAiPageIs page={calendarWeekPage(data, today)} />
-            <BusinessWeek
-                // A new week starts with its own day picked and every layer
-                // on.
-                key={data.days[0]?.date ?? today}
-                data={data}
-                today={today}
-                thisMonth={thisMonth}
-                can={can}
-                day={day ?? undefined}
-                team={team}
-            />
+            <ScreenPending>
+                <BusinessWeek
+                    // A new week starts with its own day picked and every layer
+                    // on.
+                    key={data.days[0]?.date ?? today}
+                    data={data}
+                    today={today}
+                    thisMonth={thisMonth}
+                    can={can}
+                    day={day ?? undefined}
+                    team={team}
+                />
+            </ScreenPending>
         </PageContainer>
     );
 }

@@ -4,6 +4,7 @@ import { phoneHomeCountry, phoneNumberProblem } from "@saroh/block-contract";
 import { useId, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
+import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { SitePhoneInput } from "../phone-input";
 import { useSiteBusiness } from "../site-business";
@@ -132,6 +133,112 @@ export function DetailsSheet({
                 >
                     {busy ? "Saving…" : "Save"}
                 </button>
+            </form>
+        </Sheet>
+    );
+}
+
+/**
+ * Their GSTIN (R16): printed on invoices made from now on; issued ones keep
+ * what they had. The business's server checks it and says why it can't.
+ */
+export function GstinSheet({
+    open,
+    account,
+    onClose,
+    save,
+    onSaved,
+}: {
+    open: boolean;
+    account: AccountView;
+    onClose: () => void;
+    save: NonNullable<MeApi["saveGstin"]>;
+    onSaved: (account: AccountView) => void;
+}) {
+    const [gstin, setGstin] = useState(account.gstin ?? "");
+    const [busy, setBusy] = useState<"save" | "remove" | null>(null);
+    const [problem, setProblem] = useState<string | null>(null);
+    const ids = useId();
+    const off = busy !== null || gstin.trim() === "";
+
+    async function send(value: string, kind: "save" | "remove") {
+        setBusy(kind);
+        setProblem(null);
+        const result = await save(value).catch((): DetailsResult => ({
+            ok: false,
+            message: "We couldn't reach the business. Try again in a moment.",
+        }));
+        setBusy(null);
+        if (result.ok) onSaved(result.account);
+        else setProblem(result.message);
+    }
+
+    return (
+        <Sheet
+            open={open}
+            onClose={onClose}
+            title="Business details for GST"
+            lead="Your GSTIN prints on invoices from now on. Invoices already issued stay as they are."
+        >
+            <form
+                noValidate
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!off) void send(gstin.trim(), "save");
+                }}
+            >
+                <label
+                    htmlFor={`${ids}-gstin`}
+                    className="mt-3.5 block text-[13.5px] font-medium"
+                >
+                    GSTIN
+                </label>
+                <input
+                    id={`${ids}-gstin`}
+                    type="text"
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    maxLength={15}
+                    placeholder="29AAAAA0000A1ZY"
+                    value={gstin}
+                    onChange={(e) => {
+                        setGstin(e.target.value.toUpperCase());
+                        setProblem(null);
+                    }}
+                    aria-invalid={problem ? true : undefined}
+                    aria-describedby={problem ? `${ids}-problem` : undefined}
+                    className={cn(sheetInput, "uppercase tabular-nums")}
+                />
+                {problem ? (
+                    <p
+                        id={`${ids}-problem`}
+                        role="alert"
+                        className={cn(destructiveAlertClasses, "mt-3")}
+                    >
+                        {problem}
+                    </p>
+                ) : null}
+                <button
+                    type="submit"
+                    disabled={off}
+                    className={sheetButton(off)}
+                >
+                    {busy === "save" ? "Saving…" : "Save"}
+                </button>
+                {account.gstin ? (
+                    <button
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => void send("", "remove")}
+                        className={cn(
+                            "text-site-fg mt-2 h-11 w-full cursor-pointer text-[14px] font-semibold underline underline-offset-4 disabled:opacity-60",
+                            focusRing,
+                        )}
+                    >
+                        {busy === "remove" ? "Removing…" : "Remove GSTIN"}
+                    </button>
+                ) : null}
             </form>
         </Sheet>
     );

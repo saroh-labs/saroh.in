@@ -190,6 +190,16 @@ export function VisitUsFields({
                     }
                 />
             </div>
+            <Field optional label="A line under the address">
+                <Input
+                    value={c.extraLine ?? ""}
+                    onChange={(e) =>
+                        patch({ extraLine: e.target.value || undefined })
+                    }
+                    maxLength={160}
+                    placeholder="Parking at the back"
+                />
+            </Field>
 
             <p className="text-sm text-muted-foreground">
                 The location address is set on the location (

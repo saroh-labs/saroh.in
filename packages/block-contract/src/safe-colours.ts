@@ -4,8 +4,10 @@ import type { PaletteRole, SitePalette } from "./palette";
 import {
     contrastRatio,
     mixHex,
+    normalizeHex,
     PALETTE_GRAPHIC_CONTRAST,
     PALETTE_MIN_CONTRAST,
+    parsePalette,
     relativeLuminance,
 } from "./palette";
 
@@ -234,4 +236,46 @@ export function deriveSafeColours(
         palette: p as SafeColours["palette"],
         accentTreatment,
     };
+}
+
+/** How far toward white the page made from a brand colour sits. */
+const BRAND_PAGE_MIX = 0.92;
+/** How far toward black its ink starts. */
+const BRAND_INK_MIX = 0.8;
+
+/**
+ * A whole palette from one brand colour (U24b, "Colours from my brand
+ * colour"): the page a pale tint of it, the ink a deep shade of it, the
+ * buttons the colour itself while it reads as a fill with ink or white
+ * words on it (else moved toward the ink until it does), and links and
+ * small text a shade deep enough to read at 4.5:1. Always passes
+ * `parsePalette`; null for anything that is not `#RRGGBB`. The API runs
+ * this on every save, so a client's colours are never trusted.
+ */
+export function brandPalette(colour: string): SitePalette | null {
+    const hex = normalizeHex(colour);
+    if (!hex) return null;
+    const bg = mixHex(hex, WHITE, BRAND_PAGE_MIX);
+    const fg = reaching(
+        mixHex(hex, BLACK, BRAND_INK_MIX),
+        [bg],
+        PALETTE_MIN_CONTRAST,
+        BLACK,
+    );
+    const accent = moveUntil(
+        hex,
+        fg,
+        [bg],
+        (c) =>
+            contrastRatio(c, bg) >= PALETTE_GRAPHIC_CONTRAST &&
+            contrastRatio(textOn(c, fg), c) >= PALETTE_MIN_CONTRAST,
+    );
+    const parsed = parsePalette({
+        bg,
+        fg,
+        accent,
+        accentFg: textOn(accent, fg),
+        accentText: reaching(accent, [bg], PALETTE_MIN_CONTRAST, fg),
+    });
+    return parsed.ok ? parsed.palette : null;
 }

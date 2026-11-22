@@ -72,6 +72,7 @@ export function isAccountView(v: unknown): v is AccountView {
         isNullableString(v.email) &&
         isNullableString(v.phone) &&
         (v.signInPhone === undefined || isNullableString(v.signInPhone)) &&
+        (v.gstin === undefined || isNullableString(v.gstin)) &&
         isString(v.businessName) &&
         Array.isArray(v.tabs) &&
         v.tabs.every(isTab) &&
@@ -538,6 +539,25 @@ export function emailChangeAnswer(
  * (A13's "Wait a minute, then try again") are passed on; anything else is
  * the page's own sentence.
  */
+/**
+ * The API's message for one field it refused (`details.field`), written for
+ * the customer — such as a GSTIN that doesn't check out (R16) — else null.
+ */
+export function fieldRefusal(
+    status: number,
+    body: unknown,
+    field: string,
+): string | null {
+    const error = isRecord(body) && isRecord(body.error) ? body.error : null;
+    return status === 400 &&
+        isRecord(error?.details) &&
+        error.details.field === field &&
+        isString(error.message) &&
+        error.message.trim()
+        ? error.message
+        : null;
+}
+
 export function refusalMessage(
     status: number,
     body: unknown,

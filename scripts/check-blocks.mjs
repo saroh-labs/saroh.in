@@ -107,7 +107,7 @@ async function* walk(dir) {
         const full = join(dir, entry.name);
         if (entry.isDirectory()) {
             if (
-                ["node_modules", ".next", "dist", ".turbo"].includes(entry.name)
+                ["node_modules", ".next", ".open-next", "dist", ".turbo"].includes(entry.name)
             )
                 continue;
             yield* walk(full);
@@ -216,6 +216,10 @@ const SITE_LAYER_ALLOWED = new Set([
     // without it every palette would look identical behind the section. It
     // draws no block of its own — it renders SectionRenderer from the package.
     "apps/ui.saroh.in/app/preview/[type]/page.tsx",
+    // The website library's block preview on saroh.in (DEC-228, U11): the
+    // ui.saroh.in preview's twin, a frame around BlockFixturePreview in
+    // SiteTheme. Every block it shows is the package's own.
+    "apps/saroh.in/app/(library-preview)/library-preview/[type]/block-preview.tsx",
     // The site editor's preview frame. Same category: it supplies the
     // merchant's page ground and the selection outlines around each block, and
     // delegates every block to @saroh/site-blocks rather than drawing one.
@@ -251,6 +255,17 @@ const SITE_LAYER_ALLOWED = new Set([
     // here would put a reviewer's notes on a rendering the live site never
     // makes, which is the whole failure #189 was.
     "apps/app.saroh.in/components/sites/review/section-review.tsx",
+    // The post editor's writing page, at the desk and on a phone (U15,
+    // U15b): the post as it will read, on the merchant's page ground and in
+    // the site's type, the editor's twin of saroh.app's post-view.tsx above.
+    // It draws no block; a card from the business is the package's own
+    // classes (POST_EMBED_CARD).
+    "apps/app.saroh.in/components/sites/posts/editor/writing-surface.tsx",
+    "apps/app.saroh.in/components/sites/posts/phone/phone-surface.tsx",
+    // A reviewer reads the same post on that page ground (U17): the
+    // writing surface's read-only twin, in the site's ink.
+    "apps/app.saroh.in/components/sites/posts/review/review-body.tsx",
+    "apps/app.saroh.in/components/sites/rich-text/rich-text-editor.tsx",
 ]);
 
 /**

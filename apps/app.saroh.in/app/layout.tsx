@@ -2,6 +2,7 @@ import "@saroh/ui/globals.css";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { headers } from "next/headers";
 
 import { NIGHT, PAPER } from "@/lib/pwa/manifest";
 
@@ -78,11 +79,15 @@ export const viewport: Viewport = {
  * business need to do?" beside a nav that already lists the answers is a
  * contradiction. Route groups keep every URL unchanged.
  */
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    // This request's script nonce (the middleware's CSP, `withPrivateApp`):
+    // the two scripts written here need it to run. Reading it renders every
+    // page per request, which a nonce needs anyway.
+    const nonce = (await headers()).get("x-nonce") ?? undefined;
     return (
         // `suppressHydrationWarning` is required by next-themes, not optional
         // politeness: its blocking script stamps the resolved theme class onto
@@ -112,6 +117,7 @@ export default function RootLayout({
                  * render-blocking and nothing below has been parsed yet.
                  */}
                 <script
+                    nonce={nonce}
                     dangerouslySetInnerHTML={{
                         // Key and fallback MUST match `lib/skins.ts`
                         // (SKIN_STORAGE_KEY / DEFAULT_SKIN). It is duplicated
@@ -133,6 +139,7 @@ export default function RootLayout({
                         defaultTheme="system"
                         enableSystem
                         disableTransitionOnChange
+                        nonce={nonce}
                     >
                         {children}
                     </ThemeProvider>

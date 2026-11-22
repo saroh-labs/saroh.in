@@ -51,6 +51,8 @@ export interface SiteImageProps {
     src?: string;
     srcSet?: string;
     sizes?: string;
+    /** The focus point as `object-position`, only when the photo has one. */
+    style?: { objectPosition: string };
 }
 
 /** The photo an `<img>` draws, for sizing it. */
@@ -61,6 +63,11 @@ export interface SiteImageSource {
     width?: number | null;
     /** How wide the block draws it (the `sizes` attribute); `100vw` unsaid. */
     sizes?: string;
+    /**
+     * The photo's focus point (U46d), in percent: kept in view however the
+     * block crops it. Absent, nothing is added and the photo stays centred.
+     */
+    focus?: { x: number; y: number } | null;
 }
 
 /**
@@ -85,6 +92,14 @@ export function siteImage(
               };
     const src = image?.src?.trim();
     if (!image || !src) return loading;
+    const focused: SiteImageProps = image.focus
+        ? {
+              ...loading,
+              style: {
+                  objectPosition: `${image.focus.x}% ${image.focus.y}%`,
+              },
+          }
+        : loading;
     const sized = resizedSources(
         { src, width: image.width, sizes: image.sizes },
         siteMediaBase(),
@@ -100,5 +115,5 @@ export function siteImage(
                 : {}),
         });
     }
-    return sized ? { ...loading, ...sized } : loading;
+    return sized ? { ...focused, ...sized } : focused;
 }

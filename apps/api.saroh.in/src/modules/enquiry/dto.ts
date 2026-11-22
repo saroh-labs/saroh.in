@@ -15,4 +15,13 @@ export class SubmitEnquiryDto {
     @IsString()
     @MaxLength(200)
     idempotencyKey?: string;
+
+    /**
+     * The site page the form was on (DEC-235), counted for that page's
+     * results. Only a public site page's path is kept (`sitePagePathOf`).
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(2048)
+    pagePath?: string;
 }

@@ -70,7 +70,8 @@ export function writeRoutesIn(
     const starts: { index: number; base: string }[] = [];
     for (const match of code.matchAll(controllerRe)) {
         const arg = group(match, 1).trim();
-        const literal = /^(?:"([^"]*)"|'([^']*)')?$/.exec(arg);
+        // A trailing comma is Prettier's, on a path too long for one line.
+        const literal = /^(?:"([^"]*)"|'([^']*)')?\s*,?$/.exec(arg);
         if (!literal) {
             throw new Error(
                 `${file}: @Controller(${arg}) is not a plain string path`,

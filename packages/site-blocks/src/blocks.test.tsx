@@ -297,6 +297,7 @@ describe("block rendering", () => {
     it("booking", async () => {
         const { container } = render(
             <BookingSection
+                siteId="site_1"
                 content={BLOCK_META.booking.fixtures.default as RenderedBooking}
             />,
         );
@@ -648,6 +649,7 @@ describe("the merchant's type (H1)", () => {
     it("sets the booking flow's headings in font-site-heading", () => {
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl="https://api.test"
                 account={{
@@ -686,6 +688,7 @@ describe("the merchant's type (H1)", () => {
     it("sets the closed booking page's heading in font-site-heading", () => {
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, open: false }}
                 apiUrl="https://api.test"
                 account={{

@@ -8,6 +8,9 @@ import {
     calendarMonthPage,
     calendarWeekPage,
     customerPage,
+    postPage,
+    sitePagePage,
+    siteSectionPage,
 } from "./page-hints";
 
 /** Every question asked as written is one the API lets through free. */
@@ -139,5 +142,64 @@ describe("Ask AI's page hints (AF 1, 2, 5)", () => {
             ["Book Kavya in…", null],
         ]);
         asksOnlyStarters(page);
+    });
+});
+
+describe("Ask AI in the website editors", () => {
+    const at = { siteId: "s1", pageId: "p1", title: "Home" };
+
+    it("a page open in the editor", () => {
+        const page = sitePagePage(at);
+        expect(page.about).toEqual({
+            kind: "site_page",
+            id: "s1:p1",
+            label: "Home page",
+        });
+        expect(page.intro).toBe("Looking at your Home page in the editor.");
+        expect(page.placeholder).toBe(
+            "Ask about this page, or say what to change",
+        );
+        asksOnlyStarters(page);
+    });
+
+    it("a section, and the header as on every page", () => {
+        const page = siteSectionPage({
+            ...at,
+            sectionKey: "k1",
+            name: "Top of the page",
+        });
+        expect(page.about).toEqual({
+            kind: "site_section",
+            id: "s1:p1:k1",
+            label: "Home · Top of the page",
+        });
+        expect(page.intro).toBe(
+            "Looking at the Top of the page section on Home.",
+        );
+        asksOnlyStarters(page);
+        const header = siteSectionPage({
+            ...at,
+            sectionKey: "header",
+            name: "Header",
+            everywhere: true,
+        });
+        expect(header.about?.label).toBe("On every page · Header");
+    });
+
+    it("a post, by its title", () => {
+        const page = postPage({
+            siteId: "s1",
+            postId: "po1",
+            title: "Our new menu",
+        });
+        expect(page.about).toEqual({
+            kind: "post",
+            id: "s1:po1",
+            label: "Our new menu",
+        });
+        asksOnlyStarters(page);
+        expect(
+            postPage({ siteId: "s1", postId: "po1", title: " " }).about?.label,
+        ).toBe("Untitled post");
     });
 });

@@ -101,12 +101,10 @@ export function MakeTestReleaseDialog({
         <FormDialog
             open={open}
             size="lg"
-            title={
-                made ? `${made.release.name} is ready` : "Make a test release"
-            }
+            title={made ? `${made.release.name} is ready` : "Make a test link"}
             description={
                 made
-                    ? "Nothing here takes a real order, booking or payment. The link works for 7 days. You can turn it off or make another from Test releases."
+                    ? "Nothing here takes a real order, booking or payment. The link works for 7 days. You can turn it off or make another from Test links."
                     : "Freezes your saved draft on its own test address, for you and anyone you send the link to. Nothing goes live until you say so."
             }
             pending={isSubmitting}
@@ -128,7 +126,7 @@ export function MakeTestReleaseDialog({
                                             <Input
                                                 {...field}
                                                 autoComplete="off"
-                                                placeholder={`Test release ${nextNumber}`}
+                                                placeholder={`Test link ${nextNumber}`}
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -163,13 +161,13 @@ export function MakeTestReleaseDialog({
                                     role="status"
                                     className="text-[12.5px] text-muted-foreground"
                                 >
-                                    Saving your changes. A test release freezes
+                                    Saving your changes. A test link freezes
                                     what&apos;s saved, so it waits a moment.
                                 </p>
                             ) : null}
                         </div>
                         <FormDialogFoot
-                            saveLabel="Make test release"
+                            saveLabel="Make test link"
                             savingLabel="Making…"
                             saveOff={unsaved}
                             onSubmit={(e) => form.handleSubmit(onSubmit)(e)}

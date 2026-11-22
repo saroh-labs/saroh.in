@@ -32,6 +32,38 @@ describe("siteImage", () => {
     });
 });
 
+/** The photo's focus point (U46d): `object-position`, and only when set. */
+describe("siteImage with a focus point", () => {
+    it("keeps the focus point in view", () => {
+        expect(
+            siteImage("below", { src: "/a.jpg", focus: { x: 30, y: 20 } }),
+        ).toEqual({
+            loading: "lazy",
+            decoding: "async",
+            style: { objectPosition: "30% 20%" },
+        });
+    });
+
+    it("draws a photo without one exactly as before", () => {
+        expect(siteImage("below", { src: "/a.jpg" })).toEqual({
+            loading: "lazy",
+            decoding: "async",
+        });
+        const hero = (focus?: { x: number; y: number }) => {
+            const fixture = BLOCK_META.hero.fixtures.split as RenderedHero;
+            const content = {
+                ...fixture,
+                image: { src: "/a.jpg", alt: "", ...(focus ? { focus } : {}) },
+            } as RenderedHero;
+            return render(
+                <PageSections sections={[{ type: "hero", content }]} />,
+            ).container.querySelector("img");
+        };
+        expect(hero()?.getAttribute("style")).toBeNull();
+        expect(hero({ x: 10, y: 90 })?.style.objectPosition).toBe("10% 90%");
+    });
+});
+
 const MEDIA = "https://media.saroh.test";
 const PHOTO = `${MEDIA}/org/orgnorthwind1/site-image/1b2c-hero.jpg`;
 const PHOTO_KEY = "org/orgnorthwind1/site-image/1b2c-hero.jpg";

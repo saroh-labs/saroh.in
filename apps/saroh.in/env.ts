@@ -81,6 +81,8 @@ import { z } from "zod";
  * shows that feature's pages and links (`/features/ai-apps`, …; `DOCS` says
  * docs.saroh.in is live), anything else hides them. Unset counts as `on`
  * only under `next dev`. One reader decides: `lib/feature-switches.ts`.
+ * `NEXT_PUBLIC_WEBSITE_LIBRARY` is `/website-library`'s (DEC-228), by the
+ * same rule.
  *
  * `NEXT_PUBLIC_CLAIM_*` are the claim switches (DEC-221): finer than a
  * release switch, each lets one claim the product can't back in production
@@ -121,6 +123,7 @@ export const env = createEnv({
         NEXT_PUBLIC_SOCIAL: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_DEVELOPERS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_DOCS: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_WEBSITE_LIBRARY: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_CLAIM_SOCIAL_POSTING: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_CLAIM_SHARE_EVERY_PLAN: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_CLAIM_ASK_AI_STOCK: z.enum(["on", "off"]).optional(),
@@ -228,6 +231,7 @@ export const env = createEnv({
         NEXT_PUBLIC_SOCIAL: process.env.NEXT_PUBLIC_SOCIAL,
         NEXT_PUBLIC_DEVELOPERS: process.env.NEXT_PUBLIC_DEVELOPERS,
         NEXT_PUBLIC_DOCS: process.env.NEXT_PUBLIC_DOCS,
+        NEXT_PUBLIC_WEBSITE_LIBRARY: process.env.NEXT_PUBLIC_WEBSITE_LIBRARY,
         NEXT_PUBLIC_CLAIM_SOCIAL_POSTING:
             process.env.NEXT_PUBLIC_CLAIM_SOCIAL_POSTING,
         NEXT_PUBLIC_CLAIM_SHARE_EVERY_PLAN:

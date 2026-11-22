@@ -2,7 +2,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import type { ReactNode } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { AddTeammate } from "@/components/team/add-teammate-sheet";
 import { TeamTabs } from "@/components/team/team-tabs";
 import { can, requireStaff } from "@/lib/console";
@@ -24,7 +23,7 @@ export default async function TeamLayout({
     const { staff } = gate;
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Team"]}
@@ -37,6 +36,6 @@ export default async function TeamLayout({
                 <TeamTabs permissions={staff.permissions} />
                 {children}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

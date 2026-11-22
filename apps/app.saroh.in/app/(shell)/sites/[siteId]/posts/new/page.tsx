@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PostEditor } from "@/components/sites/posts/post-editor";
 import { deniedFor } from "@/lib/access/require-can";
@@ -7,6 +7,8 @@ import { listPostCategories } from "@/lib/content/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
+import { withQuery } from "@/lib/sites/with-query";
 
 /** The tab's title (UX-081): without one it read the bare "Saroh". */
 export const metadata = { title: "New post · Website" };
@@ -24,7 +26,13 @@ export default async function NewPostPage({
     searchParams?: Promise<{ from?: string | string[] }>;
 }) {
     const { siteId } = await params;
-    const { from } = (await searchParams) ?? {};
+    const query = (await searchParams) ?? {};
+    // With the Website area on, a new post opens in the desk editor (U15,
+    // KTD-E7), keeping `?from=`.
+    if (await websiteAreaOn()) {
+        redirect(withQuery(`/sites/${siteId}/write/new`, query));
+    }
+    const { from } = query;
     await requireSession();
     const site = await getSite(siteId);
     if (!site) notFound();

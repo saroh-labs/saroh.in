@@ -161,7 +161,7 @@ function DescriptionSurface({
     useEffect(() => {
         if (source || editor.isDestroyed) return;
         if (editor.getHTML() !== value) {
-            editor.commands.setContent(value, { emitUpdate: false });
+            editor.chain().setContent(value, { emitUpdate: false }).run();
         }
     }, [editor, value, source]);
 

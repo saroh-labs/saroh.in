@@ -28,6 +28,8 @@ export interface QuoteLine {
     label: string;
     value: string;
     iso?: string | null;
+    /** A regular price struck before `value`: a yearly offer's (DEC-239). */
+    was?: string;
 }
 
 export interface QuoteSummary {
@@ -162,6 +164,7 @@ export function quoteSummary(
     const recurring: QuoteLine = {
         label: `${plan}, ${q.cycle === "year" ? "yearly" : "monthly"}`,
         value: `${taxSum(q.pricePaise, q.gstPaise, q.totalPaise)} ${per(q.cycle)}`,
+        ...(q.regularPricePaise ? { was: planMoney(q.regularPricePaise) } : {}),
     };
     const term: QuoteLine = oneTime
         ? {

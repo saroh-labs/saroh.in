@@ -162,7 +162,15 @@ export const KEPT_FIELD_DECISIONS: Readonly<Record<string, KeptDecision>> = {
         at180Days: "kept",
         why: "Printed on an issued invoice (ADR-008).",
     },
+    "Invoice.billToGstin": {
+        at180Days: "kept",
+        why: "Printed on an issued invoice (ADR-008).",
+    },
     "Invoice.sellerAddress": {
+        at180Days: "kept",
+        why: "The seller on a tax record.",
+    },
+    "Invoice.sellerGstin": {
         at180Days: "kept",
         why: "The seller on a tax record.",
     },

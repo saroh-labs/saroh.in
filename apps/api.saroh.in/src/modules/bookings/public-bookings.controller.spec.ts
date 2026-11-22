@@ -6,6 +6,7 @@ import type { Booking } from "@saroh/database";
 import { hashClientIp } from "../../common/client-ip";
 import { trustProxy } from "../../common/trust-proxy";
 import {
+    PublicBookingPageController,
     PublicBookingsController,
     publicBookingResult,
 } from "./public-bookings.controller";
@@ -15,7 +16,14 @@ function build() {
     const bookings = {
         publicServices: jest.fn().mockResolvedValue([]),
     } as unknown as PublicBookingsService;
-    return { controller: new PublicBookingsController(bookings), bookings };
+    return {
+        controller: new PublicBookingPageController(
+            bookings,
+            {} as never,
+            {} as never,
+        ),
+        bookings,
+    };
 }
 
 const idList = (n: number) =>
@@ -24,8 +32,11 @@ const idList = (n: number) =>
 describe("PublicBookingsController.services (#255)", () => {
     it("trims, drops blanks and de-duplicates, keeping first order", async () => {
         const { controller, bookings } = build();
-        await controller.services(" a, a ,b");
-        expect(bookings.publicServices).toHaveBeenCalledWith(["a", "b"]);
+        await controller.services("site_1", " a, a ,b");
+        expect(bookings.publicServices).toHaveBeenCalledWith("site_1", [
+            "a",
+            "b",
+        ]);
     });
 
     it.each([
@@ -34,19 +45,19 @@ describe("PublicBookingsController.services (#255)", () => {
         ["no value", undefined],
     ])("asks for no services given %s", async (_label, ids) => {
         const { controller, bookings } = build();
-        await controller.services(ids);
-        expect(bookings.publicServices).toHaveBeenCalledWith([]);
+        await controller.services("site_1", ids);
+        expect(bookings.publicServices).toHaveBeenCalledWith("site_1", []);
     });
 
     it("accepts exactly 24 services", async () => {
         const { controller, bookings } = build();
-        await controller.services(idList(24));
+        await controller.services("site_1", idList(24));
         expect(bookings.publicServices).toHaveBeenCalledTimes(1);
     });
 
     it("refuses 25 services", () => {
         const { controller, bookings } = build();
-        expect(() => controller.services(idList(25))).toThrow(
+        expect(() => controller.services("site_1", idList(25))).toThrow(
             BadRequestException,
         );
         expect(bookings.publicServices).not.toHaveBeenCalled();
@@ -54,7 +65,7 @@ describe("PublicBookingsController.services (#255)", () => {
 
     it("refuses a repeated ids parameter rather than crashing", () => {
         const { controller, bookings } = build();
-        expect(() => controller.services(["a", "b"])).toThrow(
+        expect(() => controller.services("site_1", ["a", "b"])).toThrow(
             BadRequestException,
         );
         expect(bookings.publicServices).not.toHaveBeenCalled();

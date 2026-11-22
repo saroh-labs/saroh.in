@@ -4,6 +4,7 @@
  *
  *   node scripts/load-smoke.mjs [--target http://localhost:3333]
  *        [--seconds 20] [--concurrency 10] [--only enquiry,slots,book,checkout]
+ *        --site <Pulse Fitness's site id>
  *
  * LOCAL STACK ONLY. It refuses any target that isn't localhost or 127.0.0.1,
  * because it writes enquiries and bookings. Run it against the seeded e2e
@@ -47,6 +48,12 @@ const oneVisitor = args.get("one-visitor") === "true";
 
 const FORM = args.get("form") ?? "seed_sc_pulse_form_3_2";
 const SERVICE = args.get("service") ?? "seed_sc_pulse_service_1";
+// A service's public reads sit under its business's site (07 B-L2).
+const SITE = args.get("site") ?? "";
+if (!SITE) {
+    console.error("Pass --site with the id of the service's own site.");
+    process.exit(2);
+}
 const ORDER = args.get("order") ?? "seed_order_1";
 // The receipt needs the order's pay-link token (pentest 29 Oct).
 const ORDER_TOKEN = args.get("order-token") ?? "";
@@ -81,7 +88,7 @@ async function call(method, path, body) {
 /** Free class sessions over the next two weeks, fetched once. */
 async function sessions() {
     const res = await fetch(
-        new URL(`/public/services/${SERVICE}/days`, target),
+        new URL(`/public/sites/${SITE}/services/${SERVICE}/days`, target),
     );
     const body = await res.json();
     return body.days.flatMap((d) => d.starts.map((s) => s.startAt));
@@ -109,7 +116,7 @@ async function scenarios() {
         slots: () =>
             call(
                 "GET",
-                `/public/services/${SERVICE}/availability?from=${from.toISOString()}&to=${to.toISOString()}`,
+                `/public/sites/${SITE}/services/${SERVICE}/availability?from=${from.toISOString()}&to=${to.toISOString()}`,
             ),
         book: () =>
             call("POST", `/public/services/${SERVICE}/book`, {
@@ -121,7 +128,8 @@ async function scenarios() {
         // Checkout start as far as it runs without a payment provider: the
         // buyer's receipt read, which the checkout page polls. Creating a real
         // intent calls Razorpay or Cashfree, which a load smoke must not do.
-        checkout: () => call(
+        checkout: () =>
+            call(
                 "GET",
                 `/public/orders/${ORDER}/receipt?token=${encodeURIComponent(ORDER_TOKEN)}`,
             ),

@@ -46,7 +46,7 @@ export function AddressGroup({
     domain?: React.ReactNode;
 }) {
     return (
-        <Group id="address" title="Address">
+        <Group id="address" title="Web address">
             <Section>
                 <Row
                     label="Web address"

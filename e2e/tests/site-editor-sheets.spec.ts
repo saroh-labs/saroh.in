@@ -6,12 +6,14 @@ import {
     brandTab,
     editPill,
     openFromPill,
-    openMore,
     phoneSheet,
+    writeField,
 } from "../fixtures/phone-editor";
 import { pressUntil } from "../fixtures/press";
+import { openPhoneMenu, openReviewedSite } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
-import { NORTHWIND_ORG, REVIEWED_SITE, urls } from "../playwright.config";
+import { websiteAreaOn } from "../fixtures/website-area";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The site editor's sheets (DEC-185): Publish as one sheet on a desk (from
@@ -32,17 +34,8 @@ const onPhone = (testInfo: TestInfo) =>
 async function openEditor(page: Page) {
     await useSession(page);
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
-    await page.goto(`${urls.APP_URL}/sites`);
-    await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-    await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
-        timeout: 30_000,
-    });
-    const id = /\/sites\/([^/]+)\//.exec(page.url())?.[1];
-    if (id === undefined) throw new Error(`no site id in ${page.url()}`);
-    await page.goto(`${urls.APP_URL}/sites/${id}`);
-    await expect(page.locator("[data-layout]")).toBeVisible({
-        timeout: 30_000,
-    });
+    // The business's one site, in its editor (Website area on or off).
+    await openReviewedSite(page);
 }
 
 const publishSheet = (page: Page) => page.locator("[data-publish-sheet]");
@@ -58,8 +51,19 @@ async function openPublish(page: Page) {
     return publishSheet(page);
 }
 
+/**
+ * A tapped block's actions: its toolbar, or with the Website area its
+ * section sheet's Move · Duplicate · Hide here · Delete (U49).
+ */
+const blockActions = (page: Page) =>
+    page
+        .getByRole("toolbar", { name: "Block actions" })
+        .or(page.getByRole("group", { name: "Section actions" }));
+
 const heroChip = (page: Page) =>
-    page.getByRole("button", { name: /^Hero block, \d+ of \d+/ }).first();
+    page
+        .getByRole("button", { name: /^Top of the page section, \d+ of \d+/ })
+        .first();
 
 test.describe("Publish is a sheet", { tag: "@serial" }, () => {
     test("says what goes live, then turns into the result", async ({
@@ -87,11 +91,15 @@ test.describe("Publish is a sheet", { tag: "@serial" }, () => {
                       ];
             })
             .toEqual(phone ? [view.height, view.width] : [view.width, 440]);
-        await expect(sheet.locator("[data-going-live]").first()).toBeVisible();
+        // What goes live: one line, or with the Website area its list of
+        // changes, each with its own tick.
+        await expect(
+            sheet.locator("[data-going-live], [data-publish-changes]").first(),
+        ).toBeVisible();
 
         await sheet
             .getByRole("button", {
-                name: /^Publish (changes|site|without approval)$/,
+                name: /^Publish (changes|site|without approval|\d+ (of \d+ )?changes? now)$/,
             })
             .click();
         const live = sheet.locator("[role=status]");
@@ -102,10 +110,23 @@ test.describe("Publish is a sheet", { tag: "@serial" }, () => {
         ).toBeVisible();
         await sheet.getByRole("button", { name: "Done" }).click();
         await expect(publishSheet(page)).toHaveCount(0);
-        // Still editing, and nothing is waiting to go live.
-        await expect(
-            page.locator("[data-editor-bar] [role=status]"),
-        ).not.toContainText("Not published", { timeout: 30_000 });
+        // Still editing, and nothing is waiting to go live: the bar's
+        // status, or with the Website area the desk's chip ("Live · 2
+        // changes waiting") and the phone Publish's count.
+        if (!(await websiteAreaOn(page))) {
+            await expect(
+                page.locator("[data-editor-bar] [role=status]"),
+            ).not.toContainText("Not published", { timeout: 30_000 });
+        } else if (phone) {
+            await expect(
+                page.locator("[data-phone-bar] [data-publish-count]"),
+            ).toHaveCount(0, { timeout: 30_000 });
+        } else {
+            await expect(page.locator("[data-status-chip]")).toHaveText(
+                /^Live$/,
+                { timeout: 30_000 },
+            );
+        }
     });
 
     test("holds Publish while something must be fixed, and its fix goes to the block", async ({
@@ -116,18 +137,26 @@ test.describe("Publish is a sheet", { tag: "@serial" }, () => {
 
         // A hero still carrying the template's note to the owner blocks
         // publishing (DEC-141).
-        await pressUntil(heroChip(page), page.getByLabel("Subheading"));
-        const line = page.getByLabel("Subheading").filter({ visible: true });
+        // The field itself: not "Subheading on phone", nor the Website
+        // area's full-screen sheet a long one opens on a phone.
+        const line = page
+            .getByRole("textbox", { name: "Subheading", exact: true })
+            .filter({ visible: true });
+        await pressUntil(heroChip(page), line);
         const before = await line.inputValue();
         try {
-            await line.fill("Say what you do and where, in one line.");
+            await writeField(
+                page,
+                line,
+                "Say what you do and where, in one line.",
+            );
             const sheet = await openPublish(page);
             await expect(sheet.getByText(/^Fix first/)).toBeVisible({
                 timeout: 30_000,
             });
             await expect(
                 sheet.getByRole("button", {
-                    name: /^Publish (changes|site|without approval)$/,
+                    name: /^Publish (changes|site|without approval|\d+ (of \d+ )?changes? now)$/,
                 }),
             ).toBeDisabled();
             await expect(sheet.locator("[data-publish-waits]")).toHaveText(
@@ -140,14 +169,9 @@ test.describe("Publish is a sheet", { tag: "@serial" }, () => {
                 .getByRole("button", { name: "Edit" })
                 .click();
             await expect(publishSheet(page)).toHaveCount(0);
-            await expect(
-                page.getByLabel("Subheading").filter({ visible: true }),
-            ).toBeVisible();
+            await expect(line).toBeVisible();
         } finally {
-            await page
-                .getByLabel("Subheading")
-                .filter({ visible: true })
-                .fill(before);
+            await writeField(page, line, before);
             await expect(
                 page
                     .getByRole("button", { name: /^Publish/ })
@@ -172,7 +196,8 @@ test.describe("the phone editor without bottom tabs", () => {
         ).toHaveCount(0);
         await expect(editPill(page)).toBeVisible();
 
-        const more = await openMore(page);
+        // ⋯ More, or with the Website area the page picker's Pages sheet.
+        const more = await openPhoneMenu(page);
         await expect(
             more.getByRole("button", { name: /^Preview/ }),
         ).toBeVisible();
@@ -194,7 +219,9 @@ test.describe("the phone editor without bottom tabs", () => {
             const box = await b.boundingBox();
             if (box) expect(box.height).toBeGreaterThanOrEqual(44);
         }
-        await more.getByRole("button", { name: "Close More" }).click();
+        await more
+            .getByRole("button", { name: /^Close (More|pages)$/ })
+            .click();
         await expect(editPill(page)).toBeVisible();
     });
 
@@ -216,9 +243,10 @@ test.describe("the phone editor without bottom tabs", () => {
 
     test("Brand is one sheet with its tabs", async ({ page }) => {
         await openEditor(page);
-        const sheet = await brandTab(page, "Spacing");
-        await expect(sheet.locator("input[type=range]").first()).toBeVisible();
-        await brandTab(page, "Colour");
+        // One group at a time (U24b, WXBBrandPhone); no sliders.
+        const sheet = await brandTab(page, "Buttons and shapes");
+        await expect(sheet.locator("input[type=range]")).toHaveCount(0);
+        await brandTab(page, "Colours");
         await expect(
             sheet.getByRole("radiogroup", { name: "Colour" }),
         ).toBeVisible();
@@ -236,7 +264,10 @@ test.describe("the phone editor's changes", { tag: "@serial" }, () => {
     test("Blocks reorders from the grip, with Undo", async ({ page }) => {
         await openEditor(page);
         const sheet = await openFromPill(page, "Blocks");
-        const grip = sheet.getByRole("button", { name: /^Move .*: drag/ });
+        // "Move …: drag", or with the Website area "Drag to move …".
+        const grip = sheet.getByRole("button", {
+            name: /^(Move .*: drag|Drag to move )/,
+        });
         await expect(grip.first()).toBeVisible();
         await grip.first().focus();
         await page.keyboard.press("ArrowDown");
@@ -249,15 +280,28 @@ test.describe("the phone editor's changes", { tag: "@serial" }, () => {
         page,
     }) => {
         await openEditor(page);
-        const tools = page.getByRole("toolbar", { name: "Block actions" });
+        const tools = blockActions(page);
         await pressUntil(heroChip(page), tools);
         // No scrim under its settings: the toolbar is in reach.
         await expect(page.locator("[data-editor-scrim]")).toHaveCount(0);
-        const down = tools.getByRole("button", { name: "Move down" });
+        let down = tools.getByRole("button", { name: "Move down" });
+        if (await websiteAreaOn(page)) {
+            // The section sheet's Move opens the Sections sheet, where the
+            // tapped section steps down a place (U49).
+            await tools
+                .getByRole("button", { name: "Move", exact: true })
+                .click();
+            down = phoneSheet(page, "Sections on this page")
+                .locator('li[data-row-index="0"]')
+                .getByRole("button", { name: /^Move .* down$/ });
+        }
         await expect(down).toBeEnabled();
         await down.click();
-        await expect(page.getByText("Hero moved down").first()).toBeVisible();
+        await expect(
+            page.getByText("Top of the page moved down").first(),
+        ).toBeVisible();
         await page.getByRole("button", { name: "Undo" }).last().click();
+        await expect(page.getByText(/ moved down$/)).toHaveCount(0);
         await expect(heroChip(page)).toBeVisible();
     });
 
@@ -267,17 +311,24 @@ test.describe("the phone editor's changes", { tag: "@serial" }, () => {
         await openEditor(page);
         const before = await page.locator("[data-block-index]").count();
         const sheet = await openFromPill(page, "Add a block");
-        await sheet.getByLabel("Search blocks").fill("contact");
+        // "Search blocks", or with the Website area one search over pages
+        // and sections.
+        await sheet
+            .getByLabel(/^Search (blocks|pages and sections)$/)
+            .fill("contact");
         // By its name: the list filters a beat after typing, and the first
         // row before it does is Hero.
-        await sheet.getByRole("button", { name: "Add Contact" }).click();
+        // Contact is now Visit us's Talk to us layout, found by its old name (KD5).
+        await sheet
+            .getByRole("button", { name: "Add Visit us · Talk to us" })
+            .click();
         // Its settings rise; the toolbar is on the new block.
-        const tools = page.getByRole("toolbar", { name: "Block actions" });
+        const tools = blockActions(page);
         await expect(tools).toBeVisible({ timeout: 15_000 });
         await expect(page.locator("[data-block-index]")).toHaveCount(
             before + 1,
         );
-        await tools.getByRole("button", { name: "Remove" }).click();
+        await tools.getByRole("button", { name: /^(Remove|Delete)$/ }).click();
         await expect(
             page.getByText(/taken off this page$/).first(),
         ).toBeVisible();

@@ -1,4 +1,5 @@
 import {
+    dropUnsafeImages,
     pagePathResolver,
     parseSectionContent,
     toRendered,
@@ -36,6 +37,38 @@ export interface PublishablePage {
     /** A module page's kind (G14); absent for a free-form page. */
     kind?: string;
     sections: PublishableSection[];
+    /** The page's own head (KTD-7); each absent when unset. */
+    seoTitle?: string;
+    seoDescription?: string;
+    shareImageUrl?: string;
+    noindex?: true;
+}
+
+/** A page's own head fields as the draft holds them (KTD-7). */
+export interface DraftPageHead {
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    shareImageUrl?: string | null;
+    noindex?: boolean;
+}
+
+/**
+ * The page's own head as a snapshot carries it: only what is set, so a page
+ * without any is byte for byte what it was before pages had a head (an
+ * approval given then still covers its draft).
+ */
+export function pageHead(
+    page: DraftPageHead,
+): Pick<
+    PublishablePage,
+    "seoTitle" | "seoDescription" | "shareImageUrl" | "noindex"
+> {
+    return {
+        ...(page.seoTitle ? { seoTitle: page.seoTitle } : {}),
+        ...(page.seoDescription ? { seoDescription: page.seoDescription } : {}),
+        ...(page.shareImageUrl ? { shareImageUrl: page.shareImageUrl } : {}),
+        ...(page.noindex ? { noindex: true as const } : {}),
+    };
 }
 
 /** A draft section as it comes off the database, before sanitizing. */
@@ -61,7 +94,8 @@ export function toPublishableSection(
     const parsed = parseSectionContent(
         section.type,
         section.contractVersion,
-        section.content,
+        // A photo stored before unsafe srcs were refused is dropped, not fatal.
+        dropUnsafeImages(section.content),
     );
     if (!parsed.success) {
         return { ok: false, error: parsed.error.message };
@@ -98,7 +132,7 @@ export function toPublishableSection(
  * "6 sections changed" on a site they have not touched, which is the exact
  * failure this count exists to prevent: a number nobody believes.
  */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
     if (value === undefined) return "null";
     if (value === null || typeof value !== "object") {
         return JSON.stringify(value);
@@ -202,7 +236,7 @@ function diffSectionLists(
 }
 
 /** A draft page as the pending-count query loads it. */
-export interface DraftPageRow {
+export interface DraftPageRow extends DraftPageHead {
     id: string;
     path: string;
     title: string;
@@ -233,6 +267,7 @@ export function toPendingPages(pages: DraftPageRow[]): PublishablePage[] {
         title: page.title,
         isHome: page.isHome,
         ...(page.kind && page.kind !== "FREE" ? { kind: page.kind } : {}),
+        ...pageHead(page),
         sections: page.versions.flatMap((version) =>
             version.sections.map((section) => {
                 const result = toPublishableSection(section, resolvePage);
@@ -271,6 +306,8 @@ export const SITE_CHANGE_KINDS = [
     "footer",
     "menu",
     "pages",
+    // Old page links that forward (KTD-3): `snapshot.redirects`.
+    "redirects",
 ] as const;
 export type SiteChangeKind = (typeof SITE_CHANGE_KINDS)[number];
 
@@ -282,7 +319,7 @@ export type SiteChangeKind = (typeof SITE_CHANGE_KINDS)[number];
  * swatch was retuned in code, a change no merchant made.
  */
 const SITE_CHANGE_FIELDS: Record<
-    Exclude<SiteChangeKind, "pages">,
+    Exclude<SiteChangeKind, "pages" | "redirects">,
     readonly string[]
 > = {
     name: ["name", "slug"],
@@ -322,6 +359,14 @@ function pageList(pages: readonly unknown[]): unknown[] {
             // of a snapshot from before module pages, has none.
             kind:
                 typeof p.kind === "string" && p.kind !== "FREE" ? p.kind : null,
+            // The page's own head (KTD-7): a change to it is a change to
+            // the page list, as a title change is.
+            seoTitle: typeof p.seoTitle === "string" ? p.seoTitle : null,
+            seoDescription:
+                typeof p.seoDescription === "string" ? p.seoDescription : null,
+            shareImageUrl:
+                typeof p.shareImageUrl === "string" ? p.shareImageUrl : null,
+            noindex: p.noindex === true,
         }))
         .sort((a, b) => String(a.path).localeCompare(String(b.path)));
 }
@@ -338,13 +383,22 @@ export function pendingSiteChanges(
     draftSite: Record<string, unknown>,
     draftPages: readonly Pick<
         PublishablePage,
-        "path" | "title" | "isHome" | "kind"
+        | "path"
+        | "title"
+        | "isHome"
+        | "kind"
+        | "seoTitle"
+        | "seoDescription"
+        | "shareImageUrl"
+        | "noindex"
     >[],
     snapshot: unknown,
+    /** The forwards publish would write (`snapshot.redirects`). */
+    draftRedirects: readonly unknown[] = [],
 ): SiteChangeKind[] {
     const shape = (
         snapshot !== null && typeof snapshot === "object" ? snapshot : {}
-    ) as { site?: unknown; pages?: unknown };
+    ) as { site?: unknown; pages?: unknown; redirects?: unknown };
     const liveSite = (
         shape.site !== null && typeof shape.site === "object" ? shape.site : {}
     ) as Record<string, unknown>;
@@ -357,6 +411,15 @@ export function pendingSiteChanges(
                 canonical(pageList(draftPages)) !==
                 canonical(pageList(livePages))
             ) {
+                changed.push(kind);
+            }
+            continue;
+        }
+        if (kind === "redirects") {
+            const liveRedirects = Array.isArray(shape.redirects)
+                ? shape.redirects
+                : [];
+            if (canonical(draftRedirects) !== canonical(liveRedirects)) {
                 changed.push(kind);
             }
             continue;

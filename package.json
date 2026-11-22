@@ -33,6 +33,7 @@
         "check:migration-fold": "pnpm --filter @saroh/database db:verify:migration-fold",
         "check:migration-ids": "node scripts/check-migration-ids.mjs",
         "check:mktemp": "node scripts/check-mktemp.mjs",
+        "check:website-area-switch": "node scripts/check-website-area-switch.mjs",
         "check:domains": "node scripts/check-hard-coded-domains.mjs",
         "check:shared-data": "node scripts/check-shared-data.mjs",
         "check:shots": "node --test scripts/check-shots.test.mjs && node scripts/check-shots.mjs",

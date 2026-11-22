@@ -215,12 +215,13 @@ test.describe("bookings calendar", () => {
             }),
         ).toBeVisible();
         await page.goto("/bookings?layout=agenda");
-        await page
-            .getByRole("button", { name: /Change the day or the view$/ })
-            .click();
+        // A fresh page: the same press-until-it-answers as above (CI, 22 Nov 2026).
+        await pressUntil(
+            page.getByRole("button", { name: /Change the day or the view$/ }),
+            sheet,
+        );
         await expect(
-            page
-                .getByRole("dialog", { name: "Go to a day" })
+            sheet
                 .getByRole("navigation", { name: "Bookings view" })
                 .getByRole("link", { name: "List" }),
         ).toHaveAttribute("aria-current", "page");

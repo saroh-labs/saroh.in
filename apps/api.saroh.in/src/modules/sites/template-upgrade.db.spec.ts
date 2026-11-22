@@ -27,6 +27,7 @@ import { ModuleReadinessRegistry } from "../capabilities/readiness/module-readin
 import { ModuleSetupService } from "../capabilities/setup/module-setup.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FLAG_KEYS } from "../feature-flags/flags";
+import { SYSTEM_EDITOR } from "./draft-editors";
 import { OWNER_NOTE_MESSAGE } from "./site-flags";
 import { SitesService } from "./sites.service";
 import {
@@ -210,7 +211,7 @@ describe("a starter site nobody touched", () => {
 
         expect(await record(siteId)).toMatchObject({
             templateId: "starter",
-            templateVersion: 4,
+            templateVersion: 5,
             templateStyleId: "stone",
             style: { fontPair: "source-serif-inter" },
             footer: { value: "", layout: "left" },
@@ -242,7 +243,7 @@ describe("a starter site nobody touched", () => {
             outcome: "SUCCESS",
             metadata: {
                 from: "starter@3",
-                to: "starter@4",
+                to: "starter@5",
                 style: "applied",
                 footer: "applied",
                 pagesReplaced: 1,
@@ -250,6 +251,22 @@ describe("a starter site nobody touched", () => {
                 modulePagesAdded: 1,
             },
         });
+
+        // No person did it: the look and the hidden page are stamped as
+        // Saroh's, so they wait for approval where it applies (21 Nov).
+        const stamped = await prisma.site.findUniqueOrThrow({
+            where: { id: siteId },
+            select: { draftEditors: true },
+        });
+        expect(stamped.draftEditors).toMatchObject({
+            "site:style": { userId: SYSTEM_EDITOR },
+            "site:footer": { userId: SYSTEM_EDITOR },
+        });
+        const hiddenAbout = await prisma.page.findFirstOrThrow({
+            where: { siteId, path: "/about" },
+            select: { settingsEditedByUserId: true },
+        });
+        expect(hiddenAbout.settingsEditedByUserId).toBe(SYSTEM_EDITOR);
 
         // It can now go live: the note is gone.
         await expect(sites.publishSite(ctx, siteId)).resolves.toMatchObject({
@@ -299,7 +316,7 @@ describe("a starter site nobody touched", () => {
             styleApplied: 1,
             footerApplied: 1,
             counts: { pagesReplaced: 1, pagesHidden: 1, modulePagesAdded: 1 },
-            moves: { "starter@3 → starter@4": 1 },
+            moves: { "starter@3 → starter@5": 1 },
         });
 
         expect(await draft(siteId)).toEqual(before);
@@ -364,7 +381,7 @@ describe("a starter site its owner has worked on", () => {
         // Their accent, not a colourway; and no colourway recorded for it.
         expect(recorded.style).toEqual({ colours: { accent: "teal" } });
         expect(recorded).toMatchObject({
-            templateVersion: 4,
+            templateVersion: 5,
             templateStyleId: null,
             // Still serving the version they published.
             currentPublicationId: published.publicationId,
@@ -381,7 +398,7 @@ describe("a starter site its owner has worked on", () => {
         const read = await sites.getSite(ctx, siteId);
         expect(read.template).toEqual({
             id: "starter",
-            version: 4,
+            version: 5,
             styleId: null,
         });
     });

@@ -6,6 +6,9 @@ import { prisma } from "@saroh/database";
 import { planMeter } from "../billing/metering.service";
 import {
     ANALYTICS_RETENTION_DAYS,
+    ENQUIRY_SUBMITTED_TYPE,
+    SITE_PAID_TYPE,
+    SITE_STARTED_TYPE,
     SITE_VIEW_TYPE,
     sitePathOnly,
     VISIT_ORIGIN_TYPES,
@@ -27,6 +30,9 @@ export interface AnalyticsAggregatePayload {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Events read per query, so one busy day is never one huge read (04 W6). */
+export const AGGREGATE_READ_PAGE = 5000;
 
 /**
  * Whether a day may already have lost events to the retention sweep
@@ -57,6 +63,24 @@ interface Bucket {
     visitors: Set<string>;
 }
 
+/**
+ * The types with a `path` breakdown: a page's own results (website editor
+ * plan KTD-E8). Views always carry a path; a started checkout, a paid one and
+ * an enquiry get theirs counted from the day they carry one (forward only,
+ * no back-fill), so a page's part says "since" that day rather than 0.
+ *
+ * A path is kept only when it is one of the event's site's pages (02 W7, 21
+ * Nov 2026): a made-up path can't fake a page's numbers, and the path rows
+ * a day writes are bounded by the site's pages, not by what visitors send.
+ * Any other path counts in the totals alone.
+ */
+const PATH_TYPES: ReadonlySet<string> = new Set([
+    SITE_VIEW_TYPE,
+    SITE_STARTED_TYPE,
+    SITE_PAID_TYPE,
+    ENQUIRY_SUBMITTED_TYPE,
+]);
+
 /** The org-wide total of site views: the row visits a month are counted from. */
 function isVisitsTotal(bucket: Bucket): boolean {
     return (
@@ -70,7 +94,7 @@ function isVisitsTotal(bucket: Bucket): boolean {
  * Org-safe daily aggregate job (S7-002).
  *
  * Reads ONE org's `AnalyticsEvent`s for a UTC day, groups them by `(type,
- * siteId)` (plus a `path` dimension for `site.view`, and `source` and `ref`
+ * siteId)` (plus a `path` dimension for `PATH_TYPES`, and `source` and `ref`
  * dimensions for a visit's steps and paid orders, U15), and UPSERTS the
  * matching `AnalyticsDailyAggregate` rows.
  *
@@ -104,15 +128,27 @@ export class AnalyticsAggregateHandler {
             return;
         }
 
-        // ORG-ISOLATED read: only THIS org's events, only for THIS day.
-        const events = await prisma.analyticsEvent.findMany({
-            where: {
-                organizationId,
-                occurredAt: { gte: dayStart, lt: dayEnd },
-            },
-        });
-
-        const buckets = this.accumulate(events);
+        const pagePaths = await this.pagePaths(organizationId);
+        const buckets = new Map<string, Bucket>();
+        let read = 0;
+        let after: string | undefined;
+        // ORG-ISOLATED read: only THIS org's events, only for THIS day, a
+        // page at a time.
+        for (;;) {
+            const events = await prisma.analyticsEvent.findMany({
+                where: {
+                    organizationId,
+                    occurredAt: { gte: dayStart, lt: dayEnd },
+                    ...(after ? { id: { gt: after } } : {}),
+                },
+                orderBy: { id: "asc" },
+                take: AGGREGATE_READ_PAGE,
+            });
+            this.accumulate(events, pagePaths, buckets);
+            read += events.length;
+            if (events.length < AGGREGATE_READ_PAGE) break;
+            after = events[events.length - 1].id;
+        }
 
         // Recompute is idempotent: set absolute values via upsert.
         for (const bucket of buckets.values()) {
@@ -124,7 +160,7 @@ export class AnalyticsAggregateHandler {
         }
 
         this.logger.log(
-            `analytics.aggregate: org ${organizationId} ${dayStart.toISOString().slice(0, 10)} → ${events.length} events, ${buckets.size} aggregates.`,
+            `analytics.aggregate: org ${organizationId} ${dayStart.toISOString().slice(0, 10)} → ${read} events, ${buckets.size} aggregates.`,
         );
     };
 
@@ -207,14 +243,16 @@ export class AnalyticsAggregateHandler {
      * Fold the day's events into aggregate buckets:
      *  - an org-wide (siteId="") total per `type`,
      *  - a per-site total per `(type, siteId)` for events that name a site,
-     *  - and, for `site.view`, the same two rollups broken down by `path`.
+     *  - and, for `PATH_TYPES`, the same two rollups broken down by `path`.
      *
      * A null/empty `siteId` only ever contributes to the org-wide (siteId="")
      * bucket, so it can never be double-counted against a per-site row.
      */
-    private accumulate(events: AnalyticsEvent[]): Map<string, Bucket> {
-        const buckets = new Map<string, Bucket>();
-
+    private accumulate(
+        events: AnalyticsEvent[],
+        pagePaths: ReadonlyMap<string, ReadonlySet<string>>,
+        buckets: Map<string, Bucket>,
+    ): void {
         const bump = (
             siteId: string,
             type: string,
@@ -256,14 +294,13 @@ export class AnalyticsAggregateHandler {
                 bump(site, type, TOTAL_DIM, TOTAL_DIM, visitorHash);
             }
 
-            // `site.view` also gets a `path` breakdown.
-            if (type === SITE_VIEW_TYPE) {
+            // A page's results (`PATH_TYPES`) also get a `path` breakdown.
+            // Only one of the site's own pages (02 W7).
+            if (PATH_TYPES.has(type) && site !== null && site !== "") {
                 const path = this.readPath(event.properties);
-                if (path !== null) {
+                if (path !== null && pagePaths.get(site)?.has(path)) {
                     bump(ALL_SITES, type, "path", path, visitorHash);
-                    if (site !== null && site !== "") {
-                        bump(site, type, "path", path, visitorHash);
-                    }
+                    bump(site, type, "path", path, visitorHash);
                 }
             }
 
@@ -283,8 +320,23 @@ export class AnalyticsAggregateHandler {
                 }
             }
         }
+    }
 
-        return buckets;
+    /** Each of the business's sites' page links: the paths a day may keep. */
+    private async pagePaths(
+        organizationId: string,
+    ): Promise<Map<string, Set<string>>> {
+        const pages = await prisma.page.findMany({
+            where: { organizationId },
+            select: { siteId: true, path: true },
+        });
+        const out = new Map<string, Set<string>>();
+        for (const p of pages) {
+            const paths = out.get(p.siteId) ?? new Set<string>();
+            paths.add(p.path);
+            out.set(p.siteId, paths);
+        }
+        return out;
     }
 
     /**

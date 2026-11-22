@@ -69,4 +69,14 @@ describe("the Class packs block's packs on a served page (G20)", () => {
         expect(hasPacks([])).toBe(false);
         expect(hasPacks([{ type: "packs" }])).toBe(true);
     });
+
+    it("reads packs for a Plans block that sells them too (DEC-228)", () => {
+        expect(hasPacks([{ type: "plans", content: {} }])).toBe(false);
+        expect(hasPacks([{ type: "plans", content: { show: "both" } }])).toBe(
+            true,
+        );
+        expect(hasPacks([{ type: "plans", content: { show: "packs" } }])).toBe(
+            true,
+        );
+    });
 });

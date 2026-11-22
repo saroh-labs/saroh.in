@@ -1,6 +1,6 @@
 import { toRendered } from "@saroh/block-contract";
 import type { TemplateContext } from "@saroh/templates";
-import { ceramicsTemplate, instantiateTemplate } from "@saroh/templates";
+import { ceramicsTemplateV1, instantiateTemplate } from "@saroh/templates";
 import { render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -49,7 +49,7 @@ const PIECES: ShopListingCard[] = [
 ];
 
 function renderHome(ctx: TemplateContext, feed?: ProductGridFeed) {
-    const page = instantiateTemplate(ceramicsTemplate, ctx).pages[0];
+    const page = instantiateTemplate(ceramicsTemplateV1, ctx).pages[0];
     const resolvePage = () => undefined;
     const sections = page.sections.map((s) => ({
         type: s.type,

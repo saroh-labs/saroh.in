@@ -17,6 +17,7 @@ import type { ModuleKey } from "../capabilities/module-registry";
 import { moduleRolledOut } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { OrganizationKind } from "../organizations/organization-kind";
+import { tradeRead } from "../organizations/organization-trade";
 import { modulePageState } from "./module-pages";
 import { publicWeek, registeredAddress } from "./public-visit.service";
 
@@ -137,6 +138,7 @@ export async function buildTemplateContext(
         where: { id: organizationId },
         select: {
             name: true,
+            trade: true,
             businessProfile: {
                 select: {
                     legalName: true,
@@ -203,6 +205,7 @@ export async function buildTemplateContext(
 
     const place = await businessPlace(db, organizationId, profile);
     const area = businessArea(profile?.city) ?? undefined;
+    const trade = tradeRead(org.trade);
     const description = composeBusinessLine({
         offers: books
             ? services.slice(0, LINE_NAMES).map((s) => s.name)
@@ -223,6 +226,8 @@ export async function buildTemplateContext(
         ...(area ? { area } : {}),
         hasPlace: place.address,
         hasHours: place.hours,
+        // The trade's words on a template's main button (DEC-216).
+        ...(trade ? { trade } : {}),
     };
 }
 

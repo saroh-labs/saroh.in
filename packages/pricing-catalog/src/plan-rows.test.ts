@@ -25,6 +25,15 @@ describe("planRows", () => {
         expect(new Set(rows.map((r) => r.currency))).toEqual(new Set(["INR"]));
     });
 
+    it("writes the yearly offer as the yearly row's price (DEC-239)", () => {
+        const rows = planRows(
+            edit(fixture(), (c) => (c.plans[1].yearlyOfferPaise = 77_700)),
+            1,
+        );
+        const b = rows.filter((r) => r.key === "catalog.b");
+        expect(b.map((r) => r.priceCents)).toEqual([11_100, 77_700]);
+    });
+
     it("takes the catalogue's currency (stage 9)", () => {
         const rows = planRows(
             edit(fixture(), (c) => {

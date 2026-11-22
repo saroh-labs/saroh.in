@@ -3,6 +3,7 @@ import { isSafeHref } from "@saroh/block-contract";
 
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import { SiteLink } from "../site-link";
 
 /**
  * The Projects block's `rhythm` look (template polish), as the studio
@@ -213,14 +214,14 @@ function Tile({
     return (
         <article className="min-w-0">
             {link ? (
-                <a
+                <SiteLink
                     href={link}
                     rel={/^https?:\/\//i.test(link) ? "noopener" : undefined}
                     className={cn("block", focusRing)}
                 >
                     {photo}
                     {words}
-                </a>
+                </SiteLink>
             ) : (
                 <>
                     {photo}

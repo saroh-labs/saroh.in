@@ -352,10 +352,9 @@ describe("motion", () => {
         },
     );
 
-    it("keeps Classic's own entrance and timing exactly", () => {
+    it("keeps Classic's own timing exactly, with no scroll entrance (U8)", () => {
         const classic = craftRules(":root", undefined);
-        expect(classic).toContain("animation-timeline: view();");
-        expect(classic).toContain("translateY(14px)");
+        expect(classic).not.toContain("animation-timeline");
         expect(classic).toContain("site-menu-in 180ms");
         expect(classic).toContain("color 150ms");
         expect(craftRules(":root", undefined, "quiet")).toContain(
@@ -409,6 +408,14 @@ describe("the look reaches every block", () => {
         expect(withLookVariant({ type: "nope", content: {} }, "quiet")).toEqual(
             {},
         );
+    });
+
+    it("a section's own layout wins over the look's, the new ones too (U4–U6)", () => {
+        const answer = hero({ variant: "answer" });
+        expect(withLookVariant(answer, undefined)).toEqual(answer.content);
+        expect(withLookVariant(answer, "quiet")).toEqual(answer.content);
+        const band = { type: "features", content: { variant: "band" } };
+        expect(withLookVariant(band, undefined)).toEqual({ variant: "band" });
     });
 
     it("the header lies over a full-bleed hero the look chose too", () => {

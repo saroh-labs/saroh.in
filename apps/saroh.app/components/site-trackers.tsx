@@ -12,6 +12,7 @@ import {
 import type { LookId } from "@saroh/block-contract";
 import { ConsentBanner, SITE_CONSENT_OPEN_EVENT } from "@saroh/site-blocks";
 
+import { pageNonce } from "@/lib/csp";
 import type { SiteHeadTracker } from "@/lib/site-head-shape";
 import type { LoaderScript, SiteConsent } from "@/lib/trackers";
 import {
@@ -100,8 +101,11 @@ function gpcOn(): boolean {
 }
 
 function inject(scripts: readonly LoaderScript[]): void {
+    // A loader's text runs only with the page's nonce (`lib/csp.ts`).
+    const nonce = pageNonce();
     for (const s of scripts) {
         const el = document.createElement("script");
+        el.nonce = nonce;
         el.dataset.siteTracker = "";
         for (const [name, value] of Object.entries(s.attrs ?? {})) {
             el.setAttribute(name, value);

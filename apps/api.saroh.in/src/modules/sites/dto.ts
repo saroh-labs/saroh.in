@@ -1,6 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
+    ArrayMinSize,
     IsArray,
     IsBoolean,
     IsDefined,
@@ -267,6 +268,71 @@ export class UpdatePageDto {
     @IsOptional()
     @IsBoolean({ message: "inMenu must be a boolean" })
     inMenu?: boolean;
+
+    /*
+     * The page's own Google title and text and share image (KTD-7). Absent
+     * leaves alone; null (or blank) clears, and the site's own is used.
+     * Lengths are what Google shows before it cuts.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(70, { message: "Keep the Google title to 70 characters" })
+    seoTitle?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(300, { message: "Keep the Google text to 300 characters" })
+    seoDescription?: string | null;
+
+    /** A photo from the library; its address is taken when it is chosen. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    shareImageMediaId?: string | null;
+
+    /** A pasted address, when no library photo is chosen. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(2048)
+    @Matches(/^https?:\/\/\S+$/i, {
+        message:
+            "The share image must be a web address starting with http:// or https://",
+    })
+    shareImageUrl?: string | null;
+
+    /** "Show on Google" off. Absent leaves alone. */
+    @IsOptional()
+    @IsBoolean({ message: "noindex must be a boolean" })
+    noindex?: boolean;
+}
+
+/**
+ * One of the merchant's old links forwarding to a page (KTD-3): a link from
+ * an old site, or one printed before a page moved.
+ */
+export class CreateSiteRedirectDto {
+    @Transform(trim)
+    @IsString()
+    @Matches(PAGE_PATH_RE, {
+        message:
+            "The old link must start with / and use lowercase letters, numbers and hyphens (for example /old-prices)",
+    })
+    @MaxLength(200, { message: "The old link must be at most 200 characters" })
+    fromPath!: string;
+
+    @Transform(trim)
+    @IsString()
+    @Matches(PAGE_PATH_RE, { message: "Pick one of your pages" })
+    @MaxLength(200)
+    toPath!: string;
 }
 
 /**
@@ -309,6 +375,16 @@ export class CreateCommentDto {
     @MinLength(1, { message: "postId must be an id" })
     @MaxLength(64)
     postId?: string;
+
+    /**
+     * The words on the page the note is pinned to (U17a), as they read now.
+     * Absent: the note is about the whole section or post.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(500, { message: "Keep the quoted words to 500 characters" })
+    quote?: string;
 
     /** The test release the note is about (DEC-071, T8). Absent: the draft. */
     @IsOptional()
@@ -531,6 +607,38 @@ export class GoLiveOptionsDto {
     override?: boolean;
 }
 
+/**
+ * Publish (U8): `leaveOut` names change units (`GET …/changes` keys) that
+ * stay in the draft and go live as they are live now.
+ */
+export class PublishOptionsDto extends GoLiveOptionsDto {
+    @IsOptional()
+    @IsArray({ message: "leaveOut must be a list of changes" })
+    @ArrayMaxSize(500, { message: "leaveOut is too long" })
+    @IsString({ each: true, message: "leaveOut must be a list of changes" })
+    @MaxLength(300, { each: true, message: "leaveOut has a key too long" })
+    leaveOut?: string[];
+}
+
+/** Approve waiting changes (DEC-226, U9): their unit keys. */
+export class ApproveChangesDto {
+    @IsArray({ message: "units must be a list of changes" })
+    @ArrayMinSize(1, { message: "Choose at least one change" })
+    @ArrayMaxSize(500, { message: "units is too long" })
+    @IsString({ each: true, message: "units must be a list of changes" })
+    @MaxLength(300, { each: true, message: "units has a key too long" })
+    units!: string[];
+}
+
+/** Ask for changes on waiting changes, saying what (UX-043, U9). */
+export class AskForChangesDto extends ApproveChangesDto {
+    @Transform(trim)
+    @IsString({ message: "Say what needs changing." })
+    @MinLength(3, { message: "Say what needs changing." })
+    @MaxLength(500, { message: "Keep it under 500 characters." })
+    reason!: string;
+}
+
 /** Mint a preview link (#198). The choices are the ones the design offers. */
 export class CreatePreviewLinkDto {
     @IsIn([1, 7, 30], { message: "A preview link lasts 1, 7 or 30 days" })
@@ -554,9 +662,9 @@ const TEST_RELEASE_NOTE_MAX = 500;
 export class CreateTestReleaseDto {
     @IsOptional()
     @Transform(trimOrUndefined)
-    @IsString({ message: "Give the test release a name" })
+    @IsString({ message: "Give the test link a name" })
     @MaxLength(TEST_RELEASE_NAME_MAX, {
-        message: `A test release name must be at most ${TEST_RELEASE_NAME_MAX} characters`,
+        message: `A test link name must be at most ${TEST_RELEASE_NAME_MAX} characters`,
     })
     name?: string;
 
@@ -575,10 +683,10 @@ export class UpdateTestReleaseDto {
     // Checked whenever present: a release always has a name.
     @ValidateIf((_o, v) => v !== undefined)
     @Transform(trim)
-    @IsString({ message: "Give the test release a name" })
-    @MinLength(1, { message: "Give the test release a name" })
+    @IsString({ message: "Give the test link a name" })
+    @MinLength(1, { message: "Give the test link a name" })
     @MaxLength(TEST_RELEASE_NAME_MAX, {
-        message: `A test release name must be at most ${TEST_RELEASE_NAME_MAX} characters`,
+        message: `A test link name must be at most ${TEST_RELEASE_NAME_MAX} characters`,
     })
     name?: string;
 
@@ -594,7 +702,7 @@ export class UpdateTestReleaseDto {
 
 /** A new link to share a test release, lasting 1, 7 or 30 days. */
 export class CreateTestReleaseLinkDto {
-    @IsIn([1, 7, 30], { message: "A test release link lasts 1, 7 or 30 days" })
+    @IsIn([1, 7, 30], { message: "A test link lasts 1, 7 or 30 days" })
     days!: 1 | 7 | 30;
 }
 

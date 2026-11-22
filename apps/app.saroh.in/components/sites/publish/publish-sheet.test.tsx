@@ -52,8 +52,19 @@ const flags = (
     canChange = true,
     fixedHost: string | null = null,
 ) =>
+    (["blockers", "advice"] as const)
+        .map((part) => partOf(part, list, canChange, fixedHost))
+        .join("");
+
+const partOf = (
+    part: "blockers" | "advice",
+    list: Flag[],
+    canChange = true,
+    fixedHost: string | null = null,
+) =>
     renderToStaticMarkup(
         <PublishFlags
+            part={part}
             flags={list}
             pages={[about]}
             addressFix={{
@@ -68,20 +79,22 @@ const flags = (
     );
 
 describe("the Publish sheet's list (DEC-185)", () => {
-    it("puts a blocker first, in red, with its fix, and marks advice as not stopping you", () => {
-        const html = flags([noDescription, noAddress]);
-        expect(html.indexOf("Fix first · 1")).toBeLessThan(
-            html.indexOf("Worth a look · 1 · won’t stop you"),
-        );
-        expect(html).toContain('data-flag-tone="block"');
-        expect(html).toContain("Choose address");
-        // With a blocker, the "won't stop you" line is in the heading only.
-        expect(html).not.toContain("It won’t stop you publishing.");
+    it("puts a blocker above the changes, in red, with its fix; the advice below, folded", () => {
+        const top = partOf("blockers", [noDescription, noAddress]);
+        expect(top).toContain("Fix first · 1");
+        expect(top).toContain('data-flag-tone="block"');
+        expect(top).toContain("Choose address");
+        expect(top).not.toContain("worth a look");
+        const below = partOf("advice", [noDescription, noAddress]);
+        expect(below).toContain("<details");
+        expect(below).not.toContain("<details open");
+        expect(below).toContain("1 more thing worth a look");
+        expect(below).not.toContain("Fix first");
     });
 
     it("names each advice with its page and its fix", () => {
         const html = flags([noDescription]);
-        expect(html).toContain("1 thing worth a look");
+        expect(html).toContain("1 more thing worth a look");
         expect(html).toContain("No search description");
         expect(html).toContain(
             "About · Search results show the first lines of the page instead.",

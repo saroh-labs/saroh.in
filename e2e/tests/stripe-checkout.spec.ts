@@ -267,7 +267,12 @@ async function stripeBookingSite(
     browser: Browser,
     testInfo: TestInfo,
     prefix: string,
-): Promise<{ b: OwnBusiness; site: string; serviceId: string }> {
+): Promise<{
+    b: OwnBusiness;
+    site: string;
+    siteId: string;
+    serviceId: string;
+}> {
     const b = await stripeBusiness(page, browser, testInfo, prefix, [
         "MODULE_CRM",
         "MODULE_APPOINTMENTS",
@@ -291,6 +296,8 @@ async function stripeBookingSite(
     const serviceId = services.at(0)?.id ?? "";
     expect(serviceId, "the setup made its service").toBeTruthy();
     await api.post("/booking-page/publish");
+    const siteId = (await api.get<{ id: string }[]>("/sites")).at(0)?.id ?? "";
+    expect(siteId, "the setup made its site").toBeTruthy();
     const renderer = new URL(urls.RENDERER_URL);
     const site = `${renderer.protocol}//${b.address}.${renderer.host}`;
     await expect
@@ -298,7 +305,7 @@ async function stripeBookingSite(
             timeout: 20_000,
         })
         .toBe(200);
-    return { b, site, serviceId };
+    return { b, site, siteId, serviceId };
 }
 
 /**
@@ -606,7 +613,7 @@ test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-2
         test.setTimeout(180_000);
         const s = stamp(testInfo);
         const tag = s.replace(/[^A-Za-z0-9]/g, "");
-        const { b, site, serviceId } = await stripeBookingSite(
+        const { b, site, siteId, serviceId } = await stripeBookingSite(
             page,
             browser,
             testInfo,
@@ -629,7 +636,7 @@ test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-2
 
         const offered = async () => {
             const res = await page.request.get(
-                `${urls.API_URL}/public/services/${serviceId}/days`,
+                `${urls.API_URL}/public/sites/${siteId}/services/${serviceId}/days`,
             );
             return (
                 (await res.json()) as {

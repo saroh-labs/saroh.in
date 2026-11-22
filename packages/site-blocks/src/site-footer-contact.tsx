@@ -7,8 +7,6 @@ import { phoneText } from "./lib/phone";
 import { isSocialLink } from "./lib/public-contact";
 import { reachOf } from "./reach-links";
 import { FooterHours } from "./site-footer-hours";
-import type { SiteNavItem } from "./site-header-menu";
-import { SiteFooterMenu } from "./site-header-menu";
 import { SocialLinkRow } from "./social-icons";
 
 /**
@@ -58,15 +56,11 @@ export interface SiteContactPlace {
 export const FOOTER_LINK =
     "focus-visible:ring-site-footer-fg rounded-sm underline decoration-1 underline-offset-[3px] transition-[text-decoration-color,opacity] duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-site-footer-bg active:opacity-70";
 
-/** A link someone taps: a full 44px target on a touch pointer. */
-const TAP_LINK = `${FOOTER_LINK} coarse:min-h-11 inline-flex items-center`;
-
 /**
- * A page in the footer's menu: plain until the pointer is on it, since a
- * list of pages under "Pages" needs no underline to read as links.
+ * A link someone taps: a full 44px target on a touch pointer, and on any
+ * pointer at phone width (U8: the critique measured 17-21px rows).
  */
-const MENU_LINK =
-    "focus-visible:ring-site-footer-fg coarse:min-h-11 inline-flex min-h-8 items-center rounded-sm underline decoration-transparent decoration-1 underline-offset-[3px] transition-[text-decoration-color,opacity] duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-site-footer-bg active:opacity-70 aria-[current=page]:font-bold aria-[current=page]:decoration-current";
+const TAP_LINK = `${FOOTER_LINK} coarse:min-h-11 max-[699px]:min-h-11 inline-flex items-center`;
 
 /** A column's heading: small, wide-tracked, in the footer's own text colour. */
 const COLUMN_HEADING =
@@ -119,7 +113,7 @@ export function lookFooterClasses(look: LookId) {
 
 /** The label over a place's week, one step quieter than a column heading. */
 const HOURS_LABEL =
-    "font-site-body m-0 mb-1.5 text-[11.5px] font-bold uppercase leading-snug tracking-[0.1em]";
+    "font-site-body m-0 mb-1.5 text-[12px] font-bold uppercase leading-snug tracking-[0.1em]";
 
 /** A trimmed string, or null when there is nothing in it. */
 function nonBlank(value: string | null | undefined): string | null {
@@ -168,11 +162,9 @@ export function shownContact(contact: SiteContact | null | undefined) {
 /** Whether the footer has any fact to lay out in columns. */
 export function hasFooterFacts(
     contact: SiteContact | null | undefined,
-    menu: readonly SiteNavItem[] = [],
 ): boolean {
     const { phone, email, places, address, social } = shownContact(contact);
     return (
-        menu.length > 0 ||
         phone !== null ||
         email !== null ||
         address !== null ||
@@ -182,15 +174,19 @@ export function hasFooterFacts(
 }
 
 /**
- * The footer's facts, in columns: where to find the business (each place
- * with its address, "Get directions" and its week), how to get in touch
- * (phone, WhatsApp, email, social links) and the site's pages.
+ * The footer's facts, in columns: the answers someone scrolls to the
+ * bottom for (U8, the 17 Nov critique and board TPSystem): the hours, with
+ * today marked in the browser; where to visit, with directions; and how to
+ * talk (phone, WhatsApp, email, social links). Never the header's menu
+ * again: the header and its menu already list every page.
  *
  * Draws nothing at all when nothing is set, and never a heading with
  * nothing under it: a column exists only for facts the business has given.
  * On a phone the columns stack, in the order someone looks for them.
  *
- * - One place is "Find us"; several are each a column under their own name.
+ * - One place: "Hours" (its week) and "Visit" (its address and
+ *   directions). Several are each a column under their own name, with
+ *   their week inside.
  * - The address is an `<address>`, its lines kept. Directions open the
  *   place's own Google Maps link when the merchant gave it one, else a
  *   search for the address.
@@ -198,18 +194,18 @@ export function hasFooterFacts(
  *   email a `mailto:`; WhatsApp the business's own `wa.me` link, said in
  *   words, so it is not repeated among the icons.
  * - Social links are icons in the footer's own colour.
+ * - The column says "Hours", never "Today": a page may be kept and served
+ *   tomorrow, so the cached HTML carries the week and the browser marks
+ *   today (R18).
  */
 export function FooterContact({
     contact,
-    menu = [],
     now,
     look,
     leading = null,
     trailing = null,
 }: {
     contact: SiteContact | null | undefined;
-    /** The site's menu, each address already as the page should link it. */
-    menu?: readonly SiteNavItem[];
     /** The moment today is marked for. Fixtures and tests pin it. */
     now?: Date;
     /**
@@ -220,11 +216,11 @@ export function FooterContact({
     /** A first column before the places (Folio's name block); it orders
      * itself first. */
     leading?: ReactNode;
-    /** One more column after the pages (a look's "Your account"). */
+    /** One more column after the ways to talk (a look's "Your account"). */
     trailing?: ReactNode;
 }) {
     const { phone, email, places, address, social } = shownContact(contact);
-    if (!hasFooterFacts(contact, menu)) return null;
+    if (!hasFooterFacts(contact)) return null;
     const heading = look ? LOOK_COLUMN_HEADING[look] : COLUMN_HEADING;
     const tap = look
         ? look === "live"
@@ -232,9 +228,12 @@ export function FooterContact({
             : LOOK_FOOTER_LINK
         : TAP_LINK;
     const centred = look === "quiet";
+    const hoursLabel = look
+        ? `${HOURS_LABEL} text-site-footer-muted`
+        : HOURS_LABEL;
 
     const whatsapp = reachOf({ phone, email, social }).whatsapp;
-    // Said in words under "Get in touch", so not again as an icon.
+    // Said in words under "Talk", so not again as an icon.
     const icons = whatsapp
         ? social.filter((link) => link.network !== "whatsapp")
         : social;
@@ -242,6 +241,25 @@ export function FooterContact({
     // A way to reach the business in words, as against the icons.
     const direct = phone ?? whatsapp ?? email;
     const inTouch = direct !== null || icons.length > 0;
+    // One place: its week is a column of its own, ahead of the address.
+    const only = several ? null : (places[0] ?? null);
+    // As `hoursRows`: a week with no open day is no week.
+    const week = only?.hours?.some((day) => !day.closed) ? only.hours : null;
+
+    const directions = (place: (typeof places)[number]) => (
+        <a
+            href={
+                // Re-checked: only Google's own map pages are ever a link.
+                mapLinkOrNull(place.mapUrl) ??
+                addressDirectionsHref(place.address)
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${tap} mt-1.5`}
+        >
+            Get directions
+        </a>
+    );
 
     return (
         <div
@@ -252,49 +270,58 @@ export function FooterContact({
                     : "grid grid-cols-1 gap-x-10 gap-y-9 text-left text-[14.5px] leading-relaxed sm:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]"
             }
         >
-            {places.map((place, i) => {
-                const named = several ? nonBlank(place.name) : null;
-                return (
-                    <section key={`${place.name ?? ""}|${place.address}|${i}`}>
-                        <h2 className={heading}>{named ?? "Find us"}</h2>
-                        <address className="whitespace-pre-line not-italic">
-                            {addressLines(place.address).join("\n")}
-                        </address>
-                        <a
-                            href={
-                                // Re-checked: only Google's own map pages
-                                // are ever a link.
-                                mapLinkOrNull(place.mapUrl) ??
-                                addressDirectionsHref(place.address)
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`${tap} mt-1.5`}
-                        >
-                            Get directions
-                        </a>
-                        <FooterHours
-                            hours={place.hours ?? null}
-                            timeZone={contact?.timeZone}
-                            now={now}
-                            labelClassName={
-                                look
-                                    ? `${HOURS_LABEL} text-site-footer-muted`
-                                    : HOURS_LABEL
-                            }
-                        />
-                    </section>
-                );
-            })}
+            {week ? (
+                <section data-site-footer-hours="">
+                    <FooterHours
+                        hours={week}
+                        timeZone={contact?.timeZone}
+                        now={now}
+                        label="Hours"
+                        labelAs="h2"
+                        labelClassName={heading}
+                        flush
+                    />
+                </section>
+            ) : null}
+            {only ? (
+                <section>
+                    <h2 className={heading}>Visit</h2>
+                    <address className="whitespace-pre-line not-italic">
+                        {addressLines(only.address).join("\n")}
+                    </address>
+                    {directions(only)}
+                </section>
+            ) : null}
+            {several
+                ? places.map((place, i) => (
+                      <section
+                          key={`${place.name ?? ""}|${place.address}|${i}`}
+                      >
+                          <h2 className={heading}>
+                              {nonBlank(place.name) ?? "Visit"}
+                          </h2>
+                          <address className="whitespace-pre-line not-italic">
+                              {addressLines(place.address).join("\n")}
+                          </address>
+                          {directions(place)}
+                          <FooterHours
+                              hours={place.hours ?? null}
+                              timeZone={contact?.timeZone}
+                              now={now}
+                              labelClassName={hoursLabel}
+                          />
+                      </section>
+                  ))
+                : null}
             {address ? (
                 <section>
-                    <h2 className={heading}>Find us</h2>
+                    <h2 className={heading}>Visit</h2>
                     <address className="not-italic">{address}</address>
                 </section>
             ) : null}
             {inTouch ? (
                 <section>
-                    <h2 className={heading}>Get in touch</h2>
+                    <h2 className={heading}>Talk</h2>
                     {direct ? (
                         <ul className="m-0 grid list-none justify-items-start gap-1 p-0">
                             {phone ? (
@@ -342,12 +369,6 @@ export function FooterContact({
                     />
                 </section>
             ) : null}
-            <SiteFooterMenu
-                items={[...menu]}
-                heading="Pages"
-                headingClassName={heading}
-                linkClassName={look ? lookFooterClasses(look).link : MENU_LINK}
-            />
             {trailing}
             {/* Last in the tree, so Classic's ids don't move; first on screen. */}
             {leading}

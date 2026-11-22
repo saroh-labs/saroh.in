@@ -22,6 +22,7 @@ import {
 } from "../prices/pack-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import { SiteLink } from "../site-link";
 import { FeedFailed } from "./feed-failed";
 import {
     PriceFrame,
@@ -280,7 +281,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const textButton = cn(
-    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "coarse:inline-flex coarse:min-h-11 coarse:items-center cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 
@@ -436,14 +437,14 @@ function PackCards({
                     {label}
                 </button>
             ) : feed.askHref && !stopped ? (
-                <a
+                <SiteLink
                     href={askAboutHref(feed.askHref, pack.name, "pack")}
                     aria-label={`${label}: ${pack.name}`}
                     className={classes}
                     {...mark}
                 >
                     {label}
-                </a>
+                </SiteLink>
             ) : null;
             return (
                 <li
@@ -533,7 +534,7 @@ function PackCards({
                             key={pack.id}
                             className="bg-site-surface text-site-fg border-site-border grid min-w-0 content-start gap-1.5 overflow-hidden rounded-[calc(var(--site-radius)*1.4)] border p-4"
                         >
-                            <span className="text-site-muted text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                            <span className="text-site-muted text-[12px] font-bold uppercase tracking-[0.08em]">
                                 {packEyebrow(pack)}
                             </span>
                             <h3 className="font-site-heading text-[calc(1.1875rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em]">
@@ -575,7 +576,7 @@ function PackCards({
                                         {label}
                                     </button>
                                 ) : feed.askHref && !stopped ? (
-                                    <a
+                                    <SiteLink
                                         href={askAboutHref(
                                             feed.askHref,
                                             pack.name,
@@ -585,7 +586,7 @@ function PackCards({
                                         className={liveButton}
                                     >
                                         {label}
-                                    </a>
+                                    </SiteLink>
                                 ) : null}
                             </span>
                         </li>

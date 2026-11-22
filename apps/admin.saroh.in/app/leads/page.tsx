@@ -1,7 +1,6 @@
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { AdminShell } from "@/components/admin-shell";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { LeadsBoard } from "@/components/team/leads-board";
 import { can, requireStaff } from "@/lib/console";
@@ -32,7 +31,7 @@ export default async function LeadsPage({
     const board = await getLeadsBoard({ owner, q }).catch(() => undefined);
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Leads"]}
@@ -54,6 +53,6 @@ export default async function LeadsPage({
                     <FailedPanel things="leads" />
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

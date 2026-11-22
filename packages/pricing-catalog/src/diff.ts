@@ -179,6 +179,13 @@ function offersDiff(a: Catalog, b: Catalog): string[] {
     for (const p of b.plans) {
         const o = a.plans.find((x) => x.id === p.id);
         if (!o) continue;
+        if (o.yearlyOfferPaise !== p.yearlyOfferPaise) {
+            out.push(
+                p.yearlyOfferPaise
+                    ? `${p.name}: yearly offer ${o.yearlyOfferPaise ? `${formatInr(o.yearlyOfferPaise)} → ` : ""}${formatInr(p.yearlyOfferPaise)} a year`
+                    : `${p.name}: yearly offer off`,
+            );
+        }
         const ta = o.trial ?? { on: false, days: 0 };
         const tb = p.trial ?? { on: false, days: 0 };
         if (ta.on !== tb.on) {

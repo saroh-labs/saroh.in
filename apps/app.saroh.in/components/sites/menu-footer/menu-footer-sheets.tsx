@@ -147,7 +147,7 @@ export function FooterSheet({
                     value={format}
                     onValueChange={setFormat}
                     options={[
-                        { value: "html", label: "HTML" },
+                        { value: "html", label: "Formatted text" },
                         { value: "markdown", label: "Plain text" },
                     ]}
                 />

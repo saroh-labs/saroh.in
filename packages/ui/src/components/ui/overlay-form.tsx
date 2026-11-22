@@ -337,7 +337,9 @@ export function OverlayBody({
         <div
             data-overlay-body
             className={cn(
-                "-mx-1 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto px-1 pb-1 pt-1",
+                // Relative, so an sr-only input in it (a photo field's
+                // file input) is clipped here and never scrolls the page.
+                "relative -mx-1 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto px-1 pb-1 pt-1",
                 className,
             )}
         >

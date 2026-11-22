@@ -2,7 +2,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Suspense } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { HomeCounts, NeedsYou } from "@/components/home/needs-you";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { PanelSkeleton } from "@/components/states/panel-skeleton";
@@ -30,7 +29,7 @@ export default async function HomePage() {
     if (!gate.ok) return gate.screen;
 
     return (
-        <AdminShell staff={gate.staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader title={greeting()} />
                 <Suspense
@@ -39,7 +38,7 @@ export default async function HomePage() {
                     <HomeBody />
                 </Suspense>
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

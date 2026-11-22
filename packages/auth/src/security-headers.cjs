@@ -4,21 +4,33 @@
 /**
  * The page policies every Saroh app sends with its pages, beside the
  * SECURITY_HEADERS in its next.config (pentest, 29 Oct 2026): a
- * Content-Security-Policy that only REPORTS for now, and a Permissions-Policy
- * that is enforced. Plain CommonJS so the apps' next.config files (and
- * `scripts/check-security-headers.mjs`) load it with no build step.
+ * Content-Security-Policy and a Permissions-Policy. Plain CommonJS so the
+ * apps' next.config files, their middleware and
+ * `scripts/check-security-headers.mjs` load it with no build step.
  *
- * Only pages need them: a policy governs a document, so neither goes in
- * `public/_headers` (files) or `withPrivateApp` (redirects).
- *
- * The CSP lists what each app's browser really loads; a host missing here
- * shows up as a "[Report Only]" line in the console, and is blocked by
- * nothing. Enforce it once a release
- * runs clean.
+ * The signed-in apps (app, admin, accounts) ENFORCE the CSP with a fresh
+ * script nonce per answer, set by `withPrivateApp`'s middleware (21 Nov
+ * 2026); saroh.in still only reports it. The CSP lists what each app's
+ * browser really loads; a host missing here is blocked.
  */
 
 /** Where business media is served from (R2's public buckets, prod and dev). */
 const MEDIA = ["https://media.saroh.in", "https://media.saroh.io"];
+
+/**
+ * The floor the signed-in apps and the merchant sites enforce (security
+ * review, 21 Nov 2026): no framing by another site, no inline event handler
+ * (`<img onerror=…>`, the usual injected payload), no plugins, no moved base.
+ * Each `public/_headers` sends it on the files Cloudflare serves without the
+ * Worker; on pages the middleware sends the full policy instead, which
+ * contains every directive of this one. `PRIVATE_APP_HEADERS` repeats it as
+ * text; `check:security-headers` keeps them the same.
+ */
+const ENFORCED_CSP =
+    "frame-ancestors 'self'; script-src-attr 'none'; object-src 'none'; base-uri 'self'";
+
+/** Sent with every page: a link to another site carries the origin only. */
+const REFERRER_POLICY = "strict-origin-when-cross-origin";
 
 /** PostHog's EU host, the default when NEXT_PUBLIC_POSTHOG_HOST isn't set. */
 const POSTHOG_DEFAULT = "https://eu.i.posthog.com";
@@ -40,12 +52,14 @@ const SOURCES = {
     turnstile: { script: [TURNSTILE], frame: [TURNSTILE] },
     // MSG91's OTP widget (SMS codes); the API names the script (DEC-196).
     phoneCodeWidget: {
-        script: ["https://verify.msg91.com"],
+        // The widget's loader, and what it loads from its own hosts.
+        script: ["https://verify.msg91.com", "https://*.msg91.com"],
         connect: ["https://*.msg91.com"],
     },
     // Razorpay's checkout window: a script, then its own frame.
     razorpay: {
-        script: ["https://checkout.razorpay.com"],
+        // checkout.js, and what it loads from Razorpay's own hosts.
+        script: ["https://checkout.razorpay.com", "https://*.razorpay.com"],
         frame: ["https://api.razorpay.com", "https://checkout.razorpay.com"],
         connect: ["https://*.razorpay.com"],
         img: ["https://*.razorpay.com"],
@@ -105,6 +119,11 @@ function originOf(/** @type {string | undefined} */ url) {
 
 /**
  * @typedef {object} PageHeaderOptions
+ * @property {string} [nonce] This answer's script nonce: the policy is then
+ *   the enforced one (scripts by nonce only, no inline handler, no framing).
+ * @property {boolean} [enforced] next.config only: the middleware enforces
+ *   the CSP with a nonce, so no report-only copy is sent. (On Workers a
+ *   next.config header of the same name would REPLACE the middleware's.)
  * @property {(string | undefined)[]} [origins] First-party origins the browser
  *   calls or loads from: the API, sign-in. Unset or malformed ones are dropped.
  * @property {(keyof typeof SOURCES)[]} [uses] The third parties this app loads.
@@ -118,6 +137,7 @@ function contentSecurityPolicy({
     uses = [],
     posthogHost,
     dev = false,
+    nonce,
 } = {}) {
     const own = Array.from(
         new Set(origins.map(originOf).filter((o) => o !== null)),
@@ -129,9 +149,15 @@ function contentSecurityPolicy({
 
     return [
         "default-src 'self'",
-        // TODO(csp): Next's inline bootstrap needs 'unsafe-inline' until the
-        // apps send a nonce; required before this policy is enforced.
-        `script-src ${list("'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : []), ...from("script"))}`,
+        // With a nonce: scripts carrying it, Saroh's own files and the listed
+        // hosts, nothing else. No 'strict-dynamic': Chrome lets it run ANY
+        // script added through the DOM, an injected inline one included
+        // (checked 21 Nov 2026), so what a third party loads in turn must be
+        // from its listed host. `next dev` needs eval (React's error stacks);
+        // production never.
+        `script-src ${list("'self'", ...(nonce ? [`'nonce-${nonce}'`] : ["'unsafe-inline'"]), ...(dev ? ["'unsafe-eval'"] : []), ...from("script"))}`,
+        // Inline styles stay: React's `style={…}` props, Radix's positioning
+        // and next/font's tags write them, and none can carry a nonce.
         "style-src 'self' 'unsafe-inline'",
         `img-src ${list("'self'", "data:", "blob:", ...own, ...MEDIA, ...from("img"))}`,
         `media-src ${list("'self'", "blob:", ...own, ...MEDIA)}`,
@@ -142,6 +168,8 @@ function contentSecurityPolicy({
         "worker-src 'self' blob:",
         "object-src 'none'",
         "base-uri 'self'",
+        // Ignored in a report-only policy, so only with the enforced one.
+        ...(nonce ? ["frame-ancestors 'self'", "script-src-attr 'none'"] : []),
     ].join("; ");
 }
 
@@ -171,24 +199,32 @@ function permissionsPolicy(uses = []) {
 }
 
 /**
- * Both, as next.config `headers()` entries.
+ * Both (the CSP only when the middleware doesn't enforce it), and the
+ * Referrer-Policy, as next.config `headers()` entries.
  * @param {PageHeaderOptions} options
  */
 function pageSecurityHeaders(options = {}) {
     return [
-        {
-            key: "Content-Security-Policy-Report-Only",
-            value: contentSecurityPolicy(options),
-        },
+        ...(options.enforced
+            ? []
+            : [
+                  {
+                      key: "Content-Security-Policy-Report-Only",
+                      value: contentSecurityPolicy(options),
+                  },
+              ]),
         {
             key: "Permissions-Policy",
             value: permissionsPolicy(options.uses),
         },
+        { key: "Referrer-Policy", value: REFERRER_POLICY },
     ];
 }
 
 module.exports = {
+    ENFORCED_CSP,
     MEDIA,
+    REFERRER_POLICY,
     contentSecurityPolicy,
     permissionsPolicy,
     pageSecurityHeaders,

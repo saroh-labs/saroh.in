@@ -2,7 +2,6 @@ import { NotFound } from "@saroh/ui/not-found";
 import { PageContainer } from "@saroh/ui/page-container";
 import { Wordmark } from "@saroh/ui/wordmark";
 
-import { AdminShell } from "@/components/admin-shell";
 import type { StaffIdentity } from "@/lib/control-plane";
 import { getStaffIdentity } from "@/lib/control-plane";
 
@@ -44,11 +43,8 @@ export async function ConsoleNotFound({
     );
 
     if (staff) {
-        return (
-            <AdminShell staff={staff}>
-                <PageContainer width="full">{page}</PageContainer>
-            </AdminShell>
-        );
+        // Inside the console frame the root layout draws.
+        return <PageContainer width="full">{page}</PageContainer>;
     }
     return (
         <main className="flex min-h-screen items-center justify-center bg-background">

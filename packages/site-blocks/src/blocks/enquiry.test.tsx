@@ -168,6 +168,24 @@ describe("the Contact page's form, signed in (A13)", () => {
         expect(screen.queryByText(/Signed in as/)).toBeNull();
     });
 
+    it("sends the page it is on as its path alone (DEC-235)", async () => {
+        window.history.replaceState(null, "", "/bridal/?ref=diwali-post#form");
+        const fetch = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValue(new Response("{}", { status: 201 }));
+        render(<EnquirySection content={content} thread={null} />);
+        act(() => {
+            fireEvent.change(screen.getByLabelText(/Email/), {
+                target: { value: "asha@example.com" },
+            });
+        });
+        await send();
+        const body = JSON.parse(fetch.mock.calls[0]?.[1]?.body as string) as {
+            pagePath?: string;
+        };
+        expect(body.pagePath).toBe("/bridal");
+    });
+
     it("reaches the form through the page's sections", () => {
         render(
             <PageSections

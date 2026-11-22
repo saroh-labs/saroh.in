@@ -66,6 +66,8 @@ export interface TemplateFixture {
     timetable?: PublicTimetable;
     /** The hero's On today panel: today's free times, by who has them. */
     today?: PublicToday;
+    /** A Booking block's open times (UTC ISO), in place of its read. */
+    slots?: { startAt: string; endAt: string }[];
     posts?: PostFixture[];
     plans?: PublicPlan[];
     packs?: PublicPack[];
@@ -86,7 +88,7 @@ export const FIXTURE_DAY = "2026-10-13";
 /**
  * The moment every render is drawn at (`SiteFixtures.now`): 10:30 in India
  * on {@link FIXTURE_DAY}, inside every sample business's opening hours. So
- * "Open now" and "Free today" agree, and a capture taken at night reads the
+ * "Open now" and "Open today" agree, and a capture taken at night reads the
  * same as one taken in the morning. Live sites read the clock.
  */
 export const FIXTURE_NOW = `${FIXTURE_DAY}T05:00:00.000Z`;
@@ -338,8 +340,48 @@ function gymTimetable(): PublicTimetable {
     return { timezone: FIXTURE_TIME_ZONE, days: GYM_WEEK, sessions };
 }
 
+const GYM_HOURS = week({
+    MON: ["05:30", "22:00"],
+    TUE: ["05:30", "22:00"],
+    WED: ["05:30", "22:00"],
+    THU: ["05:30", "22:00"],
+    FRI: ["05:30", "22:00"],
+    SAT: ["07:00", "18:00"],
+    SUN: ["08:00", "14:00"],
+});
+
+/** The hero's On today: the timetable's classes on FIXTURE_DAY. */
+function gymToday(): PublicToday {
+    return {
+        timezone: FIXTURE_TIME_ZONE,
+        date: FIXTURE_DAY,
+        // Classes are booked through Appointments, as Prana's are.
+        appointments: true,
+        classes: true,
+        items: gymTimetable()
+            // Still to come at FIXTURE_NOW, as the today read sends.
+            .sessions.filter(
+                (s) => s.date === FIXTURE_DAY && s.startAt > FIXTURE_NOW,
+            )
+            .map((s) => ({
+                kind: "class",
+                serviceId: s.serviceId,
+                serviceName: s.serviceName,
+                durationMinutes: s.durationMinutes,
+                startAt: s.startAt,
+                date: s.date,
+                time: s.time,
+                staffName: s.staffName,
+                placesLeft: s.placesLeft,
+            })),
+        hours: GYM_HOURS,
+        closedDates: [],
+    };
+}
+
 const gym: TemplateFixture = {
     timetable: gymTimetable(),
+    today: gymToday(),
     plans: [
         {
             id: "gym-off-peak",
@@ -380,15 +422,7 @@ const gym: TemplateFixture = {
         address:
             "Hill Road, Bandra West, Mumbai. Two minutes from the station, above the pharmacy.",
         phone: null,
-        hours: week({
-            MON: ["05:30", "22:00"],
-            TUE: ["05:30", "22:00"],
-            WED: ["05:30", "22:00"],
-            THU: ["05:30", "22:00"],
-            FRI: ["05:30", "22:00"],
-            SAT: ["07:00", "18:00"],
-            SUN: ["08:00", "14:00"],
-        }),
+        hours: GYM_HOURS,
     },
     footer: GYM_GALLERY_SAMPLE.footer,
 };
@@ -411,6 +445,14 @@ const dietician: TemplateFixture = {
             currency: "INR",
         },
     ],
+    // Next open's sample times: Wednesday to Friday after FIXTURE_DAY, IST.
+    slots: [
+        ["2026-10-14T05:30:00Z", "2026-10-14T06:15:00Z"],
+        ["2026-10-14T09:30:00Z", "2026-10-14T10:15:00Z"],
+        ["2026-10-15T04:30:00Z", "2026-10-15T05:15:00Z"],
+        ["2026-10-16T06:30:00Z", "2026-10-16T07:15:00Z"],
+        ["2026-10-16T10:00:00Z", "2026-10-16T10:45:00Z"],
+    ].map(([startAt = "", endAt = ""]) => ({ startAt, endAt })),
     visit: {
         address: "Lane 6, Koregaon Park, Pune",
         phone: null,
@@ -874,7 +916,7 @@ const PRANA_HOURS = week({
     SAT: ["07:00", "13:00"],
 });
 
-/** VB01's "Next free": today and tomorrow, the Foundations full. */
+/** VB01's "Next open": today and tomorrow, the Foundations full. */
 const PRANA_WEEK: TimetableSession[] = [
     pranaSession(FIXTURE_DAY, "18:00", "prana-vinyasa", "Kabir", 3),
     pranaSession(FIXTURE_DAY, "19:30", "prana-online", "Ananya", 12),

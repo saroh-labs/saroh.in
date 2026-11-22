@@ -4,6 +4,8 @@ import {
     Delete,
     Get,
     HttpCode,
+    HttpException,
+    HttpStatus,
     Param,
     Post,
     Put,
@@ -16,8 +18,28 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { CreatePostDto, UpdatePostDto } from "./dto";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
+import { WebsiteAreaSwitchGuard } from "../sites/website-area-switch";
+import {
+    ApprovePostDto,
+    AskPostChangesDto,
+    CreatePostDto,
+    PostApprovalRequestDto,
+    PostChecksDto,
+    SchedulePostDto,
+    UpdatePostDto,
+} from "./dto";
+import { PostApprovalService } from "./post-approval.service";
+import { PostRevisionsService } from "./post-revisions.service";
 import { PostsService } from "./posts.service";
+
+/** Publish post's checks a minute, per person (W-ReDoS). */
+export const POST_CHECKS_PER_MINUTE = 30;
+const postChecksLimit = new SharedRateLimiter(
+    "post-checks",
+    POST_CHECKS_PER_MINUTE,
+    60_000,
+);
 
 /**
  * A site's posts (ADR-004, #209). These used to hang off a store
@@ -33,7 +55,11 @@ import { PostsService } from "./posts.service";
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
 @RequireModule("WEBSITE")
 export class PostsController {
-    constructor(private readonly posts: PostsService) {}
+    constructor(
+        private readonly posts: PostsService,
+        private readonly revisions: PostRevisionsService,
+        private readonly approval: PostApprovalService,
+    ) {}
 
     @Get()
     list(
@@ -91,6 +117,133 @@ export class PostsController {
         @Param("postId") postId: string,
     ) {
         return this.posts.unpublish(ctx, siteId, postId);
+    }
+
+    /** Publish post › Later (U17a): `{ at }`, an ISO instant. Moves an earlier one. */
+    @Put(":postId/schedule")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    schedule(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: SchedulePostDto,
+    ) {
+        return this.posts.schedule(ctx, siteId, postId, dto);
+    }
+
+    /** Don't publish it later after all. */
+    @Delete(":postId/schedule")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    unschedule(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+    ) {
+        return this.posts.unschedule(ctx, siteId, postId);
+    }
+
+    /**
+     * Send for approval (O7): `{ note?, at? }`. `section:write`. Alerts
+     * whoever may approve it.
+     */
+    @Post(":postId/approval-request")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    @HttpCode(200)
+    requestApproval(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: PostApprovalRequestDto,
+    ) {
+        return this.approval.request(ctx, siteId, postId, dto);
+    }
+
+    /**
+     * Approve the post (O7): `site:approve`, never its last editor (403).
+     * Publishes it now, or on the day its writer picked.
+     */
+    @Post(":postId/approve")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    @HttpCode(200)
+    approve(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: ApprovePostDto,
+    ) {
+        return this.approval.approve(ctx, siteId, postId, dto);
+    }
+
+    /** Ask for changes on the post, with a reason (UX-043). Same rules. */
+    @Post(":postId/ask")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    @HttpCode(200)
+    askForChanges(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: AskPostChangesDto,
+    ) {
+        return this.approval.askForChanges(ctx, siteId, postId, dto);
+    }
+
+    /**
+     * Publish post's checks (U18): prices against Services, links against
+     * the site's pages and live posts. `site:read`; changes nothing.
+     */
+    @Post(":postId/checks")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    @HttpCode(200)
+    async checks(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: PostChecksDto,
+    ) {
+        // Reads up to 100 KB of writing per call: limited per person (W-ReDoS).
+        if (!(await postChecksLimit.take(ctx.userId))) {
+            throw new HttpException(
+                "Too many checks. Wait a moment, then try again.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
+        return this.posts.checks(ctx, siteId, postId, dto);
+    }
+
+    /** History (U17a): newest first, who and why, no bodies. */
+    @Get(":postId/revisions")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    listRevisions(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+    ) {
+        return this.revisions.list(ctx, siteId, postId);
+    }
+
+    /** One revision in full, for Compare. */
+    @Get(":postId/revisions/:revisionId")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    getRevision(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Param("revisionId") revisionId: string,
+    ) {
+        return this.revisions.get(ctx, siteId, postId, revisionId);
+    }
+
+    /** Make a revision the draft (the draft as it was is kept first). */
+    @Post(":postId/revisions/:revisionId/restore")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    @HttpCode(200)
+    restoreRevision(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Param("revisionId") revisionId: string,
+    ) {
+        return this.revisions.restore(ctx, siteId, postId, revisionId);
     }
 
     @Delete(":postId")

@@ -1,10 +1,21 @@
 "use client";
 
-import { TIMETABLE_MAX_SERVICES } from "@saroh/block-contract";
+import {
+    TIMETABLE_MAX_SERVICES,
+    TIMETABLE_PLACES_FROM_MAX,
+    TIMETABLE_PLACES_FROM_MIN,
+} from "@saroh/block-contract";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@saroh/ui/select";
 import { Switch } from "@saroh/ui/switch";
 import { Textarea } from "@saroh/ui/textarea";
 
@@ -13,6 +24,27 @@ import type { TimetableContent } from "@/lib/sites/service";
 import { OptionSwitch } from "@/components/sites/section-fields/option-switch";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
 import { ServicesLoadNotice } from "./services-load-notice";
+
+/** The Select's value for no `placesFrom`: each path's own rule (KD8). */
+const AUTOMATIC = "auto";
+
+const PLACES_FROM_OPTIONS = Array.from(
+    { length: TIMETABLE_PLACES_FROM_MAX - TIMETABLE_PLACES_FROM_MIN + 1 },
+    (_, i) => TIMETABLE_PLACES_FROM_MIN + i,
+);
+
+/**
+ * The stored `placesFrom` for a Select value: a whole number in bounds, or
+ * absent ("Automatic") for anything else.
+ */
+export function placesFromChoice(value: string): number | undefined {
+    const n = Number(value);
+    return Number.isInteger(n) &&
+        n >= TIMETABLE_PLACES_FROM_MIN &&
+        n <= TIMETABLE_PLACES_FROM_MAX
+        ? n
+        : undefined;
+}
 
 /**
  * The `timetable` section's editor fields (industry templates U2).
@@ -136,6 +168,32 @@ export function TimetableFields({
                     A full class always says Full.
                 </p>
             </div>
+            {c.showPlacesLeft !== false ? (
+                <Field label="Say places left from">
+                    <Select
+                        value={
+                            c.placesFrom === undefined
+                                ? AUTOMATIC
+                                : String(c.placesFrom)
+                        }
+                        onValueChange={(v) =>
+                            patch({ placesFrom: placesFromChoice(v) })
+                        }
+                    >
+                        <SelectTrigger aria-label="Say places left from">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={AUTOMATIC}>Automatic</SelectItem>
+                            {PLACES_FROM_OPTIONS.map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                    {n === 1 ? "1 left" : `${n} left or fewer`}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Field>
+            ) : null}
             <OptionSwitch
                 label="Monday to Friday only"
                 checked={c.weekdaysOnly === true}

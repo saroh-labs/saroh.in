@@ -160,6 +160,9 @@ const MERCHANT_OWN_AD_TAGS = new Set([
     "apps/saroh.app/lib/trackers.ts",
     "apps/saroh.app/lib/trackers.test.ts",
     "apps/saroh.app/components/site-trackers.tsx",
+    // The merchant site's CSP allows its own trackers' hosts (DEC-244), never Saroh's.
+    "apps/saroh.app/lib/csp.ts",
+    "apps/saroh.app/lib/csp.test.ts",
     "apps/app.saroh.in/components/sites/search-tracking/site-search-tracking.test.tsx",
 ]);
 

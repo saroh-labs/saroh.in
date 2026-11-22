@@ -39,7 +39,7 @@ export function TestReleaseStop({
                 className,
             )}
         >
-            <p className="text-site-muted text-[11.5px] font-bold uppercase tracking-[0.08em]">
+            <p className="text-site-muted text-[12px] font-bold uppercase tracking-[0.08em]">
                 Test release
             </p>
             <p className="mt-1.5">On the live site, {live}.</p>

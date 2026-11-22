@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { LOOK_IDS } from "./looks";
+import { LOOK_IDS, LOOKS } from "./looks";
 import type { SitePalette, SitePaletteInput } from "./palette";
 import {
     contrastRatio,
@@ -8,7 +8,7 @@ import {
     PALETTE_MIN_CONTRAST,
     parsePalette,
 } from "./palette";
-import { deriveSafeColours } from "./safe-colours";
+import { brandPalette, deriveSafeColours } from "./safe-colours";
 import {
     defaultSiteStyle,
     siteStyleSafeColours,
@@ -395,5 +395,78 @@ describe("every colour Website › Style can produce reads in every look", () =>
             expect(vars["--site-accent-text"]).toBeTruthy();
             expect(vars["--site-rule"]).toBeTruthy();
         }
+    });
+});
+
+describe("brandPalette (U24b)", () => {
+    const hexes = [
+        "#E8A0B4", // a pale pink, too light for white words
+        "#FFE600", // a bright yellow
+        "#000000",
+        "#FFFFFF",
+        "#1F3F75",
+        "#4C7A44",
+    ];
+
+    it.each(hexes)(
+        "%s makes a palette that passes, in Classic and every look",
+        (hex) => {
+            const palette = brandPalette(hex);
+            expect(palette).not.toBeNull();
+            if (!palette) return;
+            expect(parsePalette(palette).ok).toBe(true);
+            expect(
+                contrastRatio(palette.fg, palette.bg),
+            ).toBeGreaterThanOrEqual(PALETTE_MIN_CONTRAST);
+            expect(
+                contrastRatio(palette.accentFg, palette.accent),
+            ).toBeGreaterThanOrEqual(PALETTE_MIN_CONTRAST);
+            expect(
+                contrastRatio(palette.accentText ?? "", palette.bg),
+            ).toBeGreaterThanOrEqual(PALETTE_MIN_CONTRAST);
+            for (const look of LOOK_IDS) {
+                const safe = deriveSafeColours(palette, look);
+                expect(
+                    parsePalette(safe.palette, {
+                        accentFillContrast:
+                            LOOKS[look].colour.accentFillContrast,
+                    }).ok,
+                ).toBe(true);
+            }
+        },
+    );
+
+    it("keeps a colour that reads as a button as it is", () => {
+        expect(brandPalette("#1F3F75")?.accent).toBe("#1F3F75");
+    });
+
+    it("moves a pale pink deeper, with dark words on it", () => {
+        const palette = brandPalette("#E8A0B4");
+        expect(palette?.accent).not.toBe("#E8A0B4");
+        expect(palette?.accentFg).not.toBe("#FFFFFF");
+    });
+
+    it("refuses what is not a colour", () => {
+        expect(brandPalette("pink")).toBeNull();
+        expect(brandPalette("#12345")).toBeNull();
+    });
+});
+
+describe("stored spacing keeps rendering (U24b: the sliders are gone)", () => {
+    it("writes a site's stored scalars into its variables as before", () => {
+        const style = defaultSiteStyle();
+        style.scalars = {
+            pageMargin: 24,
+            sectionPadding: 80,
+            gridGap: 3,
+            cornerRadius: 12,
+            headingScale: 1.2,
+        };
+        const vars = siteStyleVariables(style);
+        expect(vars["--site-page-margin"]).toBe("24px");
+        expect(vars["--site-section-padding"]).toBe("80px");
+        expect(vars["--site-grid-gap"]).toBe("3px");
+        expect(vars["--site-radius"]).toBe("12px");
+        expect(vars["--site-heading-scale"]).toBe("1.2");
     });
 });

@@ -53,6 +53,8 @@ import { askAiCall, refused, textOf } from "../tools/ask-ai-call";
 import type { AiToolRun, AiTurnRef } from "../tools/toolbox.port";
 import type { DraftSpec, ReadContext, TargetState } from "./draft-targets";
 import { DRAFT_SPECS, labelOf } from "./draft-targets";
+import type { Fact } from "./fact-checks";
+import { basedOnFor, checksFor, givenFacts, unconfirmed } from "./fact-checks";
 
 /** A create's request_id while it is only drafted (rolled back, so never kept). */
 const DRAFTING = "ask-ai-draft";
@@ -275,6 +277,9 @@ export class DraftsService {
                 output: `Nothing would change: ${spec.kind} ${targetId} is already like that. Tell the person.`,
             };
         }
+        const checked = await this.checksOf(asker, spec, parsed, draft.fields);
+        draft.checks = checked.checks;
+        draft.basedOn = checked.basedOn;
         return this.keep(draft);
     }
 
@@ -359,6 +364,26 @@ export class DraftsService {
             return this.refuse(row, kept, "changed", CHANGED);
         }
 
+        // Check this (RULES §5): every fact the business never gave is
+        // confirmed by the person, decided here, never by the browser.
+        if (spec.pageText) {
+            const { checks } = await this.checksOf(
+                asker,
+                spec,
+                input,
+                kept.card.fields,
+            );
+            const open = unconfirmed(checks, body.confirmed);
+            if (open.length) {
+                return refusedResult(
+                    kept.card,
+                    row.status,
+                    `Check ${open.map((c) => JSON.stringify(c.words)).join(", ")} first: nothing on your page or in Saroh says it.`,
+                    "missing",
+                );
+            }
+        }
+
         // One Confirm wins; a second, or one racing it, finds it taken.
         const confirmedAt = new Date();
         if (
@@ -437,7 +462,7 @@ export class DraftsService {
                   ]
                       .filter(Boolean)
                       .join(" ")
-                : "Done.",
+                : (spec.doneWords ?? "Done."),
             // A create has no Undo, but a booking, which can be called off (AF 4).
             canUndo: !!spec.undo,
             open: create && madeId ? { kind: spec.kind, id: madeId } : null,
@@ -798,6 +823,25 @@ export class DraftsService {
             : null;
     }
 
+    /** The new words' facts the business never gave (Check this). */
+    private async checksOf(
+        asker: McpCall,
+        spec: DraftSpec,
+        input: Record<string, unknown>,
+        fields: AskAiDraftField[],
+    ): Promise<{ checks: Fact[]; basedOn: string | null }> {
+        const pageText = spec.pageText;
+        if (!pageText) return { checks: [], basedOn: null };
+        const org = asker.ctx.organizationId;
+        const given = await asBusiness(org, async () =>
+            givenFacts(org, await pageText(this.reader(asker), input)),
+        );
+        return {
+            checks: checksFor(fields, given),
+            basedOn: basedOnFor(fields, given),
+        };
+    }
+
     private reader(asker: McpCall): ReadContext {
         return {
             ctx: asker.ctx,
@@ -841,6 +885,12 @@ export class DraftsService {
             refusal: d.refusal ?? null,
             note: d.spec.note ?? null,
             expiresAt: expiresAt.toISOString(),
+            ...(d.spec.pageText
+                ? {
+                      checks: (d.checks ?? []).map(({ key: _, ...c }) => c),
+                      basedOn: d.basedOn ?? d.spec.basedOn ?? null,
+                  }
+                : {}),
         };
         const row = {
             id: d.id,
@@ -870,10 +920,13 @@ export class DraftsService {
                 },
             }),
         );
+        const checking = d.checks?.length
+            ? ` The card marks ${d.checks.map((c) => JSON.stringify(c.words)).join(", ")} as Check this: facts the business never gave, which the person must confirm. Say so in one line.`
+            : "";
         return {
             output: d.refusal
                 ? `Saroh won't make this change: ${d.refusal.words} The person sees why on a card.`
-                : "Drafted. The person sees a card and confirms it; nothing is saved until they do.",
+                : `Drafted. The person sees a card and confirms it; nothing is saved until they do.${checking}`,
             card: { kind: "draft", data: card },
         };
     }
@@ -1004,6 +1057,10 @@ interface NewDraft {
     fields: AskAiDraftField[];
     missing: string[];
     refusal?: Refusal;
+    /** Check this: new facts the business never gave. */
+    checks?: Fact[];
+    /** What the card says it is based on, from the facts it used. */
+    basedOn?: string | null;
 }
 
 const CHANGED =

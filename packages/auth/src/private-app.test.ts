@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { withDevAccess } from "./dev-access";
 import { createAuthMiddleware } from "./middleware";
-import { PRIVATE_APP_HEADERS, withPrivateApp } from "./private-app";
+import { PRIVATE_APP_HEADERS, withNonce, withPrivateApp } from "./private-app";
+
+const policy = (nonce: string) =>
+    `script-src 'self' 'nonce-${nonce}'; frame-ancestors 'self'`;
 
 function request(url: string, init: { method?: string; origin?: string } = {}) {
     return new NextRequest(url, {
@@ -28,7 +31,7 @@ describe("withPrivateApp — a signed-in app is never indexed", () => {
     afterEach(() => vi.unstubAllEnvs());
 
     it("a page it lets through carries the headers on to the page", async () => {
-        const gate = withPrivateApp(() => NextResponse.next());
+        const gate = withPrivateApp(() => NextResponse.next(), policy);
         const res = await gate(request("https://app.saroh.in/orders"));
         expectPrivate(res);
         // Still a pass-through: Next reads this to go on to the page.
@@ -40,6 +43,7 @@ describe("withPrivateApp — a signed-in app is never indexed", () => {
             createAuthMiddleware({
                 loginUrl: "https://accounts.saroh.in/login",
             }),
+            policy,
         );
         const res = await gate(request("https://app.saroh.in/orders"));
         expect(res.status).toBe(307);
@@ -54,6 +58,7 @@ describe("withPrivateApp — a signed-in app is never indexed", () => {
             createAuthMiddleware({
                 loginUrl: "https://accounts.saroh.in/login",
             }),
+            policy,
         );
         const res = await gate(
             request("https://app.saroh.in/orders", {
@@ -69,7 +74,7 @@ describe("withPrivateApp — a signed-in app is never indexed", () => {
         vi.stubEnv("DEV_ACCESS_KEY", "a-long-random-dev-key");
         vi.stubEnv("DEV_REDIRECT_ORIGIN", "https://app.saroh.in");
         const next = vi.fn(() => NextResponse.next());
-        const gate = withPrivateApp(withDevAccess(next));
+        const gate = withPrivateApp(withDevAccess(next), policy);
         const res = await gate(request("https://app.saroh.io/orders"));
         expect(next).not.toHaveBeenCalled();
         expect(res.status).toBe(301);
@@ -80,7 +85,7 @@ describe("withPrivateApp — a signed-in app is never indexed", () => {
 
     it("copies an answer whose headers can't be written", async () => {
         const frozen = Response.redirect("https://accounts.saroh.in/login");
-        const gate = withPrivateApp(() => frozen);
+        const gate = withPrivateApp(() => frozen, policy);
         const res = await gate(request("https://app.saroh.in/"));
         expect(res.status).toBe(302);
         expect(res.headers.get("location")).toBe(
@@ -94,7 +99,7 @@ describe("withPrivateApp — a signed-in app is never indexed", () => {
             const res = NextResponse.redirect("https://app.saroh.in/");
             res.cookies.set("seen", "1");
             return res;
-        });
+        }, policy);
         const res = await gate(request("https://app.saroh.in/x"));
         expect(res.headers.get("set-cookie")).toContain("seen=1");
         expectPrivate(res);
@@ -108,5 +113,73 @@ describe("withPrivateApp — a signed-in app is never indexed", () => {
             "Content-Security-Policy",
             "X-Content-Type-Options",
         ]);
+    });
+});
+
+describe("withNonce — the CSP is enforced with a fresh nonce (21 Nov 2026)", () => {
+    const nonceOf = (res: Response) =>
+        /'nonce-([^']+)'/.exec(
+            res.headers.get("Content-Security-Policy") ?? "",
+        )?.[1];
+
+    it("sends a nonce, a different one on every request", async () => {
+        const gate = withPrivateApp(() => NextResponse.next(), policy);
+        const one = await gate(request("https://app.saroh.in/orders"));
+        const two = await gate(request("https://app.saroh.in/orders"));
+        expect(nonceOf(one)).toMatch(/^[A-Za-z0-9+/]{22}==$/);
+        expect(nonceOf(two)).toMatch(/^[A-Za-z0-9+/]{22}==$/);
+        expect(nonceOf(one)).not.toBe(nonceOf(two));
+        // The floor in PRIVATE_APP_HEADERS is replaced, not sent beside it.
+        expect(one.headers.get("Content-Security-Policy")).toContain(
+            "script-src 'self' 'nonce-",
+        );
+    });
+
+    it("hands the page its policy and nonce on the request, keeping the rest", async () => {
+        const gate = withPrivateApp(() => NextResponse.next(), policy);
+        const req = new NextRequest("https://app.saroh.in/orders", {
+            headers: { cookie: "a=1" },
+        });
+        const res = await gate(req);
+        const nonce = nonceOf(res);
+        const listed = res.headers
+            .get("x-middleware-override-headers")
+            ?.split(",");
+        expect(listed).toEqual(
+            expect.arrayContaining([
+                "cookie",
+                "content-security-policy",
+                "x-nonce",
+            ]),
+        );
+        expect(res.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
+        expect(
+            res.headers.get("x-middleware-request-content-security-policy"),
+        ).toBe(res.headers.get("Content-Security-Policy"));
+        expect(res.headers.get("x-middleware-request-cookie")).toBe("a=1");
+    });
+
+    it("merges with request headers the inner middleware already set", async () => {
+        const gate = withNonce(() => {
+            const headers = new Headers({ "x-path": "/shop" });
+            return NextResponse.rewrite("https://app.saroh.in/x", {
+                request: { headers },
+            });
+        }, policy);
+        const res = await gate(request("https://app.saroh.in/shop"));
+        expect(res.headers.get("x-middleware-override-headers")).toBe(
+            "x-path,content-security-policy,x-nonce",
+        );
+        expect(res.headers.get("x-middleware-request-x-path")).toBe("/shop");
+    });
+
+    it("a redirect carries the policy but hands nothing on", async () => {
+        const gate = withNonce(
+            () => NextResponse.redirect("https://accounts.saroh.in/login"),
+            policy,
+        );
+        const res = await gate(request("https://app.saroh.in/"));
+        expect(nonceOf(res)).toBeTruthy();
+        expect(res.headers.get("x-middleware-override-headers")).toBeNull();
     });
 });

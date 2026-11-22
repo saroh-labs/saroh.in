@@ -85,6 +85,38 @@ const resolvesNestedCta: ToRendered = (draft, ctx) => {
     return { ...content, cta: withHref(content.cta, ctx) };
 };
 
+/**
+ * A gallery whose lookbook photos link to a page: each such link gains the
+ * page's resolved `href`, as a button does. A gallery with none comes back
+ * untouched (the same object), so its published bytes do not move.
+ */
+const resolvesPhotoLinks: ToRendered = (draft, ctx) => {
+    if (draft === null || typeof draft !== "object") return draft;
+    const images: unknown = (draft as { images?: unknown }).images;
+    if (!Array.isArray(images)) return draft;
+    const pageLink = (image: unknown): string | undefined => {
+        if (image === null || typeof image !== "object") return undefined;
+        const link = (image as { link?: { kind?: unknown; pageId?: unknown } })
+            .link;
+        return link?.kind === "page" && typeof link.pageId === "string"
+            ? link.pageId
+            : undefined;
+    };
+    if (!images.some((image) => pageLink(image) !== undefined)) return draft;
+    return {
+        ...(draft as Record<string, unknown>),
+        images: (images as unknown[]).map((image) => {
+            const pageId = pageLink(image);
+            if (pageId === undefined) return image;
+            const { link } = image as { link: Record<string, unknown> };
+            return {
+                ...(image as Record<string, unknown>),
+                link: { ...link, href: ctx.resolvePage(pageId) ?? "" },
+            };
+        }),
+    };
+};
+
 /** A block that IS a button. */
 const resolvesOwnCta: ToRendered = (draft, ctx) => withHref(draft, ctx);
 
@@ -99,7 +131,8 @@ export const TO_RENDERED = {
     cta: resolvesOwnCta,
     // Authored content is already what the component draws. Stated, not assumed.
     richText: identity,
-    gallery: identity,
+    // A lookbook photo's page link resolves like a button's (DEC-228).
+    gallery: resolvesPhotoLinks,
     enquiry: identity,
     booking: identity,
     // Text only: nothing to resolve. Stated, not assumed.

@@ -12,7 +12,7 @@ export default function Loading() {
                     Website
                 </Link>,
             ]}
-            label="Loading the test release"
+            label="Loading the test link"
         />
     );
 }

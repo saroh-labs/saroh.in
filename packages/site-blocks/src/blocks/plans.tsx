@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { LookId, RenderedPlans } from "@saroh/block-contract";
+import type {
+    LookId,
+    RenderedPacks,
+    RenderedPlans,
+} from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import type { AutopayMethod } from "../autopay/api";
@@ -25,7 +30,11 @@ import { JoinSheet } from "../prices/join-sheet";
 import { planBrowsePrice, planEvery, planPrice } from "../prices/plan-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import { SiteLink } from "../site-link";
 import { FeedFailed } from "./feed-failed";
+import type { PacksFeed } from "./packs";
+import PacksSection from "./packs";
+import { PlansCompare } from "./plans-compare";
 import {
     PriceFrame,
     PriceParts,
@@ -151,7 +160,68 @@ type LoadState =
     | { kind: "unoffered" }
     | { kind: "error" };
 
-export default function PlansSection({
+/** What a Plans block offers (DEC-228); anything else draws as plans. */
+export function plansShow(content: RenderedPlans): "plans" | "packs" | "both" {
+    return content.show === "packs" || content.show === "both"
+        ? content.show
+        : "plans";
+}
+
+type PlansProps = LookProps & {
+    content: RenderedPlans;
+    beside?: React.ReactNode;
+    feed?: PlansFeed;
+    /**
+     * The class packs on sale, read by the page that serves the site, for
+     * Show = packs or both (DEC-228). Undefined beside a plans `feed`: the
+     * page read none, so no packs are drawn rather than the canvas's notes.
+     */
+    packs?: PacksFeed;
+    prices?: PricesActions | null;
+    siteId?: string | null;
+    apiUrl?: string;
+};
+
+/**
+ * The Plans block (G9), which also sells class packs (DEC-228, "Show"):
+ * plans, packs, or plans then packs, the packs drawn as the Class packs
+ * block draws them. With Both and no plans on sale, the packs lead under
+ * the block's own title, and only one "nothing on sale" note is said.
+ */
+export default function PlansSection(props: PlansProps) {
+    const { content, feed, packs, siteId } = props;
+    const show = plansShow(content);
+    if (show === "plans") return <PlansOnly {...props} />;
+    const noPlans = show === "packs" || feed?.plans.length === 0;
+    const packsContent: RenderedPacks = {
+        title: noPlans ? content.title : undefined,
+        // The plans' button words are for joining; packs keep their own
+        // unless the block sells packs alone.
+        buttonLabel: show === "packs" ? content.buttonLabel : undefined,
+        showDescriptions: content.showDescriptions,
+    };
+    const packsBlock = (
+        <PacksSection
+            content={packsContent}
+            feed={packs}
+            prices={props.prices}
+            apiUrl={props.apiUrl}
+            look={props.look}
+            plansOnPage={!noPlans}
+            // A live page that read plans but no packs draws none.
+            siteId={feed !== undefined && packs === undefined ? null : siteId}
+        />
+    );
+    if (show === "packs") return packsBlock;
+    return (
+        <>
+            <PlansOnly {...props} quietWhenNone />
+            {packsBlock}
+        </>
+    );
+}
+
+function PlansOnly({
     content,
     feed,
     prices = null,
@@ -159,7 +229,13 @@ export default function PlansSection({
     apiUrl = DEFAULT_API_URL,
     look,
     beside = null,
+    quietWhenNone = false,
 }: LookProps & {
+    /**
+     * Packs follow (Show = both): with no plans on sale the canvas says
+     * nothing here, so the packs' own note is the only one.
+     */
+    quietWhenNone?: boolean;
     content: RenderedPlans;
     /**
      * Under a look, cards drawn first in the plans' own row: Live's class
@@ -271,6 +347,14 @@ export default function PlansSection({
             </PlansNote>
         );
     }
+    if (
+        quietWhenNone &&
+        (state.kind === "off" ||
+            state.kind === "unoffered" ||
+            state.plans.length === 0)
+    ) {
+        return null;
+    }
     if (state.kind === "off") {
         return (
             <PlansNote title={title}>
@@ -317,7 +401,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const textButton = cn(
-    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "coarse:inline-flex coarse:min-h-11 coarse:items-center cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 
@@ -458,6 +542,105 @@ function PlanCards({
         </>
     ) : null;
 
+    // Compare (DEC-228): a table of what each plan includes, its buttons
+    // under it, in the look's buttons under a look.
+    if (resolveVariant("plans", content) === "compare") {
+        const buttonClass = (highlighted: boolean) =>
+            look
+                ? priceButton(look, highlighted)
+                : cn(
+                      joinButton,
+                      "w-full justify-center",
+                      !canvas &&
+                          "cursor-pointer transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]",
+                      !canvas && focusRing,
+                  );
+        const table = (
+            <PlansCompare
+                content={content}
+                plans={feed.plans}
+                highlightFirst={highlightFirst}
+                eyebrow={planEvery}
+                badge={(plan, highlighted) =>
+                    highlighted && plan.mostChosen ? MOST_CHOSEN : null
+                }
+                price={(plan) => {
+                    if (!showPrices) return null;
+                    const gst = paying
+                        ? gstUnderWords(plan.gst, plan.currency)
+                        : null;
+                    return (
+                        <>
+                            {paying ? planPrice(plan) : planBrowsePrice(plan)}
+                            {gst ? (
+                                <span
+                                    data-price-gst=""
+                                    className="text-site-muted block text-xs font-normal"
+                                >
+                                    {gst}
+                                </span>
+                            ) : null}
+                        </>
+                    );
+                }}
+                action={(plan, highlighted) => {
+                    const classes = buttonClass(highlighted);
+                    if (canvas) return <span className={classes}>{label}</span>;
+                    if (joins) {
+                        return (
+                            <button
+                                type="button"
+                                onClick={() => join(plan)}
+                                aria-label={`${label}: ${plan.name}`}
+                                className={classes}
+                            >
+                                {label}
+                            </button>
+                        );
+                    }
+                    return feed.joinHref && !stopped ? (
+                        <SiteLink
+                            href={joinHref(feed.joinHref, plan.name)}
+                            aria-label={`${label}: ${plan.name}`}
+                            className={classes}
+                        >
+                            {label}
+                        </SiteLink>
+                    ) : null;
+                }}
+            />
+        );
+        const notes = (
+            <>
+                {done && prices ? (
+                    <PricesDone
+                        message={done}
+                        accountHref={prices.accountHref}
+                    />
+                ) : null}
+                {stopped ? <NotTakingOrders /> : null}
+            </>
+        );
+        return look ? (
+            <PriceFrame
+                content={content}
+                look={look}
+                title={title}
+                intro={said(content.intro)}
+            >
+                {notes}
+                {table}
+                {sheets}
+            </PriceFrame>
+        ) : (
+            <PlansFrame title={title} intro={said(content.intro)}>
+                {notes}
+                {table}
+                {sheets}
+            </PlansFrame>
+        );
+    }
+
     // Under a look (DEC-172, U7): the look's columns, the highlighted
     // plan's Join the one filled button, and how long a member may pause
     // as the business allows it.
@@ -498,14 +681,14 @@ function PlanCards({
                                 {label}
                             </button>
                         ) : feed.joinHref && !stopped ? (
-                            <a
+                            <SiteLink
                                 href={joinHref(feed.joinHref, plan.name)}
                                 aria-label={`${label}: ${plan.name}`}
                                 className={classes}
                                 {...primary}
                             >
                                 {label}
-                            </a>
+                            </SiteLink>
                         ) : null;
                         return (
                             <li
@@ -592,11 +775,11 @@ function PlanCards({
                             )}
                         >
                             <span className="flex min-h-[18px] items-center gap-2">
-                                <span className="text-site-muted flex-1 text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                                <span className="text-site-muted flex-1 text-[12px] font-bold uppercase tracking-[0.08em]">
                                     {every}
                                 </span>
                                 {highlighted && plan.mostChosen ? (
-                                    <span className="bg-site-accent text-site-accent-fg rounded-full px-2 py-0.5 text-[11px] font-bold">
+                                    <span className="bg-site-accent text-site-accent-fg rounded-full px-2 py-0.5 text-[12px] font-bold">
                                         {MOST_CHOSEN}
                                     </span>
                                 ) : null}
@@ -641,7 +824,7 @@ function PlanCards({
                                         {label}
                                     </button>
                                 ) : feed.joinHref && !stopped ? (
-                                    <a
+                                    <SiteLink
                                         href={joinHref(
                                             feed.joinHref,
                                             plan.name,
@@ -654,7 +837,7 @@ function PlanCards({
                                         )}
                                     >
                                         {label}
-                                    </a>
+                                    </SiteLink>
                                 ) : null}
                             </span>
                         </li>

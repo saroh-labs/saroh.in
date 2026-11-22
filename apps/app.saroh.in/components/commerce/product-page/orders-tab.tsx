@@ -12,6 +12,10 @@ import type { OverviewOrder } from "@/lib/products/overview-rules";
 import { ORDER_STATUS_LABEL } from "@/lib/products/overview-rules";
 
 import { listTable } from "@/components/shared/lists/list-toolbar";
+import {
+    PendingRegion,
+    ScreenPending,
+} from "@/components/shared/page/screen-pending";
 import { TextLink } from "@saroh/ui/text-link";
 import { LinkFilter } from "./link-filter";
 import {
@@ -71,129 +75,170 @@ export function ProductOrdersTab({
     const grid =
         "grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1.3fr)_90px_100px_90px] gap-2.5";
 
+    // Open | Recent: the filter stays, the orders grey (`ScreenPending`).
     return (
-        <div>
-            <div className="mb-3 flex flex-wrap items-center gap-2.5">
-                <LinkFilter
-                    label="Which orders"
-                    value={filter}
-                    options={[
-                        {
-                            value: "open",
-                            label: "Open",
-                            count: data.openCount,
-                            href: here,
-                        },
-                        {
-                            value: "recent",
-                            label: "Recent",
-                            href: `${here}&orders=recent`,
-                        },
-                    ]}
-                />
-                <p className="flex-[1_1_200px] text-[12px] text-muted-foreground">
-                    {filter === "open"
-                        ? heldBy(data.recent, product.name)
-                        : `The latest ${rows.length} of ${Math.max(data.recent.length, data.thisMonthCount)} orders this month.`}
-                </p>
-                <TextLink
-                    data-ph-unmask=""
-                    href="/commerce/orders"
-                    className="text-[12.5px]"
-                >
-                    All orders for it in Orders →
-                </TextLink>
-            </div>
-
-            {rows.length === 0 ? (
-                <TabState
-                    icon={ShoppingBag}
-                    title="No open orders"
-                    description="None holds this product's stock right now."
-                >
-                    <StateLink href={`${here}&orders=recent`}>
-                        See recent orders
-                    </StateLink>
-                </TabState>
-            ) : (
-                <>
-                    {/* The one table look: the head band, rows ruled
-                        edge to edge. */}
-                    <div
-                        data-list-table=""
-                        className={cn(
-                            listTable.frame,
-                            "overflow-x-auto max-[759px]:hidden",
-                        )}
+        <ScreenPending>
+            <div>
+                <div className="mb-3 flex flex-wrap items-center gap-2.5">
+                    <LinkFilter
+                        label="Which orders"
+                        value={filter}
+                        options={[
+                            {
+                                value: "open",
+                                label: "Open",
+                                count: data.openCount,
+                                href: here,
+                            },
+                            {
+                                value: "recent",
+                                label: "Recent",
+                                href: `${here}&orders=recent`,
+                            },
+                        ]}
+                    />
+                    <p className="flex-[1_1_200px] text-[12px] text-muted-foreground">
+                        {filter === "open"
+                            ? heldBy(data.recent, product.name)
+                            : `The latest ${rows.length} of ${Math.max(data.recent.length, data.thisMonthCount)} orders this month.`}
+                    </p>
+                    <TextLink
+                        data-ph-unmask=""
+                        href="/commerce/orders"
+                        className="text-[12.5px]"
                     >
-                        <table className="w-full min-w-[600px] text-[13px]">
-                            <caption className="sr-only">
-                                Orders for {product.name}
-                            </caption>
-                            <thead>
-                                <tr
-                                    data-list-head=""
-                                    data-ph-unmask=""
-                                    className={cn(
-                                        grid,
-                                        listTable.head,
-                                        "rounded-t-[10px] text-left",
-                                    )}
-                                >
-                                    <th scope="col">Order</th>
-                                    <th scope="col">Customer</th>
-                                    <th scope="col">What</th>
-                                    <th scope="col">Location</th>
-                                    <th scope="col">When</th>
-                                    <th scope="col">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map((o) => (
-                                    <tr
-                                        key={o.id}
-                                        className={cn(
-                                            grid,
-                                            listTable.row,
-                                            "items-center",
-                                        )}
-                                    >
-                                        <td>
-                                            <TextLink
-                                                href={orderHref(storeId, o.id)}
-                                                className="font-mono text-[12px]"
-                                            >
-                                                {o.orderNumber}
-                                            </TextLink>
-                                        </td>
-                                        <td className="truncate">
-                                            {o.customerId ? (
-                                                <TextLink
-                                                    href={customerHref(
-                                                        storeId,
-                                                        o.customerId,
-                                                    )}
-                                                >
-                                                    {o.customer}
-                                                </TextLink>
-                                            ) : (
-                                                // A walk-in (B13): no record to open.
-                                                o.customer
+                        All orders for it in Orders →
+                    </TextLink>
+                </div>
+
+                <PendingRegion>
+                    {rows.length === 0 ? (
+                        <TabState
+                            icon={ShoppingBag}
+                            title="No open orders"
+                            description="None holds this product's stock right now."
+                        >
+                            <StateLink href={`${here}&orders=recent`}>
+                                See recent orders
+                            </StateLink>
+                        </TabState>
+                    ) : (
+                        <>
+                            {/* The one table look: the head band, rows ruled
+                        edge to edge. */}
+                            <div
+                                data-list-table=""
+                                className={cn(
+                                    listTable.frame,
+                                    "overflow-x-auto max-[759px]:hidden",
+                                )}
+                            >
+                                <table className="w-full min-w-[600px] text-[13px]">
+                                    <caption className="sr-only">
+                                        Orders for {product.name}
+                                    </caption>
+                                    <thead>
+                                        <tr
+                                            data-list-head=""
+                                            data-ph-unmask=""
+                                            className={cn(
+                                                grid,
+                                                listTable.head,
+                                                "rounded-t-[10px] text-left",
                                             )}
-                                        </td>
-                                        <td className="text-foreground/75">
-                                            {linesText(o, product.name)}
-                                        </td>
-                                        <td className="truncate text-muted-foreground">
-                                            {overview.storefront.name}
-                                        </td>
-                                        <td className="text-muted-foreground">
-                                            <ViewerDate
-                                                iso={o.createdAt}
-                                                variant="dayMonth"
-                                            />
-                                        </td>
-                                        <td>
+                                        >
+                                            <th scope="col">Order</th>
+                                            <th scope="col">Customer</th>
+                                            <th scope="col">What</th>
+                                            <th scope="col">Location</th>
+                                            <th scope="col">When</th>
+                                            <th scope="col">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {rows.map((o) => (
+                                            <tr
+                                                key={o.id}
+                                                className={cn(
+                                                    grid,
+                                                    listTable.row,
+                                                    "items-center",
+                                                )}
+                                            >
+                                                <td>
+                                                    <TextLink
+                                                        href={orderHref(
+                                                            storeId,
+                                                            o.id,
+                                                        )}
+                                                        className="font-mono text-[12px]"
+                                                    >
+                                                        {o.orderNumber}
+                                                    </TextLink>
+                                                </td>
+                                                <td className="truncate">
+                                                    {o.customerId ? (
+                                                        <TextLink
+                                                            href={customerHref(
+                                                                storeId,
+                                                                o.customerId,
+                                                            )}
+                                                        >
+                                                            {o.customer}
+                                                        </TextLink>
+                                                    ) : (
+                                                        // A walk-in (B13): no record to open.
+                                                        o.customer
+                                                    )}
+                                                </td>
+                                                <td className="text-foreground/75">
+                                                    {linesText(o, product.name)}
+                                                </td>
+                                                <td className="truncate text-muted-foreground">
+                                                    {overview.storefront.name}
+                                                </td>
+                                                <td className="text-muted-foreground">
+                                                    <ViewerDate
+                                                        iso={o.createdAt}
+                                                        variant="dayMonth"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <Badge
+                                                        variant={
+                                                            o.open
+                                                                ? "warning"
+                                                                : "neutral"
+                                                        }
+                                                        size="sm"
+                                                    >
+                                                        {ORDER_STATUS_LABEL[
+                                                            o.status
+                                                        ] ?? o.status}
+                                                    </Badge>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <ul
+                                aria-label={`Orders for ${product.name}`}
+                                className="flex flex-col gap-2 min-[760px]:hidden"
+                            >
+                                {rows.map((o) => (
+                                    <OrderCardFrame
+                                        key={o.id}
+                                        href={orderHref(storeId, o.id)}
+                                        title={
+                                            <>
+                                                {o.customer}
+                                                <span className="sr-only">
+                                                    , order {o.orderNumber}
+                                                </span>
+                                            </>
+                                        }
+                                        aside={
                                             <Badge
                                                 variant={
                                                     o.open
@@ -201,68 +246,40 @@ export function ProductOrdersTab({
                                                         : "neutral"
                                                 }
                                                 size="sm"
+                                                className="flex-none"
                                             >
                                                 {ORDER_STATUS_LABEL[o.status] ??
                                                     o.status}
                                             </Badge>
-                                        </td>
-                                    </tr>
+                                        }
+                                        meta={
+                                            <>
+                                                <span className="font-mono">
+                                                    {o.orderNumber}
+                                                </span>
+                                                <span aria-hidden>·</span>
+                                                <span className="text-foreground/75">
+                                                    {linesText(o, product.name)}
+                                                </span>
+                                            </>
+                                        }
+                                        footer={
+                                            <div className="text-[12px] text-muted-foreground">
+                                                <ViewerDate
+                                                    iso={o.createdAt}
+                                                    variant="dayMonth"
+                                                />
+                                                {` · ${overview.storefront.name}`}
+                                            </div>
+                                        }
+                                    />
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <ul
-                        aria-label={`Orders for ${product.name}`}
-                        className="flex flex-col gap-2 min-[760px]:hidden"
-                    >
-                        {rows.map((o) => (
-                            <OrderCardFrame
-                                key={o.id}
-                                href={orderHref(storeId, o.id)}
-                                title={
-                                    <>
-                                        {o.customer}
-                                        <span className="sr-only">
-                                            , order {o.orderNumber}
-                                        </span>
-                                    </>
-                                }
-                                aside={
-                                    <Badge
-                                        variant={o.open ? "warning" : "neutral"}
-                                        size="sm"
-                                        className="flex-none"
-                                    >
-                                        {ORDER_STATUS_LABEL[o.status] ??
-                                            o.status}
-                                    </Badge>
-                                }
-                                meta={
-                                    <>
-                                        <span className="font-mono">
-                                            {o.orderNumber}
-                                        </span>
-                                        <span aria-hidden>·</span>
-                                        <span className="text-foreground/75">
-                                            {linesText(o, product.name)}
-                                        </span>
-                                    </>
-                                }
-                                footer={
-                                    <div className="text-[12px] text-muted-foreground">
-                                        <ViewerDate
-                                            iso={o.createdAt}
-                                            variant="dayMonth"
-                                        />
-                                        {` · ${overview.storefront.name}`}
-                                    </div>
-                                }
-                            />
-                        ))}
-                    </ul>
-                </>
-            )}
-        </div>
+                            </ul>
+                        </>
+                    )}
+                </PendingRegion>
+            </div>
+        </ScreenPending>
     );
 }
 

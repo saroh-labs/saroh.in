@@ -28,6 +28,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyleKit } from "@tiptap/extension-text-style";
+import type { Editor } from "@tiptap/react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -60,6 +61,9 @@ import { MediaPicker } from "@/components/shared/fields/media-picker";
 import { editorKey } from "@/lib/tiptap/editor-key";
 import { Tip } from "@saroh/ui/tooltip";
 
+import { BusinessEmbed } from "./embeds/business-embed";
+import { FormatBar, insertImage, SlashMenu } from "./writing-menus";
+
 /**
  * Write copy without typing markup (#208).
  *
@@ -75,7 +79,9 @@ import { Tip } from "@saroh/ui/tooltip";
  * worst failure, because it is silent. So every
  * extension loaded here maps onto something the allowlist keeps, and the ones
  * that do not — task lists render an <input>, embeds an <iframe> — are not
- * loaded, however good they look in the reference.
+ * loaded, however good they look in the reference. A post's cards from the
+ * business (U15b) are the one embed: a `<div>` with two attributes the
+ * allowlist keeps, filled in live by the page.
  *
  * Colour, highlight, font family, size and alignment are included on a product
  * call, and they are the one place a merchant can step outside the site's
@@ -140,12 +146,29 @@ export function RichTextEditor({
     onChange,
     placeholder = "Start writing…",
     className,
+    variant = "boxed",
+    toolbar = false,
+    onToolbarChange,
+    onEditor,
 }: {
     value: string;
     onChange: (html: string) => void;
     placeholder?: string;
     className?: string;
+    /**
+     * `boxed`: a field with its toolbar on top (sections, the footer).
+     * `document`: a post's writing surface (U15, `blogdesk/WXWInsert`):
+     * no box, a format bar over a selection, "/" to add on an empty line,
+     * and the full toolbar only when `toolbar` is on (More formatting).
+     */
+    variant?: "boxed" | "document";
+    /** `document` only: the full toolbar is showing. */
+    toolbar?: boolean;
+    onToolbarChange?: (open: boolean) => void;
+    /** The editor once made, for a host that adds to it (rail › Add). */
+    onEditor?: (editor: Editor | null) => void;
 }) {
+    const asDocument = variant === "document";
     const editor = useEditor({
         // No SSR guard here on purpose. This component is only ever reached
         // through `next/dynamic` with `ssr: false`, so there is no server pass
@@ -181,17 +204,28 @@ export function RichTextEditor({
             TableCell,
             Placeholder.configure({ placeholder }),
             CharacterCount,
+            // A post's cards from the business (U15b); a section has none.
+            ...(asDocument ? [BusinessEmbed] : []),
         ],
         content: value,
         editorProps: {
             attributes: {
                 // The merchant's own prose styles, so what they write here
                 // reads like it will on the page.
-                class: "prose prose-sm max-w-none min-h-40 px-3 py-2 outline-none dark:prose-invert",
+                class: asDocument
+                    ? // The site's own type (`--site-*`), set by the host's scope.
+                      "prose max-w-none min-h-[50vh] outline-none font-site-body text-site-body prose-headings:font-site-heading prose-headings:text-site-fg prose-strong:text-site-fg prose-blockquote:text-site-body prose-a:text-site-fg"
+                    : "prose prose-sm max-w-none min-h-40 px-3 py-2 outline-none dark:prose-invert",
             },
         },
         onUpdate: ({ editor }) => onChange(editor.getHTML()),
     });
+
+    useEffect(() => {
+        if (!onEditor) return;
+        onEditor(editor);
+        return () => onEditor(null);
+    }, [editor, onEditor]);
 
     /*
      * Two components on purpose. `useEditorState` builds its state manager
@@ -228,6 +262,9 @@ export function RichTextEditor({
             value={value}
             onChange={onChange}
             className={className}
+            asDocument={asDocument}
+            toolbar={toolbar}
+            onToolbarChange={onToolbarChange}
         />
     );
 }
@@ -237,13 +274,27 @@ function EditorSurface({
     value,
     onChange,
     className,
+    asDocument = false,
+    toolbar = false,
+    onToolbarChange,
 }: {
     editor: NonNullable<ReturnType<typeof useEditor>>;
     value: string;
     onChange: (html: string) => void;
     className?: string;
+    asDocument?: boolean;
+    toolbar?: boolean;
+    onToolbarChange?: (open: boolean) => void;
 }) {
     const [source, setSource] = useState(false);
+    /*
+     * On a phone the bar is the board's short set (`fix/WXNText`): text
+     * style, Bold, Link and a list. The rest waits under More, so the
+     * field keeps the room (editor audit, 21 Nov).
+     */
+    const [more, setMore] = useState(false);
+    // A post's full toolbar (`document`) is already the "more" one.
+    const extra = cn("contents", !more && !asDocument && PHONE_HIDDEN);
 
     /*
      * Keep the editor in step with the field it edits. Switching sections
@@ -261,7 +312,13 @@ function EditorSurface({
     useEffect(() => {
         if (source || editor.isDestroyed) return;
         if (editor.getHTML() !== value) {
-            editor.commands.setContent(value, { emitUpdate: false });
+            // Matching the saved words is not an edit: kept out of Undo, or
+            // a post's Undo lit up on opening with nothing changed.
+            editor
+                .chain()
+                .setMeta("addToHistory", false)
+                .setContent(value, { emitUpdate: false })
+                .run();
         }
     }, [editor, value, source]);
 
@@ -324,13 +381,9 @@ function EditorSurface({
 
     const chain = () => editor.chain().focus();
 
-    return (
-        // The same border and fill as every other field, so the editor reads as
-        // one more place to type rather than a panel of its own.
-        <div
-            className={cn("rounded-md border border-input bg-field", className)}
-        >
-            <div className="flex flex-wrap items-center gap-0.5 border-b p-1">
+    const bar = (
+        <div className="flex flex-wrap items-center gap-0.5 border-b p-1">
+            <span className={extra}>
                 <Tool
                     label="Undo"
                     onClick={() => chain().undo().run()}
@@ -352,34 +405,36 @@ function EditorSurface({
                     <Eraser />
                 </Tool>
                 <Gap />
+            </span>
 
-                <Select
-                    value={String(state.heading)}
-                    onValueChange={(v) => {
-                        const level = Number(v);
-                        if (level === 0) chain().setParagraph().run();
-                        else
-                            chain()
-                                .toggleHeading({
-                                    level: level as 1 | 2 | 3 | 4,
-                                })
-                                .run();
-                    }}
+            <Select
+                value={String(state.heading)}
+                onValueChange={(v) => {
+                    const level = Number(v);
+                    if (level === 0) chain().setParagraph().run();
+                    else
+                        chain()
+                            .toggleHeading({
+                                level: level as 1 | 2 | 3 | 4,
+                            })
+                            .run();
+                }}
+            >
+                <SelectTrigger
+                    className="h-7 w-[7.5rem]"
+                    aria-label="Text style"
                 >
-                    <SelectTrigger
-                        className="h-7 w-[7.5rem]"
-                        aria-label="Text style"
-                    >
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="0">Paragraph</SelectItem>
-                        <SelectItem value="1">Heading 1</SelectItem>
-                        <SelectItem value="2">Heading 2</SelectItem>
-                        <SelectItem value="3">Heading 3</SelectItem>
-                        <SelectItem value="4">Heading 4</SelectItem>
-                    </SelectContent>
-                </Select>
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="0">Paragraph</SelectItem>
+                    <SelectItem value="1">Heading 1</SelectItem>
+                    <SelectItem value="2">Heading 2</SelectItem>
+                    <SelectItem value="3">Heading 3</SelectItem>
+                    <SelectItem value="4">Heading 4</SelectItem>
+                </SelectContent>
+            </Select>
+            <span className={extra}>
                 <Select
                     value={state.font ?? "__site"}
                     onValueChange={(v) =>
@@ -424,15 +479,17 @@ function EditorSurface({
                         ))}
                     </SelectContent>
                 </Select>
-                <Gap />
+            </span>
+            <Gap />
 
-                <Mark
-                    label="Bold"
-                    pressed={state.bold}
-                    onPressedChange={() => chain().toggleBold().run()}
-                >
-                    <Bold />
-                </Mark>
+            <Mark
+                label="Bold"
+                pressed={state.bold}
+                onPressedChange={() => chain().toggleBold().run()}
+            >
+                <Bold />
+            </Mark>
+            <span className={extra}>
                 <Mark
                     label="Italic"
                     pressed={state.italic}
@@ -516,14 +573,16 @@ function EditorSurface({
                     <AlignRight />
                 </Mark>
                 <Gap />
+            </span>
 
-                <Mark
-                    label="Bulleted list"
-                    pressed={state.bullet}
-                    onPressedChange={() => chain().toggleBulletList().run()}
-                >
-                    <List />
-                </Mark>
+            <Mark
+                label="Bulleted list"
+                pressed={state.bullet}
+                onPressedChange={() => chain().toggleBulletList().run()}
+            >
+                <List />
+            </Mark>
+            <span className={extra}>
                 <Mark
                     label="Numbered list"
                     pressed={state.ordered}
@@ -552,22 +611,24 @@ function EditorSurface({
                     <Minus />
                 </Tool>
                 <Gap />
+            </span>
 
-                <LinkTool
-                    active={state.link}
-                    current={
-                        (editor.getAttributes("link").href as
-                            string | undefined) ?? ""
-                    }
-                    onSet={(href) =>
-                        href
-                            ? chain()
-                                  .extendMarkRange("link")
-                                  .setLink({ href })
-                                  .run()
-                            : chain().extendMarkRange("link").unsetLink().run()
-                    }
-                />
+            <LinkTool
+                active={state.link}
+                current={
+                    (editor.getAttributes("link").href as string | undefined) ??
+                    ""
+                }
+                onSet={(href) =>
+                    href
+                        ? chain()
+                              .extendMarkRange("link")
+                              .setLink({ href })
+                              .run()
+                        : chain().extendMarkRange("link").unsetLink().run()
+                }
+            />
+            <span className={extra}>
                 <Popover>
                     <PopoverTrigger asChild>
                         <IconButton
@@ -579,20 +640,7 @@ function EditorSurface({
                     <PopoverContent align="start" className="w-80">
                         <MediaPicker
                             label="Choose a photo"
-                            onPick={(img) =>
-                                chain()
-                                    .setImage({
-                                        src: img.src,
-                                        alt: "",
-                                        ...(img.width && img.height
-                                            ? {
-                                                  width: img.width,
-                                                  height: img.height,
-                                              }
-                                            : {}),
-                                    })
-                                    .run()
-                            }
+                            onPick={(img) => insertImage(editor, img)}
                         />
                     </PopoverContent>
                 </Popover>
@@ -621,16 +669,88 @@ function EditorSurface({
                         // through the schema, so a stray tag is normalised the
                         // way a paste would be.
                         if (!on && !editor.isDestroyed)
-                            editor.commands.setContent(value, {
-                                emitUpdate: false,
-                            });
+                            editor
+                                .chain()
+                                .setContent(value, { emitUpdate: false })
+                                .run();
                         setSource(on);
                     }}
                     aria-label="Edit as HTML"
                 >
                     HTML
                 </Toggle>
+            </span>
+            {asDocument ? null : (
+                <Toggle
+                    size="sm"
+                    className="h-7 px-2 text-xs min-[760px]:hidden"
+                    pressed={more}
+                    onPressedChange={setMore}
+                    aria-label="More formatting"
+                >
+                    More
+                </Toggle>
+            )}
+        </div>
+    );
+
+    const body = source ? (
+        <Textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={10}
+            className="rounded-none border-0 font-mono focus-visible:ring-0"
+            aria-label="HTML source"
+        />
+    ) : (
+        <EditorContent editor={editor} />
+    );
+
+    if (asDocument) {
+        return (
+            <div className={className}>
+                {toolbar ? (
+                    <div
+                        role="toolbar"
+                        aria-label="More formatting"
+                        className="sticky top-0 z-10 mb-6 flex items-start rounded-[10px] border bg-background font-sans shadow-sm [&>div]:flex-1 [&>div]:border-b-0"
+                    >
+                        {bar}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            className="m-1"
+                            onClick={() => onToolbarChange?.(false)}
+                        >
+                            Hide
+                        </Button>
+                    </div>
+                ) : null}
+                {/* The editor is null on the first render (immediatelyRender
+                    off): the menus wait for it rather than read null. */}
+                {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- null at first render whatever Tiptap's types say (see above) */}
+                {editor ? (
+                    <>
+                        <FormatBar
+                            editor={editor}
+                            onMoreFormatting={() => onToolbarChange?.(true)}
+                        />
+                        <SlashMenu editor={editor} />
+                    </>
+                ) : null}
+                {body}
             </div>
+        );
+    }
+
+    return (
+        // The same border and fill as every other field, so the editor reads as
+        // one more place to type rather than a panel of its own.
+        <div
+            className={cn("rounded-md border border-input bg-field", className)}
+        >
+            {bar}
 
             {source ? (
                 <Textarea
@@ -650,6 +770,9 @@ function EditorSurface({
         </div>
     );
 }
+
+/** The editor's phone width (`PHONE_QUERY`): the short bar's tools only. */
+const PHONE_HIDDEN = "max-[759.98px]:hidden";
 
 function Gap() {
     return <Separator orientation="vertical" className="mx-1 h-5" />;

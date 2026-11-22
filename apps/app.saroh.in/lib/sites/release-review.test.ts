@@ -38,10 +38,10 @@ const lines = (p: SitePublication) =>
 describe("what a review is about", () => {
     it("names a release by number and name, once when it kept its default", () => {
         expect(releaseTitle({ number: 2, name: "Diwali menu" })).toBe(
-            "Test release 2 · Diwali menu",
+            "Test link 2 · Diwali menu",
         );
-        expect(releaseTitle({ number: 3, name: "Test release 3" })).toBe(
-            "Test release 3",
+        expect(releaseTitle({ number: 3, name: "Test link 3" })).toBe(
+            "Test link 3",
         );
     });
 
@@ -49,15 +49,15 @@ describe("what a review is about", () => {
         expect(reviewSubject(null)).toBe("Draft");
         expect(
             reviewSubject({ id: "rel_1", number: 2, name: "Diwali menu" }),
-        ).toBe("Test release 2 · Diwali menu");
+        ).toBe("Test link 2 · Diwali menu");
     });
 
     it("words a release's newest verdict as a reviewer reads it", () => {
         expect(releaseVerdictLine(null)).toBe(
-            "Nobody has reviewed this test release yet.",
+            "Nobody has reviewed this test link yet.",
         );
         expect(releaseVerdictLine({ outcome: "APPROVED", by: "Meera" })).toBe(
-            "Meera approved this test release.",
+            "Meera approved this test link.",
         );
         expect(
             releaseVerdictLine({ outcome: "CHANGES_REQUESTED", by: "Meera" }),
@@ -122,14 +122,14 @@ describe("a version's row in the history", () => {
         ).toEqual(["Live", "Approved"]);
     });
 
-    it("says which test release a go-live came from, linked", () => {
+    it("says which test link a go-live came from, linked", () => {
         const p = version({
             testRelease: { id: "rel_1", number: 2, name: "Diwali menu" },
         });
         const copy = versionRowCopy(p);
         expect(copy.lines.map((l) => l.text)).toEqual([
             "Went live by Asha",
-            "From test release 2 · Diwali menu",
+            "From test link 2 · Diwali menu",
         ]);
         expect(copy.lines[1].releaseId).toBe("rel_1");
 
@@ -139,11 +139,11 @@ describe("a version's row in the history", () => {
                     testRelease: {
                         id: "rel_3",
                         number: 3,
-                        name: "Test release 3",
+                        name: "Test link 3",
                     },
                 }),
             ),
-        ).toContain("From test release 3");
+        ).toContain("From test link 3");
     });
 
     it("reads an older API without the new fields as before", () => {

@@ -18,6 +18,7 @@ export const askAiDraftKind = z.enum([
     "order",
     "customer",
     "blog_post",
+    "section",
 ]);
 export type AskAiDraftKind = z.infer<typeof askAiDraftKind>;
 
@@ -77,6 +78,23 @@ export const askAiDraftCard = z.object({
     note: z.string().nullable(),
     /** No Confirm or Undo after this (the end of the business's day). */
     expiresAt: z.string(),
+    /**
+     * Check this (RULES §5, U43): facts in the new words the owner never
+     * gave (a price, an offer, a time, "free", a phone number, a number
+     * or claim). The server won't save until each is confirmed.
+     */
+    checks: z
+        .array(
+            z.object({
+                id: z.string(),
+                field: z.string(),
+                words: z.string(),
+                why: z.string(),
+            }),
+        )
+        .optional(),
+    /** What the suggestion is based on: "This section's words now". */
+    basedOn: z.string().nullable().optional(),
 });
 export type AskAiDraftCard = z.infer<typeof askAiDraftCard>;
 
@@ -86,6 +104,8 @@ export type AskAiDraftCard = z.infer<typeof askAiDraftCard>;
  */
 export const askAiConfirmBody = z.object({
     fields: z.record(z.string(), z.unknown()).optional(),
+    /** The card's Check this ids the person confirmed. */
+    confirmed: z.array(z.string().max(64)).max(20).optional(),
 });
 export type AskAiConfirmBody = z.infer<typeof askAiConfirmBody>;
 

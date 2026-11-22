@@ -9,7 +9,6 @@ import {
     MoreHorizontal,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -22,6 +21,11 @@ import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { callName } from "@/lib/services/call-name";
 import type { LocalDate } from "@/lib/services/diary";
 import { addDays, weekStartOf } from "@/lib/services/diary";
+
+import {
+    useScreenGo,
+    useScreenLink,
+} from "@/components/shared/page/screen-pending";
 
 import { DateSheet } from "./date-sheet";
 import { OptionsSheet } from "./options-sheet";
@@ -101,14 +105,16 @@ export function CalendarHeader({
     /** Add someone who takes bookings, for someone who may. */
     onAddPerson?: () => void;
 }) {
-    const router = useRouter();
+    // The screen's transition: the diary greys while the header stays.
+    const screenGo = useScreenGo();
+    const screenLink = useScreenLink();
     const [open, setOpen] = useState<Open>(null);
     const { opens, change } = useBookingsOpens(kept);
     const toggle = (which: Exclude<Open, null>) => (o: boolean) =>
         setOpen(o ? which : null);
     const go = (href: string) => {
         setOpen(null);
-        router.push(href, { scroll: false });
+        screenGo(href);
     };
 
     const title = headerTitle(layout, date, today);
@@ -222,6 +228,7 @@ export function CalendarHeader({
         >
             <Link
                 href={hrefFor(layout, addDays(date, -step))}
+                onNavigate={screenLink(hrefFor(layout, addDays(date, -step)))}
                 scroll={false}
                 aria-label={`Previous ${unit}`}
                 className={cn(STEP, PHONE_STEP, "order-1")}
@@ -230,6 +237,7 @@ export function CalendarHeader({
             </Link>
             <Link
                 href={hrefFor(layout, addDays(date, step))}
+                onNavigate={screenLink(hrefFor(layout, addDays(date, step)))}
                 scroll={false}
                 aria-label={`Next ${unit}`}
                 className={cn(

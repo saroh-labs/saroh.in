@@ -18,7 +18,11 @@ export type PageShape =
     | "answers"
     | "settings"
     | "home"
-    | "money-list";
+    | "money-list"
+    // Regions of an editor, drawn `bare` inside the frame that stays.
+    | "writing"
+    | "canvas"
+    | "inspector";
 
 export interface PageLoadingProps {
     shape: PageShape;
@@ -92,7 +96,13 @@ export function PageLoading({
             className={bodyClassName}
         >
             <span className="sr-only">{label}</span>
-            <div aria-hidden>{BODY[shape](rows)}</div>
+            <div
+                aria-hidden
+                // A region fills the part of the frame it stands in for.
+                className={shape in REGION ? "h-full" : undefined}
+            >
+                {BODY[shape](rows)}
+            </div>
         </div>
     );
     if (bare) return body;
@@ -449,6 +459,72 @@ function SettingsBody(rows = 5) {
     );
 }
 
+/**
+ * The post editor's writing surface while a post opens: its address strip,
+ * then the page with a title and paragraphs (`WritingSurface`'s boxes).
+ */
+function WritingBody(lines = 5) {
+    return (
+        <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+            <div className="flex h-7 items-center gap-2.5 bg-muted px-4">
+                <Skeleton className="h-3 w-64" />
+            </div>
+            <div className="min-h-0 overflow-hidden bg-muted/60 px-6 py-8">
+                <div className="mx-auto min-h-full w-full max-w-[760px] space-y-4 rounded-lg bg-card px-14 py-12 shadow-sm">
+                    <Skeleton className="h-3.5 w-32" />
+                    <Skeleton className="h-10 w-4/5" />
+                    <Skeleton className="h-3.5 w-48" />
+                    <div className="space-y-2.5 pt-6">
+                        {Array.from({ length: lines }, (_, i) => (
+                            <Skeleton
+                                key={i}
+                                className={cn(
+                                    "h-4",
+                                    i % 3 === 2 ? "w-3/5" : "w-full",
+                                )}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/** The site editor's canvas while a page opens: the page under its bar. */
+function CanvasBody(sections = 3) {
+    return (
+        <div className="h-full min-h-0 overflow-hidden bg-muted/60 p-6">
+            <div className="mx-auto w-full max-w-[1100px] space-y-3 rounded-lg bg-card p-6 shadow-sm">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-64 w-full" />
+                {Array.from({ length: sections }, (_, i) => (
+                    <Skeleton key={i} className="h-32 w-full" />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/** An inspector's body: label and value rows down the right column. */
+function InspectorBody(rows = 5) {
+    return (
+        <div className="space-y-5 p-4">
+            {Array.from({ length: rows }, (_, i) => (
+                <div key={i} className="flex gap-4">
+                    <Skeleton className="h-3.5 w-20 shrink-0" />
+                    <div className="flex-1 space-y-2">
+                        <Skeleton className="h-3.5 w-full" />
+                        <Skeleton className="h-3 w-2/3" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+const REGION = { writing: true, canvas: true, inspector: true };
+
 const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     list: ListBody,
     detail: DetailBody,
@@ -459,4 +535,7 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     settings: SettingsBody,
     home: HomeBody,
     "money-list": MoneyListBody,
+    writing: WritingBody,
+    canvas: CanvasBody,
+    inspector: InspectorBody,
 };

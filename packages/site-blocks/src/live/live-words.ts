@@ -16,15 +16,16 @@ export const PLACES_SHOWN_AT_MOST = 5;
  * "3 places left", "Last place", or nothing: more than
  * {@link PLACES_SHOWN_AT_MOST} free says nothing (it isn't news), and a
  * full or unknown class says nothing here (Full is the timetable's word).
- * `short` is Live's strip: "3 left".
+ * `short` is Live's strip: "3 left". `from` is the timetable's own number
+ * (KD8, 1 to 10); absent, {@link PLACES_SHOWN_AT_MOST}.
  */
 export function placesLeftWords(
     placesLeft: number | null | undefined,
-    { short = false }: { short?: boolean } = {},
+    { short = false, from }: { short?: boolean; from?: number } = {},
 ): string | null {
     if (placesLeft === null || placesLeft === undefined) return null;
     if (!Number.isFinite(placesLeft) || placesLeft <= 0) return null;
-    if (placesLeft > PLACES_SHOWN_AT_MOST) return null;
+    if (placesLeft > (from ?? PLACES_SHOWN_AT_MOST)) return null;
     if (placesLeft === 1) return "Last place";
     return short ? `${placesLeft} left` : `${placesLeft} places left`;
 }

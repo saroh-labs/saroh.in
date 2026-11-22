@@ -36,12 +36,15 @@ type Days =
 export function MoveClass({
     row,
     apiUrl,
+    siteId,
     businessName,
     move,
 }: {
     /** The customer's booking, or null when it isn't theirs to move. */
     row: AccountBookingRow | null;
     apiUrl: string;
+    /** The site the account is on: the class's days are read through it. */
+    siteId: string;
     businessName: string;
     move: (ref: string, startAt: string) => Promise<MoveResult>;
 }) {
@@ -67,7 +70,7 @@ export function MoveClass({
     );
     const read = useCallback(() => {
         if (!serviceRef) return;
-        void fetchDays(apiUrl, serviceRef).then(
+        void fetchDays(apiUrl, siteId, serviceRef).then(
             (result: Result<BookingDays>) => {
                 if (!open.current) return;
                 setDays(
@@ -77,7 +80,7 @@ export function MoveClass({
                 );
             },
         );
-    }, [apiUrl, serviceRef]);
+    }, [apiUrl, siteId, serviceRef]);
     useEffect(read, [read]);
 
     const back = (

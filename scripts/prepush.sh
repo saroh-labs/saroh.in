@@ -395,8 +395,12 @@ e2e_stack() {
     # saroh.in's release switches on, as CI (plan 2026-11-13-002).
     export NEXT_PUBLIC_AI_APPS=on NEXT_PUBLIC_ASK_AI=on NEXT_PUBLIC_SOCIAL=on
     export NEXT_PUBLIC_DEVELOPERS=on NEXT_PUBLIC_DOCS=on
+    export NEXT_PUBLIC_WEBSITE_LIBRARY=on
     # Settings › API and AI apps on, as CI: the role specs list its tab.
     export NEXT_PUBLIC_API_AREA=on
+    # The redesigned Website area on, as CI (plan 2026-11-18-001). The
+    # api's switch is the only one: the app asks the api (DEC-240).
+    export WEBSITE_AREA=on
     # Share as a post and Create post on, as CI (DEC-217): app and API.
     export NEXT_PUBLIC_SHARE_POSTS=on SHARE_POSTS=on
     # Ask AI's screens on, as CI (DEC-220).
@@ -984,6 +988,7 @@ bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
 bg_step decision-ids pnpm run check:decision-ids
 bg_step mktemp pnpm run check:mktemp
+bg_step website-area-switch pnpm run check:website-area-switch
 bg_step domains pnpm run check:domains
 bg_step openapi pnpm run check:openapi
 bg_step docs-links pnpm run check:docs-links

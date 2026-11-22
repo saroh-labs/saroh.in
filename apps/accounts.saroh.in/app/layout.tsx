@@ -1,6 +1,7 @@
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { headers } from "next/headers";
 import "./auth.css";
 
 import { ThemeProvider } from "@saroh/ui/theme-provider";
@@ -53,11 +54,15 @@ export const metadata: Metadata = {
     robots: { index: false, follow: false },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    // This request's script nonce (the middleware's CSP, `withPrivateApp`),
+    // for the theme's script. Reading it renders every page per request,
+    // which a nonce needs anyway.
+    const nonce = (await headers()).get("x-nonce") ?? undefined;
     return (
         // `suppressHydrationWarning` because next-themes' blocking script
         // stamps the resolved theme onto <html> before React hydrates, so a
@@ -85,6 +90,7 @@ export default function RootLayout({
                     defaultTheme="system"
                     enableSystem
                     disableTransitionOnChange
+                    nonce={nonce}
                 >
                     <Providers>
                         {/* `fixed`, not `absolute` + `h-screen`: the account page is

@@ -130,6 +130,26 @@ export const listSectionTypesTool = {
                 variants: z.array(z.string()),
             }),
         ),
+        /**
+         * The same types as catalogue entries, one per family (KD5): Visit
+         * us lists Address and hours, Hours and Talk to us. Each layout is
+         * added by its own `type`. Optional, so older readers are unchanged.
+         */
+        families: z
+            .array(
+                z.object({
+                    family: z.string(),
+                    description: z.string(),
+                    layouts: z.array(
+                        z.object({
+                            type: z.string(),
+                            label: z.string(),
+                            variants: z.array(z.string()),
+                        }),
+                    ),
+                }),
+            )
+            .optional(),
         schema: z.record(z.string(), z.unknown()).nullable(),
         example: z.record(z.string(), z.unknown()).nullable(),
     }),
@@ -266,6 +286,44 @@ export const editPageTool = {
             ops: z.array(sectionOp).min(1).max(20),
         })
         .strict(),
+    output: pageWrite,
+};
+
+/**
+ * One section's words (owner, 21 Nov; plan U42, narrow): its heading, the
+ * line under it and its main button's label. Text only; the rest of the
+ * section is never touched. Ask AI drafts it on a Now and New card.
+ */
+const sectionWords = z.string().trim().min(1).max(300);
+export const editSectionTool = {
+    input: z
+        .object({
+            site_id: siteId,
+            page_id: pageId,
+            section_key: sectionKey,
+            heading: sectionWords.optional().describe("The section's heading."),
+            subheading: sectionWords
+                .optional()
+                .describe("The line under the heading."),
+            button_label: z
+                .string()
+                .trim()
+                .min(1)
+                .max(60)
+                .optional()
+                .describe("The words on the section's main button."),
+        })
+        .strict()
+        .refine(
+            (v) =>
+                v.heading !== undefined ||
+                v.subheading !== undefined ||
+                v.button_label !== undefined,
+            {
+                message:
+                    "Give at least one of heading, subheading or button_label.",
+            },
+        ),
     output: pageWrite,
 };
 

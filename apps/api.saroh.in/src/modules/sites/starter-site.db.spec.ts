@@ -3,7 +3,7 @@
  * Website on, and what that site gains when the business switches another
  * module on afterwards.
  *
- * A new site starts from `starter@4`: a look of its own, sections for what
+ * A new site starts from `starter@5` (v4 with what and where up top, U10): a look of its own, sections for what
  * the business has switched on, one action, the module pages that go with
  * them, and no line that is not true of the business. (`starter@3` put a
  * note to the owner under every headline; `starter@1` pointed at images no
@@ -197,11 +197,11 @@ beforeAll(async () => {
     }
 });
 
-describe("Turning Website on drafts starter@4", () => {
+describe("Turning Website on drafts starter@5", () => {
     it("a business with nothing else on: a headline, a way to get in touch, and a Contact page", async () => {
         expect(starterTemplate).toMatchObject({
             id: STARTER_TEMPLATE_ID,
-            version: 4,
+            version: 5,
         });
         const ctx = await business("Asha Rao");
         const siteId = await website(ctx, "Asha Rao");
@@ -217,7 +217,8 @@ describe("Turning Website on drafts starter@4", () => {
             unknown
         >;
         expect(hero).toMatchObject({
-            variant: "centered",
+            // starter@5 (U10): the split hero, the Stamp in its image slot.
+            variant: "split",
             heading: "Asha Rao",
             cta: { label: "Get in touch", href: "/contact" },
         });
@@ -245,7 +246,7 @@ describe("Turning Website on drafts starter@4", () => {
         });
         expect(site).toMatchObject({
             templateId: STARTER_TEMPLATE_ID,
-            templateVersion: 4,
+            templateVersion: 5,
             templateStyleId: "stone",
             style: { fontPair: "source-serif-inter" },
             footer: { value: "", layout: "left" },
@@ -289,7 +290,8 @@ describe("Turning Website on drafts starter@4", () => {
             heading: "Kesar Salon",
             subheading: "Haircut in Bengaluru",
             cta: { label: "Book a time", href: "/book" },
-            onToday: true,
+            // starter@5 (U10): Open now, Directions and Call under it.
+            answerRow: true,
         });
         expect(services?.content).toMatchObject({ serviceIds: [serviceId] });
 

@@ -2,6 +2,8 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { openDeskBrand } from "../fixtures/phone-editor";
+import { openReviewedSite } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -144,22 +146,11 @@ test.describe("merchant sites load no Saroh font", () => {
         await useSession(page);
 
         await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
-        await page.goto(`${urls.APP_URL}/sites`);
-        // Website sends the owner straight to the business's one site
-        // (ADR-006), so its id is in the address; the editor is its root.
-        await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-        const id = /\/sites\/([^/]+)\//.exec(page.url())?.[1];
-        if (id === undefined) {
-            throw new Error(`no site id in the address: ${page.url()}`);
-        }
-        await page.goto(`${urls.APP_URL}/sites/${id}`);
+        // The business's one site (ADR-006), in its editor.
+        await openReviewedSite(page);
 
-        // The Style panel is the rail's Brand tab since G2.
-        const brand = page.getByRole("tab", { name: "Brand" });
-        await expect(brand).toBeVisible({ timeout: 30_000 });
-        if ((await brand.getAttribute("aria-selected")) !== "true") {
-            await brand.click();
-        }
+        // The Style panel is Brand: the rail's tab, or the area's trail.
+        await openDeskBrand(page);
         // The pairing picker (industry templates, KTD-2; DEC-184). Read-only
         // here: a seeded site has chosen no pair, so the system font is the
         // one in force, and the search behind Change offers the rest.
@@ -168,7 +159,7 @@ test.describe("merchant sites load no Saroh font", () => {
             "system",
         );
         await page.locator("[data-typeface-change]").click();
-        const typeface = page.getByRole("dialog", { name: "Typeface" });
+        const typeface = page.getByRole("dialog", { name: "Fonts" });
         await expect(
             typeface.getByRole("option", {
                 name: /Your visitor's system font/,

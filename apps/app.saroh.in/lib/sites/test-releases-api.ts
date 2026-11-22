@@ -122,7 +122,7 @@ export function createTestRelease(
         "",
         "POST",
         input,
-        "Couldn't make a test release.",
+        "Couldn't make a test link.",
     );
 }
 
@@ -136,7 +136,7 @@ export function updateTestRelease(
         `/${encodeURIComponent(releaseId)}`,
         "PATCH",
         input,
-        "Couldn't save the test release.",
+        "Couldn't save the test link.",
     );
 }
 
@@ -146,7 +146,7 @@ export function discardTestRelease(siteId: string, releaseId: string) {
         `/${encodeURIComponent(releaseId)}/discard`,
         "POST",
         undefined,
-        "Couldn't discard the test release.",
+        "Couldn't discard the test link.",
     );
 }
 
@@ -160,7 +160,7 @@ export function goLiveWithRelease(
         `/${encodeURIComponent(releaseId)}/go-live`,
         "POST",
         override ? { override: true } : {},
-        "Couldn't go live with the test release.",
+        "Couldn't go live with the test link.",
     );
 }
 
@@ -208,7 +208,7 @@ export function openTestRelease(siteId: string, releaseId: string) {
         `/${encodeURIComponent(releaseId)}/open`,
         "POST",
         undefined,
-        "Couldn't open the test release.",
+        "Couldn't open the test link.",
     );
 }
 

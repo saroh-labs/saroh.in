@@ -17,7 +17,7 @@
  * working on a render): a dev server draws Next's indicator and its issue
  * badge, which no committed picture may show. Every render is drawn at one
  * fixed weekday morning (`FIXTURE_NOW`, `packages/site-blocks/src/showcase/fixtures.ts`),
- * so "Open now" and "Free today" read the same whenever the run is. `TEMPLATE_RENDER_URL` points this elsewhere. No API, database or
+ * so "Open now" and "Open today" read the same whenever the run is. `TEMPLATE_RENDER_URL` points this elsewhere. No API, database or
  * sign-in: each template is drawn for its sample business from fixtures.
  *
  * For each template, in its first colourway, every page its sample business

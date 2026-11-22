@@ -47,12 +47,13 @@ const TEST_HOST_PATTERNS = ["test--.+", "test\\..+\\..+"];
 const SECURITY_HEADERS = [
     { key: "Strict-Transport-Security", value: "max-age=31536000" },
     { key: "X-Frame-Options", value: "SAMEORIGIN" },
-    { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+    // No Content-Security-Policy here: the middleware sends it, with a
+    // fresh script nonce per answer (`lib/csp.ts`), and on Workers a
+    // next.config header of the same name would replace that one.
     { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     // Camera, microphone, location and USB off (pentest, 29 Oct 2026); the
-    // checkout's payment keeps the browser's default. No CSP beyond
-    // frame-ancestors yet: each business's trackers (#889), checkout and
-    // media hosts would need listing.
+    // checkout's payment keeps the browser's default.
     {
         key: "Permissions-Policy",
         value: "camera=(), microphone=(), geolocation=(), usb=()",

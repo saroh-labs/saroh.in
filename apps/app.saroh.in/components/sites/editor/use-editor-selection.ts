@@ -1,6 +1,6 @@
 import { showError } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useMemo, useSyncExternalStore } from "react";
+import { useOpenPageId } from "./page-switch";
 
 import { carryPreview } from "@/components/sites/canvas/use-editor-viewport";
 import {
@@ -122,7 +122,7 @@ export function useOpenPage({
     /** The link was to the page already open. */
     onSamePage: () => void;
 }) {
-    const router = useRouter();
+    const openPageId = useOpenPageId(siteId);
     return (page: SitePage) => {
         if (page.id === pageId) {
             onSamePage();
@@ -134,7 +134,7 @@ export function useOpenPage({
             return;
         }
         carryPreview(siteId, page.id);
-        router.push(`/sites/${siteId}?page=${page.id}`);
+        openPageId(page.id);
     };
 }
 

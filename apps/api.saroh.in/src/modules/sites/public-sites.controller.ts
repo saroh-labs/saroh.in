@@ -13,6 +13,7 @@ import {
 import { hashClientIp } from "../../common/client-ip";
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
+import { postMovedTo } from "../content/post-old-slugs";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import type { PublicContact } from "../organizations/business-contact";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
@@ -57,6 +58,12 @@ export class PublicSitesController {
         300,
         60_000,
     );
+
+    /**
+     * The post reads, per visitor as relayed (02 W6, 21 Nov 2026): a post
+     * page is two of them, so as generous as the test-host lookup.
+     */
+    readonly postReadLimiter = new FixedWindowRateLimiter(300, 60_000);
 
     constructor(
         private readonly sites: SitesService,
@@ -177,14 +184,55 @@ export class PublicSitesController {
      * a site once, then asks here by id.
      */
     @Get(":siteId/posts")
-    posts(@Param("siteId") siteId: string) {
+    posts(
+        @Param("siteId") siteId: string,
+        @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ) {
+        this.takePostRead(siteId, ip, relay);
         return this.sites.getPublicPosts(siteId);
+    }
+
+    /**
+     * Where an old post link forwards (U17a): `{ to }`, the post's live
+     * slug, or 404. The renderer asks only after a post read missed.
+     */
+    @Get(":siteId/posts/:slug/moved")
+    postMoved(
+        @Param("siteId") siteId: string,
+        @Param("slug") slug: string,
+        @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ) {
+        this.takePostRead(siteId, ip, relay);
+        return postMovedTo(siteId, slug);
     }
 
     /** One live post by slug (#232). 404 when it is not live. */
     @Get(":siteId/posts/:slug")
-    post(@Param("siteId") siteId: string, @Param("slug") slug: string) {
+    post(
+        @Param("siteId") siteId: string,
+        @Param("slug") slug: string,
+        @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ) {
+        this.takePostRead(siteId, ip, relay);
         return this.sites.getPublicPost(siteId, slug);
+    }
+
+    /** 429 past the post reads' limit; a caller with no address shares the site's. */
+    private takePostRead(
+        siteId: string,
+        ip: string,
+        relay: string | undefined,
+    ): void {
+        const key = visitorKey(ip, relay) ?? `posts:${siteId}`;
+        if (!this.postReadLimiter.take(key)) {
+            throw new HttpException(
+                "Too many requests. Try again shortly.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
     }
 
     /**

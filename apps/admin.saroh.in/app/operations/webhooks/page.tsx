@@ -3,7 +3,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { StatCard } from "@saroh/ui/stat-card";
 
-import { AdminShell } from "@/components/admin-shell";
 import { FilterBar, FilterSelect, FilterText } from "@/components/filter-bar";
 import { BulkAction } from "@/components/operations/bulk-action";
 import { Pager } from "@/components/operations/pager";
@@ -46,7 +45,7 @@ export default async function WebhooksPage({
     const day = summary?.lastDay ?? {};
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Webhooks"]}
@@ -135,6 +134,6 @@ export default async function WebhooksPage({
                     </>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

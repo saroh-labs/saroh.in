@@ -95,6 +95,26 @@ describe("site view beacon", () => {
         expect(
             visitStepBody("started", { source: "other", ref: null }).type,
         ).toBe("site.started");
+        // A start says the page it began on, the path alone (DEC-235);
+        // no other step does, and never a private page.
+        expect(
+            visitStepBody(
+                "started",
+                { source: "other", ref: null },
+                "/bridal?x=1",
+            ).properties,
+        ).toEqual({ source: "other", path: "/bridal" });
+        expect(
+            visitStepBody(
+                "started",
+                { source: "other", ref: null },
+                "/account/bookings",
+            ).properties,
+        ).toEqual({ source: "other" });
+        expect(
+            visitStepBody("looked", { source: "other", ref: null }, "/bridal")
+                .properties,
+        ).toEqual({ source: "other" });
         // Paid (DEC-181): the group and label only, never the order.
         expect(
             visitStepBody("paid", { source: "instagram", ref: "diwali-post" }),

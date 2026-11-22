@@ -5,6 +5,7 @@
  * a table with "+N more" and its Open in link; app routes only.
  */
 import type { AskAiInfoCard } from "@saroh/api-contract";
+import { contentSecurityPolicy } from "@saroh/auth/security-headers";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
@@ -26,7 +27,7 @@ vi.mock("next/link", () => ({
     ),
 }));
 
-import nextConfig from "../../next.config.js";
+import cspSources from "../../csp-sources.cjs";
 import {
     AnswerCard,
     MEDIA_ORIGINS,
@@ -134,16 +135,9 @@ describe("products card", () => {
         expect(hrefs()).toEqual([]);
     });
 
-    it("the media hosts are the ones the page's CSP lets images load from", async () => {
-        const rules = (await nextConfig.headers?.()) ?? [];
-        const csp =
-            rules
-                .flatMap((r) => r.headers)
-                .find(
-                    (h) =>
-                        h.key.toLowerCase() ===
-                        "content-security-policy-report-only",
-                )?.value ?? "";
+    it("the media hosts are the ones the page's CSP lets images load from", () => {
+        // Enforced per request by the middleware with a nonce (DEC-244).
+        const csp = contentSecurityPolicy({ ...cspSources, nonce: "test" });
         const img = csp.split("; ").find((p) => p.startsWith("img-src ")) ?? "";
         for (const origin of MEDIA_ORIGINS) expect(img).toContain(origin);
     });

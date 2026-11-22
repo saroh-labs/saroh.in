@@ -22,10 +22,12 @@ import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
+import { SiteLink } from "../site-link";
 import { FeedFailed } from "./feed-failed";
 import { cardLink, listCard, listPhoto } from "./list-layout";
 import { LeadGrid } from "./product-grid-lead";
 import { PlatesGrid } from "./product-grid-plates";
+import { ProductStepper } from "./product-stepper";
 
 /**
  * `productGrid` v1 — products from the catalogue, read live (G12).
@@ -80,6 +82,12 @@ export interface ProductGridFeed {
     moreHref?: string | null;
     /** The read failed: not "none", so the section says so (`FeedFailed`). */
     failed?: boolean;
+    /**
+     * The site whose bag the cards' Add fills (`addInPlace`, DEC-237), set
+     * only where the site takes orders online. Absent: no Add on a live
+     * page; the card opens the product as before.
+     */
+    bagSite?: string | null;
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -273,6 +281,7 @@ export default function ProductGridSection({
             title={title}
             // The canvas draws the cards; clicking one selects the block.
             feed={{ products: state.products, basePath: null }}
+            canvas
         />
     );
 }
@@ -281,7 +290,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const textButton = cn(
-    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
+    "coarse:inline-flex coarse:min-h-11 coarse:items-center cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 transition-opacity hover:underline active:opacity-70",
     focusRing,
 );
 
@@ -381,10 +390,13 @@ function ProductCards({
     content,
     title,
     feed,
+    canvas = false,
 }: {
     content: RenderedProductGrid;
     title: string;
     feed: ProductGridFeed;
+    /** The editor's canvas: Add is drawn, not pressed. */
+    canvas?: boolean;
 }) {
     const products = feed.products.slice(
         0,
@@ -402,6 +414,7 @@ function ProductCards({
             products.some((p) => p.image !== null),
         line: content.showDescriptions !== false,
         label: said(content.buttonLabel),
+        preorder: said(content.preorderWords),
     };
     const list = content.layout === "list";
     const base =
@@ -424,6 +437,18 @@ function ProductCards({
         !list && (content.phoneColumns === 1 || content.phoneColumns === 2)
             ? content.phoneColumns
             : undefined;
+    // Add to bag from the card (DEC-237): the even grid, bare cards and the
+    // list. Plates are for browsing, and the lead piece opens its page.
+    const order =
+        content.addInPlace === true
+            ? (p: ShopListingCard) => (
+                  <ProductStepper
+                      product={p}
+                      bagSite={feed.bagSite ?? null}
+                      canvas={canvas}
+                  />
+              )
+            : null;
 
     return (
         <GridFrame
@@ -433,19 +458,19 @@ function ProductCards({
             cutOff={said(content.cutOff)}
             more={
                 feed.moreHref ? (
-                    <a
+                    <SiteLink
                         href={feed.moreHref}
                         className={cn(textButton, "shrink-0")}
                     >
                         See all products
-                    </a>
+                    </SiteLink>
                 ) : feed.atShop ? null : base !== null ? (
-                    <a
+                    <SiteLink
                         href={base || "/"}
                         className={cn(textButton, "shrink-0")}
                     >
                         Shop <span aria-hidden="true">→</span>
-                    </a>
+                    </SiteLink>
                 ) : (
                     <span className="text-site-accent-text shrink-0 text-sm font-semibold">
                         Shop <span aria-hidden="true">→</span>
@@ -476,6 +501,7 @@ function ProductCards({
                     base={base}
                     columns={content.columns}
                     phone={phone}
+                    order={order}
                 />
             ) : (
                 <ul
@@ -497,10 +523,38 @@ function ProductCards({
                         ) : (
                             <CardBody product={p} show={show} />
                         );
+                        // With Add on the card, the card is the box and
+                        // its words the link: a button can't sit in a link.
+                        const control = order?.(p) ?? null;
+                        if (control && !list) {
+                            return (
+                                <li
+                                    key={p.slug}
+                                    className={cn(card(p), "min-w-0")}
+                                >
+                                    {base !== null ? (
+                                        <SiteLink
+                                            href={`${base}/${encodeURIComponent(p.slug)}`}
+                                            className={cn(
+                                                "group grid cursor-pointer content-start gap-1.5",
+                                                focusRing,
+                                            )}
+                                        >
+                                            {inner}
+                                        </SiteLink>
+                                    ) : (
+                                        <div className="grid content-start gap-1.5">
+                                            {inner}
+                                        </div>
+                                    )}
+                                    <div className="mt-1.5 px-4">{control}</div>
+                                </li>
+                            );
+                        }
                         return (
                             <li key={p.slug} className="min-w-0">
                                 {base !== null ? (
-                                    <a
+                                    <SiteLink
                                         href={`${base}/${encodeURIComponent(p.slug)}`}
                                         className={cn(
                                             card(p),
@@ -509,10 +563,13 @@ function ProductCards({
                                         )}
                                     >
                                         {inner}
-                                    </a>
+                                    </SiteLink>
                                 ) : (
                                     <div className={card(p)}>{inner}</div>
                                 )}
+                                {control ? (
+                                    <div className="mt-2">{control}</div>
+                                ) : null}
                             </li>
                         );
                     })}
@@ -529,6 +586,25 @@ interface CardShow {
     line: boolean;
     /** The merchant's words at the card's foot; null draws none. */
     label: string | null;
+    /** The owner's Pre-order tag words (DEC-228); null draws none. */
+    preorder: string | null;
+}
+
+/**
+ * The owner's Pre-order tag, "Pre-order for Saturday": their words on each
+ * card, typed until products carry a pre-order date. Said in words, in an
+ * outline, so it is never told only by colour from Sold out.
+ */
+function PreorderTag({ words }: { words: string | null }) {
+    if (!words) return null;
+    return (
+        <span
+            data-preorder=""
+            className="border-site-accent text-site-accent-text shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold"
+        >
+            {words}
+        </span>
+    );
 }
 
 /** "Show as: List" (G16): the photo on the left, the words beside it. */
@@ -542,15 +618,17 @@ function ListRowBody({
     return (
         <>
             {show.photo && p.image ? (
-                <img
-                    src={p.image.url}
-                    alt={p.image.alt}
-                    {...siteImage("below", {
-                        src: p.image.url,
-                        sizes: "(min-width: 640px) 240px, 40vw",
-                    })}
-                    className={listPhoto}
-                />
+                <span data-site-photo="product" className="contents">
+                    <img
+                        src={p.image.url}
+                        alt={p.image.alt}
+                        {...siteImage("below", {
+                            src: p.image.url,
+                            sizes: "(min-width: 640px) 240px, 40vw",
+                        })}
+                        className={listPhoto}
+                    />
+                </span>
             ) : null}
             <span className="grid min-w-0 content-start gap-1.5 py-4">
                 <CardWords product={p} show={show} />
@@ -571,15 +649,17 @@ function CardBody({
             {!show.photo ? null : p.image ? (
                 // Remote images from the merchant's media, a plain <img> as
                 // every block's: next/image would need each origin allowlisted.
-                <img
-                    src={p.image.url}
-                    alt={p.image.alt}
-                    {...siteImage("below", {
-                        src: p.image.url,
-                        sizes: "(min-width: 1024px) 25vw, 50vw",
-                    })}
-                    className="mb-1.5 h-[130px] w-full object-cover"
-                />
+                <span data-site-photo="product" className="contents">
+                    <img
+                        src={p.image.url}
+                        alt={p.image.alt}
+                        {...siteImage("below", {
+                            src: p.image.url,
+                            sizes: "(min-width: 1024px) 25vw, 50vw",
+                        })}
+                        className="mb-1.5 h-[130px] w-full object-cover"
+                    />
+                </span>
             ) : (
                 // Its neighbours have photos: its name, in the photo's box.
                 <NamePlate name={p.name} className="mb-1.5 h-[130px]" />
@@ -605,13 +685,14 @@ function CardWords({
     );
     return (
         <>
-            {eyebrow || p.soldOut ? (
+            {eyebrow || p.soldOut || show.preorder ? (
                 <span className="flex items-center gap-2 px-4">
-                    <span className="text-site-muted min-w-0 flex-1 truncate text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                    <span className="text-site-muted min-w-0 flex-1 truncate text-[12px] font-bold uppercase tracking-[0.08em]">
                         {eyebrow}
                     </span>
+                    <PreorderTag words={show.preorder} />
                     {p.soldOut ? (
-                        <span className="bg-site-fg text-site-bg shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">
+                        <span className="bg-site-fg text-site-bg shrink-0 rounded-full px-2 py-0.5 text-[12px] font-bold">
                             Sold out
                         </span>
                     ) : null}
@@ -680,6 +761,7 @@ function BareGrid({
     base,
     columns,
     phone,
+    order = null,
 }: {
     products: ShopListingCard[];
     show: CardShow;
@@ -687,6 +769,8 @@ function BareGrid({
     columns?: number;
     /** Across on a phone, when the merchant chose it. */
     phone?: 1 | 2;
+    /** Each card's Add (`addInPlace`); null draws none. */
+    order?: ((p: ShopListingCard) => React.ReactNode) | null;
 }) {
     const fixed =
         columns === undefined
@@ -709,14 +793,17 @@ function BareGrid({
                     p.gstAdded === true,
                 );
                 const soldOut = p.soldOut ? (
-                    <span className="bg-site-fg text-site-bg px-2 py-1 text-[11.5px] font-semibold uppercase tracking-[0.06em]">
+                    <span className="bg-site-fg text-site-bg px-2 py-1 text-[12px] font-semibold uppercase tracking-[0.06em]">
                         Sold out
                     </span>
                 ) : null;
                 const inner = (
                     <>
                         {show.photo ? (
-                            <span className="bg-site-surface relative mb-3.5 block aspect-[4/5] overflow-hidden rounded-[var(--site-radius)]">
+                            <span
+                                data-site-photo="product"
+                                className="bg-site-surface relative mb-3.5 block aspect-[4/5] overflow-hidden rounded-[var(--site-radius)]"
+                            >
                                 {p.image ? (
                                     <img
                                         src={p.image.url}
@@ -765,6 +852,11 @@ function BareGrid({
                                 </span>
                             ) : null}
                         </span>
+                        {show.preorder ? (
+                            <span className="mt-1.5 flex">
+                                <PreorderTag words={show.preorder} />
+                            </span>
+                        ) : null}
                         {line ? (
                             <span className="text-site-body mt-1.5 block text-[14px] leading-normal [text-wrap:pretty]">
                                 {line}
@@ -780,7 +872,7 @@ function BareGrid({
                 return (
                     <li key={p.slug} className="text-site-fg min-w-0">
                         {base !== null ? (
-                            <a
+                            <SiteLink
                                 href={`${base}/${encodeURIComponent(p.slug)}`}
                                 className={cn(
                                     "group block cursor-pointer rounded-[var(--site-radius)]",
@@ -788,10 +880,11 @@ function BareGrid({
                                 )}
                             >
                                 {inner}
-                            </a>
+                            </SiteLink>
                         ) : (
                             <div>{inner}</div>
                         )}
+                        {order ? <div className="mt-3">{order(p)}</div> : null}
                     </li>
                 );
             })}

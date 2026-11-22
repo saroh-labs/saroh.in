@@ -25,8 +25,14 @@ import type {
 } from "@/lib/sites/service";
 import type { SiteStyleOptions } from "@/lib/sites/style";
 import { SiteEditor } from "./site-editor";
+import { leaveLost } from "./use-editor-leave";
 
 // `vi.mock` is hoisted above the imports, so the editor gets these.
+// The Website area's switch (KTD-E1): off, today's editor and Brand panel.
+const area = vi.hoisted(() => ({ on: false }));
+vi.mock("@/components/sites/website-area", () => ({
+    useWebsiteArea: () => area.on,
+}));
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn(), replace: vi.fn() }),
@@ -441,7 +447,7 @@ describe("SiteEditor shell", () => {
         expect(
             button(/^Page: Home\. Choose another page to edit$/),
         ).toBeTruthy();
-        expect($("[role=status]")?.textContent).toBe("Published");
+        expect($("[role=status]")?.textContent).toBe("Live");
         expect($("[role=group][aria-label='Preview width']")).not.toBeNull();
         for (const d of ["desktop", "tablet", "phone"]) {
             expect(button(`Show at ${d} width`)).toBeTruthy();
@@ -508,9 +514,9 @@ describe("SiteEditor shell", () => {
         expect(button("Publish").getAttribute("aria-description")).toBe(
             "Put this site live",
         );
-        expect($("[role=status]")?.textContent).toBe("Not published yet");
+        expect($("[role=status]")?.textContent).toBe("Not live yet");
         expect(host.textContent).toContain("Nothing’s live yet");
-        expect(host.textContent).toContain("Not published yet");
+        expect(host.textContent).toContain("Not live yet");
         expect(host.textContent).not.toContain("⌘-click");
     });
 
@@ -520,14 +526,14 @@ describe("SiteEditor shell", () => {
             initialPendingSiteChanges: ["footer"],
         });
         expect($("[role=status]")?.textContent).toBe(
-            "Not published · 2 blocks, footer",
+            "Live · 3 changes waiting",
         );
         // The pill says it, so the line beside it does not say it twice.
         expect(
             $("nav[aria-label=Breadcrumb] span[title]:not([role=status])"),
         ).toBeNull();
         expect(button("Publish").getAttribute("aria-description")).toBe(
-            "Put live: 2 blocks, footer",
+            "Publish: 3 changes waiting",
         );
     });
 
@@ -558,7 +564,7 @@ describe("SiteEditor shell", () => {
         render();
         click(button(/Visible$/));
         await wait(1500);
-        expect($("[role=status]")?.textContent).toBe("Not published · 1 block");
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
         click(button(/Hidden$/));
         await wait(1500);
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
@@ -713,8 +719,8 @@ describe("SiteEditor shell", () => {
         // Any block with a single look goes straight in.
         const tile = Array.from(
             host.querySelectorAll<HTMLButtonElement>("aside button"),
-        ).find((b) => b.textContent.includes("Contact"));
-        if (!tile) throw new Error("No Contact tile");
+        ).find((b) => b.textContent === "Talk to us");
+        if (!tile) throw new Error("No Visit us · Talk to us layout");
         click(tile);
         // Back on the page's blocks, with the new one selected second.
         expect(button("Page").getAttribute("aria-selected")).toBe("true");
@@ -738,7 +744,7 @@ describe("SiteEditor shell", () => {
         // The same canvas, with no block outlines or labels on it.
         expect($("[data-previewing]")).not.toBeNull();
         expect($$("[data-block-index]")).toHaveLength(0);
-        expect(() => button(/^Hero block, 1 of/)).toThrow();
+        expect(() => button(/^Top of the page section, 1 of/)).toThrow();
         expect(() => button("Header, on every page")).toThrow();
         expect(host.textContent).toContain("Welcome in");
         // The rail and inspector are away, kept mounted, and the bar stays.
@@ -911,7 +917,7 @@ describe("SiteEditor shell", () => {
         expect(host.textContent).toContain("3 blocks");
         expect(() => button("Welcome in")).toThrow();
         expect(toast.showUndo).toHaveBeenCalledWith(
-            "Hero taken off this page",
+            "Top of the page taken off this page",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -967,8 +973,10 @@ describe("SiteEditor shell", () => {
         });
         act(() => undoFrom(0));
         await wait(1500);
-        expect(toast.showError).toHaveBeenCalledWith(
-            "Saroh couldn't save that.",
+        // Said once, on the page, not in a toast as well (editor audit F3).
+        expect(toast.showError).not.toHaveBeenCalled();
+        expect($("[data-save-failed]")?.textContent).toContain(
+            "Couldn't save.",
         );
         expect(host.textContent).toContain("Not saved");
     });
@@ -977,7 +985,7 @@ describe("SiteEditor shell", () => {
         render();
         click(button("Move block down"));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero moved down",
+            "Top of the page moved down",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -988,7 +996,7 @@ describe("SiteEditor shell", () => {
 
         click(button(/Visible$/));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero is hidden on this page",
+            "Top of the page is hidden on this page",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -1024,7 +1032,7 @@ describe("SiteEditor shell", () => {
         click(button(/Visible$/));
         expect(button(/Hidden$/)).toBeTruthy();
         expect(button("Publish").disabled).toBe(true);
-        expect($("[role=status]")?.textContent).not.toBe("Published");
+        expect($("[role=status]")?.textContent).not.toBe("Live");
 
         await wait(1500);
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
@@ -1037,7 +1045,7 @@ describe("SiteEditor shell", () => {
         expect(toast.showSuccess).not.toHaveBeenCalled();
         expect(button("Publish").disabled).toBe(false);
         // G2: the pill carries what the save counted.
-        expect($("[role=status]")?.textContent).toBe("Not published · 1 block");
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
     });
 
     it("keeps a hidden section in the block list, marked Hidden (G16)", () => {
@@ -1061,19 +1069,112 @@ describe("SiteEditor shell", () => {
         actions.saveDraftSections.mockResolvedValue({
             ok: false,
             conflict: true,
+            by: "Ritika Sharma",
             error: "Someone else saved.",
         });
         render();
         click(button(/Visible$/));
         await wait(1500);
-        expect(toast.showError).toHaveBeenCalledWith("Someone else saved.");
+        // The notice says it; not a toast as well (editor audit F4).
+        expect(toast.showError).not.toHaveBeenCalled();
+        // C12: who changed it, never live presence.
         expect($("[role=alert]")?.textContent).toContain(
-            "Someone else saved this page while you were editing.",
+            "Ritika Sharma changed Home since you opened it.",
         );
+        // Not also "Couldn't save": one message at a time.
+        expect($("[data-save-failed]")).toBeNull();
         expect(button("Reload the latest")).toBeTruthy();
         click(button(/Hidden$/));
         await wait(5000);
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+    });
+
+    it("says it was you, in another tab, when the newer save was yours (editor audit F4)", async () => {
+        actions.saveDraftSections.mockResolvedValue({
+            ok: false,
+            conflict: true,
+            by: null,
+            you: true,
+            error: "You saved this page in another tab.",
+        });
+        render();
+        click(button(/Visible$/));
+        await wait(1500);
+        const notice = $("[data-save-conflict]")?.textContent ?? "";
+        expect(notice).toContain("You changed Home in another tab or window.");
+        expect(notice).not.toContain("Someone else");
+    });
+
+    it("couldn't save tries again by itself when the connection is back", async () => {
+        actions.saveDraftSections.mockResolvedValueOnce({
+            ok: false,
+            error: "Couldn't reach Saroh.",
+        });
+        render();
+        click(button(/Visible$/));
+        await wait(1500);
+        expect($("[data-save-failed]")).toBeTruthy();
+        act(() => {
+            window.dispatchEvent(new Event("online"));
+        });
+        await wait(0);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
+        expect($("[data-save-failed]")).toBeNull();
+    });
+
+    it("couldn't save keeps the words, and Try again sends the save now (RULES §4)", async () => {
+        actions.saveDraftSections.mockResolvedValueOnce({
+            ok: false,
+            error: "Couldn't reach Saroh.",
+        });
+        render();
+        click(button(/Visible$/));
+        await wait(1500);
+        const notice = $("[data-save-failed]");
+        expect(notice?.textContent).toContain("Couldn't save.");
+        expect(notice?.textContent).toContain(
+            "Your words are kept here. Check your connection, then try again.",
+        );
+        // Not again by itself: the same draft waits for Try again.
+        await wait(5000);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+        await press(button("Try again"));
+        await wait(0);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
+        expect($("[data-save-failed]")).toBeNull();
+    });
+
+    it("leaving says only the unsaved words are at risk; saved changes wait", () => {
+        expect(leaveLost(5)).toBe(
+            "Your other 5 changes are saved and wait for Publish. Only what you changed since the last save would be lost.",
+        );
+        expect(leaveLost(1)).toContain(
+            "Your other change is saved and waits for Publish.",
+        );
+        expect(leaveLost(0)).toBe(
+            "Your latest changes to this site haven't saved, and will be lost if you leave now.",
+        );
+    });
+
+    it("Brand reads, with who can change it, for a role without site:update (C11)", () => {
+        area.on = true;
+        try {
+            render({ canUpdateSite: false });
+            click(button("Brand"));
+            expect($("[data-brand-read-only=denied]")?.textContent).toContain(
+                "Your role can read the look but not change it.",
+            );
+            expect($("[data-brand-panel]")).toBeNull();
+        } finally {
+            area.on = false;
+        }
+    });
+
+    it("keeps today's Brand panel while the Website area is off", () => {
+        render({ canUpdateSite: false });
+        click(button("Brand"));
+        expect($("[data-brand-read-only]")).toBeNull();
+        expect(host.textContent).toContain("Spacing");
     });
 
     it("names what goes live in the Publish sheet, and reads Published after", async () => {
@@ -1082,7 +1183,7 @@ describe("SiteEditor shell", () => {
             initialPendingSiteChanges: ["footer"],
         });
         expect($("[role=status]")?.textContent).toBe(
-            "Not published · 1 block, footer",
+            "Live · 2 changes waiting",
         );
         await press(button("Publish"));
         // Two areas: one row each (DEC-185).
@@ -1094,7 +1195,7 @@ describe("SiteEditor shell", () => {
         await press(go[go.length - 1]);
         await wait(0);
         expect(actions.publishSite).toHaveBeenCalledTimes(1);
-        expect($("[role=status]")?.textContent).toBe("Published");
+        expect($("[role=status]")?.textContent).toBe("Live");
     });
 
     it("publishes while a page is out for review, and records the bypass", async () => {
@@ -1295,9 +1396,7 @@ describe("SiteEditor header and footer text (G6)", () => {
             name: "Rye & Co.",
         });
         expect(button("Publish").disabled).toBe(false);
-        expect($("[role=status]")?.textContent).toBe(
-            "Not published · site name",
-        );
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
 
         // And the live message names the site as it is now.
         await press(button("Publish"));
@@ -1344,7 +1443,7 @@ describe("SiteEditor header and footer text (G6)", () => {
             format: "html",
             value: "<p>Hill Road, Bandra</p>",
         });
-        expect($("[role=status]")?.textContent).toBe("Not published · footer");
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
     });
 
     it("saves an emptied footer as none, and the canvas falls back to the name", async () => {
@@ -1439,7 +1538,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         await wait(0);
         expect(actions.updateSiteFooter).toHaveBeenCalledTimes(3);
         expect(button("Publish").disabled).toBe(false);
-        expect($("[role=status]")?.textContent).toBe("Not published · footer");
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
     });
 
     /** A page whose one block is a hero with a button to /about. */
@@ -1569,7 +1668,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
     it("opens the inspector over the page when a block is chosen, and Close hands focus back to it", async () => {
         atWidth(1000);
         render();
-        click(button(/^Hero block, 2 of 2/));
+        click(button(/^Top of the page section, 2 of 2/));
 
         const open = sheet();
         expect(
@@ -1585,7 +1684,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()).toBeNull();
         // Still selected, and focus is on its label on the page.
         expect(button("Our story").getAttribute("aria-current")).toBe("true");
-        expect(focused()).toBe("Hero block, 2 of 2, selected");
+        expect(focused()).toBe("Top of the page section, 2 of 2, selected");
     });
 
     it("keeps Tab inside the sheet, and Escape closes it back to the block", async () => {
@@ -1612,7 +1711,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         escape();
         await wait(0);
         expect(sheet()).toBeNull();
-        expect(focused()).toBe("Hero block, 2 of 2, selected");
+        expect(focused()).toBe("Top of the page section, 2 of 2, selected");
     });
 
     it("edits a block in the sheet, and the page follows", () => {
@@ -1637,7 +1736,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()).toBeNull();
         expect(host.textContent).toContain("3 blocks");
         expect(toast.showUndo).toHaveBeenCalledWith(
-            "Hero taken off this page",
+            "Top of the page taken off this page",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -1689,7 +1788,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(button(/^Page: Home/)).toBeTruthy();
         expect($(`a[aria-label='Back to Website']`)).not.toBeNull();
         expect(button("Publish").disabled).toBe(false);
-        expect($("[role=status]")?.textContent).toBe("Published");
+        expect($("[role=status]")?.textContent).toBe("Live");
         expect($("[role=group][aria-label='Preview width']")).toBeNull();
         // No bottom tabs: one pill over the page.
         expect($("nav[aria-label='Edit this page']")).toBeNull();
@@ -1737,7 +1836,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()?.textContent).toContain("Blocks on Home");
         // Each block with its first line; the header and footer Fixed.
         expect(sheet()?.textContent).toContain("FooterOn every pageFixed");
-        click(button(/^HeroOur story/));
+        click(button(/^Top of the pageOur story/));
         // One sheet at a time: the list makes way for the block's fields.
         expect($$("[role=dialog]")).toHaveLength(1);
         expect(
@@ -1753,8 +1852,8 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()?.textContent).toContain("Add a block");
         const tile = Array.from(
             sheet()?.querySelectorAll<HTMLButtonElement>("aside button") ?? [],
-        ).find((b) => b.textContent.includes("Contact"));
-        if (!tile) throw new Error("No Contact tile");
+        ).find((b) => b.textContent === "Talk to us");
+        if (!tile) throw new Error("No Visit us · Talk to us layout");
         click(tile);
         expect($$("[data-block-index]")).toHaveLength(3);
         expect(
@@ -1767,7 +1866,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         render();
         click(button("Blocks"));
         act(() => {
-            button(/^Move Hero/).dispatchEvent(
+            button(/^Move Top of the page/).dispatchEvent(
                 new KeyboardEvent("keydown", {
                     key: "ArrowDown",
                     bubbles: true,
@@ -1775,7 +1874,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
             );
         });
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero moved down",
+            "Top of the page moved down",
             expect.any(Function),
             expect.anything(),
         );
@@ -1796,7 +1895,8 @@ describe("SiteEditor narrow and phone (G4)", () => {
                 new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
             );
         });
-        expect(sheet()?.textContent).toContain("Contact");
+        // Contact is Visit us's Talk to us layout, found by its old name (KD5).
+        expect(sheet()?.textContent).toContain("Visit us · Talk to us");
         expect(sheet()?.textContent).not.toContain("Every page");
         type(search, "zzzz");
         // Enter settles the search at once (ListSearch).
@@ -1811,7 +1911,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
     it("gives a tapped block a toolbar: move and remove at once, each with Undo", () => {
         atWidth(390);
         render();
-        click(button(/^Hero block, 1 of 2/));
+        click(button(/^Top of the page section, 1 of 2/));
         const tools = $("[role=toolbar][aria-label='Block actions']");
         expect(tools).not.toBeNull();
         // Its settings rise with no scrim, so the toolbar stays in reach.
@@ -1826,12 +1926,14 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(inTools("Move up").disabled).toBe(true);
         click(inTools("Move down"));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero moved down",
+            "Top of the page moved down",
             expect.any(Function),
             expect.anything(),
         );
         // It moved, and stays selected in its new place.
-        expect(button(/^Hero block, 2 of 2, selected/)).toBeTruthy();
+        expect(
+            button(/^Top of the page section, 2 of 2, selected/),
+        ).toBeTruthy();
         const after = $("[role=toolbar][aria-label='Block actions']");
         const remove = after?.querySelector<HTMLButtonElement>(
             "button[aria-label='Remove']",
@@ -1840,7 +1942,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         click(remove);
         expect($$("[data-block-index]")).toHaveLength(1);
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero taken off this page",
+            "Top of the page taken off this page",
             expect.any(Function),
             expect.anything(),
         );
@@ -1856,7 +1958,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
             ) ?? [],
         ).map((t) => t.textContent);
         // No look to offer here, so no Look tab.
-        expect(tabs).toEqual(["Type", "Colour", "Spacing"]);
+        expect(tabs).toEqual(["Type", "Colour", "Components", "Spacing"]);
         // Type: each face itself, a tap is the choice; no search on a phone.
         expect(sheet()?.textContent).toContain("Newsreader");
         expect(
@@ -1877,7 +1979,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
     it("keeps the selection and the open fields when a phone turns on its side", () => {
         atWidth(390);
         render();
-        click(button(/^Hero block, 2 of 2/));
+        click(button(/^Top of the page section, 2 of 2/));
         expect(sheet()).not.toBeNull();
 
         resizeTo(844);
@@ -1892,5 +1994,85 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()).toBeNull();
         expect($("aside[aria-label=Inspector]")).not.toBeNull();
         expect(button("Move block down").disabled).toBe(true);
+    });
+});
+
+describe("SiteEditor from page to page (the frame stays)", () => {
+    // The page's props for another page of the same site, as `?page=` hands them.
+    const about = [hero("a1", "About us")];
+    function openAbout(props: Props, overrides: Partial<Props> = {}) {
+        act(() => {
+            root.render(
+                <SiteEditor
+                    {...props}
+                    pageId="p-about"
+                    initialSections={about}
+                    initialRevision={7}
+                    {...overrides}
+                />,
+            );
+        });
+    }
+
+    it("keeps the bar and rail mounted; the page's blocks, draft and Undo start again", async () => {
+        const props = render();
+        const crumbs = $("nav[aria-label=Breadcrumb]");
+        const rail = $("[role=tablist][aria-label='Editor panels']");
+        // An edit on Home, saved: one step of Undo history.
+        click(button(/Visible$/));
+        await wait(1500);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+
+        openAbout(props);
+        // The frame's nodes are the same ones: nothing was rebuilt.
+        expect($("nav[aria-label=Breadcrumb]")).toBe(crumbs);
+        expect($("[role=tablist][aria-label='Editor panels']")).toBe(rail);
+        // The page's part is About's: its block, nothing unsaved.
+        expect(
+            button(/^Page: About\. Choose another page to edit$/),
+        ).toBeTruthy();
+        expect(button("About us", true)).not.toBeNull();
+        expect(button("Welcome in", true)).toBeNull();
+        expect(host.textContent).toContain("3 blocks");
+        expect(button("Undo", true)?.disabled ?? true).toBe(true);
+
+        // An edit on About saves to About, at About's revision.
+        click(button(/Visible$/));
+        await wait(1500);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
+        const [, pageId, sent, revision] = actions.saveDraftSections.mock
+            .calls[1] as [string, string, Section[], number];
+        expect(pageId).toBe("p-about");
+        expect(revision).toBe(7);
+        expect(sent.map((s) => s.key)).toEqual(["a1"]);
+    });
+
+    it("drops a save for the last page that lands after another page opened", async () => {
+        let land: (v: unknown) => void = () => undefined;
+        actions.saveDraftSections.mockImplementationOnce(
+            () => new Promise((resolve) => (land = resolve)),
+        );
+        const props = render();
+        click(button(/Visible$/));
+        await wait(1500);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+
+        openAbout(props);
+        await act(async () => {
+            land({
+                ok: true,
+                data: { revision: 99, pendingSectionChanges: 1 },
+            });
+            await Promise.resolve();
+        });
+        // About is still About, unsaved nothing, and keeps its own revision.
+        expect(button("About us", true)).not.toBeNull();
+        expect(button("Publish").disabled).toBe(false);
+        click(button(/Visible$/));
+        await wait(1500);
+        const [, pageId, , revision] = actions.saveDraftSections.mock
+            .calls[1] as [string, string, Section[], number];
+        expect(pageId).toBe("p-about");
+        expect(revision).toBe(7);
     });
 });

@@ -34,6 +34,37 @@ const COLOUR = [
     /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+)\s*)?\)$/i,
 ];
 
+/**
+ * A card from the business inside a post (U15b): `<div data-embed="service"
+ * data-id="…"></div>`. It stores which one and nothing else; the post's page
+ * reads the name, price and time from Services or Products when it is
+ * viewed, so the post never shows an old price. The editor
+ * (`rich-text/embeds/business-embed.ts`) and the renderer
+ * (`saroh.app/lib/post-embeds.ts`) read exactly this shape.
+ */
+export const EMBED_KINDS = ["service", "product"] as const;
+/** An id as the database mints them, the same rule the product grid reads. */
+const EMBED_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** An embed keeps its two attributes, in one order; a bad one keeps neither. */
+function embedDiv(
+    tagName: string,
+    attribs: sanitizeHtml.Attributes,
+): sanitizeHtml.Tag {
+    if (!("data-embed" in attribs) && !("data-id" in attribs)) {
+        return { tagName, attribs };
+    }
+    const { "data-embed": kind, "data-id": id, ...rest } = attribs;
+    const ok =
+        "data-embed" in attribs &&
+        "data-id" in attribs &&
+        (EMBED_KINDS as readonly string[]).includes(kind) &&
+        EMBED_ID.test(id);
+    return ok
+        ? { tagName, attribs: { "data-embed": kind, "data-id": id } }
+        : { tagName, attribs: rest };
+}
+
 const OPTIONS: sanitizeHtml.IOptions = {
     allowedTags: [
         "p",
@@ -85,6 +116,7 @@ const OPTIONS: sanitizeHtml.IOptions = {
         a: ["href", "title", "target", "rel"],
         img: ["src", "alt", "title", "width", "height"],
         mark: ["data-color"],
+        div: ["data-embed", "data-id"],
         th: ["colspan", "rowspan"],
         td: ["colspan", "rowspan"],
         "*": ["style"],
@@ -116,6 +148,7 @@ const OPTIONS: sanitizeHtml.IOptions = {
     allowedSchemes: ["http", "https", "mailto", "tel"],
     allowedSchemesByTag: { img: ["http", "https", "data"] },
     transformTags: {
+        div: embedDiv,
         /*
          * A link that opens a new tab always gets `rel="noopener noreferrer"`
          * (#280), so the page it opens cannot reach back through

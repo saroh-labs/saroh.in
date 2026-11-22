@@ -7,12 +7,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
+import { RestoreVersion as LegacyRestoreVersion } from "@/components/sites/versions/legacy/restore-version";
 import { PastVersionPreview } from "@/components/sites/versions/past-version-preview";
 import { RestoreVersion } from "@/components/sites/versions/restore-version";
 import { activeBusinessZone } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { releaseTitle } from "@/lib/sites/release-review";
 import { getPublication, getSite } from "@/lib/sites/service";
+import { restoresAsDraft } from "@/lib/sites/website-area-switch";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -134,14 +136,25 @@ export default async function PastVersionPage({
                 </PartialNotice>
             )}
 
-            {site.can.publish ? (
+            {!(await restoresAsDraft()) ? (
+                // Off, today's restore: the version goes live again.
+                site.can.publish ? (
+                    <LegacyRestoreVersion
+                        siteId={siteId}
+                        publicationId={publication.id}
+                        isCurrent={isCurrent}
+                        renderable={renderable}
+                        needsApproval={site.publishNeedsApproval === true}
+                        canOverride={site.canOverride === true}
+                    />
+                ) : null
+            ) : site.can.edit ? (
                 <RestoreVersion
                     siteId={siteId}
                     publicationId={publication.id}
+                    publishedAt={publication.publishedAt}
                     isCurrent={isCurrent}
                     renderable={renderable}
-                    needsApproval={site.publishNeedsApproval === true}
-                    canOverride={site.canOverride === true}
                 />
             ) : null}
 
@@ -176,6 +189,7 @@ export default async function PastVersionPage({
             {page ? (
                 <PastVersionPreview
                     sections={sections}
+                    siteId={siteId}
                     variables={publication.snapshot.site?.styleVariables}
                     look={publication.snapshot.site?.look}
                 />

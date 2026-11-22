@@ -15,11 +15,13 @@ import {
     templateStylePreset,
 } from "../manifest";
 import { getTemplate, listTemplates } from "../registry";
+import { firstSection, redesignChecks } from "./redesign-checks";
 import {
     SALON_GALLERY_SAMPLE,
     SALON_TEMPLATE_ID,
     salonServiceIds,
-    salonTemplate,
+    salonTemplateV1 as salonTemplate,
+    salonTemplate as salonV2,
 } from "./salon";
 
 type Ctx = TemplateContext;
@@ -89,8 +91,8 @@ function section(ctx: Ctx, type: string) {
 describe("salon@1 (industry templates U11)", () => {
     it("is registered as the Salon template, version 1", () => {
         expect(salonTemplate.id).toBe(SALON_TEMPLATE_ID);
-        expect(getTemplate("salon")).toBe(salonTemplate);
-        expect(listTemplates()).toContain(salonTemplate);
+        expect(getTemplate("salon", 1)).toBe(salonTemplate);
+        expect(listTemplates()).not.toContain(salonTemplate);
         expect(salonTemplate.version).toBe(1);
     });
 
@@ -128,11 +130,11 @@ describe("salon@1 (industry templates U11)", () => {
             bg: "#F7EFE9",
             fg: "#2B1D1A",
             // The gallery's #B4533A a step darker, to read 4.5:1 as a link.
-            accent: "#AF4F36",
+            accent: "#A44A33",
         });
         expect(mauve.style.palette).toMatchObject({
             bg: "#F6EEF4",
-            accent: "#9A5095",
+            accent: "#914B8C",
         });
         for (const s of [kesar, mauve]) {
             expect(parsePalette(s.style.palette)).toMatchObject({ ok: true });
@@ -304,5 +306,42 @@ describe("salon@1 (industry templates U11)", () => {
             section({ ...booking, tagline: "Cuts on Linking Road" }, "hero")
                 ?.subheading,
         ).toBe("Cuts on Linking Road");
+    });
+});
+
+describe("salon@2 (U10, overdrive)", () => {
+    const all = profiles.map(([, ctx]) => ctx);
+    redesignChecks(salonV2, salonTemplate, all);
+
+    it("opens on the headline with one main action, Book a chair, and the answer row", () => {
+        const hero = firstSection(salonV2, booking);
+        expect(hero?.content).toMatchObject({
+            heading: "Book your chair. Walk in fresh.",
+            answerRow: true,
+            onToday: true,
+            cta: { label: "Book a chair", href: "/book" },
+        });
+        expect(hero?.content).not.toHaveProperty("secondaryCta");
+    });
+
+    it("lets the work lead: its own skeleton, the Lookbook, a Menu, the rules on a Band", () => {
+        const [home] = instantiateTemplate(salonV2, booking).pages;
+        expect(home.sections.map((s) => s.type)).toEqual([
+            "hero",
+            "gallery",
+            "servicesList",
+            "person",
+            "features",
+            "visitUs",
+        ]);
+        expect(home.sections[1]?.content).toMatchObject({
+            variant: "lookbook",
+            images: [],
+        });
+        expect(home.sections[2]?.content).toMatchObject({
+            variant: "menu",
+            buttonLabel: "Book",
+        });
+        expect(home.sections[4]?.content).toMatchObject({ variant: "band" });
     });
 });

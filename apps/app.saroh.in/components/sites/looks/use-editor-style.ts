@@ -6,6 +6,7 @@ import { updateSiteStyle } from "@/lib/sites/actions";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { inLook } from "@/lib/sites/style";
 import type { LookId } from "@saroh/block-contract";
+import { useLookChanges } from "./look-changes";
 import { lookName } from "./look-picker";
 
 /**
@@ -18,7 +19,14 @@ export function useEditorStyle({
     initialStyle,
     styleOptions,
     onSaved,
+    legacyBrand = false,
 }: {
+    /**
+     * Today's Brand panel (`looks/legacy`), while the Website area is off:
+     * its Reset style keeps the component choices, which have their own
+     * "Reset to <look>" there (DEC-237).
+     */
+    legacyBrand?: boolean;
     siteId: string;
     initialStyle: SiteStyle;
     styleOptions: SiteStyleOptions;
@@ -38,6 +46,8 @@ export function useEditorStyle({
     const [lookError, setLookError] = useState<string | null>(null);
     // A style drawn on the page but not saved: a typeface being tried.
     const [trying, tryStyle] = useState<SiteStyle | null>(null);
+    // This visit's changes, each with its own Undo (U24b).
+    const lookChanges = useLookChanges(style, setStyle, styleOptions);
 
     /*
      * A style change that is unsaved or still saving counts as unpublished
@@ -123,10 +133,19 @@ export function useEditorStyle({
         return () => clearTimeout(id);
     }, [style, savedStyleJson, savedLook, siteId, styleSaving, onSaved]);
 
-    /** Choose a look, or Classic for null (U16): a draft change. */
-    function chooseLook(look: LookId | null) {
+    /**
+     * Choose a look, or Classic for null (U16): a draft change. The
+     * component choices go with it unless the owner asked for the new
+     * look's own ("Use <look>'s styles", DEC-237 KD3).
+     */
+    function chooseLook(look: LookId | null, keepComponents = true) {
         setLookError(null);
-        setStyle((now) => inLook(now, look));
+        setStyle((now) => {
+            const next = inLook(now, look);
+            if (keepComponents) return next;
+            const { components: _dropped, ...rest } = next;
+            return rest;
+        });
     }
 
     function resetStyle() {
@@ -137,11 +156,24 @@ export function useEditorStyle({
         const start = styleOptions.colourways?.find(
             (c) => c.id === styleOptions.startColourway,
         );
-        // Reset is colours, type and spacing: the look stays as chosen
-        // (U16), since Classic is its own choice in the Look row.
+        // Reset to <look> (U24b) is colours, fonts, buttons and shapes and
+        // any spacing a slider stored before the sliders went: the look
+        // stays as chosen (U16), since Classic is its own choice in the
+        // Look row. A template's colourway keeps its own spacing, which is
+        // the look it started in, not a merchant's.
         const look = style.look ?? null;
+        lookChanges.nameNext("Look", `Reset to ${lookName(look)}`);
+        const keep = (next: SiteStyle): SiteStyle => {
+            if (legacyBrand) {
+                return style.components
+                    ? { ...next, components: style.components }
+                    : next;
+            }
+            const { components: _c, brandColour: _b, ...rest } = next;
+            return rest;
+        };
         if (start) {
-            setStyle(inLook(start.style, look));
+            setStyle(keep(inLook(start.style, look)));
             return;
         }
         const defaults: SiteStyle = {
@@ -152,7 +184,7 @@ export function useEditorStyle({
                 styleOptions.scalars.map((sc) => [sc.key, sc.default]),
             ),
         };
-        setStyle(inLook(defaults, look));
+        setStyle(keep(inLook(defaults, look)));
     }
 
     // The style the server holds: its own choices stay open to the site
@@ -174,6 +206,7 @@ export function useEditorStyle({
         savedLook,
         trying,
         tryStyle,
+        lookChanges,
     };
 }
 

@@ -33,6 +33,8 @@ export function EditorSheet({
     actions,
     modal = true,
     className,
+    head,
+    full = false,
     children,
 }: {
     open: boolean;
@@ -51,6 +53,13 @@ export function EditorSheet({
     /** False: no scrim, and the page stays in reach (a block's settings). */
     modal?: boolean;
     className?: string;
+    /**
+     * A bottom sheet's own head in place of the title row (the phone
+     * editor's boards, U49): the title stays, for assistive tech only.
+     */
+    head?: ReactNode;
+    /** The whole of `container`, no grip: the phone's Sections and text sheets. */
+    full?: boolean;
     children: ReactNode;
 }) {
     const bottom = side === "bottom";
@@ -114,6 +123,15 @@ export function EditorSheet({
                             event.preventDefault();
                         }
                     }}
+                    onOpenAutoFocus={(event) => {
+                        // A sheet with no scrim opens on a tap: focus goes
+                        // to the sheet, not a ring on its Close (audit).
+                        if (modal) return;
+                        event.preventDefault();
+                        (event.currentTarget as HTMLElement | null)?.focus({
+                            preventScroll: true,
+                        });
+                    }}
                     onCloseAutoFocus={(event) => {
                         const target = returnFocus?.() ?? null;
                         if (target === null) return;
@@ -126,7 +144,11 @@ export function EditorSheet({
                         bottom
                             ? cn(
                                   "inset-x-0 bottom-0 rounded-t-2xl border-t pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_hsl(var(--shadow-color)/0.24)] transition-[height] duration-base data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom motion-reduce:transition-none",
-                                  tall ? "h-[92%]" : "h-[55%]",
+                                  full
+                                      ? "h-full rounded-none border-t-0"
+                                      : tall
+                                        ? "h-[92%]"
+                                        : "h-[55%]",
                               )
                             : // 300px, never more than 88% of a small window.
                               "inset-y-0 right-0 w-[300px] max-w-[88%] border-l shadow-[-8px_0_24px_hsl(var(--shadow-color)/0.12)] data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
@@ -154,31 +176,42 @@ export function EditorSheet({
                                 }
                             }}
                         >
-                            <button
-                                type="button"
-                                aria-label={
-                                    tall
-                                        ? "Make the sheet smaller"
-                                        : "Make the sheet taller"
-                                }
-                                // A grip for the thumb; the keyboard starts on
-                                // Close, and the sheet scrolls either way.
-                                tabIndex={-1}
-                                onClick={() => setTall(!tall)}
-                                className="mx-auto flex h-5 w-16 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                                <span
-                                    aria-hidden
-                                    className="h-1 w-9 rounded-full bg-border"
-                                />
-                            </button>
-                            <div className="flex items-center gap-1 pb-1 pl-4 pr-1.5">
-                                <Dialog.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-                                    {title}
-                                </Dialog.Title>
-                                {actions}
-                                {close}
-                            </div>
+                            {full ? null : (
+                                <button
+                                    type="button"
+                                    aria-label={
+                                        tall
+                                            ? "Make the sheet smaller"
+                                            : "Make the sheet taller"
+                                    }
+                                    // A grip for the thumb; the keyboard starts on
+                                    // Close, and the sheet scrolls either way.
+                                    tabIndex={-1}
+                                    onClick={() => setTall(!tall)}
+                                    className="mx-auto flex h-5 w-16 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    <span
+                                        aria-hidden
+                                        className="h-1 w-9 rounded-full bg-border"
+                                    />
+                                </button>
+                            )}
+                            {head !== undefined ? (
+                                <>
+                                    <Dialog.Title className="sr-only">
+                                        {title}
+                                    </Dialog.Title>
+                                    {head}
+                                </>
+                            ) : (
+                                <div className="flex items-center gap-1 pb-1 pl-4 pr-1.5">
+                                    <Dialog.Title className="min-w-0 flex-1 truncate text-base font-semibold">
+                                        {title}
+                                    </Dialog.Title>
+                                    {actions}
+                                    {close}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <>

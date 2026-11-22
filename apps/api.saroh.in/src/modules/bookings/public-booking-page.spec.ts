@@ -20,6 +20,8 @@ jest.mock("@saroh/database", () => {
             count: jest.fn().mockResolvedValue(0),
         },
         contact: {
+            // No GSTIN saved on the contact (R16).
+            findFirst: jest.fn().mockResolvedValue(null),
             findUnique: jest.fn().mockResolvedValue(null),
             upsert: jest.fn(),
             update: jest.fn(),

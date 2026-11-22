@@ -199,6 +199,31 @@ describe("the visit, in this tab's memory (U15)", () => {
         ]);
     });
 
+    it("a start says the site page it began on, never the booking page or a private one (DEC-235)", () => {
+        const sent: unknown[][] = [];
+        registerVisitSender((step, _origin, path) => sent.push([step, path]));
+        seeVisitPage(1, { ...page(""), path: "/bridal" });
+        seeVisitPage(2, { ...page(""), path: "/book" });
+        seeVisitPage(3, { ...page(""), path: "/account/bookings" });
+        markVisitStep("looked", 4);
+        markVisitStep("started", 5);
+        markVisitStep("paid", 6);
+        expect(sent).toEqual([
+            ["visit", null],
+            ["looked", null],
+            ["started", "/bridal"],
+            ["paid", null],
+        ]);
+    });
+
+    it("a visit that landed on the booking page starts with no page", () => {
+        const sent: unknown[][] = [];
+        registerVisitSender((step, _origin, path) => sent.push([step, path]));
+        seeVisitPage(1, { ...page(""), path: "/book" });
+        markVisitStep("started", 2);
+        expect(sent.at(-1)).toEqual(["started", null]);
+    });
+
     it("writes nothing to any storage", () => {
         const set = vi.spyOn(Storage.prototype, "setItem");
         registerVisitSender(() => undefined);

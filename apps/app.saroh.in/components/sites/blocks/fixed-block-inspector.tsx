@@ -102,10 +102,13 @@ export function FixedBlockInspector({
     part,
     siteId,
     text,
+    bare = false,
 }: {
     part: "header" | "footer";
     siteId: string;
     text: FixedBlockText;
+    /** In the new inspector (U47): its own header names it, no padding. */
+    bare?: boolean;
 }) {
     const Icon = part === "header" ? PanelTop : PanelBottom;
     const readOnly = !text.canUpdate;
@@ -133,21 +136,23 @@ export function FixedBlockInspector({
     );
 
     return (
-        <div className="space-y-4 p-4">
-            <div className="space-y-1.5">
-                <h2 className="flex items-center gap-2 text-base font-semibold">
-                    <Icon
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-muted-foreground"
-                    />
-                    {part === "header" ? "Header" : "Footer"}
-                    <Badge variant="neutral">Fixed</Badge>
-                </h2>
-                <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
-                    On every page of this site. Its text is edited here. Where
-                    it sits is not a per-page choice.
-                </p>
-            </div>
+        <div className={bare ? "space-y-4" : "space-y-4 p-4"}>
+            {bare ? null : (
+                <div className="space-y-1.5">
+                    <h2 className="flex items-center gap-2 text-base font-semibold">
+                        <Icon
+                            aria-hidden="true"
+                            className="size-4 shrink-0 text-muted-foreground"
+                        />
+                        {part === "header" ? "Header" : "Footer"}
+                        <Badge variant="neutral">Fixed</Badge>
+                    </h2>
+                    <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">
+                        On every page of this site. Its text is edited here.
+                        Where it sits is not a per-page choice.
+                    </p>
+                </div>
+            )}
 
             {readOnly ? (
                 <ReadOnlyNote className="mb-0">

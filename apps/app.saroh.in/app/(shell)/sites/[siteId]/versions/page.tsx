@@ -4,11 +4,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
+import { SiteVersions as LegacySiteVersions } from "@/components/sites/versions/legacy/site-versions";
 import type { ScheduledGoLives } from "@/components/sites/versions/site-versions";
 import { SiteVersions } from "@/components/sites/versions/site-versions";
 import { requireSession } from "@/lib/session";
 import { getReviewState, getSite, listPublications } from "@/lib/sites/service";
 import { readTestReleases } from "@/lib/sites/test-releases-api";
+import { restoresAsDraft } from "@/lib/sites/website-area-switch";
 
 /**
  * Version history (#194).
@@ -27,15 +29,16 @@ export default async function SiteVersionsPage({
     const { siteId } = await params;
     await requireSession();
 
-    const [site, publications, review, releases] = await Promise.all([
+    const asDraft = await restoresAsDraft();
+    const [site, publications, releases, review] = await Promise.all([
         getSite(siteId),
         listPublications(siteId),
-        // So the restore confirm can say a change request is outstanding
-        // before a restore goes live past it (#279).
-        getReviewState(siteId),
         // Go-lives that are scheduled and haven't happened (T12). Never
         // throws: `off` while test releases are off, and `failed` is said.
         readTestReleases(siteId),
+        // Off, today's restore confirm says a change request is outstanding
+        // before a restore goes live past it (#279).
+        asDraft ? null : getReviewState(siteId),
     ]);
     if (!site) notFound();
 
@@ -72,15 +75,24 @@ export default async function SiteVersionsPage({
                     </Button>
                 }
             />
-            <SiteVersions
-                siteId={siteId}
-                publications={publications}
-                changesRequested={review.outstanding}
-                canRestore={site.can.publish}
-                needsApproval={site.publishNeedsApproval === true}
-                canOverride={site.canOverride === true}
-                scheduled={scheduled}
-            />
+            {asDraft ? (
+                <SiteVersions
+                    siteId={siteId}
+                    publications={publications}
+                    canRestore={site.can.edit}
+                    scheduled={scheduled}
+                />
+            ) : (
+                <LegacySiteVersions
+                    siteId={siteId}
+                    publications={publications}
+                    changesRequested={review?.outstanding ?? false}
+                    canRestore={site.can.publish}
+                    needsApproval={site.publishNeedsApproval === true}
+                    canOverride={site.canOverride === true}
+                    scheduled={scheduled}
+                />
+            )}
         </PageContainer>
     );
 }

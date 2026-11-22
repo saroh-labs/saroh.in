@@ -82,6 +82,7 @@ const NOUN: Record<AskAiDraftKind, string> = {
     order: "order",
     customer: "customer",
     blog_post: "blog post",
+    section: "section",
 };
 
 /** Moving a booking is a move; other edits are changes (boards 5 and 14). */
@@ -106,6 +107,21 @@ export function draftWords(card: AskAiDraftCard) {
             editor: "Open in editor",
             handedOff: "Opened in the editor",
             done: "Added",
+        };
+    }
+    // A section's words (owner, 21 Nov): Now and New, Apply to the draft.
+    if (card.kind === "section") {
+        return {
+            noun,
+            tag: "New words",
+            confirm: "Apply",
+            state:
+                card.status === "refused" ? "Not applied" : "Not applied yet",
+            cancelled: "Not applied",
+            open: "Open in the editor",
+            editor: null,
+            handedOff: null,
+            done: "Saved · goes live when you publish",
         };
     }
     // Several orders to one step (AF 8): "Change 3 orders", "Mark 3 ready".
@@ -182,6 +198,11 @@ export function recordHref(kind: AskAiDraftKind, id: string): string {
             return `/commerce/orders/${at}`;
         case "customer":
             return `/contacts/${at}`;
+        case "section": {
+            // `<siteId>:<pageId>:<sectionKey>`: the page in the site editor.
+            const [site = "", page = ""] = id.split(":");
+            return `/sites/${encodeURIComponent(site)}?page=${encodeURIComponent(page)}`;
+        }
         case "blog_post": {
             // `<siteId>:<postId>`: the post editor sits under its website.
             const [site = "", post = ""] = id.split(":");
@@ -226,4 +247,42 @@ export function valueText(value: unknown, field?: string): string {
             .join(" ");
     }
     return "";
+}
+
+/**
+ * Now and New word by word (owner, 21 Nov): each side's words, marked
+ * where they differ from the other side's. A plain longest common run of
+ * words; a section's words are a few dozen at most.
+ */
+export function wordDiff(
+    now: string,
+    next: string,
+): {
+    now: { word: string; changed: boolean }[];
+    next: { word: string; changed: boolean }[];
+} {
+    const a = now.split(/\s+/).filter(Boolean);
+    const b = next.split(/\s+/).filter(Boolean);
+    const lcs = a.map(() => b.map(() => 0));
+    for (let i = a.length - 1; i >= 0; i--) {
+        for (let j = b.length - 1; j >= 0; j--) {
+            lcs[i][j] =
+                a[i] === b[j]
+                    ? 1 + (lcs[i + 1]?.[j + 1] ?? 0)
+                    : Math.max(lcs[i + 1]?.[j] ?? 0, lcs[i]?.[j + 1] ?? 0);
+        }
+    }
+    const keepA = new Set<number>();
+    const keepB = new Set<number>();
+    for (let i = 0, j = 0; i < a.length && j < b.length;) {
+        if (a[i] === b[j]) {
+            keepA.add(i++);
+            keepB.add(j++);
+        } else if ((lcs[i + 1]?.[j] ?? 0) >= (lcs[i]?.[j + 1] ?? 0)) i++;
+        else j++;
+    }
+    return {
+        now: a.map((word, i) => ({ word, changed: !keepA.has(i) })),
+        next: b.map((word, j) => ({ word, changed: !keepB.has(j) })),
+    };
 }

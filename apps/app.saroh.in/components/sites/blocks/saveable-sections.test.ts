@@ -100,3 +100,29 @@ describe("saveableSections", () => {
         expect(out.heldBack).toHaveLength(1);
     });
 });
+
+/*
+ * Families are a catalogue view (U3, KD5): a stored contact, hours or packs
+ * section keeps its type and bytes when a sibling is edited and saved.
+ */
+describe("stored family members", () => {
+    it("are sent byte-identical beside an edited sibling", () => {
+        const stored: Section[] = [
+            {
+                key: "c",
+                type: "contact",
+                contractVersion: 1,
+                content: { heading: "Talk to us", phone: "+91 00000 01001" },
+            },
+            { key: "h", type: "hours", contractVersion: 1, content: {} },
+            { key: "p", type: "packs", contractVersion: 1, content: {} },
+        ];
+        const saved = [hero("a", "Welcome"), ...stored];
+        const current = [hero("a", "Fresh bread"), ...stored];
+        const out = saveableSections(current, saved);
+        expect(JSON.stringify(out.toSend.slice(1))).toBe(
+            JSON.stringify(stored),
+        );
+        expect(out.heldBack).toEqual([]);
+    });
+});

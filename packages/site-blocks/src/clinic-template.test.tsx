@@ -1,7 +1,11 @@
 import { toRendered } from "@saroh/block-contract";
-import type { TemplateContext } from "@saroh/templates";
-import { clinicTemplate, instantiateTemplate } from "@saroh/templates";
-import { render, screen } from "@testing-library/react";
+import type { TemplateContext, TemplateManifest } from "@saroh/templates";
+import {
+    clinicTemplateV1 as clinicTemplate,
+    clinicTemplate as clinicTemplateV2,
+    instantiateTemplate,
+} from "@saroh/templates";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SAMPLE_VISIT } from "./block-fixture-preview";
@@ -69,7 +73,7 @@ const bookable: TemplateContext = {
 
 function stubApi() {
     const fetchMock = vi.fn((url: string) => {
-        if (url.startsWith(`${API}/public/services`)) {
+        if (url.startsWith(`${API}/public/sites/${SITE}/services?`)) {
             return Promise.resolve(
                 new Response(JSON.stringify(TREATMENTS), { status: 200 }),
             );
@@ -90,8 +94,11 @@ function stubApi() {
     return fetchMock;
 }
 
-function renderHome(ctx: TemplateContext) {
-    const [home] = instantiateTemplate(clinicTemplate, ctx).pages;
+function renderHome(
+    ctx: TemplateContext,
+    template: TemplateManifest = clinicTemplate,
+) {
+    const [home] = instantiateTemplate(template, ctx).pages;
     const resolvePage = () => undefined;
     return render(
         <PageSections
@@ -131,7 +138,7 @@ describe("the Clinic template, rendered live", () => {
         await screen.findByRole("rowheader", { name: /Monday/ });
         expect(headings(container)).toEqual([
             "Book a check-up. Know what happens next.",
-            "Free today",
+            "Open today",
             "Treatments",
             "What a treatment involves",
             "Who you will see",
@@ -173,8 +180,31 @@ describe("the Clinic template, rendered live", () => {
         });
         const order = headings(container);
         expect(order).not.toContain("Treatments");
-        expect(order).not.toContain("Free today");
+        expect(order).not.toContain("Open today");
         expect(order).toContain("Ask before you book");
         expect(container.querySelectorAll("details").length).toBe(2);
+    });
+});
+
+describe("clinic@2, rendered live (U10)", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("opens on the Same-day call panel, with Call and one Book in the first screen", async () => {
+        stubApi();
+        const { container } = renderHome(bookable, clinicTemplateV2);
+        const first = container.querySelectorAll("section")[0];
+        expect(first.getAttribute("data-site-answer-hero")).toBe("sameDayCall");
+        const hero = within(first);
+        expect(hero.getByText("Same-day? Call the desk")).toBeTruthy();
+        const call = await hero.findAllByRole("link", { name: /call/i });
+        expect(call[0]?.getAttribute("href")).toMatch(/^tel:/);
+        // One main action: Book, to the booking page.
+        const book = hero
+            .getAllByRole("link")
+            .filter((a) => a.getAttribute("href") === "/book");
+        expect(book).toHaveLength(1);
+        expect(container.textContent).not.toMatch(/emergenc/i);
     });
 });

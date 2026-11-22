@@ -177,7 +177,14 @@ describe("the phone on the booking page, for a signed-in customer", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked, 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         const phone = screen.getByLabelText("Phone (optional)");
         // Its code in the picker, the number in the box (#1036).
@@ -195,7 +202,14 @@ describe("the phone on the booking page, for a signed-in customer", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked, 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.change(screen.getByLabelText("Phone (optional)"), {
             target: { value: "" },
@@ -234,7 +248,12 @@ describe("the booking page on a phone", () => {
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked, 201),
         );
         const { container, unmount } = render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
         );
         await chooseOneToOne();
         // Both are in the page the server sends: no script picks one.
@@ -247,7 +266,14 @@ describe("the booking page on a phone", () => {
         unmount();
 
         viewport("phone");
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         // The time chosen above is kept for this tab, and brought back.
         await screen.findByRole("button", { name: "Edit the time, 7:00 am" });
         expect(
@@ -266,7 +292,14 @@ describe("the booking page on a phone", () => {
 
     it("gives each day and time 44px under a finger", async () => {
         serve(() => json(ONE_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
@@ -308,7 +341,14 @@ describe("choosing on the booking page", () => {
                 },
             ],
         };
-        render(<BookingFlow page={page} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={page}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         expect(screen.queryByText(/Bring trainers/)).toBeNull();
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
@@ -320,7 +360,14 @@ describe("choosing on the booking page", () => {
 
     it("offers With: Anyone or a person when more than one takes it, and reads that person's times", async () => {
         serve(() => json(TWO_PEOPLE));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
@@ -333,7 +380,7 @@ describe("choosing on the booking page", () => {
         fireEvent.click(screen.getByRole("radio", { name: "Ritu Kapoor" }));
         await waitFor(() =>
             expect(calls.at(-1)?.url).toBe(
-                `${API}/public/services/svc_pt/days?staffId=staff_ritu`,
+                `${API}/public/sites/site_1/services/svc_pt/days?staffId=staff_ritu`,
             ),
         );
         expect(
@@ -342,21 +389,35 @@ describe("choosing on the booking page", () => {
         fireEvent.click(screen.getByRole("radio", { name: "Anyone" }));
         await waitFor(() =>
             expect(calls.at(-1)?.url).toBe(
-                `${API}/public/services/svc_pt/days`,
+                `${API}/public/sites/site_1/services/svc_pt/days`,
             ),
         );
     });
 
     it("offers no choice of person when one takes it", async () => {
         serve(() => json({ ...ONE_DAYS, staff: [TWO_PEOPLE.staff[0]] }));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         expect(screen.queryByRole("radiogroup", { name: "With" })).toBeNull();
     });
 
     it("shows later dates past the first two weeks, and the way back", async () => {
         serve(() => json(ONE_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         // The weeks are on the day strip: Edit opens it again.
         fireEvent.click(screen.getByRole("button", { name: /Edit the day/ }));
@@ -365,7 +426,7 @@ describe("choosing on the booking page", () => {
         );
         await waitFor(() =>
             expect(calls.at(-1)?.url).toBe(
-                `${API}/public/services/svc_pt/days?skip=14`,
+                `${API}/public/sites/site_1/services/svc_pt/days?skip=14`,
             ),
         );
         // The business books 21 days ahead: nothing later than these.
@@ -386,7 +447,7 @@ describe("choosing on the booking page", () => {
         );
         await waitFor(() =>
             expect(calls.at(-1)?.url).toBe(
-                `${API}/public/services/svc_pt/days`,
+                `${API}/public/sites/site_1/services/svc_pt/days`,
             ),
         );
     });
@@ -408,6 +469,7 @@ describe("choosing on the booking page", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -421,7 +483,7 @@ describe("choosing on the booking page", () => {
             screen.getByRole("radio", { name: /Personal training/ }),
         );
         expect(
-            await screen.findByText(/Nothing free in the next two weeks/),
+            await screen.findByText(/No open times in the next two weeks/),
         ).toBeVisible();
         expect(
             screen.getByRole("link", { name: "Call +91 80409 92210" }),
@@ -441,11 +503,18 @@ describe("choosing on the booking page", () => {
                 days: [{ date: "2026-09-20", open: true, starts: [] }],
             }),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
-        await screen.findByText(/Nothing free in the next two weeks/);
+        await screen.findByText(/No open times in the next two weeks/);
         expect(screen.queryByRole("link", { name: /^Call/ })).toBeNull();
         expect(screen.queryByRole("link", { name: /WhatsApp/ })).toBeNull();
     });
@@ -458,7 +527,14 @@ describe("the booking through a reload", () => {
 
     it("brings back the service and the time, says so, and never keeps the note or the phone number", async () => {
         serve(() => json(ONE_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={signedOut()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.change(screen.getByLabelText("Phone (optional)"), {
             target: { value: "98450 12345" },
@@ -490,7 +566,14 @@ describe("the booking through a reload", () => {
         // The page loads again: a new page, the same tab.
         cleanup();
         serve(() => json(ONE_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={signedOut()}
+            />,
+        );
         // Each brought back folded, as they left it.
         expect(
             await screen.findByRole("button", {
@@ -514,7 +597,14 @@ describe("the booking through a reload", () => {
 
     it("checks the kept time against what is free now, and chooses the next one when it has gone", async () => {
         serve(() => json(ONE_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={signedOut()}
+            />,
+        );
         await chooseOneToOne();
         cleanup();
 
@@ -536,7 +626,14 @@ describe("the booking through a reload", () => {
                 ],
             }),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={signedOut()}
+            />,
+        );
         expect(
             await screen.findByRole("button", {
                 name: "Edit the time, 9:00 am",
@@ -544,7 +641,7 @@ describe("the booking through a reload", () => {
         ).toBeVisible();
         expect(
             screen.getAllByText(
-                "That time has gone. We've chosen the next free one: Sun 20 Sep at 9:00 am.",
+                "That time has gone. We've chosen the next open one: Sun 20 Sep at 9:00 am.",
             ).length,
         ).toBeGreaterThan(0);
     });
@@ -553,7 +650,14 @@ describe("the booking through a reload", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked, 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         expect(window.sessionStorage.getItem("saroh.booking-draft")).not.toBe(
             null,
@@ -622,7 +726,14 @@ describe("the booked card's calendar", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked, 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.click(screen.getByRole("button", { name: /^Book/ }));
         await screen.findByRole("heading", { name: "You're booked, Asha." });
@@ -690,7 +801,12 @@ describe("the header's Sign in during a booking", () => {
         render(
             <>
                 {entry(flow.signIn)}
-                <BookingFlow page={PAGE} apiUrl={API} account={flow} />
+                <BookingFlow
+                    siteId="site_1"
+                    page={PAGE}
+                    apiUrl={API}
+                    account={flow}
+                />
             </>,
         );
         pressHeader();
@@ -706,7 +822,12 @@ describe("the header's Sign in during a booking", () => {
         render(
             <>
                 {entry(flow.signIn)}
-                <BookingFlow page={PAGE} apiUrl={API} account={flow} />
+                <BookingFlow
+                    siteId="site_1"
+                    page={PAGE}
+                    apiUrl={API}
+                    account={flow}
+                />
             </>,
         );
         await chooseOneToOne();
@@ -743,6 +864,7 @@ describe("the customer the server's next draw brings", () => {
     const signedOut = () => account({ customer: null });
     const drawnAgain = (customer: SignedInCustomer | null) => (
         <BookingFlow
+            siteId="site_1"
             page={PAGE}
             apiUrl={API}
             account={account({ customer })}
@@ -758,7 +880,12 @@ describe("the customer the server's next draw brings", () => {
     it("keeps what was chosen and typed, says who is booking, and asks for no code", async () => {
         serve(() => json(ONE_DAYS));
         const { rerender } = render(
-            <BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={signedOut()}
+            />,
         );
         await chooseOneToOne();
         fireEvent.change(screen.getByLabelText("Phone (optional)"), {
@@ -794,7 +921,12 @@ describe("the customer the server's next draw brings", () => {
     it("fills an empty phone from their account", async () => {
         serve(() => json(ONE_DAYS));
         const { rerender } = render(
-            <BookingFlow page={PAGE} apiUrl={API} account={signedOut()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={signedOut()}
+            />,
         );
         await chooseOneToOne();
         rerender(drawnAgain(ASHA));
@@ -806,7 +938,12 @@ describe("the customer the server's next draw brings", () => {
     it('doesn\'t undo "Not you?" when a draw still carries the old customer', async () => {
         serve(() => json(ONE_DAYS));
         const { rerender } = render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
         );
         await chooseOneToOne();
         fireEvent.click(screen.getByRole("button", { name: "Not you?" }));

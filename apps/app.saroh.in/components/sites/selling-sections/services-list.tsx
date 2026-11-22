@@ -27,10 +27,12 @@ import {
 import {
     DisplayOptions,
     hiddenFlag,
-    unlessDefault,
     wordsOrAbsent,
 } from "@/components/sites/section-fields/display-options";
+import { OptionSwitch } from "@/components/sites/section-fields/option-switch";
+import { PhoneTextField } from "@/components/sites/section-fields/phone-text-field";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
+import { RepeatedItems } from "@/components/sites/section-fields/repeated-items";
 import { ServicesLoadNotice } from "./services-load-notice";
 
 /** The contract's cap. */
@@ -55,10 +57,11 @@ export function ServicesListFields({
     // unknown id means "not loaded", not "gone".
     const services = load.status === "ready" ? load.services : [];
     const c = section.content;
-    const patch = (next: Partial<ServicesListContent>) =>
+    const patch = (next: Partial<ServicesListContent & { variant?: string }>) =>
         onChange({ ...section, content: { ...c, ...next } });
 
     const byId = new Map(services.map((s) => [s.id, s]));
+    const variant = resolveVariant("servicesList", c);
     const addable = services.filter(
         (s) => s.status === "ACTIVE" && !c.serviceIds.includes(s.id),
     );
@@ -240,9 +243,22 @@ export function ServicesListFields({
             </Field>
 
             <DisplayOptions
-                // A list is how services have always shown, so it is absent.
-                layout={c.layout ?? "list"}
-                onLayout={(v) => patch({ layout: unlessDefault(v, "list") })}
+                /*
+                 * Cards is a look now (DEC-237), picked above. Show as stays
+                 * only under the list look, where an older section may still
+                 * say cards: choosing cards moves it to the Cards look.
+                 */
+                {...(variant === "default"
+                    ? {
+                          layout: c.layout ?? "list",
+                          onLayout: (v: "cards" | "list") =>
+                              patch(
+                                  v === "cards"
+                                      ? { variant: "cards", layout: undefined }
+                                      : { layout: undefined },
+                              ),
+                      }
+                    : {})}
                 descriptions={{
                     value: c.showDescriptions !== false,
                     onChange: (on) =>
@@ -282,9 +298,27 @@ export function ServicesListFields({
                     }
                 />
             ) : null}
+            {c.cta?.label.trim() ? (
+                <PhoneTextField
+                    label="Button"
+                    value={c.cta.phoneLabel}
+                    fallback={c.cta.label}
+                    maxLength={40}
+                    onChange={(phoneLabel) =>
+                        patch({ cta: c.cta && { ...c.cta, phoneLabel } })
+                    }
+                />
+            ) : null}
 
-            {resolveVariant("servicesList", c) === "priceCard" ? (
+            {variant === "priceCard" ? (
                 <PriceCardFields content={c} patch={patch} />
+            ) : null}
+            {variant === "menu" ? (
+                <MenuGroupsFields
+                    content={c}
+                    patch={patch}
+                    nameOf={(id) => byId.get(id)?.name ?? "Unknown service"}
+                />
             ) : null}
         </div>
     );
@@ -391,5 +425,94 @@ function PriceCardFields({
                 </Field>
             ) : null}
         </>
+    );
+}
+
+/** The contract's caps on the menu's headings. */
+const MAX_GROUPS = 8;
+
+type Groups = NonNullable<ServicesListContent["groups"]>;
+
+/**
+ * The menu's headings (DEC-237): each a name over the services ticked
+ * under it, from the services this section shows. A service in no heading
+ * goes under "More" on the site, so nothing listed is ever lost.
+ */
+function MenuGroupsFields({
+    content: c,
+    patch,
+    nameOf,
+}: {
+    content: ServicesListContent;
+    patch: (next: Partial<ServicesListContent & { variant?: string }>) => void;
+    nameOf: (id: string) => string;
+}) {
+    const groups = c.groups ?? [];
+    const setGroups = (next: Groups) =>
+        patch({ groups: next.length > 0 ? next : undefined });
+    return (
+        <Field
+            optional
+            label="Headings"
+            hint="Like a price list: Hair, Colour, Nails. A service under no heading shows under More."
+        >
+            <div className="grid gap-2">
+                {groups.length === 0 ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="justify-self-start"
+                        onClick={() =>
+                            setGroups([{ name: "", serviceIds: [] }])
+                        }
+                    >
+                        Add a heading
+                    </Button>
+                ) : (
+                    <RepeatedItems
+                        items={groups}
+                        onChange={setGroups}
+                        max={MAX_GROUPS}
+                        min={0}
+                        itemNoun="Heading"
+                        addLabel="Add a heading"
+                        fullMessage="That is the most headings a menu carries."
+                        newItem={() => ({ name: "", serviceIds: [] })}
+                        reorderable
+                    >
+                        {(group, set) => (
+                            <>
+                                <Input
+                                    value={group.name}
+                                    aria-label="Heading"
+                                    maxLength={80}
+                                    onChange={(e) =>
+                                        set({ name: e.target.value })
+                                    }
+                                    placeholder="Hair"
+                                />
+                                {c.serviceIds.map((id) => (
+                                    <OptionSwitch
+                                        key={id}
+                                        label={nameOf(id)}
+                                        checked={group.serviceIds.includes(id)}
+                                        onChange={(on) =>
+                                            set({
+                                                serviceIds: on
+                                                    ? [...group.serviceIds, id]
+                                                    : group.serviceIds.filter(
+                                                          (x) => x !== id,
+                                                      ),
+                                            })
+                                        }
+                                    />
+                                ))}
+                            </>
+                        )}
+                    </RepeatedItems>
+                )}
+            </div>
+        </Field>
     );
 }

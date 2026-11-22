@@ -40,7 +40,9 @@ describe("servicesList (#255)", () => {
     async function renderFetching(response: Response) {
         const fetchMock = vi.fn((_url: string) => Promise.resolve(response));
         globalThis.fetch = fetchMock as unknown as typeof fetch;
-        const view = render(<ServicesListSection content={content} />);
+        const view = render(
+            <ServicesListSection siteId="site_1" content={content} />,
+        );
         await act(async () => {
             await Promise.resolve();
         });
@@ -50,10 +52,22 @@ describe("servicesList (#255)", () => {
     const json = (body: unknown, status = 200) =>
         new Response(JSON.stringify(body), { status });
 
+    // 07 B-L2: services are read only through the site, never by bare id.
+    it("reads nothing with no site to read through", async () => {
+        const fetchMock = vi.fn();
+        globalThis.fetch = fetchMock;
+        const { container } = render(<ServicesListSection content={content} />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(container.innerHTML).toBe("");
+    });
+
     it("draws what the API returns, in the merchant's order", async () => {
         const { fetchMock } = await renderFetching(json([cut, consult]));
         expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
-            "/public/services?ids=fixture-cut%2Cfixture-colour%2Cfixture-consult",
+            "/public/sites/site_1/services?ids=fixture-cut%2Cfixture-colour%2Cfixture-consult",
         );
         const names = screen
             .getAllByRole("heading", { level: 3 })
@@ -94,6 +108,7 @@ describe("servicesList (#255)", () => {
     it("hides prices when the merchant turns them off", () => {
         const { container } = render(
             <ServicesListSection
+                siteId="site_1"
                 content={{ ...content, showPrices: false }}
                 services={[cut]}
             />,
@@ -129,7 +144,9 @@ describe("the services list's states (starter audit)", () => {
     it("holds the list's shape while the services are read, and says so to a screen reader", () => {
         // A read that never answers: the section stays in its loading state.
         globalThis.fetch = vi.fn(() => new Promise<Response>(() => undefined));
-        const { container } = render(<ServicesListSection content={content} />);
+        const { container } = render(
+            <ServicesListSection siteId="site_1" content={content} />,
+        );
         const loading = screen.getByRole("status", {
             name: "Loading services",
         });
@@ -146,6 +163,7 @@ describe("the services list's states (starter audit)", () => {
     it("gives Book in a row a ring, a pressed state and 44px under a finger", () => {
         render(
             <ServicesListSection
+                siteId="site_1"
                 content={{ ...content, layout: "list" }}
                 services={[cut]}
                 bookHref="/book"
@@ -163,6 +181,7 @@ describe("the services list's states (starter audit)", () => {
     it("gives a card's Book button 44px under a finger", () => {
         render(
             <ServicesListSection
+                siteId="site_1"
                 content={{ ...content, layout: "cards" }}
                 services={[cut]}
                 bookHref="/book"
@@ -221,7 +240,9 @@ describe("a service's price when GST comes on top", () => {
                 ),
             ),
         );
-        const { container } = render(<ServicesListSection content={content} />);
+        const { container } = render(
+            <ServicesListSection siteId="site_1" content={content} />,
+        );
         await act(async () => {
             await Promise.resolve();
         });
@@ -245,6 +266,7 @@ describe("a Book page's list, fed what the flow offers", () => {
         globalThis.fetch = fetchMock;
         render(
             <ServicesListSection
+                siteId="site_1"
                 content={{ ...content, serviceIds: ["gone"] }}
                 feed={{ services: [cut, consult] }}
                 bookHref="/book"
@@ -269,6 +291,7 @@ describe("a Book page's list, fed what the flow offers", () => {
     ])("offers the rest under %s", (_name, extra, look) => {
         render(
             <ServicesListSection
+                siteId="site_1"
                 content={{ ...content, ...extra }}
                 feed={{ services: [cut], moreHref: "/book?step=what" }}
                 bookHref="/book"
@@ -293,5 +316,115 @@ describe("a free service under a look (DEC-172, VD01, VA01)", () => {
         expect(lookPriceWords({ ...free, priceCents: 60_000 }, "en-IN")).toBe(
             "₹600",
         );
+    });
+});
+
+describe("servicesList cards and menu (DEC-237, U5)", () => {
+    const colour: PublicService = {
+        id: "fixture-colour",
+        name: "Full colour",
+        description: null,
+        durationMinutes: 120,
+        priceCents: 9000,
+        currency: "GBP",
+        noTimesSoon: true,
+    };
+    const extra: PublicService = {
+        id: "fixture-extra",
+        name: "Fringe trim",
+        description: null,
+        durationMinutes: 15,
+        priceCents: 800,
+        currency: "GBP",
+    };
+
+    it("Menu with two groups and one ungrouped service: three headings, Book on every row", () => {
+        render(
+            <ServicesListSection
+                siteId="site_1"
+                content={{
+                    variant: "menu",
+                    heading: "Price list",
+                    serviceIds: [cut.id, colour.id, extra.id],
+                    groups: [
+                        { name: "Hair", serviceIds: [cut.id] },
+                        { name: "Colour", serviceIds: [colour.id] },
+                    ],
+                }}
+                services={[cut, colour, extra]}
+                bookHref="/book"
+            />,
+        );
+        expect(
+            screen
+                .getAllByRole("heading", { level: 3 })
+                .map((h) => h.textContent),
+        ).toEqual(["Hair", "Colour", "More"]);
+        for (const s of [cut, colour, extra]) {
+            const book = screen.getByRole("link", { name: `Book: ${s.name}` });
+            expect(book.getAttribute("href")).toBe(`/book?service=${s.id}`);
+        }
+        expect(screen.getByText("£38")).toBeTruthy();
+        expect(screen.getByText("45 min")).toBeTruthy();
+        expect(screen.getByText("2 hr")).toBeTruthy();
+    });
+
+    it("a service with no times soon says No times yet · Ask, and keeps Book", () => {
+        render(
+            <ServicesListSection
+                siteId="site_1"
+                content={{ variant: "menu", serviceIds: [colour.id] }}
+                services={[colour]}
+                feed={{ services: [colour], askHref: "/contact#enquiry" }}
+                bookHref="/book"
+            />,
+        );
+        expect(screen.getByText(/No times yet/)).toBeTruthy();
+        expect(
+            screen
+                .getByRole("link", { name: "Ask about Full colour" })
+                .getAttribute("href"),
+        ).toBe("/contact#enquiry");
+        expect(
+            screen.getByRole("link", { name: "Book: Full colour" }),
+        ).toBeTruthy();
+    });
+
+    it("the old Show as: Cards draws the same cards as the cards look", () => {
+        const old = render(
+            <ServicesListSection
+                siteId="site_1"
+                content={{ serviceIds: [cut.id], layout: "cards" }}
+                services={[cut]}
+                bookHref="/book"
+            />,
+        );
+        const before = old.container.innerHTML;
+        old.unmount();
+        const now = render(
+            <ServicesListSection
+                siteId="site_1"
+                content={{ serviceIds: [cut.id], variant: "cards" }}
+                services={[cut]}
+                bookHref="/book"
+            />,
+        );
+        expect(now.container.innerHTML).toBe(before);
+    });
+
+    it("the menu look wins over Show as: Cards", () => {
+        render(
+            <ServicesListSection
+                siteId="site_1"
+                content={{
+                    serviceIds: [cut.id],
+                    layout: "cards",
+                    variant: "menu",
+                }}
+                services={[cut]}
+            />,
+        );
+        expect(document.querySelector("[data-services-menu]")).toBeTruthy();
+        expect(document.querySelector("ul.grid")).toBeNull();
     });
 });

@@ -26,8 +26,11 @@ export function PastVersionPreview({
     sections,
     variables,
     look: lookInput,
+    siteId,
 }: {
     sections: RenderedSection[];
+    /** The site, so its services and booking sections read its own business. */
+    siteId: string;
     variables?: Record<string, string> | null;
     /**
      * The look that version was published in (`snapshot.site.look`,
@@ -62,6 +65,7 @@ export function PastVersionPreview({
                 <PageSections
                     sections={sections}
                     look={look}
+                    siteId={siteId}
                     // The business's own history screen, never a visitor's.
                     isOwnerPreview
                 />

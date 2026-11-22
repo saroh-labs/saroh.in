@@ -61,6 +61,24 @@ export function approvalRequired(): ConflictException {
     });
 }
 
+export const CHANGES_AWAIT_APPROVAL_MESSAGE =
+    "Every change is waiting for approval. Ask a reviewer, an admin or the owner to approve them.";
+
+/**
+ * The 409 for a publish whose every change is a teammate's still waiting
+ * for approval (DEC-226, U9): nothing would go out. Names the changes.
+ */
+export function changesAwaitApproval(units: string[]): ConflictException {
+    return new ConflictException({
+        message: CHANGES_AWAIT_APPROVAL_MESSAGE,
+        details: {
+            code: "APPROVAL_REQUIRED",
+            reason: "changesAwaitApproval",
+            units,
+        },
+    });
+}
+
 /**
  * Whether the caller is an owner of the business. A role the business
  * invented is never one, however much it may do, and nor is a Saroh

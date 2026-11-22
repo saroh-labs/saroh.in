@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { SectionType } from "./section-contract";
-import { SECTION_TYPES } from "./section-contract";
+import { imageFocusSchema, SECTION_TYPES } from "./section-contract";
 
 /**
  * The RENDERED shape of a block (#252).
@@ -97,6 +97,8 @@ export const renderedCtaSchema = z.object({
             kind: z.enum(["page", "url", "email", "call", "whatsapp"]),
         })
         .optional(),
+    /** Shorter words for a phone (KD9); absent or empty, the label. */
+    phoneLabel: z.string().optional(),
 });
 export type RenderedCta = z.infer<typeof renderedCtaSchema>;
 
@@ -115,6 +117,8 @@ export const renderedImageSchema = z.object({
     alt: z.string().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
+    /** Its focus point (U46d); absent on every photo published before. */
+    focus: imageFocusSchema.optional(),
 });
 
 const renderedHero = z.object({
@@ -131,7 +135,36 @@ const renderedHero = z.object({
     /** `false`: the heading is for screen readers only (the `none` look). */
     titleVisible: z.boolean().optional(),
     /** A quieter link beside the button; drawn by the looks. */
-    secondaryCta: z.object({ label: z.string(), href: z.string() }).optional(),
+    secondaryCta: z
+        .object({
+            label: z.string(),
+            href: z.string(),
+            phoneLabel: z.string().optional(),
+        })
+        .optional(),
+    /**
+     * The `answer` look's panel (DEC-228). A kind this build does not know
+     * is a string, and the look draws as Today.
+     */
+    panel: z
+        .object({
+            kind: z.string(),
+            words: z.string().optional(),
+            phone: z.string().optional(),
+            orderBy: z.string().optional(),
+            where: z.string().optional(),
+        })
+        .optional(),
+    answerRow: z.boolean().optional(),
+    byline: z
+        .object({
+            image: renderedImageSchema.optional(),
+            name: z.string(),
+            role: z.string().optional(),
+        })
+        .optional(),
+    /** A shorter line for a phone (KD9); absent or empty, the subheading. */
+    phoneLine: z.string().optional(),
 });
 
 /**
@@ -159,6 +192,8 @@ const renderedRichText = z.object({
     headingStyle: z.string().optional(),
     factsStyle: z.string().optional(),
     label: z.string().optional(),
+    /** A shorter body for a phone (KD9); absent or empty, `value`. */
+    phoneBody: z.string().optional(),
 });
 
 const renderedCta = renderedCtaSchema.extend({ variant, padding });
@@ -180,7 +215,24 @@ const renderedGallery = z.object({
      * draws as nothing. Each image may carry a caption (U2).
      */
     images: z.array(
-        renderedImageSchema.extend({ caption: z.string().optional() }),
+        renderedImageSchema.extend({
+            caption: z.string().optional(),
+            // The lookbook look's words per photo (DEC-228).
+            name: z.string().optional(),
+            fromPrice: z.string().optional(),
+            // A page link carries the `href` resolved at publish; a service
+            // or product is read live. A kind this build does not know is
+            // drawn without a link.
+            link: z
+                .object({
+                    kind: z.string(),
+                    serviceId: z.string().optional(),
+                    productId: z.string().optional(),
+                    pageId: z.string().optional(),
+                    href: z.string().optional(),
+                })
+                .optional(),
+        }),
     ),
     imageBrief: z.string().optional(),
     // Where captions sit (DEC-090); a value this build does not know is below.
@@ -213,6 +265,8 @@ const renderedBooking = z.object({
     description: z.string().optional(),
     submitLabel: z.string().optional(),
     successMessage: z.string().optional(),
+    /** The owner's "Before you book" note. */
+    beforeYouBook: z.string().optional(),
 });
 
 /**
@@ -306,6 +360,10 @@ const renderedServicesList = z.object({
     followUpLine: z.string().optional(),
     includesLabel: z.string().optional(),
     includes: z.array(z.string()).optional(),
+    /** The menu look's headings, each over its services (DEC-237). */
+    groups: z
+        .array(z.object({ name: z.string(), serviceIds: z.array(z.string()) }))
+        .optional(),
 });
 
 /**
@@ -319,6 +377,7 @@ const renderedVisitUs = z.object({
     storeId: z.string().optional(),
     showMap: z.boolean().optional(),
     showHours: z.boolean().optional(),
+    extraLine: z.string().optional(),
 });
 
 /**
@@ -355,6 +414,24 @@ const renderedPlans = z.object({
     showDescriptions: z.boolean().optional(),
     layout: z.enum(["cards", "list"]).optional(),
     showPrices: z.boolean().optional(),
+    // A choice this build does not know draws as plans, as absent does.
+    show: z.string().optional(),
+    /** The compare look's typed rows (DEC-228). */
+    includes: z
+        .array(
+            z.object({
+                label: z.string(),
+                cells: z
+                    .array(
+                        z.object({
+                            id: z.string(),
+                            words: z.string().optional(),
+                        }),
+                    )
+                    .optional(),
+            }),
+        )
+        .optional(),
 });
 
 /**
@@ -384,6 +461,10 @@ const renderedProductGrid = z.object({
     columns: z.number().int().optional(),
     // Across on a phone; a count this build does not know keeps the look's.
     phoneColumns: z.number().int().optional(),
+    /** A − / + stepper on each card (DEC-237); absent, off. */
+    addInPlace: z.boolean().optional(),
+    /** The owner's Pre-order tag words; absent, no tag. */
+    preorderWords: z.string().optional(),
 });
 
 /**
@@ -442,6 +523,8 @@ const renderedTimetable = z.object({
     showPlacesLeft: z.boolean().optional(),
     weekdaysOnly: z.boolean().optional(),
     showCounts: z.boolean().optional(),
+    // Places left from this many down (KD8); absent, each path's own rule.
+    placesFrom: z.number().int().optional(),
 });
 
 const renderedHours = z.object({

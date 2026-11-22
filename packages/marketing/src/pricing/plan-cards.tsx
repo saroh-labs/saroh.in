@@ -83,6 +83,20 @@ function PlanCard({ plan: p, cta }: { plan: PlanCardView; cta: PlanCta }) {
                         ch?.price && MARK,
                     )}
                 >
+                    {p.was ? (
+                        <>
+                            <s
+                                className={cn(
+                                    "mr-2 font-sans text-[18px] font-medium tracking-normal",
+                                    muted,
+                                )}
+                            >
+                                <span className="sr-only">Regular price </span>
+                                {p.was}
+                            </s>
+                            <span className="sr-only">offer price </span>
+                        </>
+                    ) : null}
                     {p.price}
                     {p.per ? (
                         <span

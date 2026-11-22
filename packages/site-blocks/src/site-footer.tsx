@@ -11,9 +11,7 @@ import {
     FooterContact,
     hasFooterFacts,
 } from "./site-footer-contact";
-import type { SiteNavItem } from "./site-header-menu";
-import type { ModulePageStates } from "./site-menu";
-import { siteMenuEntries, underBasePath } from "./site-menu";
+import { underBasePath } from "./site-menu";
 import type { SiteSeller } from "./sold-by";
 import { SoldByBlock } from "./sold-by";
 
@@ -101,9 +99,8 @@ const WRITTEN_PROSE =
  * The foot of every page (#202, G17).
  *
  * TWO PARTS. First the facts someone scrolls down for, in columns
- * (`FooterContact`): where to find the business, each place with its
- * address, directions and its week by day; how to get in touch; and the
- * site's pages. Then the closing line: the merchant's own line, and on Free
+ * (`FooterContact`): the hours with today marked, where to visit with
+ * directions, and how to talk; never the header's menu again (U8). Then the closing line: the merchant's own line, and on Free
  * "Made with Saroh" linking to saroh.in with the business's referral code
  * (DEC-102). Paid plans show no Saroh credit; the renderer reads the plan
  * and passes `credit` only for Free.
@@ -121,10 +118,6 @@ const WRITTEN_PROSE =
  * and `social` are where customers come and the business's social links
  * (DEC-128), from the public contact read; nothing is drawn for what isn't
  * set.
- *
- * `navigation`, `modules` and `shopServes` are the header's own, so the two
- * menus are worked out one way (`siteMenuEntries`). The footer lists every
- * page, the one the header's main button opens included.
  *
  * Everything is plain text in the site's own footer colours and type, never
  * Saroh's colours or font: a merchant's site does not wear the brand. The
@@ -148,9 +141,6 @@ export function SiteFooter({
     credit = null,
     cookieChoices = false,
     seller = null,
-    navigation = [],
-    modules,
-    shopServes = false,
     basePath = "",
     now,
     look,
@@ -187,12 +177,6 @@ export function SiteFooter({
      * footer shows no contact of its own.
      */
     seller?: SiteSeller | null;
-    /** The published menu, as the header takes it; none lists no pages. */
-    navigation?: readonly SiteNavItem[];
-    /** Whether each module page shows now (G15), as the header takes it. */
-    modules?: ModulePageStates | null;
-    /** `/shop` serves now (P4), as the header takes it. */
-    shopServes?: boolean;
     /** Prefix for every link, "" on a live site (a draft preview's path). */
     basePath?: string;
     /** The moment today is marked for. Fixtures and tests pin it. */
@@ -200,14 +184,8 @@ export function SiteFooter({
 }) {
     const written = footer && footer.value.trim() !== "" ? footer : null;
     const left = footer?.layout === "left";
-    const menu = siteMenuEntries({ navigation, modules, shopServes }).map(
-        (item) => ({
-            label: item.label,
-            href: underBasePath(basePath, item.href),
-        }),
-    );
-    const facts = hasFooterFacts(contact, menu) ? (
-        <FooterContact contact={contact} menu={menu} now={now} />
+    const facts = hasFooterFacts(contact) ? (
+        <FooterContact contact={contact} now={now} />
     ) : null;
     const owner = seller ? (
         <SoldByBlock
@@ -266,7 +244,6 @@ export function SiteFooter({
                         : null
                 }
                 contact={contact}
-                menu={menu}
                 session={session}
                 basePath={basePath}
                 closing={

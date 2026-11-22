@@ -1,6 +1,7 @@
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
+import { listSites } from "@/lib/sites/service";
 
 import type {
     BookingBrief,
@@ -126,9 +127,14 @@ export async function readOffered(
     staffId?: string,
 ): Promise<OfferedRead> {
     try {
+        // The public read is scoped to a site's own business (21 Nov security
+        // review): ask through the business's site. One site per business for
+        // now (DEC-230); none means no booking page to show.
+        const site = (await listSites()).at(0);
+        if (!site) return { ok: false, why: "off" };
         const query = staffId ? `?staffId=${encodeURIComponent(staffId)}` : "";
         const res = await apiFetch(
-            `/public/services/${encodeURIComponent(serviceId)}/days${query}`,
+            `/public/sites/${encodeURIComponent(site.id)}/services/${encodeURIComponent(serviceId)}/days${query}`,
         );
         // Not on the booking page, paused, or bookings switched off.
         if (res.status === 404 || res.status === 410) {

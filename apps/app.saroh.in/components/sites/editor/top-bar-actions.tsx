@@ -122,7 +122,7 @@ export function TopBarActions({
                         <Button
                             variant="outline"
                             size="sm"
-                            aria-label="More: preview, feedback and test releases"
+                            aria-label="More: preview, feedback and test links"
                             className={cn(
                                 "text-[0.78125rem] text-muted-foreground",
                                 "w-[34px] px-0",
@@ -311,7 +311,7 @@ function ShareControl(p: TopBarActionProps) {
                 <ShareChoice
                     icon={<UserCheck className="size-4" />}
                     label="Ask a teammate to review"
-                    hint="Puts the site In review. Reviewers comment on blocks, and publishing still works."
+                    hint="Puts the site In review. Reviewers comment on sections, and publishing still works."
                     disabled={p.asking}
                     onSelect={pick(p.askForReview)}
                 />
@@ -359,9 +359,7 @@ function TestReleaseSplit({
     stacked: boolean;
 }) {
     const listLabel =
-        actions.count > 0
-            ? `Test releases · ${actions.count}`
-            : "Test releases";
+        actions.count > 0 ? `Test links · ${actions.count}` : "Test links";
     if (stacked) {
         return (
             <>
@@ -377,7 +375,7 @@ function TestReleaseSplit({
                         onClick={actions.onMake}
                     >
                         <Plus aria-hidden className="size-[15px]" />
-                        Make a test release
+                        Make a test link
                     </Button>
                 ) : null}
                 <Button
@@ -397,12 +395,12 @@ function TestReleaseSplit({
         );
     }
     return (
-        <div role="group" aria-label="Test release" className="flex">
+        <div role="group" aria-label="Test link" className="flex">
             <Tip
                 label={
                     actions.onMake
-                        ? "Freeze the draft into a test release, to share and go live with later"
-                        : "See this site's test releases"
+                        ? "Freeze the draft into a test link, to share and go live with later"
+                        : "See this site's test links"
                 }
             >
                 <Button
@@ -412,7 +410,7 @@ function TestReleaseSplit({
                     onClick={actions.onMake ?? actions.onOpenList}
                 >
                     <FlaskConical aria-hidden className="size-[15px]" />
-                    Test release
+                    Test link
                 </Button>
             </Tip>
             <DropdownMenu>
@@ -420,7 +418,7 @@ function TestReleaseSplit({
                     <Button
                         variant="outline"
                         size="sm"
-                        aria-label="More test release actions"
+                        aria-label="More test link actions"
                         className="w-8 rounded-l-none rounded-r-[9px] border-l-0 px-0 text-muted-foreground"
                     >
                         <ChevronDown aria-hidden className="size-[13px]" />
@@ -430,7 +428,7 @@ function TestReleaseSplit({
                     {actions.onMake ? (
                         <DropdownMenuItem onSelect={actions.onMake}>
                             <Plus aria-hidden className="size-4" />
-                            Make a test release
+                            Make a test link
                         </DropdownMenuItem>
                     ) : null}
                     <DropdownMenuItem onSelect={actions.onOpenList}>

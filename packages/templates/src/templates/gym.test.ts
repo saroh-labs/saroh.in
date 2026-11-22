@@ -10,7 +10,13 @@ import { describe, expect, it } from "vitest";
 import { instantiateTemplate } from "../instantiate";
 import type { TemplateContext } from "../manifest";
 import { getTemplate, listTemplates } from "../registry";
-import { GYM_TEMPLATE_ID, gymTemplate } from "./gym";
+import {
+    GYM_PLACES_FROM,
+    GYM_TEMPLATE_ID,
+    gymTemplateV1 as gymTemplate,
+    gymTemplate as gymV2,
+} from "./gym";
+import { firstSection, redesignChecks } from "./redesign-checks";
 
 /** A context as the API builds it; `malformed` widens one the tests break. */
 type WithModules = TemplateContext;
@@ -69,8 +75,8 @@ describe("gym@1 (industry templates, U6)", () => {
     it("is registered as the Gym template, version 1, with its gallery facts", () => {
         expect(gymTemplate.id).toBe(GYM_TEMPLATE_ID);
         expect(gymTemplate.version).toBe(1);
-        expect(getTemplate("gym")).toBe(gymTemplate);
-        expect(listTemplates()).toContain(gymTemplate);
+        expect(getTemplate("gym", 1)).toBe(gymTemplate);
+        expect(listTemplates()).not.toContain(gymTemplate);
         expect(gymTemplate).toMatchObject({
             name: "Gym",
             slug: "gym",
@@ -419,5 +425,49 @@ describe("gym@1 (industry templates, U6)", () => {
             everythingOn,
         ).pages;
         expect(pages.map((p) => p.path)).toEqual(["/"]);
+    });
+});
+
+describe("gym@2 (U10, overdrive)", () => {
+    const all = profiles.map(([, ctx]) => ctx);
+    redesignChecks(gymV2, gymTemplate, all);
+
+    it("opens on today's classes, the first class free and one main action", () => {
+        const hero = firstSection(gymV2, everythingOn);
+        expect(hero?.content).toMatchObject({
+            variant: "answer",
+            panel: { kind: "today" },
+            answerRow: true,
+            cta: { label: "Book a class", href: "/book" },
+        });
+        expect(hero?.content).not.toHaveProperty("secondaryCta");
+        expect(
+            String((hero?.content as { subheading?: string }).subheading),
+        ).toMatch(/first class is free/i);
+    });
+
+    it("counts places only from two left, on Home and on the timetable page", () => {
+        const timetables = instantiateTemplate(gymV2, everythingOn)
+            .pages.flatMap((p) => p.sections)
+            .filter((s) => s.type === "timetable");
+        expect(timetables).toHaveLength(2);
+        for (const t of timetables) {
+            expect(t.content).toMatchObject({
+                placesFrom: GYM_PLACES_FROM,
+                showPlacesLeft: true,
+            });
+        }
+        expect(GYM_PLACES_FROM).toBe(2);
+    });
+
+    it("keeps v1's pages, with no timetable or prices without their modules", () => {
+        expect(
+            instantiateTemplate(gymV2, everythingOn).pages.map((p) => p.path),
+        ).toEqual(["/", "/timetable", "/membership", "/trainers"]);
+        const types = instantiateTemplate(gymV2, nameOnly)
+            .pages.flatMap((p) => p.sections)
+            .map((s) => s.type);
+        expect(types).not.toContain("timetable");
+        expect(types).not.toContain("plans");
     });
 });

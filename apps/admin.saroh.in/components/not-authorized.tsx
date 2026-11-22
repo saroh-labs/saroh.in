@@ -4,7 +4,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { StaffIdentity } from "@/lib/control-plane";
 import { EDITION, EDITION_LABEL } from "@/lib/edition";
@@ -44,11 +43,10 @@ export function NotAuthorized({
 }) {
     if (staff) {
         return (
-            <AdminShell staff={staff}>
-                <PageContainer width="full">
-                    <NoAccessPanel email={staff.email} />
-                </PageContainer>
-            </AdminShell>
+            // Inside the console frame the root layout draws.
+            <PageContainer width="full">
+                <NoAccessPanel email={staff.email} />
+            </PageContainer>
         );
     }
 

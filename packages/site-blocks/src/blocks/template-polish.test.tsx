@@ -5,6 +5,7 @@ import type {
 } from "@saroh/block-contract";
 import { BLOCK_META } from "@saroh/block-contract";
 import { render, screen, within } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -15,6 +16,11 @@ import {
     SAMPLE_VISIT,
 } from "../block-fixture-preview";
 import { fills, isWeekday, weekCounts } from "../lib/timetable-read";
+import { SiteFooter, SiteHeader } from "../site-chrome";
+import type { SiteContact } from "../site-footer-contact";
+import { PHONE_ROW_MAX } from "../site-header-menu";
+import { StickyActions } from "../sticky-actions";
+import { viewport } from "../test-viewport";
 import FeaturesSection from "./features";
 import HoursSection, { groupedHoursRows, hoursRows } from "./hours";
 import type { JournalPost } from "./journal";
@@ -721,5 +727,143 @@ describe("servicesList: the price card", () => {
             />,
         );
         expect(container.innerHTML).toBe("");
+    });
+});
+
+/**
+ * The chrome every template carries (U8): a footer that answers what
+ * someone scrolls down for, a phone header row of three, and a Book bar
+ * only where the site books.
+ */
+describe("the shared chrome fixes (U8)", () => {
+    const PAGES = ["Classes", "Plans", "Team", "Journal", "About"].map(
+        (label) => ({ label, href: `/${label.toLowerCase()}` }),
+    );
+    const CONTACT: SiteContact = {
+        phone: "+919845012345",
+        email: "hello@pulse.example.com",
+        address: null,
+        places: [
+            {
+                name: null,
+                address: "12th Main\nIndiranagar",
+                hours: (
+                    ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const
+                ).map((day) => ({
+                    day,
+                    open: "06:00",
+                    close: "21:00",
+                    closed: day === "SUN",
+                })),
+            },
+        ],
+        social: [
+            { network: "whatsapp", url: "https://wa.me/919845012345" },
+            { network: "instagram", url: "https://www.instagram.com/pulse" },
+        ],
+    };
+
+    it.each([undefined, "folio", "quiet"] as const)(
+        "puts three of five pages in the phone row (%s), Menu keeps them all",
+        (look) => {
+            const { container } = render(
+                <SiteHeader name="Pulse" navigation={PAGES} look={look} />,
+            );
+            const row = container.querySelector("[data-site-phone-row]");
+            expect(PHONE_ROW_MAX).toBe(3);
+            expect(
+                Array.from(row?.querySelectorAll("a") ?? []).map(
+                    (a) => a.textContent,
+                ),
+            ).toEqual(["Classes", "Plans", "Team"]);
+            expect(row?.className).toContain("min-[700px]:hidden");
+            for (const a of Array.from(row?.querySelectorAll("a") ?? [])) {
+                expect(a.className).toContain("min-h-11");
+                // 44px wide too: "Home" alone drew 40px (CI, 21 Nov 2026).
+                expect(a.className).toContain("min-w-11");
+            }
+        },
+    );
+
+    it("gives Classic's brand link a 44px target", () => {
+        render(<SiteHeader name="Pulse" navigation={PAGES} />);
+        expect(screen.getByRole("link", { name: "Pulse, home" })).toHaveClass(
+            "min-h-11",
+        );
+    });
+
+    it.each([undefined, "folio", "quiet", "live"] as const)(
+        "footer (%s): Hours, Visit, Talk, never the header's menu",
+        (look) => {
+            render(
+                <SiteFooter
+                    footer={null}
+                    name="Pulse"
+                    contact={CONTACT}
+                    look={look}
+                />,
+            );
+            const footer = screen.getByRole("contentinfo");
+            expect(
+                within(footer)
+                    .getAllByRole("heading", { level: 2 })
+                    .map((h) => h.textContent),
+            ).toEqual(expect.arrayContaining(["Hours", "Visit", "Talk"]));
+            expect(within(footer).queryByRole("navigation")).toBeNull();
+            for (const name of [
+                "Get directions",
+                "Call +91 98450 12345",
+                "Message on WhatsApp",
+                "hello@pulse.example.com",
+            ]) {
+                expect(
+                    within(footer).getByRole("link", { name }).className,
+                ).toMatch(/min-h-11/);
+            }
+            expect(
+                within(footer).getByRole("link", { name: "Instagram" }),
+            ).toBeInTheDocument();
+        },
+    );
+
+    it("sends the week with no day marked; the browser marks today", () => {
+        const html = renderToStaticMarkup(
+            <SiteFooter footer={null} name="Pulse" contact={CONTACT} />,
+        );
+        expect(html).toContain("Monday to Saturday");
+        expect(html).not.toContain("data-today");
+        expect(html).not.toMatch(/>Today</);
+        render(<SiteFooter footer={null} name="Pulse" contact={CONTACT} />);
+        expect(document.querySelectorAll("[data-today]")).toHaveLength(1);
+        expect(screen.getByText("Today")).toBeInTheDocument();
+    });
+
+    it("keeps the phone bar for the site's main action, 44px, with room under the footer", () => {
+        viewport("phone");
+        // A shop's bar still carries Order: a restyle never drops an action.
+        const { unmount } = render(
+            <StickyActions
+                look="folio"
+                action={{ kind: "shop", label: "Order", href: "/shop" }}
+            />,
+        );
+        expect(document.querySelector("[data-site-bar-room]")).not.toBeNull();
+        unmount();
+
+        render(
+            <StickyActions
+                look="folio"
+                action={{ kind: "book", label: "Book", href: "/book" }}
+            />,
+        );
+        const bar = document.querySelector('[data-site-chrome-bar="book"]');
+        expect(
+            within(bar as HTMLElement).getByRole("link", { name: "Book" }),
+        ).toHaveClass("h-[52px]");
+        // The room holds the bar and the phone's safe area, so the
+        // footer's last row is never under it.
+        expect(
+            document.querySelector("[data-site-bar-room]")?.className,
+        ).toContain("env(safe-area-inset-bottom)");
     });
 });

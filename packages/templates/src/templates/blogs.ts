@@ -55,7 +55,7 @@ const TYPE = {
 
 const SCALARS = { cornerRadius: 0, pageMargin: 40 } as const;
 
-export const blogsTemplate: TemplateManifest = {
+export const blogsTemplateV1: TemplateManifest = {
     id: BLOGS_TEMPLATE_ID,
     version: 1,
     name: "Blogs",

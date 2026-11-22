@@ -1,8 +1,11 @@
 import { withDevAccess } from "@saroh/auth/dev-access";
 import { createAuthMiddleware } from "@saroh/auth/middleware";
 import { withPrivateApp } from "@saroh/auth/private-app";
+import { contentSecurityPolicy } from "@saroh/auth/security-headers";
 
 import { accountsLoginUrl } from "@/lib/admin-access";
+
+import cspSources from "./csp-sources.cjs";
 
 // Every admin route requires an authenticated accounts session. The role
 // check (isAdmin) runs server-side in the pages — middleware only enforces
@@ -12,6 +15,8 @@ import { accountsLoginUrl } from "@/lib/admin-access";
 // among them, says "noindex, nofollow" and carries the security headers.
 export default withPrivateApp(
     withDevAccess(createAuthMiddleware({ loginUrl: accountsLoginUrl })),
+    // This answer's CSP, scripts by nonce only (@saroh/auth/security-headers).
+    (nonce) => contentSecurityPolicy({ ...cspSources, nonce }),
 );
 
 export const config = {

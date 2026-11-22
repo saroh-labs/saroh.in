@@ -104,6 +104,21 @@ export function BookingFields({
                     placeholder="Pick a time that suits you."
                 />
             </Field>
+            <Field
+                optional
+                label="Before you book"
+                hint="A note customers read before they choose a time."
+            >
+                <Textarea
+                    value={c.beforeYouBook ?? ""}
+                    onChange={(e) =>
+                        patch({ beforeYouBook: e.target.value || undefined })
+                    }
+                    rows={2}
+                    maxLength={600}
+                    placeholder="Come ten minutes early and bring any reports."
+                />
+            </Field>
         </div>
     );
 }

@@ -112,6 +112,16 @@ const ROUTES: Route[] = [
         expect: [ctx, SITE],
     },
     {
+        handler: "changes",
+        method: RequestMethod.GET,
+        path: ":siteId/changes",
+        target: "sites",
+        call: "getChanges",
+        // `?against=` a past version (History's Compare, U47a).
+        args: [ctx, SITE, "pub_1"],
+        expect: [ctx, SITE, "pub_1"],
+    },
+    {
         handler: "listComments",
         method: RequestMethod.GET,
         path: ":siteId/comments",
@@ -186,6 +196,32 @@ const ROUTES: Route[] = [
         expect: [ctx, SITE, DTO],
     },
     {
+        handler: "approveChanges",
+        method: RequestMethod.POST,
+        path: ":siteId/changes/approve",
+        target: "sites",
+        call: "recordChangeVerdict",
+        args: [ctx, SITE, { units: ["site:footer"] }],
+        expect: [ctx, SITE, { units: ["site:footer"], outcome: "APPROVED" }],
+    },
+    {
+        handler: "askForChanges",
+        method: RequestMethod.POST,
+        path: ":siteId/changes/ask",
+        target: "sites",
+        call: "recordChangeVerdict",
+        args: [ctx, SITE, { units: ["site:footer"], reason: "Old hours" }],
+        expect: [
+            ctx,
+            SITE,
+            {
+                units: ["site:footer"],
+                outcome: "CHANGES_REQUESTED",
+                reason: "Old hours",
+            },
+        ],
+    },
+    {
         handler: "createPreviewLink",
         method: RequestMethod.POST,
         path: ":siteId/preview-links",
@@ -247,6 +283,15 @@ const ROUTES: Route[] = [
         call: "updatePage",
         args: [ctx, SITE, PAGE, DTO],
         expect: [ctx, SITE, PAGE, DTO],
+    },
+    {
+        handler: "duplicatePage",
+        method: RequestMethod.POST,
+        path: ":siteId/pages/:pageId/duplicate",
+        target: "sites",
+        call: "duplicatePage",
+        args: [ctx, SITE, PAGE],
+        expect: [ctx, SITE, PAGE],
     },
     {
         handler: "deletePage",

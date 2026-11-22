@@ -57,6 +57,16 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
+    // Old page links that forward (KTD-3).
+    "sites/site-redirects.controller.ts": "WEBSITE",
+    // A site's Overview (website area U4).
+    "sites/site-overview.controller.ts": "WEBSITE",
+    // The editor's page results, service uses and Undo one change (U47a).
+    "sites/page-results.controller.ts": "WEBSITE",
+    "sites/service-uses.controller.ts": "WEBSITE",
+    "sites/change-revert.controller.ts": "WEBSITE",
+    // Restore a version as the draft (owner, 20 Nov 2026).
+    "sites/version-restore.controller.ts": "WEBSITE",
     "share-posts/share-posts.controller.ts": "WEBSITE",
     // The booking page's card with the sheet's headline (#1375).
     "share-posts/share-cards.controller.ts": "WEBSITE",
@@ -135,6 +145,8 @@ const CLASS_LEVEL_WITHIN: Record<string, string[]> = {
  * finishing the rollout and would in fact break the thing the runbook protects.
  */
 const NEVER: Record<string, string> = {
+    "sites/website-area.controller.ts":
+        "the deployment's one Website area switch (DEC-240), read by every signed-in app before any business is open",
     "messaging/messaging.controller.ts":
         "Saroh-sent codes are paid from the wallet with their own per-module switch, not a plan module",
     "product-reviews/public-product-reviews.controller.ts":

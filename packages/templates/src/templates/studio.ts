@@ -136,7 +136,7 @@ const TYPE = {
     labelStyle: "eyebrow",
 } as const;
 
-export const studioTemplate: TemplateManifest = {
+export const studioTemplateV1: TemplateManifest = {
     id: STUDIO_TEMPLATE_ID,
     version: 1,
     name: "Studio",
@@ -327,4 +327,23 @@ export const STUDIO_GALLERY_SAMPLE = {
         facts: ["Bandra, Mumbai", "Anaya Pillai and Rohan Desai", "2019"],
     },
     address: "St Leo Road, Bandra West, Mumbai",
+    /** v2's opening (board TB): what the studio does, and for whom. */
+    positioning: {
+        heading:
+            "A two-person studio in Mumbai for identity, and everything it has to survive.",
+        line: "Packaging, signage, a website, the form at the counter · six or seven projects a year",
+    },
+    /** v2's `/project` page: the lead project, Kadak Coffee. */
+    project: {
+        line: "An identity for a Mumbai roaster, and the bags, cups and delivery boxes it had to work on.",
+        /** The facts' values, in the template's order (its labels stay). */
+        facts: [
+            "Kadak Coffee",
+            "2026",
+            "Identity, packaging",
+            "Anaya Pillai, Rohan Desai",
+        ],
+        brief: "Kadak roasts in small batches and sells through two counters and a delivery app. The old bags were printed by whoever was cheapest that month, so no two runs matched. The ask was a mark that survives a one-colour stamp on kraft paper, and a system the counter staff can reorder from without calling us.",
+        made: "A K that works at 12mm on a cup lid, three bag sizes from one die line, and a sheet that tells the printer which ink, which paper and which side up.",
+    },
 } as const;

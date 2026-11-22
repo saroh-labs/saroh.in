@@ -3,6 +3,7 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { prunePostRevisions } from "../content/post-revision-retention";
 import { heldOrganizationIds } from "../organizations/legal-hold";
 
 /**
@@ -12,6 +13,10 @@ import { heldOrganizationIds } from "../organizations/legal-hold";
  * the rows whose stamp has passed. The daily rollups
  * (`AnalyticsDailyAggregate`) are never touched: Insights and the plan's
  * visits a month read those, and they outlive the events they came from.
+ *
+ * The same daily run prunes blog posts' old autosave revisions
+ * (`content/post-revision-retention.ts`, W5 21 Nov 2026), counted and
+ * caught on its own.
  */
 export const ANALYTICS_RETENTION_TYPE = "analytics.retention";
 
@@ -73,6 +78,22 @@ export class AnalyticsRetentionHandler {
         } catch (error) {
             this.logger.error(
                 `analytics.retention: sweep failed before it finished: ${error instanceof Error ? error.name : "unknown"}`,
+            );
+        }
+        try {
+            const pruned = await prunePostRevisions(
+                prisma,
+                await heldOrganizationIds(prisma),
+            );
+            more ||= pruned.more;
+            if (pruned.deleted > 0) {
+                this.logger.log(
+                    `analytics.retention: pruned ${pruned.deleted} old post revisions${pruned.more ? "; more due, next run soon" : ""}`,
+                );
+            }
+        } catch (error) {
+            this.logger.error(
+                `analytics.retention: post revision prune failed: ${error instanceof Error ? error.name : "unknown"}`,
             );
         }
         const wait = more

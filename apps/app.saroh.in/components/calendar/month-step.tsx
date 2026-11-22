@@ -2,6 +2,8 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { useScreenLink } from "@/components/shared/page/screen-pending";
+
 import type { Edge } from "@/lib/calendar/range";
 import { Tip } from "@saroh/ui/tooltip";
 
@@ -23,6 +25,8 @@ export function MonthStep({
     className?: string;
     children: React.ReactNode;
 }) {
+    // In the screen's transition: the old month stays, greyed.
+    const screenLink = useScreenLink();
     if (edge) {
         return (
             <Tip label={edge.title}>
@@ -50,7 +54,7 @@ export function MonthStep({
             size="sm"
             className={cn("w-8 px-0", className)}
         >
-            <Link href={href} aria-label={label}>
+            <Link href={href} onNavigate={screenLink(href)} aria-label={label}>
                 {children}
             </Link>
         </Button>

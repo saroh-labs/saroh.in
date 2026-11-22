@@ -7,7 +7,13 @@ vi.mock("@/env", () => ({
     },
 }));
 
-import { getMovedTo, movedAddressOf } from "./publication";
+import {
+    findRedirect,
+    getMovedTo,
+    movedAddressOf,
+    pageHead,
+    withQuery,
+} from "./publication";
 
 /**
  * An old web address that forwards (DEC-069, L3). The layout asks only on
@@ -135,5 +141,102 @@ describe("a site's primary host", () => {
         expect(siteOriginFor(null, "rye.saroh.app")).toBe(
             "https://rye.saroh.app",
         );
+    });
+});
+
+describe("findRedirect (KTD-3)", () => {
+    const snapshot = {
+        site: { name: "Rye", slug: "rye" },
+        pages: [
+            { path: "/", title: null, isHome: true, sections: [] },
+            { path: "/bridal", title: "Bridal", isHome: false, sections: [] },
+        ],
+        redirects: [
+            { from: "/services/bridal-makeup-packages", to: "/bridal" },
+            { from: "/bridal", to: "/" },
+            { from: "/away", to: "//evil.com" },
+            { from: "/full", to: "https://evil.com/x" },
+            { from: "/self", to: "/self/" },
+        ],
+        publishedAt: "2026-11-18T00:00:00.000Z",
+    };
+
+    it("names where an old link now lives, trailing slash or not", () => {
+        expect(findRedirect(snapshot, "/services/bridal-makeup-packages")).toBe(
+            "/bridal",
+        );
+        expect(
+            findRedirect(snapshot, "/services/bridal-makeup-packages/"),
+        ).toBe("/bridal");
+    });
+
+    it("lets a live page win over a forward at the same link", () => {
+        expect(findRedirect(snapshot, "/bridal")).toBeNull();
+    });
+
+    it("never leaves the site or loops on itself", () => {
+        expect(findRedirect(snapshot, "/away")).toBeNull();
+        expect(findRedirect(snapshot, "/full")).toBeNull();
+        expect(findRedirect(snapshot, "/self")).toBeNull();
+    });
+
+    it("is null for a snapshot from before forwards, as a 404 was", () => {
+        const { redirects: _none, ...old } = snapshot;
+        expect(
+            findRedirect(old, "/services/bridal-makeup-packages"),
+        ).toBeNull();
+    });
+});
+
+describe("withQuery", () => {
+    it("keeps the query a visitor asked with", () => {
+        expect(withQuery("/bridal", { ref: "ig", tag: ["a", "b"] })).toBe(
+            "/bridal?ref=ig&tag=a&tag=b",
+        );
+        expect(withQuery("/bridal", {})).toBe("/bridal");
+    });
+});
+
+describe("pageHead (KTD-7)", () => {
+    const site = {
+        name: "Rye",
+        slug: "rye",
+        seoDescription: "Bread, daily.",
+        socialImageUrl: "https://img.test/site.jpg",
+    };
+    const page = {
+        path: "/about",
+        title: "About",
+        isHome: false,
+        sections: [],
+    };
+
+    it("falls back to the site's text and picture", () => {
+        expect(pageHead(page, site)).toEqual({
+            title: undefined,
+            description: "Bread, daily.",
+            images: ["https://img.test/site.jpg"],
+            robots: undefined,
+        });
+    });
+
+    it("uses the page's own, and keeps it off Google when asked", () => {
+        expect(
+            pageHead(
+                {
+                    ...page,
+                    seoTitle: "About our bakery",
+                    seoDescription: "Since 1990.",
+                    shareImageUrl: "https://img.test/about.jpg",
+                    noindex: true,
+                },
+                site,
+            ),
+        ).toEqual({
+            title: "About our bakery",
+            description: "Since 1990.",
+            images: ["https://img.test/about.jpg"],
+            robots: { index: false, follow: true },
+        });
     });
 });

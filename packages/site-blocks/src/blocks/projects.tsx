@@ -4,6 +4,7 @@ import { isSafeHref, resolveVariant } from "@saroh/block-contract";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
+import { SiteLink } from "../site-link";
 import { listCard, listPhoto } from "./list-layout";
 import { RhythmGallery } from "./projects-rhythm";
 import { ProjectRows, projectsCount } from "./projects-rows";
@@ -272,7 +273,7 @@ function ProjectWords({
                 </p>
             ) : null}
             {href ? (
-                <a
+                <SiteLink
                     href={href}
                     rel={/^https?:\/\//i.test(href) ? "noopener" : undefined}
                     className={linkClasses}
@@ -280,7 +281,7 @@ function ProjectWords({
                     {PROJECTS_LINK}
                     <span className="sr-only">: {title}</span>
                     <span aria-hidden="true">→</span>
-                </a>
+                </SiteLink>
             ) : null}
         </>
     );

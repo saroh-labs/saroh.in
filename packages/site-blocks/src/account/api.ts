@@ -13,7 +13,7 @@
 /** What the sheet needs before anything is typed. */
 export interface SignInOptions {
     businessName: string;
-    /** The business's public phone, for "Or call ‹Business› on ‹phone›". */
+    /** The business's public phone, for "Call ‹phone›" when a code can't be sent. */
     phone: string | null;
     /** Whether the bot challenge is likely, and its widget's public key. */
     challenge: { required: boolean; siteKey: string | null };
@@ -152,15 +152,6 @@ export function retryText(seconds: number): string {
 /** The sentence when a code can't be sent (R4; user, 2026-09-27). */
 export const UNAVAILABLE_TEXT =
     "We couldn't send your code. Try again in a few minutes";
-
-/** "Or call ‹Business› on ‹phone›", or null when there's no phone. */
-export function callLine(
-    businessName: string,
-    phone: string | null,
-): string | null {
-    const number = phone?.trim();
-    return number ? `Or call ${businessName} on ${number}` : null;
-}
 
 /** A six-digit code, from whatever was typed or pasted. */
 export function codeDigits(value: string): string {

@@ -63,7 +63,7 @@ export function PlanChooser({
 }: {
     /** Per cycle; null when Saroh's price list couldn't be read. */
     rows: Record<Cycle, PickerRow[]> | null;
-    yearly: { on: false } | { on: true; freeMonths: number };
+    yearly: { on: false } | { on: true; freeMonths: number; label: string };
     initialCycle: Cycle;
     /** `billing:manage`: who may change the plan. */
     canChange: boolean;
@@ -161,7 +161,7 @@ export function PlanChooser({
                                 { value: "month", label: "Monthly" },
                                 {
                                     value: "year",
-                                    label: `Yearly · ${yearly.freeMonths} months free`,
+                                    label: yearly.label,
                                 },
                             ]}
                         />

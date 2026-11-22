@@ -131,7 +131,7 @@ export const CERAMICS_FORMER_FOOTER_LINES: readonly string[] = [
     "Your area and town — and when the studio is open",
 ];
 
-export const ceramicsTemplate: TemplateManifest = {
+export const ceramicsTemplateV1: TemplateManifest = {
     id: CERAMICS_TEMPLATE_ID,
     version: 1,
     name: "Store",
@@ -315,4 +315,18 @@ export const CERAMICS_GALLERY_SAMPLE = {
         /** The facts' values, in the template's order (its labels stay). */
         facts: ["Koregaon Park, Pune", "Anjali Deshpande", "2018"],
     },
+    /** v2's hero (board TB): what the shop makes, and its maker first. */
+    hero: {
+        heading: "Stoneware from one wheel in Koregaon Park",
+        line: "Plates, mugs, bowls and vases, thrown by hand in runs of twenty or thirty. When a glaze is gone it is genuinely gone.",
+        maker: "Anjali Deshpande",
+        role: "Potter · throwing since 2018",
+    },
+    /** v2's delivery band, point by point. */
+    delivery: [
+        "Each piece is wrapped in paper and double-boxed. Ships across India in 4 to 7 working days.",
+        "If anything arrives broken, send a photo within 48 hours and we replace it or refund you.",
+        "Unused pieces can come back in their box within 7 days of delivery.",
+        "Stoneware is dishwasher and microwave safe. Not for the oven or a direct flame.",
+    ],
 } as const;

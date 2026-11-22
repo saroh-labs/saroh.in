@@ -26,6 +26,8 @@ export interface SiteFixtures {
     timetable?: PublicTimetable;
     /** For the hero's On today panel. */
     today?: PublicToday;
+    /** For every Booking block, in place of its open-times read. */
+    slots?: { startAt: string; endAt: string }[];
     /**
      * The moment the page is drawn for, as an ISO instant: "Open now", today
      * in Opening hours and the Journal's short dates are worked out for it

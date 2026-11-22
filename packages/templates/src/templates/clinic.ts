@@ -1,3 +1,5 @@
+import { SAME_DAY_CALL_WORDS } from "@saroh/block-contract";
+
 import type { TemplateContext, TemplateManifest } from "../manifest";
 
 /**
@@ -225,7 +227,8 @@ const TYPE = {
     labelStyle: "eyebrow",
 } as const;
 
-export const clinicTemplate: TemplateManifest = {
+/** `clinic@1`, as it shipped: kept for the sites made from it. */
+export const clinicTemplateV1: TemplateManifest = {
     id: CLINIC_TEMPLATE_ID,
     version: 1,
     name: "Clinic",
@@ -259,11 +262,11 @@ export const clinicTemplate: TemplateManifest = {
                     body: "#24414B",
                     muted: "#4C6570",
                     border: "#D8E3E7",
-                    accent: "#2F7A8C",
+                    accent: "#2C7384",
                     accentFg: "#FFFFFF",
                     heroBg: "#F4F7F8",
                     heroFg: "#16303A",
-                    ctaBg: "#2F7A8C",
+                    ctaBg: "#2C7384",
                     ctaFg: "#FFFFFF",
                     footerBg: "#E5EEF1",
                     footerFg: "#16303A",
@@ -294,11 +297,11 @@ export const clinicTemplate: TemplateManifest = {
                     body: "#3F384E",
                     muted: "#635D72",
                     border: "#E2DFE8",
-                    accent: "#766496",
+                    accent: "#736292",
                     accentFg: "#FFFFFF",
                     heroBg: "#F7F6F8",
                     heroFg: "#2F283C",
-                    ctaBg: "#766496",
+                    ctaBg: "#736292",
                     ctaFg: "#FFFFFF",
                     footerBg: "#EDEBF2",
                     footerFg: "#2F283C",
@@ -436,6 +439,187 @@ export const clinicTemplate: TemplateManifest = {
                         title: "Appointments and hours",
                         groupDays: true,
                         showAddress: true,
+                    },
+                },
+            ],
+        },
+    ],
+};
+
+/*
+ * `clinic@2` (DEC-228, plan 2026-11-18-001 U10, board TC Clinic): DISTILLED
+ * to what a patient needs first. It hurts, or a check-up is due: can I be
+ * seen, and where is it. So the hero answers both before anything else:
+ * the Same-day call panel ("Same-day? Call the desk") beside the headline,
+ * and under the button the answer row (Open now, Directions, Call). The
+ * photo band under the hero is dropped (no grey box where a room photo
+ * should be); the treatments are a priced list, a row each; the hours and
+ * the address end the page as Visit us, with directions and the week.
+ *
+ * Never "emergency": a practice that cannot promise one must not say it
+ * (DEC-228). The disclaimer and the "can't wait" answer send a patient to
+ * the clinic's phone, else the nearest hospital.
+ *
+ * For new sites only (KD10): `clinic@1` stays as shipped.
+ */
+
+/** v2's line: what the page answers, in the order the board says it. */
+function heroLineV2(ctx: TemplateContext): string {
+    if (ctx.tagline) return ctx.tagline;
+    if (hasTreatments(ctx)) {
+        return "Every treatment priced for all its visits, who you will see, and the next open time.";
+    }
+    return `The treatments at ${ctx.organizationName}, who you will see, and how to get an appointment.`;
+}
+
+/** v2's disclaimer: the same honesty, with no promise of an emergency service. */
+const DISCLAIMER_V2 =
+    "Nothing on this site is a diagnosis or a substitute for seeing a doctor. If it cannot wait, call the clinic, or go to the nearest hospital.";
+
+/** v2's questions: "can't wait" first, as the board opens it. */
+function questionsV2(ctx: TemplateContext) {
+    const [bring, ...rest] = questions(ctx).slice(0, -1);
+    return [
+        {
+            question: "What if it can't wait?",
+            answer: "Call the clinic and ask for the earliest time. If you cannot reach anyone, go to the nearest hospital.",
+        },
+        bring,
+        ...rest,
+    ];
+}
+
+/** `clinic@2`: the one new sites start from. */
+export const clinicTemplate: TemplateManifest = {
+    ...clinicTemplateV1,
+    version: 2,
+    description:
+        "For a clinic or practice: a same-day call and the way in up top, every treatment with its price and visits, what a treatment involves, the doctors, questions before coming in, and the hours and address.",
+    pages: [
+        {
+            path: "/",
+            title: "Home",
+            isHome: true,
+            sections: [
+                {
+                    // The headline beside the Same-day call panel; the
+                    // answer row (Open now, Directions, Call) under the
+                    // button. No photo slot. The page's h1.
+                    type: "hero",
+                    contractVersion: 1,
+                    content: (ctx: TemplateContext) => ({
+                        variant: "answer",
+                        heading: HEADLINE,
+                        subheading: heroLineV2(ctx),
+                        panel: {
+                            kind: "sameDayCall",
+                            words: SAME_DAY_CALL_WORDS,
+                        },
+                        answerRow: true,
+                        ...(hasTreatments(ctx)
+                            ? {
+                                  cta: {
+                                      label: "Book a visit",
+                                      href: "/book",
+                                      style: "primary",
+                                      phoneLabel: "Book",
+                                  },
+                              }
+                            : {}),
+                    }),
+                },
+                {
+                    // A row a treatment, read live: what it is, a visit's
+                    // length, the price for all its visits, Book.
+                    type: "servicesList",
+                    contractVersion: 1,
+                    when: hasTreatments,
+                    content: (ctx: TemplateContext) => ({
+                        anchor: "treatments",
+                        navLabel: "Treatments",
+                        band: "surface",
+                        heading: "Treatments and prices",
+                        intro: "A treatment that needs several visits is priced once, for all of them. You get the plan and the price before anything starts.",
+                        serviceIds: clinicServiceIds(ctx),
+                        showPrices: true,
+                        showDescriptions: true,
+                        layout: "list",
+                        buttonLabel: "Book",
+                    }),
+                },
+                {
+                    type: "features",
+                    contractVersion: 1,
+                    content: {
+                        anchor: "how",
+                        variant: "steps",
+                        heading: "What a treatment involves",
+                        intro: `${countWord(STEPS.length)} steps, and you can stop and ask at any of them.`,
+                        items: STEPS.map((s) => ({ ...s })),
+                        note: DISCLAIMER_V2,
+                    },
+                },
+                {
+                    type: "person",
+                    contractVersion: 1,
+                    content: doctors({
+                        anchor: "doctors",
+                        navLabel: "Doctors",
+                        band: "surface",
+                        title: "Who you will see",
+                    }),
+                },
+                {
+                    type: "faq",
+                    contractVersion: 1,
+                    content: (ctx: TemplateContext) => ({
+                        anchor: "questions",
+                        navLabel: "Questions",
+                        heading: "Before you come in",
+                        items: questionsV2(ctx),
+                    }),
+                },
+                {
+                    // No booking page: write to the clinic, by email…
+                    type: "contact",
+                    contractVersion: 1,
+                    when: (ctx) =>
+                        Boolean(ctx.contactEmail) && !hasTreatments(ctx),
+                    content: (ctx: TemplateContext) => ({
+                        anchor: "contact",
+                        heading: "Ask for an appointment",
+                        intro: "Say what you would like to be seen for and which days suit you, and the clinic will reply.",
+                        email: ctx.contactEmail,
+                    }),
+                },
+                {
+                    // …or by a form, with no email either.
+                    type: "enquiry",
+                    contractVersion: 1,
+                    when: (ctx) => !ctx.contactEmail && !hasTreatments(ctx),
+                    content: {
+                        anchor: "appointments",
+                        title: "Ask for an appointment",
+                        description:
+                            "Say what you would like to be seen for and which days suit you, and the clinic will reply with a time.",
+                        submitLabel: "Send",
+                        successMessage:
+                            "Thank you. The clinic will reply to the email you gave.",
+                        fields: ENQUIRY_FIELDS.map((f) => ({ ...f })),
+                    },
+                },
+                {
+                    // The clinic's own place on the dark band: the address,
+                    // the week, directions. Nothing until it has one.
+                    type: "visitUs",
+                    contractVersion: 1,
+                    content: {
+                        anchor: "visit",
+                        navLabel: "Hours and address",
+                        band: "inverse",
+                        title: "Hours and address",
+                        showMap: true,
+                        showHours: true,
                     },
                 },
             ],

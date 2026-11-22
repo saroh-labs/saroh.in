@@ -3,7 +3,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { StatCard } from "@saroh/ui/stat-card";
 
-import { AdminShell } from "@/components/admin-shell";
 import { FilterBar, FilterSelect, FilterText } from "@/components/filter-bar";
 import { BulkAction } from "@/components/operations/bulk-action";
 import { JobTable } from "@/components/operations/job-table";
@@ -45,7 +44,7 @@ export default async function JobsPage({
             .map((job) => job.id) ?? [];
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Jobs"]}
@@ -150,6 +149,6 @@ export default async function JobsPage({
                     </>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

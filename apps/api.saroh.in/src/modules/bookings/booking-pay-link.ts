@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { contactBillToGst } from "../invoices/contact-gstin";
 import { rateToBps } from "../invoices/gst";
 import { assertRatesSet } from "../invoices/gst-rate-required";
 import { buildManualInvoice } from "../invoices/order-invoice";
@@ -174,6 +175,7 @@ export async function bookingPayLinkInTx(
             rate: booking.service.gstRate,
         },
     ]);
+    const gst = await contactBillToGst(tx, organizationId, booking.contactId);
     const doc = buildManualInvoice(
         [
             {
@@ -190,7 +192,7 @@ export async function bookingPayLinkInTx(
             },
         ],
         profile,
-        null,
+        gst.billToState,
         0,
     );
     const number = await numberFor(tx, organizationId, profile, "INVOICE", now);
@@ -205,6 +207,7 @@ export async function bookingPayLinkInTx(
             contactId: booking.contactId,
             billToName: booking.bookerName,
             billToEmail: booking.bookerEmail,
+            ...gst,
             currency: terms.currency,
             ...documentColumns(doc),
             issuedAt: now,

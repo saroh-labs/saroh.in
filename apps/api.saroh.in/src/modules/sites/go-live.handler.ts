@@ -284,7 +284,7 @@ async function mayGoLive(
 }
 
 /** Who scheduled it, as the business sees them now. */
-async function schedulerStanding(
+export async function schedulerStanding(
     tx: Tx,
     organizationId: string,
     userId: string,
@@ -293,6 +293,8 @@ async function schedulerStanding(
     member: boolean;
     canPublish: boolean;
     owner: boolean;
+    /** May write sections (and so posts): what a scheduled post needs. */
+    canWrite: boolean;
 }> {
     const [user, membership] = await Promise.all([
         tx.user.findUnique({
@@ -308,7 +310,13 @@ async function schedulerStanding(
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const name = user?.name?.trim() || user?.email || "The person";
     if (!membership) {
-        return { name, member: false, canPublish: false, owner: false };
+        return {
+            name,
+            member: false,
+            canPublish: false,
+            owner: false,
+            canWrite: false,
+        };
     }
     const stored = await tx.organizationRole.findUnique({
         where: {
@@ -327,6 +335,7 @@ async function schedulerStanding(
         member: true,
         canPublish: actions.has("site:publish"),
         owner: membership.role === "OWNER",
+        canWrite: actions.has("section:write"),
     };
 }
 

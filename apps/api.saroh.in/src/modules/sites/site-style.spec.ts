@@ -370,3 +370,116 @@ describe("a look (DEC-172)", () => {
         expect(quiet["--site-radius"]).toBe(classic["--site-radius"]);
     });
 });
+
+describe("component styles (DEC-237, KD1)", () => {
+    function refusal(style: unknown): unknown {
+        try {
+            parseSiteStyle(style);
+        } catch (e) {
+            expect(e).toBeInstanceOf(BadRequestException);
+            return (e as BadRequestException).getResponse();
+        }
+        throw new Error("expected a refusal");
+    }
+
+    it("keeps listed choices, even one equal to the look's default", () => {
+        // Classic's cards are Bordered: the key stays so the choice survives
+        // Classic → Quiet → Classic.
+        expect(
+            parseSiteStyle({
+                components: { cards: "bordered", buttons: "pill" },
+            }).components,
+        ).toEqual({ cards: "bordered", buttons: "pill" });
+        expect(
+            parseSiteStyle({ look: "quiet", components: { cards: "flat" } })
+                .components,
+        ).toEqual({ cards: "flat" });
+    });
+
+    it("reads an empty object, null or absent as no choices, writing nothing", () => {
+        for (const components of [{}, null, undefined]) {
+            expect(parseSiteStyle({ components })).not.toHaveProperty(
+                "components",
+            );
+        }
+        expect(parseSiteStyle({ components: {} })).toEqual(defaultSiteStyle());
+    });
+
+    it("refuses an unknown option, naming the field", () => {
+        expect(refusal({ components: { buttons: "wobbly" } })).toMatchObject({
+            details: { field: "components.buttons" },
+        });
+        expect(refusal({ components: { images: 3 } })).toMatchObject({
+            details: { field: "components.images" },
+        });
+    });
+
+    it("refuses an unknown component, naming it", () => {
+        expect(refusal({ components: { shadows: "deep" } })).toMatchObject({
+            details: { field: "components.shadows" },
+        });
+    });
+
+    it("refuses components that are not an object", () => {
+        for (const components of ["pill", ["pill"], 1]) {
+            expect(refusal({ components })).toMatchObject({
+                details: { field: "components" },
+            });
+        }
+    });
+});
+
+describe("one brand colour (U24b)", () => {
+    it("derives the palette from the colour, never the one sent with it", () => {
+        const style = parseSiteStyle({
+            brandColour: "#e8a0b4",
+            palette: {
+                bg: "#FFFFFF",
+                fg: "#FFFFFF",
+                accent: "#FFFFFF",
+                accentFg: "#FFFFFF",
+            },
+        });
+        expect(style.brandColour).toBe("#E8A0B4");
+        expect(style.palette?.bg).not.toBe("#FFFFFF");
+        expect(style.palette?.fg).not.toBe("#FFFFFF");
+    });
+
+    it("refuses a brand colour that is not #RRGGBB, naming the field", () => {
+        for (const bad of ["pink", "#12345", 7]) {
+            try {
+                parseSiteStyle({ brandColour: bad });
+                throw new Error("accepted");
+            } catch (e) {
+                expect(e).toBeInstanceOf(BadRequestException);
+                expect((e as BadRequestException).getResponse()).toMatchObject({
+                    details: { field: "brandColour" },
+                });
+            }
+        }
+    });
+
+    it("leaves a style without one as it was", () => {
+        expect(parseSiteStyle({}).brandColour).toBeUndefined();
+        expect(parseSiteStyle({ brandColour: null }).palette).toBeUndefined();
+    });
+});
+
+describe("stored spacing after the sliders went (U24b)", () => {
+    it("keeps reading a stored site's scalars, so it renders the same", () => {
+        const stored = {
+            scalars: {
+                pageMargin: 24,
+                sectionPadding: 80,
+                gridGap: 14,
+                cornerRadius: 12,
+                headingScale: 1.2,
+            },
+        };
+        const vars = siteStyleVariables(parseSiteStyle(stored));
+        expect(vars["--site-page-margin"]).toBe("24px");
+        expect(vars["--site-section-padding"]).toBe("80px");
+        expect(vars["--site-radius"]).toBe("12px");
+        expect(vars["--site-heading-scale"]).toBe("1.2");
+    });
+});

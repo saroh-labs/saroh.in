@@ -19,8 +19,10 @@ import {
     DIETICIAN_GALLERY_SAMPLE,
     DIETICIAN_TEMPLATE_ID,
     dieticianServiceIds,
-    dieticianTemplate,
+    dieticianTemplateV1 as dieticianTemplate,
+    dieticianTemplate as dieticianV2,
 } from "./dietician";
+import { firstSection, redesignChecks } from "./redesign-checks";
 
 type Ctx = TemplateContext;
 
@@ -89,8 +91,8 @@ function copy(ctx: Ctx): string {
 describe("dietician@1 (industry templates U7)", () => {
     it("is registered as the Dietician template, version 1", () => {
         expect(dieticianTemplate.id).toBe(DIETICIAN_TEMPLATE_ID);
-        expect(getTemplate("dietician")).toBe(dieticianTemplate);
-        expect(listTemplates()).toContain(dieticianTemplate);
+        expect(getTemplate("dietician", 1)).toBe(dieticianTemplate);
+        expect(listTemplates()).not.toContain(dieticianTemplate);
         expect(dieticianTemplate.version).toBe(1);
     });
 
@@ -441,5 +443,59 @@ describe("dietician@1 (industry templates U7)", () => {
         expect(copy(withEmail).toLowerCase()).not.toMatch(
             /\b(we're|we'll|our|us)\b/,
         );
+    });
+});
+
+describe("dietician@2 (U10, distilled)", () => {
+    const all = profiles.map(([, ctx]) => ctx);
+    redesignChecks(dieticianV2, dieticianTemplate, all);
+
+    function homeV2(ctx: Ctx) {
+        const [page] = instantiateTemplate(dieticianV2, ctx).pages;
+        return page.sections;
+    }
+
+    it("puts the price and the way to book in the first screen: the Consultation panel and one Book", () => {
+        const hero = firstSection(dieticianV2, oneService);
+        expect(hero?.content).toMatchObject({
+            variant: "answer",
+            heading: "Dr Sample Name",
+            panel: { kind: "consultation" },
+            cta: { label: "Book a consultation", href: "/book" },
+        });
+        expect(hero?.content).not.toHaveProperty("secondaryCta");
+        // How to book follows at once: the next open times for that service.
+        const [, booking] = homeV2(oneService);
+        expect(booking.type).toBe("booking");
+        expect(booking.content).toMatchObject({
+            variant: "nextOpen",
+            serviceId: "svc_initial",
+        });
+    });
+
+    it("keeps the practitioner, as About under the hero, one h1 a page", () => {
+        const person = homeV2(oneService).find((s) => s.type === "person");
+        expect(person?.content).toMatchObject({
+            anchor: "about",
+            asTitle: false,
+        });
+        expect(
+            homeV2(oneService).filter((s) => s.type === "servicesList"),
+        ).toHaveLength(0);
+    });
+
+    it("opens on the practitioner as v1 did with several consultations or none", () => {
+        for (const ctx of [twoServices, nameOnly]) {
+            const [first] = homeV2(ctx);
+            expect(first.type).toBe("person");
+            expect(first.content).toMatchObject({ asTitle: true });
+        }
+    });
+
+    it("ends on where the practice is when it has a place, else its hours", () => {
+        expect(homeV2({ ...oneService, hasPlace: true }).at(-1)?.type).toBe(
+            "visitUs",
+        );
+        expect(homeV2(oneService).at(-1)?.type).toBe("hours");
     });
 });

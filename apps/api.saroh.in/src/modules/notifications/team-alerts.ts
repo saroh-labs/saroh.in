@@ -151,6 +151,16 @@ export type TeamAlertPayload =
     | { event: "review"; about: "approval"; approvalId: string }
     | { event: "review"; about: "note"; commentId: string }
     | { event: "review"; about: "release"; testReleaseId: string }
+    /** A post sent for approval (O7): its `sent` revision. */
+    | { event: "review"; about: "post"; revisionId: string }
+    | {
+          event: "review";
+          about: "change";
+          /** One of the rows asking (DEC-226, U9). */
+          changeApprovalId: string;
+          /** Whose changes were asked about: told alone. */
+          editorUserId: string;
+      }
     | { event: "webhook"; webhookEventId: string }
     | {
           event: "domain";

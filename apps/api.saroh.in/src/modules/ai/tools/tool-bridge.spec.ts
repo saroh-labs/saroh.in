@@ -26,7 +26,7 @@ import type { OrgAction } from "../../organizations/organization-actions";
 import type { OrganizationContextService } from "../../organizations/organization-context.service";
 import type { AgentDefinition } from "../agents/agent-definition";
 import type { DraftsService } from "../drafts/drafts.service";
-import { CARD_SHOWN, cardShown, ToolBridge } from "./tool-bridge";
+import { CARD_SHOWN, cardShown, PAGE_UNREAD, ToolBridge } from "./tool-bridge";
 
 const ORG = "org_a";
 const asker: OrganizationContext = {
@@ -89,6 +89,12 @@ const slots = defineTool({
     name: "find_free_slots",
     module: "APPOINTMENTS",
 });
+const page = defineTool({
+    ...readBookings,
+    name: "get_page",
+    capability: "site:read",
+    run: () => Promise.reject(new NotFoundException("Site not found")),
+});
 const write = defineTool({
     ...readBookings,
     name: "create_booking",
@@ -108,7 +114,7 @@ function bridge(
                 Promise.resolve({ gatesPassed: !off.includes(moduleKey) }),
         } as unknown as ModuleAvailabilityService,
     );
-    registry.register(readBookings, sensitive, slots, write, orders);
+    registry.register(readBookings, sensitive, slots, write, orders, page);
     const organizations = {
         resolve: jest.fn((userId: string, organizationId: string) => {
             const now = actions();
@@ -129,6 +135,7 @@ function bridge(
             "read_notes",
             "create_booking",
             "list_orders",
+            "get_page",
         ],
         draftTools: drafts ? ["create_booking"] : [],
     } as unknown as AgentDefinition;
@@ -292,6 +299,17 @@ describe("ToolBridge", () => {
         );
         expect(run.card).toBeUndefined();
         expect(run.output).not.toContain(CARD_SHOWN);
+    });
+
+    it("a page it can't read is said, never swapped for another (07 B-I2)", async () => {
+        const run = await bridge(() => ["site:read"]).run(
+            asker,
+            call("get_page"),
+            live,
+        );
+        expect(run).toMatchObject({ isError: true });
+        expect(run.output).toContain("Site not found");
+        expect(run.output).toContain(PAGE_UNREAD);
     });
 
     it("runs nothing once stopped", async () => {

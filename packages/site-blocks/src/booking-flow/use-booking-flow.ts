@@ -7,6 +7,7 @@ import { customerHandle } from "../account/api";
 import { timeWords } from "../lib/clock";
 import { useQrSource } from "../qr-source";
 import { useTestRelease } from "../test-release/context";
+import { markVisitStep } from "../visit-source";
 import type { BookingFlowProps } from "./booking-account";
 import type { WaitMode } from "./flow-words";
 import { blockOf, payWords } from "./flow-words";
@@ -67,6 +68,7 @@ export function useBookingFlow(
     const keys = useAttemptKeys();
     const times = useTimes({
         apiUrl,
+        siteId: props.siteId,
         services,
         first,
         initialDate,
@@ -199,6 +201,12 @@ export function useBookingFlow(
             : phase.kind === "paying" || phase.kind === "expired"
               ? "pay"
               : chooseStep;
+    // A time chosen is a booking started (DEC-235), once per visit, as an
+    // opened checkout is; the visit says which page it began on.
+    const started = step === "details" || step === "pay";
+    useEffect(() => {
+        if (started) markVisitStep("started");
+    }, [started]);
     // A booking made, or read by its reference, is named by that alone:
     // its ticket's address carries nothing of the choosing.
     const bookedRef =

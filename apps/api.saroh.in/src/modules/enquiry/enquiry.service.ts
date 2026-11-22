@@ -103,12 +103,14 @@ export class EnquiryService {
      * @param data            raw field name → value map as submitted
      * @param idempotencyKey  optional client key to dedupe double-submits
      * @param ipHash          sha256 of the source IP (never the raw IP), for rate-limiting
+     * @param pagePath        the site page the form was on (DEC-235); kept only as a public page's path
      */
     async submit(
         formId: string,
         data: Record<string, unknown>,
         idempotencyKey: string | undefined,
         ipHash: string | undefined,
+        pagePath?: string,
     ): Promise<EnquiryResult> {
         // 1. Load the Form. The org is taken from HERE, never from the client.
         const form = await prisma.form.findUnique({ where: { id: formId } });
@@ -251,6 +253,7 @@ export class EnquiryService {
                         formId,
                         leadId: lead.id,
                         submissionId: submission.id,
+                        pagePath,
                     }),
                 });
 

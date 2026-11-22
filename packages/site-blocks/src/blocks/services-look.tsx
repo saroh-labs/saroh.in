@@ -4,9 +4,11 @@ import type { LookId, RenderedServicesList } from "@saroh/block-contract";
 import { sectionFrameOf } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
+import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 import { LookIcon } from "../look-icons";
 import { useQrSource, withQrSource } from "../qr-source";
+import { SiteLink } from "../site-link";
 import {
     FRONT_RING,
     FRONT_TYPE,
@@ -65,7 +67,7 @@ export function SeeAllServices({
 }) {
     const source = useQrSource();
     return (
-        <a
+        <SiteLink
             href={withQrSource(href, source)}
             className={
                 look
@@ -77,7 +79,7 @@ export function SeeAllServices({
             }
         >
             See all services
-        </a>
+        </SiteLink>
     );
 }
 
@@ -112,7 +114,7 @@ export default function LookServices({
                 <LookEyebrow content={content} look={look} />
                 {heading ? (
                     <h2 data-site-title="" className={type.h2}>
-                        {heading}
+                        <EditableText field="heading">{heading}</EditableText>
                     </h2>
                 ) : null}
                 {intro ? (
@@ -122,7 +124,7 @@ export default function LookServices({
                             look === "quiet" && "min-[700px]:mx-auto",
                         )}
                     >
-                        {intro}
+                        <EditableText field="intro">{intro}</EditableText>
                     </p>
                 ) : null}
             </div>
@@ -272,7 +274,7 @@ function Rows({
                     : null;
                 const duration = formatDuration(service.durationMinutes);
                 const name = href ? (
-                    <a
+                    <SiteLink
                         href={href}
                         data-service-row-link=""
                         className={cn(
@@ -287,18 +289,19 @@ function Rows({
                         {look === "folio" ? (
                             <LookIcon name="arrow" look={look} size={16} />
                         ) : null}
-                    </a>
+                    </SiteLink>
                 ) : (
                     service.name
                 );
-                // VD01: the whole row is the way in, with no Book of its own.
-                const book = quiet ? null : href ? (
-                    <a
+                // Book stays in every look (U8: Quiet had dropped it); Quiet
+                // draws it as a 44px text link, the row still the way in.
+                const book = href ? (
+                    <SiteLink
                         href={href}
                         aria-label={`${words}: ${service.name}`}
                         className={frontButton(
                             look,
-                            "quiet",
+                            quiet ? "link" : "quiet",
                             cn(
                                 "relative z-10 shrink-0",
                                 // VB01's desk card books with a link.
@@ -308,11 +311,17 @@ function Rows({
                         )}
                     >
                         {words}
-                    </a>
+                    </SiteLink>
                 ) : label ? (
                     // The editor's canvas has no booking page: the words
                     // show, and go nowhere.
-                    <span className={frontButton(look, "quiet", "shrink-0")}>
+                    <span
+                        className={frontButton(
+                            look,
+                            quiet ? "link" : "quiet",
+                            "shrink-0",
+                        )}
+                    >
                         {label}
                     </span>
                 ) : null;

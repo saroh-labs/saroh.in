@@ -12,7 +12,6 @@ import {
     hasFooterFacts,
     lookFooterClasses,
 } from "./site-footer-contact";
-import type { SiteNavItem } from "./site-header-menu";
 
 /**
  * The foot of every page under a look (DEC-172, plan U5, #1092), as the
@@ -20,14 +19,14 @@ import type { SiteNavItem } from "./site-header-menu";
  *
  * - **Folio**: the name large in the display face with the business's own
  *   line under it and an outline Book; then the facts in columns (Find us
- *   with directions and the week, Get in touch, Pages, Your account); then
+ *   the hours, Visit with directions, Talk, Your account); then
  *   the closing row on a hairline.
  * - **Quiet**: the same, centred, in the warm footer band.
  * - **Live**: the name heavy and huge, the columns beside it on a desk.
  *
  * Every capability of Classic's footer stays: the places with directions
  * and their weeks, Call, the business's own WhatsApp chat link (DEC-172),
- * email and social links, the pages, the merchant's own words, "Sold by"
+ * email and social links, the merchant's own words, "Sold by"
  * with the registered address, Cookie choices, and on Free "Made with
  * Saroh" with Report. What a look adds: its Book as an OUTLINE (the view's
  * filled button is the page's own, or the bar's), "Your account" read in
@@ -93,7 +92,6 @@ export function LookFooter({
     block,
     action,
     contact,
-    menu,
     session,
     basePath,
     closing,
@@ -109,7 +107,6 @@ export function LookFooter({
     /** The site's main action, drawn as an outline here; none draws none. */
     action: { label: string; href: string } | null;
     contact: SiteContact | null;
-    menu: SiteNavItem[];
     session: SiteSession | null;
     basePath: string;
     /** "Made with Saroh" and Report on Free, as Classic's footer draws them. */
@@ -155,10 +152,9 @@ export function LookFooter({
         </div>
     );
     const folio = look === "folio";
-    const facts = hasFooterFacts(contact, menu) ? (
+    const facts = hasFooterFacts(contact) ? (
         <FooterContact
             contact={contact}
-            menu={menu}
             look={look}
             leading={folio ? lead : null}
             trailing={account}

@@ -34,6 +34,7 @@ export const SESSIONS_SHOWN = 10;
  */
 export function useTimes({
     apiUrl,
+    siteId,
     services,
     first,
     initialDate,
@@ -43,6 +44,8 @@ export function useTimes({
     fallbackZone,
 }: {
     apiUrl: string;
+    /** The site whose booking page this is; days are read through it. */
+    siteId: string;
     services: BookingService[];
     /** The service the page was opened on, if it offers it. */
     first: BookingService | null;
@@ -86,7 +89,7 @@ export function useTimes({
         (id: string, ask: DaysAsk = {}) => {
             const key = `${id}:${ask.skip ?? 0}:${ask.staffId ?? ""}`;
             wanted.current = key;
-            void fetchDays(apiUrl, id, ask).then((result) => {
+            void fetchDays(apiUrl, siteId, id, ask).then((result) => {
                 if (wanted.current !== key) return;
                 setDaysState(
                     result.ok
@@ -102,7 +105,7 @@ export function useTimes({
                 );
             });
         },
-        [apiUrl],
+        [apiUrl, siteId],
     );
 
     // The service the page was opened on (`?service=`) loads once, for

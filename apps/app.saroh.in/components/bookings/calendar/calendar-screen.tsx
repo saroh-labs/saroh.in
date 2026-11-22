@@ -23,6 +23,10 @@ import { NewBookingFromGap } from "@/components/bookings/free-time/new-booking-f
 import { OpenHoursDialog } from "@/components/bookings/free-time/open-hours-dialog";
 import { useGapTargets } from "@/components/bookings/free-time/use-gap-targets";
 import { BookingQuickLook } from "@/components/bookings/quick-look/booking-quick-look";
+import {
+    PendingRegion,
+    useScreenGo,
+} from "@/components/shared/page/screen-pending";
 import { PROFILE } from "@/lib/edition";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
@@ -238,8 +242,9 @@ export function CalendarScreen({
 
     const hrefFor = (l: CalendarLayout, d: LocalDate, who = person) =>
         calendarHref(l, d, { cancelled: cancelledShown, person: who });
-    const go = (l: CalendarLayout, d: LocalDate) =>
-        router.push(hrefFor(l, d), { scroll: false });
+    // In the screen's transition: the diary greys, the header stays.
+    const screenGo = useScreenGo();
+    const go = (l: CalendarLayout, d: LocalDate) => screenGo(hrefFor(l, d));
     const step = inWeek ? 7 : 1;
     const swipe = useSwipe({
         onPrevious: () => go(layout, addDays(date, -step)),
@@ -297,6 +302,7 @@ export function CalendarScreen({
                 calOnly={!can.book}
                 onAddPerson={addPerson}
             />
+            <PendingRegion>
             <div className="max-[759px]:touch-pan-y" {...swipe}>
                 {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
                 {staff === null ? (
@@ -441,6 +447,7 @@ export function CalendarScreen({
                     />
                 ) : null}
             </div>
+            </PendingRegion>
 
             <BookingQuickLook
                 block={peekBlock}

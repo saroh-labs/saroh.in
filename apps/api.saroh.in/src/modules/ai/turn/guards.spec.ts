@@ -40,6 +40,10 @@ describe("outcome table (spec §3.3)", () => {
             countsFor("ANSWERED", "What's my busiest day this year?", fresh),
         ).toBe(true);
         expect(countsFor("FAILED", "Anything", fresh)).toBe(false);
+        // The website editors' common questions don't count either.
+        expect(
+            countsFor("ANSWERED", "How could this section's words be clearer?", fresh),
+        ).toBe(false);
     });
     it("a starter counts after earlier turns, or with an about label (04-F5)", () => {
         const starter = "What's my busiest day this week?";

@@ -157,7 +157,7 @@ export function AccountMessages({
                                 >
                                     {m.text}
                                 </div>
-                                <div className="text-site-muted mt-[3px] text-[11px]">
+                                <div className="text-site-muted mt-[3px] text-[12px]">
                                     {meta(m)}
                                 </div>
                             </li>

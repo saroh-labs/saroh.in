@@ -16,6 +16,10 @@ export default function Loading() {
     return onePage ? (
         <SearchPageSkeleton />
     ) : (
-        <ConsolePageShape shape="list" label="Loading search pages" />
+        <ConsolePageShape
+            shape="list"
+            label="Loading search pages"
+            columns={6}
+        />
     );
 }

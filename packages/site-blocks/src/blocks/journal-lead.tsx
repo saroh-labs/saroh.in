@@ -1,4 +1,5 @@
 import { cn } from "../lib/utils";
+import { SiteLink } from "../site-link";
 
 /**
  * The Journal's `lead` look (template polish), as the blog design opens: the
@@ -50,7 +51,7 @@ export function JournalLead({
                 </p>
             ) : null}
             <Title className="font-site-heading mt-2 text-[calc(2.75rem*var(--site-heading-scale))] font-medium leading-[1.12] tracking-[-0.02em] [overflow-wrap:anywhere]">
-                <a
+                <SiteLink
                     href={post.href}
                     className={cn(
                         "rounded-[var(--site-radius)] underline-offset-[6px] hover:underline",
@@ -58,7 +59,7 @@ export function JournalLead({
                     )}
                 >
                     {post.title}
-                </a>
+                </SiteLink>
             </Title>
             {post.dek ? (
                 <p className="text-site-body mt-4 text-[21px] font-light leading-snug [text-wrap:pretty]">
@@ -83,7 +84,7 @@ export function JournalLead({
                 </div>
             ) : null}
             <p className="mt-6">
-                <a
+                <SiteLink
                     href={post.href}
                     className={cn(
                         "text-site-fg rounded-[var(--site-radius)] text-[17px] italic underline underline-offset-4",
@@ -92,7 +93,7 @@ export function JournalLead({
                 >
                     Continue reading
                     <span className="sr-only">: {post.title}</span>
-                </a>
+                </SiteLink>
             </p>
         </article>
     );

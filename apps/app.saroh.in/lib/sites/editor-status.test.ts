@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { EditorStatusInput } from "./editor-status";
 import { editorStatus, PENDING_UNKNOWN } from "./editor-status";
-import { shortPendingChanges } from "./pending";
 
 const base: EditorStatusInput = {
     saving: false,
@@ -24,35 +23,28 @@ const label = (over: Partial<EditorStatusInput>) =>
     editorStatus({ ...base, ...over }).label;
 
 describe("the editor's status pill", () => {
-    it("says Published when nothing is waiting", () => {
+    it("says Live when nothing is waiting", () => {
         expect(editorStatus(base)).toEqual({
-            label: "Published",
+            label: "Live",
             tone: "done",
         });
     });
 
-    it("says what publishing would put live", () => {
-        expect(label({ pending: "1 block" })).toBe("Not published · 1 block");
-        expect(label({ pending: "2 blocks, footer" })).toBe(
-            "Not published · 2 blocks, footer",
+    it("says how many changes wait, in the one status form (RULES §1)", () => {
+        expect(label({ pending: "1 change waiting" })).toBe(
+            "Live · 1 change waiting",
         );
-    });
-
-    it("counts the name and the footer typed in the inspector as not published (G6)", () => {
-        expect(label({ pending: shortPendingChanges(0, ["name"]) })).toBe(
-            "Not published · site name",
+        expect(label({ pending: "7 changes waiting" })).toBe(
+            "Live · 7 changes waiting",
         );
-        expect(
-            label({ pending: shortPendingChanges(1, ["name", "footer"]) }),
-        ).toBe("Not published · 1 block, site name, footer");
     });
 
     it("says a site that was never published is not published yet", () => {
         expect(label({ neverPublished: true, pendingKnown: false })).toBe(
-            "Not published yet",
+            "Not live yet",
         );
         expect(label({ neverPublished: true, pending: "1 block" })).toBe(
-            "Not published yet",
+            "Not live yet",
         );
     });
 
@@ -123,8 +115,8 @@ describe("the editor's status pill", () => {
                 pending: "1 block",
                 review: { ...approved, approvalIsStale: true },
             }),
-        ).toBe("Not published · 1 block");
+        ).toBe("Live · 1 block");
         // Published after the approval: nothing is waiting, so it is live.
-        expect(label({ review: approved })).toBe("Published");
+        expect(label({ review: approved })).toBe("Live");
     });
 });

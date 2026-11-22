@@ -1,8 +1,9 @@
-import type { BillingCycle, CatalogTax } from "@saroh/pricing-catalog";
+import type { BillingCycle, Catalog, CatalogTax } from "@saroh/pricing-catalog";
 import {
     addMonthsUtc,
     AUTOPAY_CHARGES_DEFAULT,
     CATALOG_PLAN_KEY_PREFIX,
+    regularYearlyPaise,
     taxPaise,
     withTaxPaise,
 } from "@saroh/pricing-catalog";
@@ -181,9 +182,33 @@ export interface ChangeQuote {
      */
     payNowTotalPaise: number;
     mandateCheck: MandateCheck;
+    /**
+     * The regular yearly price before tax, struck beside `pricePaise`, when
+     * the target is a yearly row charged at its plan's yearly offer
+     * (DEC-239); null or absent otherwise.
+     */
+    regularPricePaise?: number | null;
 }
 
 const YEAR_MONTHS = 12;
+
+/**
+ * The regular yearly price a yearly row's offer is struck against
+ * (DEC-239): set only when the row is yearly, its plan has a yearly offer
+ * on that version, and the row is charged below the regular price.
+ * Null otherwise. While it is set, the automatic launch coupon is skipped.
+ */
+export function yearlyOfferRegular(
+    catalog: Pick<Catalog, "yearly" | "plans"> | null,
+    planId: string,
+    target: Pick<QuotePlanRow, "interval" | "priceCents">,
+): number | null {
+    const plan = catalog?.plans.find((p) => p.id === planId);
+    if (!catalog || !plan || target.interval !== "year") return null;
+    if (plan.yearlyOfferPaise === undefined) return null;
+    const regular = regularYearlyPaise(catalog, plan);
+    return regular > target.priceCents ? regular : null;
+}
 
 /** The period's start, from its end: one cycle back, clamped to month end. */
 export function periodStart(end: Date, cycle: BillingCycle): Date {
@@ -298,6 +323,7 @@ export function quoteChange(input: QuoteInput): ChangeQuote {
     return {
         ...base,
         ...off,
+        regularPricePaise: input.regularPaise ?? null,
         firstChargePaise: first,
         firstChargeGstPaise: taxPaise(input.tax ?? "gst", first),
         firstChargeTotalPaise: firstTotal,
@@ -357,6 +383,8 @@ export interface QuoteInput {
     targetMonthlyPaise?: number;
     /** A coupon to apply, already checked as usable (the service's job). */
     coupon?: QuoteCoupon | null;
+    /** `yearlyOfferRegular` for the target: shown struck, never charged. */
+    regularPaise?: number | null;
 }
 
 type BaseQuote = Omit<

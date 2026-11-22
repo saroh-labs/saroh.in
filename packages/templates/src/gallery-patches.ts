@@ -7,6 +7,7 @@ import {
 } from "./templates/ceramics";
 import { CLINIC_GALLERY_SAMPLE, CLINIC_TEMPLATE_ID } from "./templates/clinic";
 import {
+    DEVELOPER_CASE_STUDY_PATH,
     DEVELOPER_GALLERY_SAMPLE,
     DEVELOPER_TEMPLATE_ID,
 } from "./templates/developer";
@@ -137,6 +138,35 @@ const BAKERY_PATCHES: readonly GallerySectionPatch[] = [
             ]),
         }),
     },
+    {
+        // v2's Answer panel (bakery@1's photo hero has none): Rye's line
+        // and its pickup words.
+        page: "/",
+        type: "hero",
+        patch: (content) =>
+            content.panel
+                ? {
+                      ...content,
+                      subheading: BAKERY_GALLERY_SAMPLE.lede,
+                      panel: {
+                          ...content.panel,
+                          ...BAKERY_GALLERY_SAMPLE.pickup,
+                      },
+                  }
+                : content,
+    },
+    {
+        // v2's `/order` band.
+        page: "/order",
+        type: "features",
+        patch: (content) => ({
+            ...content,
+            items: mergeItems(
+                content.items,
+                BAKERY_GALLERY_SAMPLE.order.map((body) => ({ body })),
+            ),
+        }),
+    },
 ];
 
 const CERAMICS_PATCHES: readonly GallerySectionPatch[] = [
@@ -160,6 +190,36 @@ const CERAMICS_PATCHES: readonly GallerySectionPatch[] = [
                 content.value,
                 CERAMICS_GALLERY_SAMPLE.studio.paragraphs,
                 CERAMICS_GALLERY_SAMPLE.studio.facts,
+            ),
+        }),
+    },
+    {
+        // v2's maker-first hero (ceramics@1's has no byline).
+        page: "/",
+        type: "hero",
+        patch: (content) =>
+            content.byline
+                ? {
+                      ...content,
+                      heading: CERAMICS_GALLERY_SAMPLE.hero.heading,
+                      subheading: CERAMICS_GALLERY_SAMPLE.hero.line,
+                      byline: {
+                          name: CERAMICS_GALLERY_SAMPLE.hero.maker,
+                          role: CERAMICS_GALLERY_SAMPLE.hero.role,
+                      },
+                  }
+                : content,
+    },
+    {
+        // v2's delivery band (ceramics@1 has one Features section).
+        page: "/",
+        type: "features",
+        nth: 1,
+        patch: (content) => ({
+            ...content,
+            items: mergeItems(
+                content.items,
+                CERAMICS_GALLERY_SAMPLE.delivery.map((body) => ({ body })),
             ),
         }),
     },
@@ -267,13 +327,69 @@ const STUDIO_PATCHES: readonly GallerySectionPatch[] = [
             address: STUDIO_GALLERY_SAMPLE.address,
         }),
     },
+    {
+        // v2's opening line (studio@1's hero is the hidden name).
+        page: "/",
+        type: "hero",
+        patch: (content) =>
+            content.variant === "centered"
+                ? {
+                      ...content,
+                      heading: STUDIO_GALLERY_SAMPLE.positioning.heading,
+                      subheading: STUDIO_GALLERY_SAMPLE.positioning.line,
+                  }
+                : content,
+    },
+    {
+        page: "/project",
+        type: "hero",
+        patch: (content) => ({
+            ...content,
+            heading: STUDIO_GALLERY_SAMPLE.projects[0].title,
+            subheading: STUDIO_GALLERY_SAMPLE.project.line,
+        }),
+    },
+    {
+        page: "/project",
+        type: "richText",
+        patch: (content) => ({
+            ...content,
+            value: prose(
+                content.value,
+                [],
+                STUDIO_GALLERY_SAMPLE.project.facts,
+            ),
+        }),
+    },
+    {
+        // The brief and what was made, under the template's part labels.
+        page: "/project",
+        type: "richText",
+        nth: 1,
+        patch: (content) => {
+            const html = typeof content.value === "string" ? content.value : "";
+            const labels = html.match(/<h3>[\s\S]*?<\/h3>/g) ?? [];
+            const { brief, made } = STUDIO_GALLERY_SAMPLE.project;
+            return {
+                ...content,
+                value: labels
+                    .map(
+                        (label, i) =>
+                            label + paragraphs([[brief, made][i] ?? ""]),
+                    )
+                    .join(""),
+            };
+        },
+    },
 ];
 
+// developer@2: Home's text blocks are the availability, then the intro;
+// the case study is on its own page.
 const DEVELOPER_PATCHES: readonly GallerySectionPatch[] = [
     {
         page: "/",
         type: "richText",
-        nth: 0,
+        nth: 1,
         patch: (content) => ({
             ...content,
             value: prose(
@@ -294,9 +410,8 @@ const DEVELOPER_PATCHES: readonly GallerySectionPatch[] = [
         }),
     },
     {
-        page: "/",
+        page: DEVELOPER_CASE_STUDY_PATH,
         type: "richText",
-        nth: 1,
         patch: (content) => ({
             ...content,
             value: caseStudy(content.value),
@@ -321,7 +436,7 @@ const DEVELOPER_PATCHES: readonly GallerySectionPatch[] = [
     {
         page: "/",
         type: "richText",
-        nth: 2,
+        nth: 0,
         patch: (content) => ({
             ...content,
             callout: { ...DEVELOPER_GALLERY_SAMPLE.availability },
@@ -335,6 +450,18 @@ const SALON_PATCHES: readonly GallerySectionPatch[] = [
         page: "/",
         type: "person",
         patch: (content) => team(content, SALON_GALLERY_SAMPLE.stylists),
+    },
+    {
+        // The Menu's groups as the design draws them (salon@2).
+        page: "/",
+        type: "servicesList",
+        patch: (content) => ({
+            ...content,
+            groups: SALON_GALLERY_SAMPLE.menu.map((g) => ({
+                name: g.name,
+                serviceIds: [...g.serviceIds],
+            })),
+        }),
     },
     {
         page: "/",

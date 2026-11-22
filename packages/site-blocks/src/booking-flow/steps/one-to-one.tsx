@@ -314,13 +314,13 @@ export function OneToOne({
                                 there is room: both drawn, one shown. The
                                 button's name is its aria-label. */}
                                     {compact ? null : (
-                                        <span className="mt-0.5 block text-[11px] max-[699px]:hidden">
+                                        <span className="mt-0.5 block text-[12px] max-[699px]:hidden">
                                             {dayCountLabel(d, false)}
                                         </span>
                                     )}
                                     <span
                                         className={cn(
-                                            "mt-0.5 block text-[11px]",
+                                            "mt-0.5 block text-[12px]",
                                             !compact && "min-[700px]:hidden",
                                         )}
                                     >
@@ -336,10 +336,10 @@ export function OneToOne({
                 <div className="mt-3">
                     <p className="text-site-body text-sm">
                         {asked
-                            ? `Nothing free with ${asked.name} in these two weeks. `
+                            ? `No open times with ${asked.name} in these two weeks. `
                             : weeks.skip > 0
-                              ? "Nothing free in these two weeks. "
-                              : "Nothing free in the next two weeks. "}
+                              ? "No open times in these two weeks. "
+                              : "No open times in the next two weeks. "}
                         Get in touch with {business} and they&apos;ll fit you
                         in.
                     </p>

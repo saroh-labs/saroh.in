@@ -40,7 +40,7 @@ const NONE: Promise<PacksRead> = Promise.resolve({
 
 /** The Class packs block's feed for a live page, or undefined without one. */
 export function getPacksFeed(
-    sections: readonly { type: string }[],
+    sections: readonly { type: string; content?: unknown }[],
     snapshot: Snapshot,
     siteId: string | null,
 ): Promise<PacksFeed | undefined> {
@@ -54,7 +54,7 @@ export function getPacksFeed(
  * preview never buys: it hands the block no actions.
  */
 export function getPreviewPacksFeed(
-    sections: readonly { type: string }[],
+    sections: readonly { type: string; content?: unknown }[],
     snapshot: Snapshot,
     siteId: string | null,
     token: string,

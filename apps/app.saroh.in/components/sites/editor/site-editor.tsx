@@ -1,5 +1,7 @@
 "use client";
 
+import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
+import { SITE_DRAFT_CHANGED } from "@/components/ask-ai/open";
 import { AddSectionDialog } from "@/components/sites/blocks/add-section-dialog";
 import { useAddBlock } from "@/components/sites/blocks/use-add-block";
 import { queryCanvas } from "@/components/sites/canvas/device-frame";
@@ -8,11 +10,19 @@ import {
     EditorCanvas,
 } from "@/components/sites/canvas/editor-canvas";
 import { useEditorViewport } from "@/components/sites/canvas/use-editor-viewport";
+import { BrandSheetActions as LegacyBrandSheetActions } from "@/components/sites/looks/legacy/brand-sheet-parts";
+import { lookChoices } from "@/components/sites/looks/look-picker";
 import { starterContentActions } from "@/components/sites/looks/starter-content-actions";
-import { BrandSheetActions } from "@/components/sites/looks/style-panel";
+import {
+    BrandAside,
+    BrandSheetActions,
+} from "@/components/sites/looks/style-panel";
 import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
+import type { PublishMore } from "@/components/sites/publish/publish-more";
 import { PublishSheet } from "@/components/sites/publish/publish-sheet";
+import type { DraftReadiness } from "@/components/sites/publish/use-publish";
 import { usePublish } from "@/components/sites/publish/use-publish";
+import { usePublishChanges } from "@/components/sites/publish/use-publish-changes";
 import { ReviewSheet } from "@/components/sites/review/review-sheet";
 import {
     reviewOwner,
@@ -26,21 +36,39 @@ import {
 } from "@/components/sites/test-releases/test-release-sheets";
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
 import { useTestReleases } from "@/components/sites/test-releases/use-test-releases";
+import { useWebsiteArea } from "@/components/sites/website-area";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
+import type { Section } from "@/lib/sites/service";
+import { siteStatus } from "@/lib/sites/site-status";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
 import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 import type { LookId } from "@saroh/block-contract";
+import type { EditableTextHost } from "@saroh/site-blocks";
+import type { ReactElement } from "react";
 import { useEffect, useRef, useState } from "react";
 import { BlockToolbar } from "./block-toolbar";
-import { SECTION_LABELS } from "./editor-constants";
+import type { EditorTopBarProps } from "./editor-bar";
+import { SECTION_LABELS, sectionTitle } from "./editor-constants";
+import type { EditorPanelsProps } from "./editor-panels";
 import { EditorPanels } from "./editor-panels";
-import { EditorRail } from "./editor-rail";
+import { EditorRail, railTabFor, selectRailTab } from "./editor-rail";
 import { EditorTopBar } from "./editor-top-bar";
 import { InspectorHost } from "./inspector-host";
+import { EverywhereBanner } from "./inspector/everywhere-banner";
+import { sectionActions } from "./inspector/section-actions";
+import { frameOf } from "./inspector/section-frame";
+import { SectionToolbar } from "./inspector/section-toolbar";
+import { SiteInspector } from "./inspector/site-inspector";
+import { historyAfterReload } from "./panels/history-panel";
+import { PhoneShell } from "./phone/phone-shell";
 import { EditorReadOnly, EditorReviewCan } from "./read-only";
+import { SaveFailedNotice } from "./save-failed";
+import type { EditorModel, TrailKey } from "./shell/editor-model";
+import { EditorShell } from "./shell/editor-shell";
 import type { SiteEditorProps } from "./site-editor-props";
+import { useEditorAskAi } from "./use-editor-ask-ai";
 import { useEditorDraft } from "./use-editor-draft";
 import { takePendingNote, useEditorJumps } from "./use-editor-jumps";
 import { useEditorLayout, useEditorSheets } from "./use-editor-layout";
@@ -53,7 +81,12 @@ import { useUndo } from "./use-undo";
 
 /**
  * SiteEditor (S2-004): the page's blocks beside a live `DraftPreview` of local
- * state. Since #260 this only composes: the state lives in the hooks in
+ * state. One editor for the whole site: opening another page (`?page=`) hands
+ * it the new page's props, and the page's state (the draft, its autosave, the
+ * Undo history, the canvas and inspector) starts again from them while the
+ * frame (the bar, the rail and its panels, the right column, Ask AI) stays
+ * mounted (docs/patterns/frontend-data-and-state.md, "Loading inside a
+ * screen"). Since #260 this only composes: the state lives in the hooks in
  * `editor/` (draft, style, header and footer text, selection, viewport,
  * review, publish, adding a block, jumping to a note, the layout for the
  * window and its sheets) and the drawing in its panels (top bar, rail,
@@ -74,6 +107,7 @@ export function SiteEditor({
     unreadableSections,
     initialPendingChanges,
     initialPendingSiteChanges,
+    initialPendingUnits = null,
     initialSections,
     initialRevision,
     siteName,
@@ -99,6 +133,9 @@ export function SiteEditor({
     reloadDraft,
     initialSheet = null,
     webAddressFix = null,
+    askAi = false,
+    siteIcon = null,
+    businessPhone = null,
 }: SiteEditorProps) {
     // Read-only (DEC-200) takes the owner's powers away whatever was sent.
     const canUpdateSite = canUpdateSiteProp && !readOnly;
@@ -130,6 +167,7 @@ export function SiteEditor({
         initialNeverPublished,
         initialPendingChanges,
         initialPendingSiteChanges,
+        initialPendingUnits,
         refreshReview: review.refreshReview,
         initialNeedsApproval: publishNeedsApproval,
         canOverride,
@@ -142,6 +180,14 @@ export function SiteEditor({
             void releaseState.readLive();
         },
     });
+    /*
+     * The Website area's shell (U46, KTD-E1): on a desk the new frame, on a
+     * phone today's until U49; off, today's chrome. All three run on the
+     * hooks below. The api's switch, through the layout (DEC-240).
+     */
+    const areaOn = useWebsiteArea();
+    // The changes by person, read as the Publish sheet opens (U11).
+    const publishChanges = usePublishChanges(siteId);
     const releases = {
         ...releaseState,
         abilities: {
@@ -176,6 +222,13 @@ export function SiteEditor({
         readOnly,
     );
     const { selection } = sheets;
+    // Another page opened: a sheet open over the last one closes, as a
+    // fresh editor's would. The frame itself stays (see the doc above).
+    const [sheetFor, setSheetFor] = useState(pageId);
+    if (sheetFor !== pageId) {
+        setSheetFor(pageId);
+        sheets.setSheet(null);
+    }
     // The editor's body, below the top bar: where its sheets are laid.
     const [body, setBody] = useState<HTMLDivElement | null>(null);
     const { setSelectedIndex, setRail, setInspector } = selection;
@@ -197,6 +250,8 @@ export function SiteEditor({
         initialStyle,
         styleOptions,
         onSaved: publish.markStylePending,
+        // Off, today's Brand panel and its Reset style (owner, 20 Nov).
+        legacyBrand: !areaOn,
     });
     const { style } = siteStyle;
     useEffect(() => {
@@ -208,6 +263,8 @@ export function SiteEditor({
         ...siteStyle,
         setSelectedIndex,
         readOnly,
+        // Ask AI's applied words start the editor afresh: its history stays.
+        carryKey: `${siteId}:${pageId}`,
     });
     /*
      * Anything not saved yet: the page, the look, the name or the footer.
@@ -217,6 +274,18 @@ export function SiteEditor({
         dirty || draft.saving || siteStyle.styleDirty || chrome.chromeDirty;
     // A link out waits for the editor's own save, and asks only when the
     // work can't save by itself.
+    // The chip's words (RULES §2), from Overview's number: the API's
+    // change units (KTD-E3), the two counts only when it sent none.
+    const status = siteStatus(
+        {
+            currentPublicationId: publish.neverPublished ? null : "live",
+            pendingSectionChanges: publish.pendingChanges,
+            pendingSiteChanges: publish.pendingSiteChanges,
+            pendingChanges: publish.pendingUnits,
+            hasUnpublishedChanges: false,
+        },
+        { reader: readOnly },
+    );
     const leaveGuard = useEditorLeave({
         unsaved,
         stuck:
@@ -224,6 +293,12 @@ export function SiteEditor({
             draft.conflict ||
             draft.saveError ||
             chrome.chromeFailed,
+        waiting: status.waiting,
+        // The page's save failed: Save and leave tries it once more.
+        save:
+            draft.saveError && !draft.conflict
+                ? () => draft.retry()
+                : undefined,
     });
 
     const add = useAddBlock({
@@ -376,216 +451,442 @@ export function SiteEditor({
               }
             : null;
 
+    // The page settings sheet (batch 1), opened from the picker or More.
+    const [settingsPage, setSettingsPage] = useState<string | null>(null);
+    const openCheck = (ready: DraftReadiness) => {
+        // An Undo pressed behind the check would change the draft being
+        // published (G-1).
+        if (!ready.dirty) {
+            edits.settleUndo();
+            void publishChanges.load();
+        }
+        return publish.openCheck(ready);
+    };
+    const desk = areaOn && layout !== "phone";
+    // History and Feedback are the shell's own rail tabs; Pages, Add and
+    // Brand are today's rail state, so a reload comes back to Brand.
+    const [trailExtra, setTrailExtra] = useState<"history" | "feedback" | null>(
+        historyAfterReload,
+    );
+    const railTab = railTabFor(selection.rail, add.adding && !readOnly);
+    const trail: TrailKey =
+        trailExtra ?? (railTab === "page" ? "pages" : railTab);
+    const openRail = (tab: TrailKey) => {
+        if (tab === "history" || tab === "feedback") {
+            setTrailExtra(tab);
+            add.setAdding(false);
+            return;
+        }
+        setTrailExtra(null);
+        selectRailTab(tab === "pages" ? "page" : tab, setRail, add.setAdding);
+    };
+    // Ask AI applied or undid new words in this site's draft (owner, 21
+    // Nov): read the draft again, unless the editor has work of its own
+    // not saved yet, which its save then meets as a conflict.
+    const unsavedNow = useRef(unsaved);
+    useEffect(() => {
+        unsavedNow.current = unsaved;
+    });
+    useEffect(() => {
+        const onChanged = (e: Event) => {
+            if ((e as CustomEvent<string>).detail !== siteId) return;
+            if (unsavedNow.current || !reloadDraft) return;
+            // Undo in the top bar takes Ask AI's words back too.
+            edits.carry();
+            reloadDraft(pageId);
+        };
+        window.addEventListener(SITE_DRAFT_CHANGED, onChanged);
+        return () => window.removeEventListener(SITE_DRAFT_CHANGED, onChanged);
+    }, [siteId, pageId, reloadDraft, edits]);
+    const askAiHere = useEditorAskAi({
+        siteId,
+        pageId,
+        pageTitle: pages.find((p) => p.id === pageId)?.title ?? "this page",
+        active,
+        chrome: selection.selectedChrome,
+    });
+    const model: EditorModel = {
+        ...{ siteId, pageId, pages, address: address ?? null, layout },
+        page: pages.find((p) => p.id === pageId),
+        siteName: chrome.displayName,
+        ...{ readOnly, canUpdateSite, canPublish, askAi: askAi && !readOnly },
+        unsaved,
+        status,
+        styleOptions,
+        canvasChrome,
+        addablePageKinds: addablePageKinds ?? [],
+        ...{ shopOpen, packsOpen, active, draft, selection, sheets, viewport },
+        ...{ edits, review, publish, publishChanges, siteStyle, chrome, add },
+        releases,
+        openPublish: () =>
+            void openCheck({
+                dirty,
+                onlyHeldBack: draft.onlyHeldBack,
+                heldBack: draft.heldBack,
+            }),
+        openPageSettings: (id) => setSettingsPage(id),
+        openRail,
+        jumpToNote,
+        trail,
+        scrollToSection: scrollToBlock,
+        reloadDraft: reloadDraft ? (page) => reloadDraft(page) : undefined,
+        businessPhone: readOnly ? null : businessPhone,
+        openAskAi: askAiHere.open,
+    };
+
+    // The selected section's toolbar on the desk canvas (U47), each with Undo.
+    const deskTools =
+        desk && !readOnly
+            ? (index: number) => {
+                  const section = sections[index];
+                  const act = sectionActions(model);
+                  return (
+                      <SectionToolbar
+                          label={sectionTitle(section)}
+                          index={index}
+                          count={sections.length}
+                          hiddenOnPhone={frameOf(section).hideOn === "phone"}
+                          onMove={(delta) => {
+                              edits.move(index, delta);
+                              setSelectedIndex(index + delta);
+                              scrollToBlock(index + delta);
+                          }}
+                          onDuplicate={() => act.duplicate(index)}
+                          onHideOnPhone={(hide) => act.hideOnPhone(index, hide)}
+                          onDelete={() => edits.removeAt(index)}
+                          onAskAi={
+                              model.askAi
+                                  ? () => model.openAskAi("section")
+                                  : undefined
+                          }
+                      />
+                  );
+              }
+            : undefined;
+
+    /*
+     * Typing on the page (U47d, `fix/WXKText`): the selected section's
+     * marked words on the desk canvas write the same draft field the
+     * inspector's input does, so the save, the change count and Undo
+     * are the inspector's. Never for a reader (DEC-200), never on a phone.
+     */
+    const textEdit =
+        desk && !readOnly
+            ? (index: number) =>
+                  inPlaceText(sections[index], (next) =>
+                      draft.replaceAt(index, next),
+                  )
+            : undefined;
+
+    /*
+     * Brand on a desk (`WXBBrand`, `WXBBrandLocked`): "On your plan" and
+     * "Changes to the look" with Reset stand where the inspector is.
+     */
+    const brandAside =
+        desk && trail === "brand" && canUpdateSite ? (
+            <BrandAside
+                style={style}
+                options={styleOptions}
+                rules={styleRules}
+                looksOffered={
+                    lookChoices({
+                        available: looksAvailable,
+                        draftLook: style.look ?? null,
+                        liveLook,
+                    }).length > 0
+                }
+                changes={siteStyle.lookChanges}
+                onReset={() => edits.resetStyle()}
+            />
+        ) : null;
+    const railEl = (
+        <EditorRail
+            hideTabs={desk}
+            phone={layout === "phone"}
+            onPicked={scrollToBlock}
+            {...selection}
+            {...siteStyle}
+            {...draft}
+            {...edits}
+            styleOptions={styleOptions}
+            {...add}
+            flagsBySection={flagsBySection}
+            notedKeys={review.notedKeys}
+            shopOpen={shopOpen}
+            packsOpen={packsOpen}
+            looks={{
+                available: looksAvailable,
+                liveLook,
+                published: !publish.neverPublished,
+                templateId,
+                error: siteStyle.lookError,
+                onChoose: siteStyle.chooseLook,
+                // Each look's Preview draws its showcase
+                // template, and offers its starter content to
+                // whoever may change the site (DEC-182).
+                preview: {
+                    pages,
+                    ...(canUpdateSite && starter ? { starter } : {}),
+                },
+            }}
+            styleRules={styleRules}
+            // Logo and tab icon (U24b): only for whoever may change the site.
+            siteIcon={canUpdateSite && siteIcon ? siteIcon : undefined}
+            // On a desk Brand's aside stands in the inspector's place.
+            asideHosted={brandAside !== null}
+            // Not a reader, and the look is refused to this role (C11).
+            styleDenied={!readOnly && !canUpdateSite}
+            // The site's template (DEC-216): changed by
+            // whoever may change the site, read by others.
+            templateRow={
+                templateRow ? (
+                    <TemplateRow
+                        source={templateRow}
+                        pages={pages}
+                        starter={canUpdateSite ? starter : null}
+                        look={style.look ?? null}
+                    />
+                ) : null
+            }
+            templateName={
+                templateRow
+                    ? (templateRow.templates?.find(
+                          (t) => t.id === templateRow.current,
+                      )?.name ?? null)
+                    : undefined
+            }
+        />
+    );
+    const canvasEl = (
+        <EditorCanvas
+            // The page's own region: drawn afresh for each page.
+            key={pageId}
+            {...viewport}
+            {...selection}
+            // A tapped section on a phone comes up to the top, above its
+            // sheet, rather than staying where the tap left the page.
+            setSelectedIndex={
+                layout === "phone"
+                    ? (index: number | null) => {
+                          setSelectedIndex(index);
+                          if (index !== null) scrollToBlock(index);
+                      }
+                    : setSelectedIndex
+            }
+            {...draft}
+            {...{
+                siteId,
+                pageId,
+                address,
+                pages,
+                styleOptions,
+            }}
+            blockTools={deskTools ?? blockTools}
+            textEdit={textEdit}
+            // A typeface being tried draws on the page unsaved.
+            style={siteStyle.trying ?? style}
+            trying={triedFace(siteStyle.trying, styleOptions)}
+            // Holds a page switch back (G-3).
+            dirty={unsaved}
+            neverPublished={publish.neverPublished}
+            canvasChrome={canvasChrome}
+            notesByKey={review.notesByKey}
+            changedByKey={review.changedByKey}
+            // The boards draw no window round the page (editor audit).
+            windowBar={!areaOn}
+            saveFailed={
+                <SaveFailedNotice
+                    draft={draft}
+                    // Pinned to the top of the canvas, so it is seen
+                    // wherever the page is scrolled (editor audit F3).
+                    className="sticky top-3 z-20 mx-auto mb-4 max-w-xl shadow-md"
+                />
+            }
+        />
+    );
+    const inspectorEl = brandAside ? (
+        <aside aria-label="Inspector" className="min-h-0 overflow-y-auto p-4">
+            {brandAside}
+        </aside>
+    ) : desk ? (
+        // The Website area's inspector (U47); off, or on a phone, today's.
+        <SiteInspector
+            key={pageId}
+            model={model}
+            activeFlags={activeFlags}
+            unreadableSections={unreadableSections}
+            onShowFlag={(flag) => jumpToFlag(flag.pageId, flag.sectionIndex)}
+        />
+    ) : (
+        <InspectorHost
+            key={pageId}
+            {...{ siteId, pageId, pages, styleOptions }}
+            {...selection}
+            {...draft}
+            {...edits}
+            {...review}
+            style={style}
+            active={active}
+            fixedText={chrome}
+            jumpToNote={jumpToNote}
+            activeFlags={activeFlags}
+            unreadableSections={unreadableSections}
+        />
+    );
+    // Today's bar and body; with the Website area on, the desk shell
+    // (U46) runs on the same props, and a phone keeps them until U49.
+    const topBar: ReactElement<EditorTopBarProps> = (
+        <EditorTopBar
+            {...{ siteId, address, pages, pageId, layout }}
+            publishedAt={publishedAt}
+            siteName={chrome.displayName}
+            {...draft}
+            // Site settings saved on their own clock: the look, the name
+            // and the footer. Publish waits for all three.
+            styleSaving={siteStyle.styleSaving || chrome.chromeSaving}
+            styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
+            saveError={draft.saveError || chrome.chromeFailed}
+            {...review}
+            {...publish}
+            openCheck={openCheck}
+            {...viewport}
+            openFeedback={() => setInspector("feedback")}
+            openSitePreview={() => {
+                // The whole site's Feedback, where a preview link is
+                // made, not a block's (UX-068): the shell's rail tab.
+                if (desk) return openRail("feedback");
+                setSelectedIndex(null);
+                setInspector("feedback");
+            }}
+            pageSettings={{ id: settingsPage, set: setSettingsPage }}
+            canUpdateSite={canUpdateSite}
+            addablePageKinds={addablePageKinds}
+            scheduled={releases.scheduled}
+            testRelease={testReleaseActions(releases)}
+            sheet={sheets.sheet}
+            setSheet={sheets.setSheet}
+            sheetHost={body}
+            reviewerVerdict={
+                !verdict ? undefined : layout === "phone" ? (
+                    <ReviewSheet
+                        {...verdict}
+                        review={review.review}
+                        loadFailed={review.loadFailed}
+                        onRetry={() => void review.refreshReview()}
+                        onSeeSettled={() => {
+                            // The whole site's Feedback, where the
+                            // settled notes are (RVD4).
+                            setSelectedIndex(null);
+                            setInspector("feedback");
+                        }}
+                        onDone={() => sheets.setSheet(null)}
+                    />
+                ) : (
+                    <TopBarVerdict {...verdict} />
+                )
+            }
+        />
+    );
+    const panels: ReactElement<EditorPanelsProps> = (
+        <EditorPanels
+            {...{ layout, viewport, sheets, selection }}
+            {...add}
+            dialogOpen={lookFor !== null || browsing}
+            hasSubject={active !== null || selection.selectedChrome !== null}
+            inspectorTitle={
+                selection.selectedChrome === "header"
+                    ? "Header"
+                    : selection.selectedChrome === "footer"
+                      ? "Footer"
+                      : // A Reviewer's Feedback sheet names its block (RVD1Phone).
+                        (selection.inspector === "feedback" && !readOnly) ||
+                          !active
+                        ? "Feedback"
+                        : SECTION_LABELS[active.section.type]
+            }
+            pageTitle={pages.find((p) => p.id === pageId)?.title ?? "this page"}
+            overlayOpen={publish.checking}
+            openNotes={review.openNotes}
+            brandActions={
+                !canUpdateSite ? undefined : !areaOn ? (
+                    <LegacyBrandSheetActions
+                        saving={siteStyle.styleSaving}
+                        dirty={siteStyle.styleDirty}
+                        onReset={() => edits.resetStyle()}
+                    />
+                ) : (
+                    <BrandSheetActions
+                        saving={siteStyle.styleSaving}
+                        dirty={siteStyle.styleDirty}
+                        onReset={() => edits.resetStyle()}
+                    />
+                )
+            }
+            body={body}
+            setBody={setBody}
+            rail={railEl}
+            canvas={canvasEl}
+            inspector={inspectorEl}
+            releases={
+                releases.available
+                    ? {
+                          open: releases.panelOpen,
+                          onClose: () => releases.setPanelOpen(false),
+                          content: (
+                              <TestReleasesPanel
+                                  siteId={siteId}
+                                  releases={releases}
+                              />
+                          ),
+                      }
+                    : undefined
+            }
+        />
+    );
+
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
         <EditorReadOnly.Provider value={readOnly}>
             <EditorReviewCan.Provider value={reviewCan}>
                 <div className="flex h-dvh flex-col bg-background text-foreground">
-                    <EditorTopBar
-                        {...{ siteId, address, pages, pageId, layout }}
-                        publishedAt={publishedAt}
-                        siteName={chrome.displayName}
-                        {...draft}
-                        // Site settings saved on their own clock: the look, the name
-                        // and the footer. Publish waits for all three.
-                        styleSaving={
-                            siteStyle.styleSaving || chrome.chromeSaving
-                        }
-                        styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
-                        saveError={draft.saveError || chrome.chromeFailed}
-                        {...review}
-                        {...publish}
-                        openCheck={(ready) => {
-                            // An Undo pressed behind the check would change the
-                            // draft being published (G-1).
-                            if (!ready.dirty) edits.settleUndo();
-                            return publish.openCheck(ready);
-                        }}
-                        {...viewport}
-                        openFeedback={() => setInspector("feedback")}
-                        openSitePreview={() => {
-                            // The whole site's Feedback, where a preview link is
-                            // made, not a block's (UX-068).
-                            setSelectedIndex(null);
-                            setInspector("feedback");
-                        }}
-                        canUpdateSite={canUpdateSite}
-                        addablePageKinds={addablePageKinds}
-                        scheduled={releases.scheduled}
-                        testRelease={testReleaseActions(releases)}
-                        sheet={sheets.sheet}
-                        setSheet={sheets.setSheet}
-                        sheetHost={body}
-                        reviewerVerdict={
-                            !verdict ? undefined : layout === "phone" ? (
-                                <ReviewSheet
-                                    {...verdict}
-                                    review={review.review}
-                                    loadFailed={review.loadFailed}
-                                    onRetry={() => void review.refreshReview()}
-                                    onSeeSettled={() => {
-                                        // The whole site's Feedback, where the
-                                        // settled notes are (RVD4).
-                                        setSelectedIndex(null);
-                                        setInspector("feedback");
-                                    }}
-                                    onDone={() => sheets.setSheet(null)}
-                                />
-                            ) : (
-                                <TopBarVerdict {...verdict} />
-                            )
-                        }
-                    />
-
-                    <EditorPanels
-                        {...{ layout, viewport, sheets, selection }}
-                        {...add}
-                        dialogOpen={lookFor !== null || browsing}
-                        hasSubject={
-                            active !== null || selection.selectedChrome !== null
-                        }
-                        inspectorTitle={
-                            selection.selectedChrome === "header"
-                                ? "Header"
-                                : selection.selectedChrome === "footer"
-                                  ? "Footer"
-                                  : // A Reviewer's Feedback sheet names its block (RVD1Phone).
-                                    (selection.inspector === "feedback" &&
-                                          !readOnly) ||
-                                      !active
-                                    ? "Feedback"
-                                    : SECTION_LABELS[active.section.type]
-                        }
-                        pageTitle={
-                            pages.find((p) => p.id === pageId)?.title ??
-                            "this page"
-                        }
-                        overlayOpen={publish.checking}
-                        openNotes={review.openNotes}
-                        brandActions={
-                            readOnly ? undefined : (
-                                <BrandSheetActions
-                                    saving={siteStyle.styleSaving}
-                                    dirty={siteStyle.styleDirty}
-                                    onReset={() => edits.resetStyle()}
-                                />
-                            )
-                        }
-                        body={body}
-                        setBody={setBody}
-                        rail={
-                            <EditorRail
-                                phone={layout === "phone"}
-                                onPicked={scrollToBlock}
-                                {...selection}
-                                {...siteStyle}
-                                {...draft}
-                                {...edits}
-                                styleOptions={styleOptions}
-                                {...add}
-                                flagsBySection={flagsBySection}
-                                notedKeys={review.notedKeys}
-                                shopOpen={shopOpen}
-                                packsOpen={packsOpen}
-                                looks={{
-                                    available: looksAvailable,
-                                    liveLook,
-                                    published: !publish.neverPublished,
-                                    templateId,
-                                    error: siteStyle.lookError,
-                                    onChoose: siteStyle.chooseLook,
-                                    // Each look's Preview draws its showcase
-                                    // template, and offers its starter content to
-                                    // whoever may change the site (DEC-182).
-                                    preview: {
-                                        pages,
-                                        ...(canUpdateSite && starter
-                                            ? { starter }
-                                            : {}),
-                                    },
-                                }}
-                                styleRules={styleRules}
-                                // The site's template (DEC-216): changed by
-                                // whoever may change the site, read by others.
-                                templateRow={
-                                    templateRow ? (
-                                        <TemplateRow
-                                            source={templateRow}
+                    {model.askAi ? <AskAiPageIs page={askAiHere.page} /> : null}
+                    {desk ? (
+                        <EditorShell
+                            model={model}
+                            bar={topBar.props}
+                            panels={panels.props}
+                            canvas={
+                                selection.selectedChrome ? (
+                                    // Header or footer: it changes every page.
+                                    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+                                        <EverywhereBanner
                                             pages={pages}
-                                            starter={
-                                                canUpdateSite ? starter : null
-                                            }
-                                            look={style.look ?? null}
+                                            onSeePages={() => openRail("pages")}
+                                            onBack={() => {
+                                                setSelectedIndex(null);
+                                                openRail("pages");
+                                            }}
                                         />
-                                    ) : null
-                                }
-                                templateName={
-                                    templateRow
-                                        ? (templateRow.templates?.find(
-                                              (t) =>
-                                                  t.id === templateRow.current,
-                                          )?.name ?? null)
-                                        : undefined
-                                }
-                            />
-                        }
-                        canvas={
-                            <EditorCanvas
-                                {...viewport}
-                                {...selection}
-                                {...draft}
-                                {...{
-                                    siteId,
-                                    pageId,
-                                    address,
-                                    pages,
-                                    styleOptions,
-                                }}
-                                blockTools={blockTools}
-                                // A typeface being tried draws on the page unsaved.
-                                style={siteStyle.trying ?? style}
-                                trying={triedFace(
-                                    siteStyle.trying,
-                                    styleOptions,
-                                )}
-                                // Holds a page switch back (G-3).
-                                dirty={unsaved}
-                                neverPublished={publish.neverPublished}
-                                canvasChrome={canvasChrome}
-                                notesByKey={review.notesByKey}
-                            />
-                        }
-                        inspector={
-                            <InspectorHost
-                                {...{ siteId, pageId, pages, styleOptions }}
-                                {...selection}
-                                {...draft}
-                                {...edits}
-                                {...review}
-                                style={style}
-                                active={active}
-                                fixedText={chrome}
-                                jumpToNote={jumpToNote}
-                                activeFlags={activeFlags}
-                                unreadableSections={unreadableSections}
-                            />
-                        }
-                        releases={
-                            releases.available
-                                ? {
-                                      open: releases.panelOpen,
-                                      onClose: () =>
-                                          releases.setPanelOpen(false),
-                                      content: (
-                                          <TestReleasesPanel
-                                              siteId={siteId}
-                                              releases={releases}
-                                          />
-                                      ),
-                                  }
-                                : undefined
-                        }
-                    />
+                                        {canvasEl}
+                                    </div>
+                                ) : (
+                                    canvasEl
+                                )
+                            }
+                            inspector={inspectorEl}
+                            brand={railEl}
+                            flagsBySection={flagsBySection}
+                        />
+                    ) : areaOn ? (
+                        <PhoneShell model={model} topBar={topBar}>
+                            {panels}
+                        </PhoneShell>
+                    ) : (
+                        <>
+                            {topBar}
+                            {panels}
+                        </>
+                    )}
 
                     <TestReleaseSheets
                         siteId={siteId}
@@ -625,6 +926,29 @@ export function SiteEditor({
 
                     <PublishSheet
                         open={publish.checking}
+                        siteId={siteId}
+                        changes={publishChanges}
+                        onFlagsChanged={() => void publish.refreshFlags()}
+                        onAsk={() => void review.askForReview()}
+                        more={publishMore(siteId, releases, publish.closeCheck)}
+                        // Tell people about the page open here, once live;
+                        // the home page when this one was left out.
+                        share={
+                            publish.siteAddress
+                                ? {
+                                      page:
+                                          (publishChanges.leftOut.has(
+                                              `page:${pageId}`,
+                                          )
+                                              ? homePage
+                                              : pages.find(
+                                                    (p) => p.id === pageId,
+                                                )) ?? pages[0],
+                                      business: chrome.displayName,
+                                      host: publish.siteAddress,
+                                  }
+                                : null
+                        }
                         phone={layout === "phone"}
                         pages={pages}
                         flags={publish.siteFlags.flags}
@@ -657,8 +981,8 @@ export function SiteEditor({
                             publish.setSiteAddress(host);
                             void publish.refreshFlags();
                         }}
-                        onPublish={() =>
-                            void publish.onPublish(chrome.displayName)
+                        onPublish={(choice) =>
+                            void publish.onPublish(chrome.displayName, choice)
                         }
                         onClose={publish.closeCheck}
                         onJump={jumpToFlag}
@@ -668,6 +992,72 @@ export function SiteEditor({
             </EditorReviewCan.Provider>
         </EditorReadOnly.Provider>
     );
+}
+
+/**
+ * The Publish sheet's other ways on (DEC-071): See versions, and the test
+ * links where they are on. Each closes the sheet for what it opens.
+ */
+function publishMore(
+    siteId: string,
+    releases: Parameters<typeof testReleaseActions>[0],
+    closeSheet: () => void,
+): PublishMore {
+    const actions = testReleaseActions(releases);
+    const then = (run: () => void) => () => {
+        closeSheet();
+        run();
+    };
+    return {
+        versionsHref: `/sites/${siteId}/versions`,
+        ...(actions
+            ? {
+                  testLinks: {
+                      count: actions.count,
+                      onOpen: then(actions.onOpenList),
+                  },
+                  // Scheduling is a test link's Go live › Schedule.
+                  onSchedule: then(actions.onOpenList),
+                  ...(actions.onMake
+                      ? { onShareTestLink: then(actions.onMake) }
+                      : {}),
+              }
+            : {}),
+    };
+}
+
+/**
+ * The fields a section's words may be typed into on the canvas (U47d): only
+ * those whose block draws the field as written, through an `EditableText`
+ * marker in `@saroh/site-blocks`. Anything else a marker sends is ignored.
+ */
+export const IN_PLACE_FIELDS: Partial<
+    Record<Section["type"], readonly string[]>
+> = {
+    hero: ["heading"],
+    faq: ["heading", "intro"],
+    features: ["heading", "intro"],
+    servicesList: ["heading", "intro"],
+    contact: ["heading", "intro"],
+    testimonials: ["heading"],
+};
+
+/** The host the canvas hands a section's markers, or none for its kind. */
+export function inPlaceText(
+    section: Section | undefined,
+    replace: (next: Section) => void,
+): EditableTextHost | undefined {
+    const fields = section ? IN_PLACE_FIELDS[section.type] : undefined;
+    if (!section || !fields) return undefined;
+    return {
+        onText: (field, text) => {
+            if (!fields.includes(field)) return;
+            replace({
+                ...section,
+                content: { ...section.content, [field]: text },
+            } as Section);
+        },
+    };
 }
 
 /** An editor's default: a reader's abilities are passed in by the page. */

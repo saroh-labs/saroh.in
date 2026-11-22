@@ -10,7 +10,7 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { styleChoiceRules } from "@/lib/sites/style-access";
 
 import { unreadableWords } from "./colour-picker";
-import { RESET_BODY, RESET_TITLE, StylePanel } from "./style-panel";
+import { resetBody, resetTitle, StylePanel } from "./style-panel";
 
 /**
  * The Brand tab's pickers (DEC-184): the typeface search tries a face on
@@ -121,6 +121,10 @@ function openTypefaces() {
     if (!picker) throw new Error("No typeface picker");
     return picker;
 }
+/** "Edit each colour" opens the six rows (U24b). */
+function openRows() {
+    act(() => host.querySelector<HTMLElement>("[data-edit-colours]")?.click());
+}
 const key = (el: Element, k: string) =>
     act(() => {
         el.dispatchEvent(
@@ -151,7 +155,7 @@ describe("the typeface search", () => {
         expect(rows(picker)).toEqual(["newsreader"]);
         type(input, "zzz");
         expect(rows(picker)).toEqual([]);
-        expect(picker.textContent).toContain("No typefaces match");
+        expect(picker.textContent).toContain("No fonts match");
     });
 
     it("tries the highlighted face on the page unsaved, and Escape puts it back", () => {
@@ -199,12 +203,12 @@ describe("the typeface search", () => {
     });
 });
 
-describe("Reset style…", () => {
+describe("Reset to <look>…", () => {
     const resetButton = () => {
         const b = Array.from(host.querySelectorAll("button")).find(
-            (el) => el.textContent === "Reset style…",
+            (el) => el.textContent === "Reset to Classic…",
         );
-        if (!b) throw new Error("No Reset style…");
+        if (!b) throw new Error("No Reset to Classic…");
         return b;
     };
     const confirmButton = (name: string) => {
@@ -221,34 +225,37 @@ describe("Reset style…", () => {
         const { onReset } = render();
         act(() => resetButton().click());
         const ask = document.querySelector('[role="alertdialog"]');
-        expect(ask?.textContent).toContain(RESET_TITLE);
-        expect(ask?.textContent).toContain(RESET_BODY);
+        expect(ask?.textContent).toContain(resetTitle(undefined));
+        expect(ask?.textContent).toContain(resetBody(undefined));
+        expect(resetTitle("quiet")).toBe("Reset to Quiet?");
         expect(document.activeElement?.textContent).toBe("Keep my style");
         act(() => confirmButton("Keep my style").click());
         expect(onReset).not.toHaveBeenCalled();
         expect(document.querySelector('[role="alertdialog"]')).toBeNull();
     });
 
-    it("resets on Reset style, which offers its Undo (useUndo)", () => {
+    it("resets on Reset to Classic, which offers its Undo (useUndo)", () => {
         const { onReset } = render();
         act(() => resetButton().click());
-        act(() => confirmButton("Reset style").click());
+        act(() => confirmButton("Reset to Classic").click());
         expect(onReset).toHaveBeenCalledTimes(1);
     });
 });
 
 describe("the colour rows", () => {
-    it("names each colour on its row, in the Brand tab's words", () => {
+    it("names each colour on its row, in the Brand panel's words", () => {
         render();
+        openRows();
         const row = (label: string) =>
             host.querySelector(`[data-colour-row="${label}"]`)?.textContent;
         expect(row("Page background")).toContain("Paper");
         expect(row("Text")).toContain("Ink");
-        expect(row("Hero")).toContain("Paper");
+        expect(row("Top of the page")).toContain("Paper");
     });
 
     it("strikes a text colour the page can't be read in, and says why", () => {
         render();
+        openRows();
         const text = host.querySelector<HTMLElement>(
             '[data-colour-row="Text"]',
         );
@@ -270,8 +277,9 @@ describe("the colour rows", () => {
 
     it("says when the Hero row changes nothing on this page", () => {
         render({ heroInText: true });
+        openRows();
         expect(host.querySelector("[data-hero-hint]")?.textContent).toBe(
-            "This hero uses your text colour. Change it in the hero block.",
+            "This top of the page uses your text colour. Change it in its section.",
         );
         render();
         expect(host.querySelector("[data-hero-hint]")).toBeNull();

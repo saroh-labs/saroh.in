@@ -232,7 +232,14 @@ describe("the waitlist's words", () => {
 
 describe("a full class on the booking page (A12)", () => {
     it("is closed, as before, when the site offers no waitlist", async () => {
-        render(<BookingFlow page={PAGE} account={account()} apiUrl="x" />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                account={account()}
+                apiUrl="x"
+            />,
+        );
         fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
         const full = await screen.findByRole("radio", { name: /Full/ });
         expect(full).toBeDisabled();
@@ -242,7 +249,14 @@ describe("a full class on the booking page (A12)", () => {
     it("joins the line with nothing to pay, and says how they'll hear", async () => {
         const wl = waitlist();
         const acc = account({ waitlist: wl });
-        render(<BookingFlow page={PAGE} account={acc} apiUrl="x" />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                account={acc}
+                apiUrl="x"
+            />,
+        );
         await pickFullSession();
 
         expect(screen.getByText("Waitlist")).toBeInTheDocument();
@@ -276,6 +290,7 @@ describe("a full class on the booking page (A12)", () => {
         const wl = waitlist();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 account={account({ customer: null, waitlist: wl })}
                 apiUrl="x"
@@ -312,6 +327,7 @@ describe("a full class on the booking page (A12)", () => {
         });
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 account={account({ waitlist: wl })}
                 apiUrl="x"
@@ -344,6 +360,7 @@ describe("a full class on the booking page (A12)", () => {
         });
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 account={account({ waitlist: wl })}
                 apiUrl="x"
@@ -366,7 +383,14 @@ describe("a full class on the booking page (A12)", () => {
             ],
         });
         const acc = account({ waitlist: wl });
-        render(<BookingFlow page={PAGE} account={acc} apiUrl="x" />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                account={acc}
+                apiUrl="x"
+            />,
+        );
         await pickFullSession(/Held for you until 3:00 pm/);
         fireEvent.click(confirmButton(/Book and pay at the desk/));
         expect(
@@ -396,6 +420,7 @@ describe("a full class on the booking page (A12)", () => {
         // else, held for Asha.
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 account={acc}
                 apiUrl="x"
@@ -435,6 +460,7 @@ describe("a full class on the booking page (A12)", () => {
         });
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 account={account({ waitlist: wl })}
                 apiUrl="x"

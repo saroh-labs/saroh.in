@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import { urls } from "../playwright.config";
-import { openMore, phoneSheet } from "./phone-editor";
+import { phoneSheet } from "./phone-editor";
 import { pressUntil } from "./press";
 
 /**
@@ -17,10 +17,27 @@ export const onPhone = (page: Page): boolean =>
 
 /**
  * The reviewer's one site, opened from Website: `/sites` → the site →
- * the editor, read-only. Returns the site's id.
+ * the editor, read-only (through All sites and Open editor while the
+ * Website area is on). Returns the site's id.
  */
 export async function openReviewedSite(page: Page): Promise<string> {
     await page.goto(`${urls.APP_URL}/sites`);
+    // The Website area (the api's WEBSITE_AREA, on in CI) lists the site
+    // at /sites: its card opens the Overview, whose Open editor opens it
+    // read-only. Off, /sites forwards straight to the editor.
+    if (new URL(page.url()).pathname === "/sites") {
+        await page
+            .getByRole("list", { name: "Your sites" })
+            .getByRole("link")
+            .first()
+            .click();
+        await page.waitForURL(/\/overview$/, { timeout: 30_000 });
+        await page
+            .getByRole("link", { name: /Open editor/ })
+            .filter({ visible: true })
+            .first()
+            .click();
+    }
     await page.waitForURL(/\/sites\/[^/?]+(\?.*)?$/, { timeout: 30_000 });
     await expect(page.locator("[data-layout]")).toBeVisible({
         timeout: 30_000,
@@ -31,12 +48,14 @@ export async function openReviewedSite(page: Page): Promise<string> {
 }
 
 /**
- * The first block drawn on the canvas, by its "Hero block, 1 of 4" name.
+ * The first block drawn on the canvas, by its "Top of the page section, 1 of 4" name.
  * The editor opens with it chosen ("…, selected"): a desk shows its
  * Feedback at once, a phone opens the sheet only when it is tapped.
  */
 export const firstBlock = (page: Page): Locator =>
-    page.getByRole("button", { name: /block, 1 of \d+(, selected)?$/ }).first();
+    page
+        .getByRole("button", { name: /section, 1 of \d+(, selected)?$/ })
+        .first();
 
 /**
  * The note box for the first block on the canvas. A Reviewer's inspector
@@ -51,11 +70,38 @@ export async function noteBoxForFirstBlock(page: Page): Promise<Locator> {
     return box;
 }
 
-/** The phone's "Your review" sheet, opened from the bar's Review. */
-async function reviewSheet(page: Page): Promise<Locator> {
+/**
+ * The phone's "Your review" sheet: from the bar's Review, or with the
+ * Website area on, from the reader bar's Approve or Ask for changes, which
+ * both open it (`fix/WXNStates`).
+ */
+export async function reviewSheet(page: Page): Promise<Locator> {
     const sheet = phoneSheet(page, "Your review");
+    if (await sheet.isVisible()) return sheet;
     await pressUntil(
-        page.getByRole("button", { name: "Review", exact: true }),
+        page
+            .getByRole("button", { name: "Review", exact: true })
+            .or(page.locator("[data-reader-bar]").getByRole("button").first()),
+        sheet,
+    );
+    return sheet;
+}
+
+/**
+ * What the phone's ⋯ More held: the More sheet, or with the Website area
+ * on, the page picker's Pages sheet, which holds it now (U49).
+ */
+export async function openPhoneMenu(page: Page): Promise<Locator> {
+    // A sheet on its way out still matches; a press there lands on nothing.
+    await expect(
+        page.locator('[role="dialog"][data-state="closed"]'),
+    ).toHaveCount(0);
+    const sheet = phoneSheet(page, "More").or(phoneSheet(page, "Pages"));
+    if (await sheet.isVisible()) return sheet;
+    await pressUntil(
+        page
+            .getByRole("button", { name: /^More: preview/ })
+            .or(page.getByRole("button", { name: /^Page: .*settings$/ })),
         sheet,
     );
     return sheet;
@@ -137,16 +183,31 @@ export async function changeYourReview(page: Page): Promise<Locator> {
     return button(page);
 }
 
-/** The editor's Test releases panel, from the bar or a phone's ⋯ More. */
+/**
+ * The editor's Test links panel: from a phone's menu ({@link openPhoneMenu}),
+ * the desk bar's button, or with the Website area on, the desk's ⋯ More.
+ */
 export async function openTestReleases(page: Page): Promise<Locator> {
-    const panel = page.getByRole("dialog", { name: "Test releases" });
-    const trigger = onPhone(page)
-        ? (await openMore(page)).getByRole("button", { name: /^Test releases/ })
-        : page
-              .getByRole("button", { name: /^Test releases/ })
-              .filter({ visible: true })
-              .first();
-    await pressUntil(trigger, panel, { timeout: 30_000 });
+    const panel = page.getByRole("dialog", { name: /^Test (releases|links)$/ });
+    if (onPhone(page)) {
+        const trigger = (await openPhoneMenu(page))
+            .getByRole("button", { name: /^Test (releases|links)/ })
+            .first();
+        await pressUntil(trigger, panel, { timeout: 30_000 });
+        return panel;
+    }
+    const item = page.getByRole("menuitem", { name: /^Test links/ });
+    await pressUntil(
+        page
+            .getByRole("button", { name: /^Test releases/ })
+            .or(page.getByRole("button", { name: /^More: find/ }))
+            .filter({ visible: true })
+            .first(),
+        item.or(panel),
+        { timeout: 30_000 },
+    );
+    if (await item.isVisible()) await item.click();
+    await expect(panel).toBeVisible();
     return panel;
 }
 

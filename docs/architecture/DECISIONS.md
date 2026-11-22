@@ -2343,7 +2343,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 ## DEC-181 Where a visit came from is counted only as totals, from links the business made in Saroh, like a cookieless analytics tool
 
-**Status: Accepted — 2026-10-21** · owner · follows the U15 privacy review (#1099); amends DEC-171 and plan A13
+**Status: Accepted — 2026-10-21** · owner · follows the U15 privacy review (#1099); amends DEC-171 and plan A13 · **superseded in part by DEC-235 (20 Nov 2026):** a started booking or checkout (`site.started`) and an enquiry now keep the site page's path; everything else here stands
 
 - Context:
     - The privacy review of site link tracking found that any `?ref=` value could be recorded (a booking id, a person's name) and that the visit's source was kept on the order, which makes it personal data once the order names a customer. The owner asked how Plausible does it: no cookies, no visitor id, a daily-rotating salt, totals only, and one line in the site owner's privacy policy instead of a banner.
@@ -3076,3 +3076,163 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context (owner, 20 Nov 2026): "Google Calendar should be with the other integrations, and also should be able to connect from the Bookings page." With a calendar in it, "Providers" read wrong; saroh.in already calls these integrations (`/integrations`).
 - Decision: **the Settings section is "Integrations" at `/settings/integrations`**, holding the business's payment, email and WhatsApp providers, its domains and, in its own group, the person's own Google Calendar (Connect, or Manage at `/settings/integrations/google-calendar`). The tab opens for anyone the calendar is switched on for, who then sees only their calendar. Bookings offers Connect in one dismissible line to someone who could connect and hasn't, and a lapsed account with Manage; nothing about the plan's lock.
 - Consequences: `/settings/providers/*` and `/settings/google-calendar` redirect (permanent, query kept), so Google's callback (`RETURN_PATH`), old links and stored notifications still land. Code names (`providers`, `comms-providers`) stay. The admin console's own Providers page is unchanged.
+
+## DEC-237 Merchant sites get component styles: free on every plan, set per kind of component, kept when the look changes
+
+**Status: Accepted — 2026-11-17, to design then build** · owner · extends DEC-172 (looks) and DEC-177 (which styles are paid)
+
+- Context (style system boards on Saroh App Designs 3, page "Site style system", 17 Nov 2026): a site is built tokens → components → blocks → templates. Today a merchant changes the look, colours and fonts; the owner asked that they can also change one kind of component without changing the whole look.
+- Decision:
+    - **Component styles** (buttons, cards, images, headings, spacing, slots and tags, links) are a layer under the look, set per kind of component, never per single instance, from a short list of options. They sit one level down in the Brand panel ("Customise components") with "Reset to <look>".
+    - **Free on every plan.** Unlike looks, colourways and fonts (DEC-177), no component style is paid.
+    - **Switching look keeps the merchant's changes by default**, and offers the new look's own defaults as the other choice.
+    - **Card corners, spacing and image corners are each the merchant's own choice.** Each look keeps today's defaults (Live's 24px photo corners, Folio's spacing); the merchant can change them.
+    - Guardrails: every option keeps 4.5:1 text and 44px targets, custom colours go through `deriveSafeColours`, no option hides a capability (Book stays), and changes wait for Publish like any edit.
+- **The services list has three layouts, all offered: List (today), Cards and Menu.** Every layout keeps Book, price and duration. Chosen per section like other block variants.
+- **Different text on phone** (owner, 17 Nov): a text can be "Same on phone" or "Shorter on phone"; an empty phone text falls back to the desktop one. Buttons may differ freely; body text may differ with a hint that search engines read the phone version; **the page's main heading (h1) and the page title never get a phone version**, they offer "Shorten it for both", because Google indexes the phone page and a page has one h1.
+- Consequences: `SiteStyle` gains a component-styles field (absent when nothing is changed, like `look` and `fontPair`, so untouched sites report no change); blocks draw shared components that read it; DEC-177's paid check ignores it.
+
+## DEC-228 A public site library on saroh.in, built on a 17-block catalogue
+
+**Status: Accepted — 2026-11-17, to design then build** · owner · follows DEC-237 · block map `~/.saroh-design-drafts/templates/BLOCK-MAP.md` (private drafts)
+
+- Context: the owner wants a library where merchants try out what their website can be made of (looks, components, blocks, templates) and that brings visitors to Saroh. `ui.saroh.in` today shows Saroh's own app UI and a rough block index.
+- Decision:
+    - **The public library lives on saroh.in** (better for search than a subdomain) and shows **only the merchant site system**: foundations and looks, components, blocks and templates, drawn live from the same code that renders merchant sites, never screenshots, never in Saroh's brand. Saroh's own app UI is not shown publicly; any internal showcase waits.
+    - **One registry** generated from the code feeds the library, the editor's Add panel, the template gallery and Ask AI / MCP.
+    - **Every page is server-rendered and indexable**, phone first. A toolbar tries looks, colourways, component styles, desk or phone and states. "Try it on your business" shows a block or template with a visitor's own name and town, saving nothing. "Use on my site" opens the editor's Add panel or sign-up. Pages follow DEC-222 (not-live features tagged) and DEC-225.
+    - **The catalogue is 17 blocks with about 45 layouts.** Contact and Hours merge into Visit us, and Packs into Plans; their old names stay in the Add panel and open the merged block. The hero gains an Answer panel (Today, Next free, Same-day call, Consultation, Pickup): a clinic's reads "Same-day? Call the desk", never a promise of emergency care. Subscribe is the one new block, held until the subscriber list ships with the Newsletter collection (sent by the business's own provider, DEC-174). "Places left" shows from a number the merchant sets, default 5. Pre-order and "Before you book" notes start as words the merchant types; the data comes with DEC-172's later gaps. Search pages are the real block-and-trade pairings, not one page per trade-named block.
+- Consequences: the existing `ui.saroh.in` stays as it is for now; the library's pages, registry and live preview are a build plan after the boards.
+- Owner picks, 2026-11-18 (accepted as recommended):
+    - Subscribe confirms by email before the address is added (double opt-in). The enquiry form gets an optional "Send me news" box, unticked by default.
+    - Menu groups in the Services Menu layout are typed on the block for now; service categories come later.
+    - "Label above" is hidden for new sections and kept where a section already uses it. The plans badge keeps "Most chosen". A Lookbook photo linked to a product reads "See the product".
+    - Visit us shows the shop photo, or no map, until a map provider exists. "Places left" takes a number from 1 to 10.
+    - The library lives at `saroh.in/website-library` with a menu entry; templates stay at `saroh.in/templates`. Per-block routes come later; the first build is one library page. "Try it" carries name, trade and colour into sign-up.
+
+## DEC-229 A customer's account on a merchant's site is one design that takes the site's theme
+
+**Status: Accepted — 2026-11-17** · owner · extends DEC-037, DEC-172 and DEC-237
+
+- Decision: the signed-in account on a merchant's site (home, bookings, orders, plan, messages, details, receipts, sign-in) has **one layout for every business, trade, template and look**. It matches the site through tokens only: the site's colours or colourway, fonts, the look's corners, type and motion, and the merchant's component styles (DEC-237). No template or look gets its own account screens.
+- Consequences: keeps today's approach (`packages/site-blocks/src/account/look-account-rules.ts`: one set of parts restyled by the look, held by `looks-account.test.tsx`). New account features are drawn once.
+- Owner picks, 2026-11-18: a GST number can be saved on the customer's account (needs an API field). Book again and Order again are built with DEC-172's later phases, not now.
+
+## DEC-230 One web address per business for now; more sites later choose a default
+
+**Status: Accepted — 2026-11-18** · owner · shapes the Website area redesign (plan website-area 2026-11-18, batch 6)
+
+- Context: the redesigned Website area draws a web address per site and an All sites list, but the code keeps one web address per business, and how a business will add more sites is planned but not settled.
+- Decision: for now the Website area shows **one web address: the business's default**, the one it selected. The All sites list and site switcher show one site until adding sites ships. When a business can add more sites, it **chooses which site keeps the default address**, and the other sites get addresses of their own.
+- Consequences: no per-site address field yet; the web address screen edits the business's default address. The site header, Overview and Links read that one address. Per-site addresses and "make this the default" are designed and built with the multi-site work.
+
+## DEC-231 The editor's price sheet changes the price in Services at once
+
+**Status: Accepted — 2026-11-20** · owner (O1) · website editor plan 2026-11-20-002, U48
+
+- Context: the editor's From Services list shows each service's price beside its section. A price drafted on the page and waiting for Publish would differ from the price bookings and bills charge, which is the wrong price the publish checks exist to catch.
+- Decision: tapping a price opens a sheet that **saves the price to the service in Services straight away**, through the service's own update, so the price history records who changed it and when. The sheet says "Changes it in Services and everywhere it shows" and "Bookings already made keep the price they were made at". It needs `service:write`; any other role sees the price read-only with who can change it. The price never appears in the Publish sheet and is never a change waiting to publish.
+- Consequences: `PRICE_WRITES_ON` is on in `price-sheet.tsx`; the read-only sheet with its link to Services stays as the view without `service:write`. The sheet's footer reads "Saved in Services · shows here at once". The pages, booking page and new bills all read the new price at once.
+
+## DEC-232 Restoring a version puts it back as the draft, not live
+
+**Status: Accepted — 2026-11-20** · owner · website editor plan 2026-11-20-002, U46b · changes #194's restore
+
+- Context: Restore in the editor's History and on Version history put an old version live at once, as a new publish.
+- Decision: **Restore <date> as the draft** copies the version's pages and sections into the current draft. Nothing goes live until Publish, which asks for approval like any publish. Each section it changes is stamped with the person restoring, so the Publish sheet lists every change as theirs. It needs the editor's own write (`section:write`), not `site:publish`; a reader can't restore. The confirm says "This replaces your draft with this version. It goes live only when you publish." A page removed since is skipped; a page added since stays; page settings, the menu and the look are not part of it.
+- Consequences: `POST …/sites/:siteId/publications/:publicationId/restore-draft` (revision checked for the open page, 409 when stale; audited as `site.version.restored_as_draft`). The editor reloads on History after a restore. The old make-it-live endpoint (`…/publications/:id/restore`) stays in the API, where the live pointer's `restore` source and its specs use it; the app no longer calls it.
+- Behind the Website area switch (owner, 20 Nov 2026; one api-held switch since DEC-240): with it off, Version history and a past version keep today's restore, which puts the version live again (`components/sites/versions/legacy/`, chosen by `restoresAsDraft()`).
+
+## DEC-238 A post's approval is a change unit; Publish post becomes Send for approval when the switch is on
+
+**Status: Accepted — 2026-11-20** · owner (O7 of the website editor redesign plan) · extends DEC-226 · keeps DEC-103
+
+- Context: posts went live past "Publishing needs approval": a post publishes on its own, outside the site's Publish, so a teammate's post never waited for anyone.
+- Decision: with "Publishing needs approval" on, a teammate who is not the owner or an admin presses **Send for approval** instead of Publish post, with an optional note and "As soon as it is approved" or "After approval, on a day I pick". **Any reviewer, admin or owner other than the post's last editor** can approve, and approving publishes the post now, or on the day the writer picked. Ask for changes needs a reason (UX-043). Owner and admin posts need no approval (DEC-103).
+- Consequences: the post is one change unit, `post:<postId>`, in the same approval records as a site's changes (DEC-226): the approval binds to the post's fingerprint, so a later edit voids it, and nobody approves their own writing. The API refuses a teammate's unapproved publish or schedule with the site's approval words (409), and the scheduled go-live checks approval again. Sending is a `sent` revision in the post's History, approving an `approved` one. No new table.
+- Behind the Website area switch (owner, 20 Nov 2026): the api's `WEBSITE_AREA`, the one switch since DEC-240; off, posts publish and schedule as before and the three approval routes are a 404.
+
+## DEC-235 A started booking or checkout and an enquiry keep the site page they came from
+
+**Status: Accepted — 2026-11-20** · owner · website editor plan 2026-11-20-002 (KTD-E8, "This page · last 7 days") · supersedes in part DEC-181 and the U15 privacy review's "no path on a visit's steps"
+
+- Context: the editor's inspector says what one page brought in the last 7 days. Visits had a path; enquiries kept only their form and lead ids, and a visit's steps no path at all (U15 privacy review, DEC-181), so a page could never honestly say "6 bookings started · 2 questions".
+- Decision:
+    - **Recorded:** the path of a site page, and nothing else about it, on two events. `enquiry.submitted` keeps the path of the page the form was on. `site.started` keeps the path of the last site page the visit saw before the booking page or the checkout (the page that sent the visitor); a visit that landed on the booking page itself keeps none. A booking counts as started when a time is chosen, as a checkout counts when it opens, once per visit.
+    - **Never recorded:** the query string or the fragment, a trailing slash, anything that isn't a site path (an address with a host, a path with spaces or control characters, over 2,048 characters), and any private page or the account area: the one list in `@saroh/block-contract` (`PRIVATE_PATH_PREFIXES`) that keeps the trackers off and the page-view beacon silent. The other steps (`site.visit`, `site.looked`, `site.paid`) still carry no path; no visitor, order, booking, customer or anything typed is added to any event.
+    - **Older events keep counting** in the site's totals and Insights; they just don't count for a page. A page's part says "since <date>" from the first day it counted by page, never a 0 it didn't measure. No back-fill.
+- Consequences: `sitePagePathOf` in `packages/block-contract/src/private-paths.ts` is the one rule, used by the site (`visit-source.ts`, `blocks/enquiry.tsx`, `lib/site-view.ts`) and again by the API contract (`analytics/event-contract.ts`), which drops a path it may not keep and still counts the event. The public enquiry endpoint takes an optional `pagePath`. The daily rollups already break `site.started` and `enquiry.submitted` down by path (U47a). Saroh's privacy policy says in one line that a site counts which page a booking was started or a question sent from: a minimal factual addition for the owner to review, as earlier ones were.
+- Rules: `docs/patterns/saroh-product.md` → "what visit tracking collects".
+
+## DEC-236 Ask AI in the editors knows the page, section or post it was opened on, reads the site, and drafts a section's words on a Now and New card
+
+**Status: Accepted — 2026-11-21** · owner ("the ask AI should be context aware about the sections it is clicked on")
+
+- Context: in the site and post editors Ask AI fell back to the whole business ("November vs October"), whichever button opened it, and had no tool to read the site, so it couldn't talk about the words on the page.
+- Decision:
+    - **Three more kinds of `about`:** `site_page` (id `<siteId>:<pageId>`, label "Home page"), `site_section` (`<siteId>:<pageId>:<sectionKey>`, "Home · Top of the page"; the header and footer are "On every page · Header") and `post` (`<siteId>:<postId>`, the post's title). The site's id travels because `get_page` needs it. The label stays only a name, never an instruction.
+    - **Where it was opened decides:** the top bar, Find and the phone page menu ask about the page; a section's toolbar or sheet about that section, and choosing a section moves the panel to it; everything in the post editor about the post. One editor-level state (`useEditorAskAi`) renders `<AskAiPageIs>`; the buttons only say "page" or "section". Clearing the label still asks about the whole business (AF 7).
+    - **Ask AI reads the site:** `get_site` and `get_page` join its tools as reads, through the same tool bridge and checks as the MCP tools (`site:read`, the Website module, the person's live role). It suggests words to copy and never adds a price, offer, time, phone number or claim the person didn't give. There is no post read tool, so for a post it works from the title and what it is told.
+    - **Six more common questions** (two per screen) are asked as written and don't count.
+    - **Where it lives (owner, 21 Nov):** at the desk Ask AI is a tab of the editors' right column, Edit · Ask AI, not a sheet over the page. The section toolbar's and the post format bar's Ask AI, the tab and ⌘J open it; with a section chosen it is about that section, otherwise the page or the post. The conversation is held by the editor layout, so switching tabs keeps it. The column drags from 320 to half the window, each tab's width remembered under its own key. The desk top bar and the post rail no longer carry Ask AI; the phone keeps its button and the full-screen sheet. Desk · Tablet · Phone and the zoom moved from More to the canvas bar (a reader may use them), and Redo sits beside Undo.
+    - **Now and New (a narrow first cut of U42/U43):** one draft tool, `edit_section`, changes a section's heading, the line under it or its main button's words, through the MCP tool of the same name and the editor's own draft save (`section:write`; never a Reviewer, never live). The card names the section, shows Now and New with the changed words marked and what it is based on, then Apply and Not now; Apply says "Saved · goes live when you publish" and Undo puts the old words back. The open editor reads its draft again.
+    - **Check this is the server's:** facts in the new words the business never gave (a price not in Services, an offer or percentage not in Discounts, a time not in its hours, "free", a phone number, a number with a claim such as "20 years", none of them on the page now) are marked on the card; Apply stays off until each is ticked, and Confirm refuses while any is unconfirmed. The person's own question doesn't count as giving a fact: they confirm it on the card.
+- Consequences: other section fields, pictures, adding, moving or removing sections, pages and settings stay out of Ask AI; a post can't be read by Ask AI (no post read tool). Editing a flagged fact on the card, rather than confirming it, is left for the full U43.
+
+## DEC-239 A yearly offer price per plan; the launch coupon doesn't stack on it
+
+**Status: Accepted — 2026-11-20** · owner
+
+- Context (owner, 20 Nov 2026): Grow and Pro are sold yearly as well as monthly. The catalogue's yearly rule ("pay for N months, get 12") gave one yearly price per plan, and the monthly launch offer (an automatic coupon) also came off a year.
+- Decision:
+    - **The regular yearly price** stays the catalogue's rule, "pay for N months, get 12" (`yearly.paid`).
+    - **Each paid plan may have a yearly offer price** (`yearlyOfferPaise`, before tax, above nothing and below the regular yearly price), set in Admin › Plans in the plan's sheet. When set, it is what a yearly buyer is charged: the plan's yearly row and its provider plan are priced at it. Absent: the regular yearly price is charged, as before.
+    - **The page leads with the offer price**, the regular yearly price struck through beside it, "a year, paid once" and the about-a-month line worked out from the offer. The "pay for N months, get 12" line is not shown while a plan has a yearly offer ("Billed yearly, one payment for the year." instead). Checkout shows the regular price struck beside the charged one.
+    - **The automatic launch coupon doesn't apply to a year at its yearly offer**: the offer is yearly's launch price. Typing that coupon's code on such a year is refused; other typed codes follow the existing coupon rules.
+    - **Extras on that year (packs, seats) do get the launch offer's percent, only inside the subscription's first months** (the automatic coupon's months, counted from the day the yearly plan started, never from the extra's own start): an extra bought at purchase or during those months has the percent taken off the part of its charge that falls in them. From then on every extra is at its regular price, including ones added later and a renewal year's. Only for a business the launch offer is for (no Saroh plan invoice or launch offer before that year), only a percent coupon, and it takes no place of the coupon's. A coupon still never comes off a monthly plan's add-ons.
+    - **The Monthly/Yearly switch** says "Yearly · save up to X%" while any plan has a yearly offer: X is the largest saving across the paid plans of the charged yearly price against 12 months at the regular monthly price, rounded down to a whole percent, worked out from the catalogue. Without a yearly offer it keeps "Yearly · N months free".
+    - **Pricing and checkout say, near the yearly price:** "We don't refund payments, including a yearly plan cancelled early. If you're ever charged twice, the extra charge is refunded on its own." The Terms already say the same and are unchanged.
+- Consequences: the real offer prices go into the catalogue, never the repo. One helper pair (`regularYearlyPaise`, `chargedYearlyPaise`) is the only place a yearly price is worked out; the version diff and the publish comparison name the offer.
+
+## DEC-240 The Website area switch is one API-held switch; with it off, site publishing and every new route behave as before
+
+**Status: Accepted — 2026-11-21** · owner (21 Nov 2026 security review of website-editor-redesign, E1 and E2) · narrows DEC-226 and DEC-238 to the switch · keeps DEC-047, DEC-071 and DEC-103
+
+- Context: the redesign had two switches set apart, the api's `WEBSITE_AREA` and the app's `NEXT_PUBLIC_WEBSITE_AREA`. When they disagreed a teammate's post could be held for approval with no Send for approval to free it, or Send for approval could 404. And per-change site approval (DEC-226) applied whatever the switch said, so shipping the branch would have changed Publish in production with the area off.
+- Decision:
+    - **One switch, held by the api** (`WEBSITE_AREA`; unset is on only under `NODE_ENV=development`). The app keeps none: it asks `GET /website-area` once per request on the server and hands the answer to client components through `WebsiteAreaProvider`. An answer it can't read is off. `NEXT_PUBLIC_WEBSITE_AREA` is gone, and `pnpm check:website-area-switch` (prepush and CI) refuses it coming back. Development and CI set `WEBSITE_AREA=on`, so the browser specs still walk the area.
+    - **Off, site publishing is what it was before the area:** a publish takes the whole draft (`leaveOut` is ignored), "Publishing needs approval" refuses a direct publish whole with `APPROVAL_REQUIRED` unless an owner overrides (DEC-071), and a whole-draft review verdict stays advisory and writes no per-change verdicts (DEC-047). Posts publish as before (DEC-238).
+    - **Off, every route the area added answers 404** (`WebsiteAreaSwitchGuard`): a site's changes and their approve and ask, Undo one change, restore as the draft, page results, service uses, Overview, the merchant's redirects, Duplicate page, and a post's schedule, checks, revisions and approval routes. Today's routes and the public reads saroh.app needs are untouched.
+    - **On, nothing changes** from DEC-226 and DEC-238. A whole-draft Approve or Ask for changes on a plan without review stays advisory, as before: it records the verdict and tells the team, and answers no change (R5).
+- Consequences: the switch is turned on by setting one variable on the api and redeploying it; the app follows on its next request. The app's legacy editor calls none of the 404 routes with the area off (its Publish sheet lists what goes live as before).
+
+## DEC-241 The Brand panel's "Colours from my brand colour" relaxes DEC-090
+
+**Status: Accepted — 2026-11-21** · owner-approved Brand panel design (20–21 Nov 2026) · relaxes [DEC-090](#dec-090-a-template-carries-its-own-exact-palette-and-type-scale) · keeps DEC-177
+
+- Context: DEC-090 let a site carry an exact palette only as one of its template's colourways or the one it already holds; merchants chose only from curated choices. The redesigned Brand panel offers "Colours from my brand colour".
+- Decision: **a merchant may set one brand colour (`#RRGGBB`) and get a whole palette from it.** The palette is generated on the server from that one hex (`brandPalette`), never sent by the app, and every text pairing in it passes the same 4.5:1 contrast check, so it can't produce an unreadable site. It is the merchant's own colour, so it is free on every plan (DEC-177). There is still no free colour picker per role, and the type scale still has no control of its own.
+- Consequences: `Site.style.brandColour` is stored with the palette made from it; anything else that isn't a template colourway or the one already held is still refused, as DEC-090 says.
+
+## DEC-242 No GSTIN on Global, and no yearly offer on saroh.tech before paid plans are on sale
+
+**Status: Accepted — 2026-11-21** · owner (21 Nov 2026 security review, E3 and E4) · follows DEC-211
+
+- A Global business's customers can't save a GSTIN and Global invoices never carry one (E3).
+- saroh.tech shows no yearly offer until paid plans are on sale (E4, follows DEC-211).
+
+## DEC-243 Post history and page analytics are bounded
+
+**Status: Accepted — 2026-11-21** · owner (21 Nov 2026 security review, 02 W5/W7 and 04 W6)
+
+- Post history keeps the newest 200 autosave, Ask AI and restore versions per post, plus every sent, approved and published one, pruned in the daily analytics retention run.
+- Page-level analytics rows exist only for a site's real pages.
+
+## DEC-244 Content-Security-Policy is enforced with a per-request nonce
+
+**Status: Accepted — 2026-11-21** · owner (21 Nov 2026 security review, 06 L2 / 07 B-I3 / 08 #1)
+
+- Content-Security-Policy is enforced with a per-request nonce on app, admin, accounts and merchant sites.
+- Policy: no `'strict-dynamic'` (a nonce-less injected script must stay blocked), no `'unsafe-inline'` scripts, `'unsafe-eval'` only in development, and `style-src` keeps `'unsafe-inline'` (React style props, Radix and next/font).
+- Third-party scripts only from named hosts; on merchant sites, those are the supported trackers' hosts and the payment and Turnstile hosts.
+- next.config sends no CSP (on Workers it would replace the middleware's nonce header); `check:security-headers` guards this.

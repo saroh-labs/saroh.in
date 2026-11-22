@@ -54,75 +54,6 @@ export class PublicBookingsController {
     constructor(private readonly bookings: PublicBookingsService) {}
 
     /**
-     * The services a website's services list shows, `?ids=a,b,c`, in that
-     * order (#255). Only services that may be offered come back; see
-     * {@link PublicBookingsService.publicServices}.
-     */
-    @Get()
-    services(@Query("ids") ids?: unknown): Promise<PublicService[]> {
-        // `?ids=a&ids=b` arrives as an array; only one comma list is accepted.
-        if (ids !== undefined && typeof ids !== "string") {
-            throw new BadRequestException("ids must be a comma-separated list");
-        }
-        const list = [
-            ...new Set(
-                (ids ?? "")
-                    .split(",")
-                    .map((id) => id.trim())
-                    .filter(Boolean),
-            ),
-        ];
-        if (list.length > MAX_PUBLIC_SERVICE_IDS) {
-            throw new BadRequestException(
-                `At most ${MAX_PUBLIC_SERVICE_IDS} services at a time`,
-            );
-        }
-        return this.bookings.publicServices(list);
-    }
-
-    /**
-     * Open slots for a bookable service over `?from=&to=` (ISO instants),
-     * optionally for one person (`?staffId=`). Inside the business's booking
-     * rules; a person appears only as an opaque id (U3).
-     */
-    @Get(":serviceId/availability")
-    availability(
-        @Param("serviceId") serviceId: string,
-        @Query("from") from: string,
-        @Query("to") to: string,
-        @Query("staffId") staffId?: string,
-    ): Promise<AvailableSlot[]> {
-        return this.bookings.publicAvailability(serviceId, from, to, staffId);
-    }
-
-    /**
-     * The booking page's next two weeks for a service (U19): each day open or
-     * not, with its free starts — or, for a class, every session with its
-     * places left. People by display name and opaque id only.
-     *
-     * `?skip=14` is the two weeks after ("Show later dates"), up to
-     * {@link MAX_DAYS_SKIP} days on; `?staffId=` keeps to one of the people
-     * who take it ("With: Asha"). Anything else in either reads as not
-     * asked: the next two weeks, with whoever is free.
-     */
-    @Get(":serviceId/days")
-    @Header("Cache-Control", "no-store")
-    days(
-        @Param("serviceId") serviceId: string,
-        @Query("skip") skip?: string,
-        @Query("staffId") staffId?: string,
-    ): Promise<PublicDays> {
-        return this.bookings.publicDays(serviceId, new Date(), {
-            skip: daysSkipOf(skip),
-            staffId:
-                typeof staffId === "string" &&
-                /^[A-Za-z0-9_-]{1,64}$/.test(staffId)
-                    ? staffId
-                    : null,
-        });
-    }
-
-    /**
      * Where a pay-now hold stands (U19), by the pay token its booking
      * answered with: what the page polls while its booker pays.
      */
@@ -147,15 +78,6 @@ export class PublicBookingsController {
         @ClientAddress() ip: string,
     ): Promise<PublicHold> {
         return this.bookings.releasePublicHold(token, hashClientIp(ip));
-    }
-
-    /**
-     * Who takes a service: a display name and an opaque id each (U3). Never
-     * their hours, and never whether or why they are off.
-     */
-    @Get(":serviceId/staff")
-    staff(@Param("serviceId") serviceId: string): Promise<PublicStaff[]> {
-        return this.bookings.publicServiceStaff(serviceId);
     }
 
     /**
@@ -228,6 +150,101 @@ export class PublicBookingPageController {
         private readonly today: PublicTodayService,
         private readonly timetable: PublicTimetableService,
     ) {}
+
+    /**
+     * The services a website's services list shows, `?ids=a,b,c`, in that
+     * order (#255), of this site's own business only (07 B-L2). Only services
+     * that may be offered come back; see
+     * {@link PublicBookingsService.publicServices}.
+     */
+    @Get(":siteId/services")
+    services(
+        @Param("siteId") siteId: string,
+        @Query("ids") ids?: unknown,
+    ): Promise<PublicService[]> {
+        // `?ids=a&ids=b` arrives as an array; only one comma list is accepted.
+        if (ids !== undefined && typeof ids !== "string") {
+            throw new BadRequestException("ids must be a comma-separated list");
+        }
+        const list = [
+            ...new Set(
+                (ids ?? "")
+                    .split(",")
+                    .map((id) => id.trim())
+                    .filter(Boolean),
+            ),
+        ];
+        if (list.length > MAX_PUBLIC_SERVICE_IDS) {
+            throw new BadRequestException(
+                `At most ${MAX_PUBLIC_SERVICE_IDS} services at a time`,
+            );
+        }
+        return this.bookings.publicServices(siteId, list);
+    }
+
+    /**
+     * The booking page's next two weeks for a service (U19): each day open or
+     * not, with its free starts — or, for a class, every session with its
+     * places left. People by display name and opaque id only.
+     *
+     * `?skip=14` is the two weeks after ("Show later dates"), up to
+     * {@link MAX_DAYS_SKIP} days on; `?staffId=` keeps to one of the people
+     * who take it ("With: Asha"). Anything else in either reads as not
+     * asked: the next two weeks, with whoever is free.
+     */
+    @Get(":siteId/services/:serviceId/days")
+    @Header("Cache-Control", "no-store")
+    days(
+        @Param("siteId") siteId: string,
+        @Param("serviceId") serviceId: string,
+        @Query("skip") skip?: string,
+        @Query("staffId") staffId?: string,
+    ): Promise<PublicDays> {
+        return this.bookings.siteServiceDays(siteId, serviceId, new Date(), {
+            skip: daysSkipOf(skip),
+            staffId:
+                typeof staffId === "string" &&
+                /^[A-Za-z0-9_-]{1,64}$/.test(staffId)
+                    ? staffId
+                    : null,
+        });
+    }
+
+    /**
+     * Open slots for a bookable service of this site's business over
+     * `?from=&to=` (ISO instants), optionally for one person (`?staffId=`).
+     * Inside the business's booking rules; a person appears only as an
+     * opaque id (U3). Another business's service is a 404 (07 B-L2).
+     */
+    @Get(":siteId/services/:serviceId/availability")
+    availability(
+        @Param("siteId") siteId: string,
+        @Param("serviceId") serviceId: string,
+        @Query("from") from: string,
+        @Query("to") to: string,
+        @Query("staffId") staffId?: string,
+    ): Promise<AvailableSlot[]> {
+        return this.bookings.siteAvailability(
+            siteId,
+            serviceId,
+            from,
+            to,
+            staffId,
+        );
+    }
+
+    /**
+     * Who takes a service of this site's business: a display name and an
+     * opaque id each (U3). Never their hours, and never whether or why they
+     * are off. Another business's service is a 404 (07 B-L2).
+     */
+    @Get(":siteId/services/:serviceId/staff")
+    staff(
+        @Param("siteId") siteId: string,
+        @Param("serviceId") serviceId: string,
+    ): Promise<PublicStaff[]> {
+        return this.bookings.siteServiceStaff(siteId, serviceId);
+    }
 
     @Get(":siteId/booking")
     @Header("Cache-Control", "no-store")

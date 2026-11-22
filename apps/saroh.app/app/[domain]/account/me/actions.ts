@@ -14,6 +14,7 @@ import { accountAreaOn } from "@/lib/account-area";
 import { dataRequestResult, noticesResult } from "@/lib/account-details-shape";
 import {
     emailChangeAnswer,
+    fieldRefusal,
     isAccountView,
     isNote,
     payNowAnswer,
@@ -69,6 +70,29 @@ export async function updateAccountDetails(
     return {
         ok: false,
         message: refusalMessage(call.res.status, body, OFFLINE),
+    };
+}
+
+/** Me's GST sheet (R16): their GSTIN for their invoices; empty removes it. */
+export async function updateAccountGstin(
+    gstin: string,
+): Promise<DetailsResult> {
+    if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
+    if (!accountAreaOn()) return { ok: false, message: OFFLINE };
+    const value = typeof gstin === "string" ? gstin.trim().slice(0, 32) : "";
+    const call = await accountFetch("me", {
+        method: "PATCH",
+        body: { gstin: value },
+    });
+    if (!call?.ok) return { ok: false, message: OFFLINE };
+    const body: unknown = await call.res.json().catch(() => null);
+    if (call.res.ok && isAccountView(body)) return { ok: true, account: body };
+    return {
+        ok: false,
+        message:
+            fieldRefusal(call.res.status, body, "gstin") ??
+            refusalMessage(call.res.status, body, OFFLINE),
     };
 }
 

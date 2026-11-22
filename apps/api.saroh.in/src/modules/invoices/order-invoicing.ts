@@ -4,6 +4,7 @@ import { ensureContactForPaidOrder } from "../customer-workspace/ensure-contact"
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { zoneOf } from "../organizations/business-zone";
 import { SUPERSEDED_INTENT } from "../payments/intent-state";
+import { contactBillToGst } from "./contact-gstin";
 import { bpsToRate, rateToBps } from "./gst";
 import { businessPriceMode } from "./gst-price";
 import type { RatedLine } from "./gst-rate-required";
@@ -296,6 +297,8 @@ export async function ensureOrderInvoice(
             discount: true,
             total: true,
             fulfilment: true,
+            // Placed signed in: their account's contact, for its GSTIN (R16).
+            customerAccount: { select: { contactId: true } },
             deliveryName: true,
             deliveryLine1: true,
             deliveryLine2: true,
@@ -344,6 +347,12 @@ export async function ensureOrderInvoice(
         assertRatesSet(profile.registered, order.items.flatMap(ratedItem));
     }
     const doc = buildOrderInvoice(order, profile);
+    // Goods: the place of supply stays the delivery's; only the GSTIN prints.
+    const { billToGstin } = await contactBillToGst(
+        tx,
+        organizationId,
+        order.customerAccount?.contactId,
+    );
     const at = opts.at ?? new Date();
     const number = await numberFor(tx, organizationId, profile, "INVOICE", at);
     const created = await tx.invoice.create({
@@ -355,6 +364,7 @@ export async function ensureOrderInvoice(
             source: "ORDER",
             orderId,
             ...billToColumns(orderBillTo(order)),
+            billToGstin,
             currency: order.currency,
             ...documentColumns(doc),
             issuedAt: at,

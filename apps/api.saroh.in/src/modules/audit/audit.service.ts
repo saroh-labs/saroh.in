@@ -118,6 +118,15 @@ export const AuditAction = {
     // the publication. Metadata: how it went live (`source`), and the test
     // release when it was one. The target is the new publication.
     SitePublishOverride: "site.publish_approval.override",
+    // A publish that kept some changes in the draft (website area U8,
+    // KTD-5), written by `putLive` with the publication. Metadata: the
+    // site and `leftOut`, the change unit keys (ids, never content). The
+    // target is the new publication.
+    SitePublishLeftOut: "site.publish.left_out",
+    // An approval of one change that a later edit no longer matches
+    // (DEC-226, website area U9), written by the publish that found it.
+    // Metadata: the change unit keys. The target is the site.
+    SiteChangeApprovalVoided: "site.change_approval.voided",
     // A site's draft brought up to its template's newest version by Saroh
     // (DEC-141, `sites/template-upgrade.ts`), written in the upgrade's own
     // transaction with the site as the target and `system:template-upgrade`
@@ -198,6 +207,14 @@ export const AuditAction = {
     SiteDetailsFilled: "site.starter_content.filled",
     SiteDraftRolledBack: "site.draft.rolled_back",
     SiteSectionBroughtIn: "site.draft.section_brought_in",
+    // One waiting change put back as it is live, History's Undo (website
+    // editor plan U47a). Metadata: the site, the change's key, kind and what
+    // it was; never a line of the site's text.
+    SiteChangeReverted: "site.change.reverted",
+    // A published version copied into the draft, History's "Restore <date>
+    // as the draft" (owner, 20 Nov 2026). Metadata: the site, the version
+    // and how many pages changed; never a line of the site's text.
+    SiteVersionRestoredAsDraft: "site.version.restored_as_draft",
     // An owner made, renamed, edited, rolled or revoked an API key (plan
     // 2026-11-10-001, U5), with the key as the target. Metadata: its kind,
     // name and display prefix; for a rename the name before; for an edit

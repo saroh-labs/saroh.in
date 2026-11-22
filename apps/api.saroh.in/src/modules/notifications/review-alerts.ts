@@ -1,5 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
+import { approverIdsOf, postFingerprint } from "../content/post-approval";
+import { revisionStateOf } from "../content/post-revisions";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import { noticeOf } from "./notice-target";
@@ -49,6 +51,10 @@ export async function wordReview(
             return wordNote(tx, organizationId, p.commentId);
         case "release":
             return wordRelease(tx, organizationId, p.testReleaseId);
+        case "change":
+            return wordChangeAsk(tx, organizationId, p);
+        case "post":
+            return wordPostAsk(tx, organizationId, p.revisionId);
     }
 }
 
@@ -311,6 +317,148 @@ async function wordNote(
             ? `/sites/${c.siteId}/releases/${c.testReleaseId}`
             : `/sites/${c.siteId}/pages`,
         skipUserId: c.authorUserId,
+    };
+}
+
+/**
+ * Changes asked for on one person's change (DEC-226, U9): told to them
+ * alone. The bell quotes the reason; the email doesn't (team free text).
+ */
+async function wordChangeAsk(
+    tx: Tx,
+    organizationId: string,
+    p: Extract<ReviewPayload, { about: "change" }>,
+): Promise<WordedAlert | null> {
+    const a = await tx.siteChangeApproval.findFirst({
+        where: { id: p.changeApprovalId, organizationId },
+        select: {
+            id: true,
+            siteId: true,
+            unitKey: true,
+            unitFingerprint: true,
+            byUserId: true,
+            reason: true,
+            site: { select: { name: true } },
+        },
+    });
+    if (!a) return null;
+    // W3: the editor's own "off" for the Website email holds; with no
+    // choice made they still hear of it, as their role may have no row.
+    const off = await tx.notificationPreference.findFirst({
+        where: {
+            organizationId,
+            userId: p.editorUserId,
+            event: "site",
+            channel: "email",
+            enabled: false,
+        },
+        select: { id: true },
+    });
+    // A post's verdict (O7) opens the post; a site change, its pages.
+    const postId = a.unitKey.startsWith("post:") ? a.unitKey.slice(5) : null;
+    const by = await tx.user.findUnique({
+        where: { id: a.byUserId },
+        select: { name: true, email: true },
+    });
+    const who = by ? nameOf(by) : "Someone on the team";
+    const line = (a.reason ?? "").replace(/\s+/g, " ").trim();
+    const quote =
+        line.length > NOTE_QUOTE_MAX
+            ? `${line.slice(0, NOTE_QUOTE_MAX - 1).trimEnd()}…`
+            : line;
+    return {
+        event: "site",
+        // W3: asked again on the unchanged change, by the same person: told once.
+        eventKey: `team:review-change:${a.unitKey}:${a.unitFingerprint}:${a.byUserId}`,
+        notificationId: null,
+        ...noticeOf(SITE_REVIEW_CHANGES_NOTIFICATION_TYPE, {
+            siteId: a.siteId,
+        }),
+        title: `${who} asked for changes to your work on ${a.site.name}`,
+        body: quote ? `“${quote}”` : "Open the site to see what they asked.",
+        mail: {
+            heading: `${mailName(by?.name, "Someone on the team")} asked for changes to your work on ${mailName(a.site.name, "your website")}`,
+            body: "Open the site in Saroh to read what they asked.",
+        },
+        path: postId
+            ? `/sites/${a.siteId}/write/${postId}`
+            : `/sites/${a.siteId}/pages`,
+        skipUserId: a.byUserId,
+        forUserId: p.editorUserId,
+        alwaysUserId: off ? null : p.editorUserId,
+    };
+}
+
+/**
+ * A post sent for approval (O7): emailed to everyone who may approve it
+ * (the site's reviewers, the admins and the owner) but the writer. Says
+ * nothing once the post has gone live since. The note is team free text:
+ * the email leaves it and the title out.
+ */
+async function wordPostAsk(
+    tx: Tx,
+    organizationId: string,
+    revisionId: string,
+): Promise<WordedAlert | null> {
+    const r = await tx.postRevision.findFirst({
+        where: { id: revisionId, organizationId, reason: "sent" },
+        select: {
+            postId: true,
+            createdAt: true,
+            savedByUserId: true,
+            title: true,
+            content: true,
+            excerpt: true,
+            image: true,
+            imageAlt: true,
+            seoTitle: true,
+            seoDescription: true,
+            shareImageUrl: true,
+            slug: true,
+            categoryId: true,
+            authorId: true,
+            post: {
+                select: {
+                    title: true,
+                    siteId: true,
+                    site: { select: { name: true } },
+                },
+            },
+            savedBy: { select: { name: true, email: true } },
+        },
+    });
+    if (!r) return null;
+    const since = await tx.postRevision.count({
+        where: {
+            postId: r.postId,
+            reason: "published",
+            createdAt: { gt: r.createdAt },
+        },
+    });
+    if (since > 0) return null;
+    const approvers = (
+        await approverIdsOf(tx, organizationId, r.post.siteId)
+    ).filter((id) => id !== r.savedByUserId);
+    if (approvers.length === 0) return null;
+    const who = r.savedBy ? nameOf(r.savedBy) : "Someone on the team";
+    const body = "Read it, then approve it or ask for changes.";
+    return {
+        event: "site",
+        // W2: sent again unchanged, the approvers aren't told again.
+        eventKey: `team:review-post:${r.postId}:${postFingerprint(revisionStateOf(r))}`,
+        notificationId: null,
+        type: "site.review.requested",
+        title: `${who} asked you to approve ${r.post.title}`,
+        body,
+        mail: {
+            heading: `${mailName(r.savedBy?.name, "Someone on the team")} asked you to approve a post on ${mailName(r.post.site.name, "your website")}`,
+            body,
+        },
+        path: `/sites/${r.post.siteId}/write/${r.postId}`,
+        skipUserId: r.savedByUserId,
+        noBell: true,
+        emailUserIds: approvers,
+        cta: "Open the post",
     };
 }
 

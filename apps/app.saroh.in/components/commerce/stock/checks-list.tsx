@@ -1,5 +1,6 @@
 "use client";
 
+import { useScreenGo } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
@@ -43,6 +44,8 @@ export function ChecksList({
     paging: StockListPage;
 }) {
     const router = useRouter();
+    // Filters and pages in the screen's transition: the rows grey.
+    const go = useScreenGo();
     const [busy, setBusy] = useState<string | null>(null);
 
     const intro = (
@@ -164,7 +167,7 @@ export function ChecksList({
                 to={(n) => ({ href: href({ page: n }) })}
                 onSize={(size) => {
                     rememberPageSize(STOCK_LISTS.checks, size);
-                    router.push(href({ size }), { scroll: false });
+                    go(href({ size }));
                 }}
             />
         </div>

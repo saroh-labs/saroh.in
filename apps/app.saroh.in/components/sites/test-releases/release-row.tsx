@@ -305,8 +305,8 @@ export function ReleaseRow({
                 onOpenChange={setDiscarding}
                 title={`Discard ${release.name}?`}
                 description="Its links stop working at once, and it can't be reviewed or put live. Your draft and the live site are left as they are. This cannot be undone."
-                confirmLabel="Discard test release"
-                keepLabel="Keep test release"
+                confirmLabel="Discard test link"
+                keepLabel="Keep test link"
                 onConfirm={discard}
             />
         </li>

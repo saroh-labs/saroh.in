@@ -1,7 +1,7 @@
 "use client";
 
 import type { Catalog, Plan } from "@saroh/pricing-catalog";
-import { yearlyPaise } from "@saroh/pricing-catalog";
+import { regularYearlyPaise } from "@saroh/pricing-catalog";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { useId } from "react";
 
@@ -14,7 +14,8 @@ import { FIELD, Field, NumberField } from "./fields";
  * Plans tab's "Plan by plan" before it): Name, the monthly price before
  * GST and when a new one reaches businesses, the line under the name, the
  * button, Highlight, and what it comes to a year when yearly billing is
- * on. Retire is the sheet's own block.
+ * on, with its yearly offer price (DEC-239). Retire is the sheet's own
+ * block.
  */
 
 export const SMALL_BUTTON =
@@ -37,21 +38,26 @@ export function PlanFields({
     errors: {
         name?: string;
         pricePaise?: string;
+        yearlyOfferPaise?: string;
         cta?: string;
         tagline?: string;
         plans?: string;
     };
     onChange: (
-        patch: Partial<Pick<Plan, "name" | "pricePaise" | "cta" | "tagline">>,
+        patch: Partial<
+            Pick<
+                Plan,
+                "name" | "pricePaise" | "cta" | "tagline" | "yearlyOfferPaise"
+            >
+        >,
     ) => void;
     onFeature: () => void;
 }) {
     const featureId = useId();
     const name = plan.name || "this plan";
-    const yearlyLine =
-        yearly.on && plan.pricePaise > 0
-            ? ` Yearly: ${planMoney(yearlyPaise(plan.pricePaise, yearly.paid))} a year.`
-            : "";
+    const yearlyOn = yearly.on && plan.pricePaise > 0;
+    const regularYear = planMoney(regularYearlyPaise({ yearly }, plan));
+    const yearlyLine = yearlyOn ? ` Yearly: ${regularYear} a year.` : "";
     return (
         <div className="grid gap-4">
             <Field label="Name" error={errors.name}>
@@ -87,6 +93,30 @@ export function PlanFields({
                 inputMode="decimal"
                 disabled={disabled}
             />
+            {yearlyOn ? (
+                <NumberField<number | null>
+                    key={`${plan.id}-year`}
+                    label="Yearly offer price, before GST"
+                    prefix={planCurrencySign()}
+                    value={plan.yearlyOfferPaise ?? null}
+                    format={(v) => (v === null ? "" : rupeesText(v))}
+                    parse={(t) => {
+                        if (t.trim() === "") return null;
+                        const v = parseRupees(t);
+                        // Nothing or zero is refused: blank is no offer.
+                        if (!v) return undefined;
+                        return v;
+                    }}
+                    onCommit={(v) =>
+                        onChange({ yearlyOfferPaise: v ?? undefined })
+                    }
+                    hint="Enter rupees above 0, like 4999, or leave it blank for no offer"
+                    error={errors.yearlyOfferPaise}
+                    note={`What a yearly buyer pays. The pricing page shows it with the regular ${regularYear} a year struck through. Leave it blank to charge the regular price.`}
+                    inputMode="decimal"
+                    disabled={disabled}
+                />
+            ) : null}
             <Field label="One line under the name" error={errors.tagline}>
                 {(a) => (
                     <input

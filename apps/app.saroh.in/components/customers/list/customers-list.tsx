@@ -1,5 +1,6 @@
 "use client";
 
+import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { Upload } from "lucide-react";
@@ -132,7 +133,7 @@ export function CustomersList({
                 count={page.total > page.pageSize ? pageText(page) : null}
             />
             {notice}
-            <div aria-busy={navigating}>
+            <PendingRegion pending={navigating}>
                 <Rows
                     page={page}
                     empty={
@@ -145,7 +146,7 @@ export function CustomersList({
                         />
                     }
                 />
-            </div>
+            </PendingRegion>
             <ListPaging
                 label="Pages of customers"
                 page={page.page}

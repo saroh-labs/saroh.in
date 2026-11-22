@@ -1,4 +1,7 @@
-import { parseCatalog } from "@saroh/pricing-catalog";
+import {
+    NO_REFUNDS_LINE as NO_REFUNDS,
+    parseCatalog,
+} from "@saroh/pricing-catalog";
 import { describe, expect, it } from "vitest";
 
 import type { PricingSite } from "./pricing-model";
@@ -185,6 +188,48 @@ describe("pricingPageModel with an automatic discount", () => {
         );
         expect(one.views["month-excl"].plans[1].trial).toBe(
             "7% off your first month",
+        );
+    });
+});
+
+describe("a plan's yearly offer price (DEC-239)", () => {
+    const offered = () => {
+        const c = catalog();
+        c.plans[1].yearlyOfferPaise = 77_700;
+        return c;
+    };
+    const launch = [{ planId: "b", discountPaise: 300, months: 3 }];
+
+    it("leads with the offer, the regular year struck, its month from the offer", () => {
+        const y = pricingPageModel(offered(), NO_TAX).views["year-excl"];
+        expect(y.plans[1]).toMatchObject({
+            price: "XX77700",
+            was: "XX111000",
+            per: "a year, paid once",
+            sub: "About XX6475 a month",
+        });
+        expect(y.plans[0].was).toBeUndefined();
+        expect(y.footnote).toBe(
+            `Billed yearly, one payment for the year. ${NO_REFUNDS}`,
+        );
+        // Monthly is untouched.
+        const m = pricingPageModel(offered(), NO_TAX).views["month-excl"];
+        expect(m.plans[1]).toMatchObject({ price: "XX11100", per: "a month" });
+        expect(m.plans[1].was).toBeUndefined();
+        expect(m.footnote).toBe("Billed monthly.");
+    });
+
+    it("never stacks the launch offer on it; without one, a year still gets it", () => {
+        const withOffer = pricingPageModel(offered(), NO_TAX, [], launch);
+        expect(withOffer.views["year-excl"].plans[1].trial).toBe("");
+        expect(withOffer.views["month-excl"].plans[1].trial).not.toBe("");
+        const plain = pricingPageModel(catalog(), NO_TAX, [], launch);
+        expect(plain.views["year-excl"].plans[1].trial).toBe(
+            "XX900 off your first year",
+        );
+        expect(plain.views["year-excl"].plans[1].was).toBeUndefined();
+        expect(plain.views["year-excl"].footnote).toBe(
+            `Billed yearly, pay for 10 months and get 12. ${NO_REFUNDS}`,
         );
     });
 });

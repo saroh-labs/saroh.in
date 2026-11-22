@@ -32,7 +32,7 @@ import { Notice } from "@saroh/ui/notice";
  * 404 when the release isn't this site's, or test releases are off for the
  * business (KTD-16): it is not told the feature exists.
  */
-export const metadata = { title: "Test release · Website" };
+export const metadata = { title: "Test link · Website" };
 
 export default async function TestReleasePage({
     params,
@@ -120,7 +120,7 @@ export default async function TestReleasePage({
                 <p>
                     {release.status === "live" ? (
                         <>
-                            This test release is live now.{" "}
+                            This test link is live now.{" "}
                             <Link
                                 data-ph-unmask=""
                                 href={`/sites/${siteId}/versions`}
@@ -131,9 +131,9 @@ export default async function TestReleasePage({
                             has the version it went live as.
                         </>
                     ) : release.status === "discarded" ? (
-                        "This test release was discarded. Its links no longer open it, and it can't be reviewed or go live."
+                        "This test link was discarded. Its links no longer open it, and it can't be reviewed or go live."
                     ) : (
-                        "A test release: the site as it was frozen, not what visitors see now. Nothing here can be edited."
+                        "A test link: the site as it was frozen, not what visitors see now. Nothing here can be edited."
                     )}
                 </p>
                 <p data-release-verdict>

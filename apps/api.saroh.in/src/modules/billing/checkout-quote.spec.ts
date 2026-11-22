@@ -3,13 +3,14 @@
  * every amount, from the plan rows alone. Made-up prices (111, 222, 333
  * rupees in paise) — never a real plan.
  */
-import { gstPaise, withGstPaise } from "@saroh/pricing-catalog";
+import { gstPaise, parseCatalog, withGstPaise } from "@saroh/pricing-catalog";
 
 import type { QuotePlanRow, QuoteSubscription } from "./checkout-quote";
 import {
     couponMonthPaise,
     prorateDifferencePaise,
     quoteChange,
+    yearlyOfferRegular,
 } from "./checkout-quote";
 import { moveReadiness } from "./plan-moves";
 
@@ -835,5 +836,55 @@ describe("how it's paid (DEC-093)", () => {
             payment: "ONE_TIME",
             payNowTotalPaise: withGstPaise(222_000),
         });
+    });
+});
+
+describe("a yearly offer price (DEC-239)", () => {
+    // Made up: a plan at 222 a month, its year paying for 10 months, and a
+    // yearly offer of 1,777 the plan row was written at.
+    const catalog = (offer?: number) =>
+        parseCatalog({
+            plans: [
+                {
+                    id: "b",
+                    name: "Plan B",
+                    pricePaise: 22_200,
+                    yearlyOfferPaise: offer,
+                },
+            ],
+            groups: [],
+            modules: [],
+            yearly: { on: true, paid: 10 },
+            gst: { show: "excl" },
+        });
+    const OFFER_YEAR = row("b-year@2", 177_700, "year", "catalog.b");
+
+    it("is the regular year only for a yearly row charged at its offer", () => {
+        expect(yearlyOfferRegular(catalog(177_700), "b", OFFER_YEAR)).toBe(
+            222_000,
+        );
+        expect(yearlyOfferRegular(catalog(), "b", B_YEAR)).toBeNull();
+        expect(yearlyOfferRegular(catalog(177_700), "b", B)).toBeNull();
+        expect(yearlyOfferRegular(null, "b", OFFER_YEAR)).toBeNull();
+    });
+
+    it("charges the offer and carries the regular price to strike", () => {
+        const q = quoteChange({
+            subscription: null,
+            target: OFFER_YEAR,
+            now: NOW,
+            regularPaise: 222_000,
+        });
+        expect(q).toMatchObject({
+            kind: "NEW",
+            pricePaise: 177_700,
+            regularPricePaise: 222_000,
+            payNowTotalPaise: withGstPaise(177_700),
+            discountPaise: 0,
+        });
+        expect(
+            quoteChange({ subscription: null, target: B_YEAR, now: NOW })
+                .regularPricePaise,
+        ).toBeNull();
     });
 });

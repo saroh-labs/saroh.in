@@ -161,7 +161,7 @@ export function ReviewPanel({
         }
         showSuccess(
             release
-                ? "Asked for a review. Share a link to the test release so they can read it."
+                ? "Asked for a review. Share the test link so they can read it."
                 : "Asked for a review. Share a preview so they can read it.",
         );
         onChanged();
@@ -295,7 +295,7 @@ export function ReviewPanel({
                  */}
                 <p className="p-4 text-xs leading-relaxed text-muted-foreground">
                     {release
-                        ? "No notes on this test release yet. Select a section to leave a note on it, and say here whether it's good to go live."
+                        ? "No notes on this test link yet. Select a section to leave a note on it, and say here whether it's good to go live."
                         : !can.approve && !can.settle
                           ? // A Reviewer (DEC-200): the verdict is the top bar's.
                             "No notes on this site yet. Select a block to leave a note on it."

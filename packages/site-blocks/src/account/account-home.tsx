@@ -7,7 +7,7 @@ import { CoursesCard } from "./courses-card";
 import type { LeaveLine, PayInvoice } from "./details-api";
 import { NextBooking } from "./home-next-booking";
 import type { HomeBlock } from "./home-order";
-import { homeLayout } from "./home-order";
+import { homeLayout, WAITING_ON_YOU } from "./home-order";
 import { linkPendingLine, offersLead, welcomeLead } from "./home-words";
 import { ACCOUNT_TAB_HREF, ORDERS_HREF } from "./hrefs";
 import { InvoicesDue } from "./invoices-due";
@@ -22,20 +22,23 @@ import {
     Unavailable,
 } from "./parts";
 import { SinceLastHere } from "./since-last-here";
+import { WaitingOnYou } from "./waiting-on-you";
 import { WaitlistPlaces } from "./waitlist-places";
 
 /**
- * The account's Home (round-2 plan A, A5; ordered by DEC-142): what this
- * customer has, in the order it matters to them (`home-order.ts`).
+ * The account's Home (DEC-229, plan U13; first round-2 plan A, A5): one
+ * design for every business, trade and look, in one fixed order
+ * (`home-order.ts`), each part left out when it has nothing to say:
  *
- * - "Since you were last here" leads when something changed.
- * - Then what is in progress: a place held for them, an invoice to pay, a
- *   booking coming up, an order on its way, a message they haven't opened.
- * - Then what is recent: their latest orders, classes left, their plan,
- *   their courses, a line they are waiting in.
- * - Then, last, what else they can do here, only for what the business
- *   offers. With nothing at all there is one welcome block, never a column
- *   of empty cards.
+ * 1. Waiting on you: a place held for them, a bill to pay.
+ * 2. What's next: the next booking, a line they are waiting in.
+ * 3. New since your last visit, and a message they haven't opened.
+ * 4. Plan and packs: their plan with the classes left on it, courses.
+ * 5. Their latest order.
+ *
+ * Then, last, what else they can do here, only for what the business
+ * offers. With nothing at all there is one welcome block with Book and the
+ * shop, never a column of empty cards.
  *
  * Each block was read on its own: one whose read failed says so and never
  * shows zero. From tablet width up the blocks sit in two columns, in the
@@ -100,10 +103,19 @@ export function AccountHome({
     const messagesHref = has("messages") ? ACCOUNT_TAB_HREF.messages : null;
     const { payInvoice, leaveLine } = api;
 
+    // Classes left sit in the plan's card when there is one (the boards'
+    // "Your plan"): one card for plan and packs.
+    const classes = home.classes.ok ? home.classes.value : null;
+    const plan = home.plan.ok ? home.plan.value : null;
+    const classesInPlan = classes !== null && plan !== null;
+    const blocks = layout.blocks.filter(
+        (b) => !(b === "classes" && classesInPlan),
+    );
+
     // With an odd number of half-width cards, the first takes the whole
     // row: the thing that matters most gets the room, and no card is left
     // alone beside a gap.
-    const halves = layout.blocks.filter((b) => !FULL_WIDTH.has(b));
+    const halves = blocks.filter((b) => !FULL_WIDTH.has(b));
     const lead = halves.length % 2 === 1 ? halves[0] : null;
     const span = (key: HomeBlock) =>
         FULL_WIDTH.has(key) || key === lead ? "md:col-span-2" : undefined;
@@ -243,7 +255,7 @@ export function AccountHome({
                     home.plan.value ? (
                         <AccountCard
                             labelledBy="account-plan"
-                            title="Membership"
+                            title="Your plan"
                             className={wide}
                             actions={
                                 // The Plan tab's page (A8), linked only
@@ -274,12 +286,18 @@ export function AccountHome({
                                     )
                                 }
                             />
+                            {classes && classesInPlan ? (
+                                <AccountRow
+                                    title="Classes left"
+                                    sub={classesLine(classes)}
+                                />
+                            ) : null}
                         </AccountCard>
                     ) : null
                 ) : (
                     <AccountCard
                         labelledBy="account-plan"
-                        title="Membership"
+                        title="Your plan"
                         className={wide}
                     >
                         <Unavailable what="Your plan" />
@@ -366,11 +384,21 @@ export function AccountHome({
         }
     }
 
+    const waiting = blocks.filter((b) => WAITING_ON_YOU.has(b));
     return (
         <div className="grid gap-3.5 md:grid-cols-2 md:items-start md:gap-4">
-            {layout.blocks.map((key) => (
-                <Fragment key={key}>{draw(key)}</Fragment>
-            ))}
+            {waiting.length > 0 ? (
+                <WaitingOnYou>
+                    {waiting.map((key) => (
+                        <Fragment key={key}>{draw(key)}</Fragment>
+                    ))}
+                </WaitingOnYou>
+            ) : null}
+            {blocks
+                .filter((b) => !WAITING_ON_YOU.has(b))
+                .map((key) => (
+                    <Fragment key={key}>{draw(key)}</Fragment>
+                ))}
         </div>
     );
 }

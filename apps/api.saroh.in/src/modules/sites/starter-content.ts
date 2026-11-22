@@ -29,6 +29,8 @@ import {
 } from "../audit/audit.service";
 import { authorize } from "../organizations/organization-policy";
 import { registeredAddressText } from "../stores/pickup-place";
+import { carryStamps } from "./change-units";
+import { changedKeys, stampDraftEditors } from "./draft-editors";
 import { lockSite } from "./live-pointer";
 import { sanitizeSectionContent } from "./sanitize";
 import { assertSiteInOrg } from "./site-access";
@@ -319,6 +321,11 @@ export async function copyStarterContent(
             created: [],
         };
         const revisions: Record<string, number> = {};
+        // Who made what the copy writes (KTD-4, R2 21 Nov 2026).
+        const stamp = {
+            lastEditedByUserId: ctx.userId,
+            lastEditedAt: new Date(),
+        };
 
         const sectionsFor = async (path: string) => {
             const page = copied.pages.find((p) => p.path === path);
@@ -397,9 +404,19 @@ export async function copyStarterContent(
                         order,
                         content: s.content,
                         key: newSectionKey(),
+                        ...stamp,
                     })),
                 });
             }
+            // Who removed the sections the copy replaced (R2).
+            await stampDraftEditors(
+                tx,
+                siteId,
+                ctx.userId,
+                (draft?.sections ?? []).map(
+                    (s) => `section:${replace.pageId}:${s.key}`,
+                ),
+            );
             // Moved on, so an editor still showing the old draft can't save
             // over the copy (#285).
             const bumped = await tx.pageVersion.update({
@@ -421,6 +438,8 @@ export async function copyStarterContent(
                     path: create.path,
                     title: create.title,
                     isHome: false,
+                    settingsEditedByUserId: ctx.userId,
+                    settingsEditedAt: stamp.lastEditedAt,
                     versions: {
                         create: {
                             organizationId: ctx.organizationId,
@@ -434,6 +453,7 @@ export async function copyStarterContent(
                                     contractVersion: s.contractVersion,
                                     order,
                                     content: s.content,
+                                    ...stamp,
                                 })),
                             },
                         },
@@ -446,7 +466,7 @@ export async function copyStarterContent(
             if (page?.inMenu ?? true) menuAdditions.push(row.id);
         }
         if (menuAdditions.length > 0) {
-            await addToMenu(tx, siteId, menuAdditions);
+            await addToMenu(tx, siteId, menuAdditions, ctx.userId);
         }
 
         const updated = await tx.site.update({
@@ -454,6 +474,15 @@ export async function copyStarterContent(
             data: { style: style as unknown as Prisma.InputJsonValue },
             select: { navigation: true },
         });
+        await stampDraftEditors(
+            tx,
+            siteId,
+            ctx.userId,
+            changedKeys({
+                "site:style": [site.style, style],
+                "site:menu": [site.navigation, updated.navigation],
+            }),
+        );
 
         const after: SnapshotAfter = {
             style: style as unknown as Prisma.JsonValue,
@@ -524,6 +553,8 @@ async function draftOf(tx: Tx, organizationId: string, pageId: string) {
                     content: true,
                     hidden: true,
                     key: true,
+                    lastEditedByUserId: true,
+                    lastEditedAt: true,
                 },
             },
         },
@@ -554,11 +585,17 @@ export async function restorePages(
     tx: Tx,
     organizationId: string,
     pages: SnapshotBefore["pages"],
+    /** Who puts them back: stamped on what changes, as a save is (R2). */
+    by: { siteId: string; userId: string },
 ): Promise<Record<string, number>> {
     const revisions: Record<string, number> = {};
     for (const page of pages) {
         const draft = await draftOf(tx, organizationId, page.pageId);
         if (!draft) continue;
+        const carried = carryStamps(draft.sections, page.sections, {
+            userId: by.userId,
+            at: new Date(),
+        });
         await tx.section.deleteMany({ where: { pageVersionId: draft.id } });
         if (page.sections.length > 0) {
             await tx.section.createMany({
@@ -571,9 +608,16 @@ export async function restorePages(
                     content: s.content as Prisma.InputJsonValue,
                     hidden: s.hidden,
                     key: s.key,
+                    ...carried.stamps[order],
                 })),
             });
         }
+        await stampDraftEditors(
+            tx,
+            by.siteId,
+            by.userId,
+            carried.removed.map((key) => `section:${page.pageId}:${key}`),
+        );
         const bumped = await tx.pageVersion.update({
             where: { id: draft.id },
             data: { revision: { increment: 1 } },
@@ -635,13 +679,20 @@ export async function undoStarterContent(
 
         await assertUntouched(tx, ctx, siteId, after);
 
-        await restorePages(tx, ctx.organizationId, before.pages);
+        await restorePages(tx, ctx.organizationId, before.pages, {
+            siteId,
+            userId: ctx.userId,
+        });
         const removed = await tx.page.deleteMany({
             where: {
                 id: { in: before.created },
                 siteId,
                 organizationId: ctx.organizationId,
             },
+        });
+        const was = await tx.site.findUniqueOrThrow({
+            where: { id: siteId },
+            select: { style: true, navigation: true },
         });
         await tx.site.update({
             where: { id: siteId },
@@ -651,6 +702,13 @@ export async function undoStarterContent(
             },
             select: { id: true },
         });
+        await stampDraftEditors(tx, siteId, ctx.userId, [
+            ...before.created.map((id) => `page:${id}`),
+            ...changedKeys({
+                "site:style": [was.style, before.style],
+                "site:menu": [was.navigation, before.navigation],
+            }),
+        ]);
         await tx.siteDraftSnapshot.update({
             where: { id: snapshot.id },
             data: { undoneAt: new Date() },
@@ -756,6 +814,9 @@ export async function fillDetails(
                             { ...section, content: out.content },
                             section,
                         ),
+                        // Who changed it (KTD-4, R2).
+                        lastEditedByUserId: ctx.userId,
+                        lastEditedAt: new Date(),
                     },
                     select: { id: true },
                 });
@@ -962,6 +1023,7 @@ export async function rollbackDraft(
             tx,
             ctx.organizationId,
             version.before.pages,
+            { siteId, userId: ctx.userId },
         );
         await tx.site.update({
             where: { id: siteId },
@@ -971,6 +1033,15 @@ export async function rollbackDraft(
             },
             select: { id: true },
         });
+        await stampDraftEditors(
+            tx,
+            siteId,
+            ctx.userId,
+            changedKeys({
+                "site:style": [site.style, version.before.style],
+                "site:menu": [site.navigation, version.before.navigation],
+            }),
+        );
         const snapshot = await tx.siteDraftSnapshot.create({
             data: {
                 siteId,
@@ -1062,6 +1133,8 @@ export async function bringInSection(
                 content: section.content as Prisma.InputJsonValue,
                 hidden: section.hidden,
                 key: newSectionKey(),
+                lastEditedByUserId: ctx.userId,
+                lastEditedAt: new Date(),
             },
             select: { id: true },
         });

@@ -1,6 +1,10 @@
 import { toRendered } from "@saroh/block-contract";
-import type { TemplateContext } from "@saroh/templates";
-import { dieticianTemplate, instantiateTemplate } from "@saroh/templates";
+import type { TemplateContext, TemplateManifest } from "@saroh/templates";
+import {
+    dieticianTemplateV1 as dieticianTemplate,
+    dieticianTemplate as dieticianTemplateV2,
+    instantiateTemplate,
+} from "@saroh/templates";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -61,9 +65,21 @@ const bookable: TemplateContext = {
 function stubApi({ hours = true }: { hours?: boolean } = {}) {
     const fetchMock = vi.fn((input: string) => {
         const url = input;
-        if (url.startsWith(`${API}/public/services`)) {
+        if (url.startsWith(`${API}/public/sites/site_dietician/services?`)) {
             return Promise.resolve(
                 new Response(JSON.stringify([CONSULTATION]), { status: 200 }),
+            );
+        }
+        // The booking page's read: the Consultation panel's one service.
+        if (url === `${API}/public/sites/site_dietician/booking`) {
+            return Promise.resolve(
+                new Response(
+                    JSON.stringify({
+                        open: true,
+                        services: [{ ...CONSULTATION, kind: "one" }],
+                    }),
+                    { status: 200 },
+                ),
             );
         }
         if (url === `${API}/public/sites/site_dietician/visit`) {
@@ -82,8 +98,12 @@ function stubApi({ hours = true }: { hours?: boolean } = {}) {
     return fetchMock;
 }
 
-function renderHome(ctx: TemplateContext, journal: JournalFeed) {
-    const [home] = instantiateTemplate(dieticianTemplate, ctx).pages;
+function renderHome(
+    ctx: TemplateContext,
+    journal: JournalFeed,
+    template: TemplateManifest = dieticianTemplate,
+) {
+    const [home] = instantiateTemplate(template, ctx).pages;
     const resolvePage = () => undefined;
     return render(
         <PageSections
@@ -242,5 +262,32 @@ describe("the Dietician template, rendered live", () => {
         const { container } = renderHome(bookable, POSTS);
         expect(container.querySelectorAll("img")).toHaveLength(0);
         expect(container.textContent).not.toContain("Professional portrait");
+    });
+});
+
+describe("dietician@2, rendered live (U10)", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("puts the price and one Book in the first screen, the next open times under it", async () => {
+        stubApi();
+        const { container } = renderHome(bookable, POSTS, dieticianTemplateV2);
+        const first = container.querySelectorAll("section")[0];
+        expect(first.getAttribute("data-site-answer-hero")).toBe(
+            "consultation",
+        );
+        const hero = within(first);
+        expect(
+            hero.getByRole("heading", { level: 1, name: "Dr Sample Nair" }),
+        ).toBeTruthy();
+        // The service's own price, read live, never the template's.
+        await waitFor(() => expect(first.textContent).toMatch(/2,500/));
+        const book = hero
+            .getAllByRole("link")
+            .filter((a) => a.getAttribute("href") === "/book");
+        expect(book).toHaveLength(1);
+        // One h1 a page: the practitioner is About now.
+        expect(container.querySelectorAll("h1")).toHaveLength(1);
     });
 });

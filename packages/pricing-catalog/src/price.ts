@@ -61,14 +61,76 @@ export function monthlyEquivalentPaise(yearPaise: number): number {
     return divHalfUp(yearPaise, 12);
 }
 
-/** A plan's price before GST for a billing cycle. */
+type YearlyPlan = Pick<Plan, "pricePaise"> & { yearlyOfferPaise?: number };
+
+/** A plan's regular yearly price before GST: "pay for N months, get 12". */
+export function regularYearlyPaise(
+    catalog: Pick<Catalog, "yearly">,
+    plan: YearlyPlan,
+): number {
+    return yearlyPaise(plan.pricePaise, catalog.yearly.paid);
+}
+
+/**
+ * What a yearly buyer is charged before GST: the plan's yearly offer when
+ * it has one (DEC-239), else the regular yearly price.
+ */
+export function chargedYearlyPaise(
+    catalog: Pick<Catalog, "yearly">,
+    plan: YearlyPlan,
+): number {
+    return plan.yearlyOfferPaise ?? regularYearlyPaise(catalog, plan);
+}
+
+/**
+ * Said near the yearly price on the pricing page and at checkout (DEC-239),
+ * in step with the Terms: Saroh refunds nothing but a double charge.
+ */
+export const NO_REFUNDS_LINE =
+    "We don't refund payments, including a yearly plan cancelled early. If you're ever charged twice, the extra charge is refunded on its own.";
+
+/**
+ * The most a yearly offer saves across the plans still offered, against 12
+ * months at the regular monthly price, rounded down to a whole percent
+ * (DEC-239). Null when no paid plan has a yearly offer.
+ */
+export function yearlySavePercent(
+    catalog: Pick<Catalog, "yearly" | "plans">,
+): number | null {
+    let best: number | null = null;
+    for (const p of catalog.plans) {
+        if (p.retired || p.pricePaise <= 0) continue;
+        if (p.yearlyOfferPaise === undefined) continue;
+        const months = 12 * p.pricePaise;
+        const save = Math.floor(
+            (100 * (months - chargedYearlyPaise(catalog, p))) / months,
+        );
+        best = Math.max(best ?? 0, save);
+    }
+    return best;
+}
+
+/**
+ * The Monthly/Yearly switch's yearly side: the best saving while a plan
+ * has a yearly offer (DEC-239), else the months the regular rule gives free.
+ */
+export function yearlySwitchLabel(
+    catalog: Pick<Catalog, "yearly" | "plans">,
+): string {
+    const save = yearlySavePercent(catalog);
+    return save !== null
+        ? `Yearly · save up to ${save}%`
+        : `Yearly · ${Math.max(0, 12 - catalog.yearly.paid)} months free`;
+}
+
+/** A plan's charged price before GST for a billing cycle. */
 export function planPricePaise(
     catalog: Pick<Catalog, "yearly">,
-    plan: Pick<Plan, "pricePaise">,
+    plan: YearlyPlan,
     cycle: BillingCycle,
 ): number {
     return cycle === "year"
-        ? yearlyPaise(plan.pricePaise, catalog.yearly.paid)
+        ? chargedYearlyPaise(catalog, plan)
         : plan.pricePaise;
 }
 

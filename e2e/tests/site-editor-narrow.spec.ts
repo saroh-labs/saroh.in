@@ -2,8 +2,10 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { editPill, writeField } from "../fixtures/phone-editor";
+import { openReviewedSite } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
-import { NORTHWIND_ORG, REVIEWED_SITE, urls } from "../playwright.config";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The site editor on a phone (round 2, G4): the page fills the screen, the
@@ -26,22 +28,21 @@ async function signIn(page: Page) {
 /** Northwind's site, opened in the editor. */
 async function openEditor(page: Page) {
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
-    await page.goto(`${urls.APP_URL}/sites`);
-    await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-    await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
-        timeout: 30_000,
-    });
-    const id = /\/sites\/([^/]+)\//.exec(page.url())?.[1];
-    if (id === undefined) throw new Error(`no site id in ${page.url()}`);
-    await page.goto(`${urls.APP_URL}/sites/${id}`);
+    // The business's one site, in its editor (Website area on or off).
+    await openReviewedSite(page);
     await expect(page.locator("[data-layout=phone]")).toBeVisible({
         timeout: 30_000,
     });
 }
 
+/** The block sheet's close: today's, or the Website area's section sheet. */
+const CLOSE = /^Close the (block panel|section)$/;
+
 /** The first hero's label on the page, which selects it. */
 const heroChip = (page: Page) =>
-    page.getByRole("button", { name: /^Hero block, \d+ of \d+/ }).first();
+    page
+        .getByRole("button", { name: /^Top of the page section, \d+ of \d+/ })
+        .first();
 
 test.describe("the site editor on a phone", { tag: "@serial" }, () => {
     test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
@@ -65,10 +66,9 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
             () => document.documentElement.scrollWidth > window.innerWidth,
         );
         expect(overflow).toBe(false);
-        // No bottom tabs: one pill over the page (DEC-185).
-        await expect(
-            page.getByRole("toolbar", { name: "Edit page" }),
-        ).toBeVisible();
+        // No bottom tabs: one pill over the page (DEC-185), or with the
+        // Website area one bar at the foot (U49).
+        await expect(editPill(page)).toBeVisible();
 
         await heroChip(page).click();
         const sheet = page.getByRole("dialog");
@@ -76,11 +76,9 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
         const heading = sheet.getByLabel("Heading", { exact: true });
         const before = await heading.inputValue();
         const after = `${before} (phone)`;
-        await heading.fill(after);
+        await writeField(page, heading, after);
 
-        await sheet
-            .getByRole("button", { name: "Close the block panel" })
-            .click();
+        await sheet.getByRole("button", { name: CLOSE }).click();
         await expect(sheet).toHaveCount(0);
         await expect(page.getByText(after).first()).toBeVisible();
         // Focus is back on the block it was about.
@@ -88,10 +86,11 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
 
         // Put it back, and let autosave send it.
         await heroChip(page).click();
-        await page
-            .getByRole("dialog")
-            .getByLabel("Heading", { exact: true })
-            .fill(before);
+        await writeField(
+            page,
+            page.getByRole("dialog").getByLabel("Heading", { exact: true }),
+            before,
+        );
         await page.keyboard.press("Escape");
         await expect(page.getByText(before).first()).toBeVisible();
         await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -112,13 +111,19 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
         await expect(page.locator("[data-layout=narrow]")).toBeVisible();
         const sheet = page.getByRole("dialog");
         await expect(sheet).toBeVisible();
+        // The block's kind: the sheet's title, or with the Website area the
+        // line under the section's own name.
         await expect(
-            sheet.getByRole("heading", { level: 2, name: "Hero" }),
+            sheet
+                .getByRole("heading", { level: 2, name: "Top of the page" })
+                .or(sheet.getByText(/^Top of the page · section \d+ of \d+$/)),
         ).toBeVisible();
         // The modal sheet hides the page from assistive tech, so the chip is
         // found by its label here rather than its role.
         await expect(
-            page.locator('button[aria-label^="Hero block,"]').first(),
+            page
+                .locator('button[aria-label^="Top of the page section,"]')
+                .first(),
         ).toHaveAttribute("aria-pressed", "true");
         // And the page is drawn beside the rail, not squeezed into the
         // divider's 1px column (it drew blank there).
@@ -127,9 +132,7 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
             .first()
             .boundingBox();
         expect(block?.width ?? 0).toBeGreaterThan(300);
-        await sheet
-            .getByRole("button", { name: "Close the block panel" })
-            .click();
+        await sheet.getByRole("button", { name: CLOSE }).click();
         await expect(heroChip(page)).toHaveAttribute("aria-pressed", "true");
     });
 
@@ -151,6 +154,19 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
             expect(inside).toBe(true);
         }
 
+        // With the Website area a long field opens full screen when focus
+        // lands on it (`fix/WXNText`): Escape puts that away first, and
+        // focus is back on its field, in the sheet.
+        const full = page.locator("#phone-text-sheet");
+        if (await full.isVisible()) {
+            await page.keyboard.press("Escape");
+            await expect(full).toHaveCount(0);
+            await expect
+                .poll(() =>
+                    sheet.evaluate((el) => el.contains(document.activeElement)),
+                )
+                .toBe(true);
+        }
         await page.keyboard.press("Escape");
         await expect(sheet).toHaveCount(0);
         await expect(heroChip(page)).toBeFocused();

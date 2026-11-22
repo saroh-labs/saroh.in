@@ -207,6 +207,7 @@ describe("a class credit online (A10)", () => {
         const credit = creditReads(PACK);
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ credit })}
@@ -240,6 +241,7 @@ describe("a class credit online (A10)", () => {
         serve();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ credit: creditReads(PACK) })}
@@ -270,6 +272,7 @@ describe("a class credit online (A10)", () => {
         serve();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ credit: creditReads(MEMBERSHIP) })}
@@ -300,6 +303,7 @@ describe("a class credit online (A10)", () => {
         serve();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ credit: creditReads(PACK) })}
@@ -323,6 +327,7 @@ describe("a class credit online (A10)", () => {
             serve();
             const { unmount } = render(
                 <BookingFlow
+                    siteId="site_1"
                     page={PAGE}
                     apiUrl={API}
                     account={account({ credit: creditReads(answer) })}
@@ -354,6 +359,7 @@ describe("a class credit online (A10)", () => {
         const credit = creditReads(PACK, null);
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ credit })}
@@ -390,6 +396,7 @@ describe("a class credit online (A10)", () => {
         const credit = creditReads(PACK);
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null, credit })}
@@ -439,6 +446,7 @@ describe("a class credit online (A10)", () => {
         const credit = creditReads(PACK);
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null, credit })}
@@ -480,6 +488,7 @@ describe("a class credit online (A10)", () => {
         serve();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null, credit: creditReads(null) })}

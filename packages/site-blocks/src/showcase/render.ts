@@ -433,6 +433,7 @@ export function templateRender(
                   : undefined,
             timetable: sampleDay?.timetable,
             today: sampleDay?.today,
+            slots: sampleDay?.slots,
             // A fixed weekday morning, not the clock (`fixtures.ts`).
             now: FIXTURE_NOW,
         },

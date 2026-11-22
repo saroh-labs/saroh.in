@@ -124,6 +124,27 @@ describe("quoteSummary (DEC-093)", () => {
         );
     });
 
+    it("a yearly offer: the regular year struck before what is charged (DEC-239)", () => {
+        const year = {
+            cycle: "year" as const,
+            payment: "ONE_TIME" as const,
+            termCharges: 1,
+            mandateCheck: "NONE" as const,
+        };
+        const offered = quoteSummary(
+            quote({ ...year, regularPricePaise: 333_000 }),
+            { currentPlan: "Plan A" },
+        );
+        const line = (q: typeof offered) =>
+            q.lines.find((l) => l.label === "Plan C, yearly");
+        expect(line(offered)).toMatchObject({
+            was: "₹3,330",
+            value: "₹222 + ₹39.96 GST = ₹261.96 a year",
+        });
+        const plain = quoteSummary(quote(year), { currentPlan: "Plan A" });
+        expect(line(plain)?.was).toBeUndefined();
+    });
+
     it("says an upgrade's charge today and when the plan's own start", () => {
         const s = quoteSummary(
             quote({

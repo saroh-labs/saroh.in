@@ -113,7 +113,8 @@ const TRIGGERS: [string, RegExp, string][] = [
         "a location's changed address or hours stays old in the footer (DEC-128)",
     ],
     [
-        "content/posts.service.ts",
+        // Publish post and the scheduled publish (U17a) share it.
+        "content/post-publish.ts",
         /enqueuePageRevalidation\(tx, \{\s*cause: "publish"/,
         "a published post is missing from the journal",
     ],

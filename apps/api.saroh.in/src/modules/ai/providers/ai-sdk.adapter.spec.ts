@@ -5,7 +5,7 @@ import {
     simulateReadableStream,
 } from "ai/test";
 
-import { AiSdkAdapter } from "./ai-sdk.adapter";
+import { AiSdkAdapter, failureOf } from "./ai-sdk.adapter";
 import { FakeAiProvider } from "./fake.provider";
 import type { AiEvent, AiStreamRequest } from "./provider.port";
 
@@ -217,6 +217,52 @@ describe("AiSdkAdapter", () => {
                 { type: "failed", reason: "overloaded", status: 529 },
             ]);
             expectNoQuestion(events);
+        });
+
+        it("the provider out of credit is its billing, not a bad request from Saroh (P3)", async () => {
+            const model = new MockLanguageModelV4({
+                doStream: async () => {
+                    throw new APICallError({
+                        message:
+                            "Your credit balance is too low to access the Anthropic API.",
+                        url: "https://provider.example/v1/messages",
+                        requestBodyValues: {
+                            messages: [{ content: QUESTION }],
+                        },
+                        statusCode: 400,
+                        responseBody: JSON.stringify({ echo: QUESTION }),
+                        isRetryable: false,
+                    });
+                },
+            });
+            expect(await collect(new AiSdkAdapter(() => model))).toEqual([
+                { type: "failed", reason: "provider-billing", status: 400 },
+            ]);
+            // Mid-stream, as an error chunk.
+            const streamed = modelOf([
+                {
+                    type: "error",
+                    error: {
+                        type: "error",
+                        error: {
+                            type: "invalid_request_error",
+                            message: "Your credit balance is too low.",
+                        },
+                    },
+                },
+            ]);
+            const events = await collect(new AiSdkAdapter(() => streamed));
+            expect(events).toEqual([
+                { type: "failed", reason: "provider-billing" },
+            ]);
+            expectNoQuestion(events);
+            // Any other bad request is still one.
+            expect(
+                failureOf({
+                    type: "error",
+                    error: { type: "invalid_request_error", message: "bad" },
+                }),
+            ).toEqual({ type: "failed", reason: "invalid-request" });
         });
 
         it("an error in the middle of the stream ends it the same way", async () => {

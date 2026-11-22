@@ -12,4 +12,8 @@ export interface ServiceOption {
     id: string;
     name: string;
     status: "ACTIVE" | "ARCHIVED";
+    /** For the inspector's "From Services" rows (U47); absent in older reads. */
+    durationMinutes?: number;
+    priceCents?: number | null;
+    currency?: string | null;
 }

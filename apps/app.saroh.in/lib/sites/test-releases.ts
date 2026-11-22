@@ -244,19 +244,19 @@ export type GoLiveGate =
 export const NEEDS_PUBLISH_PERMISSION =
     "Going live needs permission to publish the site. An owner or admin can go live with it.";
 export const NEEDS_APPROVAL_OTHERS =
-    "Publishing needs approval: this test release can go live once someone other than you approves it. Only an owner can go live without approval.";
+    "Publishing needs approval: this test link can go live once someone other than you approves it. Only an owner can go live without approval.";
 export const NEEDS_APPROVAL_OWNER =
-    "Publishing needs approval, and this test release isn't approved yet.";
+    "Publishing needs approval, and this test link isn't approved yet.";
 
 export function goLiveGate(
     release: TestRelease,
     can: ReleaseAbilities,
 ): GoLiveGate {
     if (release.status === "live") {
-        return { kind: "blocked", why: "This test release is live now." };
+        return { kind: "blocked", why: "This test link is live now." };
     }
     if (release.status === "discarded") {
-        return { kind: "blocked", why: "This test release was discarded." };
+        return { kind: "blocked", why: "This test link was discarded." };
     }
     if (release.status === "scheduled") {
         return {

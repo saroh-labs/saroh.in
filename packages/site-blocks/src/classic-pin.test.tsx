@@ -168,7 +168,6 @@ describe("Classic's chrome is pinned", () => {
                             reportHref: "https://saroh.in/report",
                         }}
                         cookieChoices
-                        navigation={navigation}
                         now={new Date("2026-10-19T03:00:00Z")}
                     />,
                 ),

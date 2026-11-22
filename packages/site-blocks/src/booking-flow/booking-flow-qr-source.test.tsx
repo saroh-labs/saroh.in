@@ -170,7 +170,12 @@ describe("the QR code a booking came from", () => {
         openAt("/book?src=qr-h7c");
         const { sent, book } = booking();
         render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account(book)} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account(book)}
+            />,
         );
         await chooseAndPay();
         fireEvent.click(
@@ -189,6 +194,7 @@ describe("the QR code a booking came from", () => {
         const { sent, book } = booking();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 initialServiceId="svc_pt"
@@ -226,7 +232,12 @@ describe("the QR code a booking came from", () => {
         openAt("/book");
         const { sent, book } = booking();
         render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account(book)} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account(book)}
+            />,
         );
         await chooseAndPay();
         fireEvent.click(
@@ -240,7 +251,12 @@ describe("the QR code a booking came from", () => {
         openAt("/book?src=newsletter");
         const { sent, book } = booking();
         render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account(book)} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account(book)}
+            />,
         );
         await chooseAndPay();
         fireEvent.click(
@@ -254,7 +270,12 @@ describe("the QR code a booking came from", () => {
         openAt("/book?src=qr-h7c");
         const { sent, book } = booking();
         const { unmount } = render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account(book)} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account(book)}
+            />,
         );
         await chooseAndPay();
         fireEvent.click(
@@ -274,7 +295,12 @@ describe("the QR code a booking came from", () => {
         unmount();
         openAt("/book");
         render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account(book)} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account(book)}
+            />,
         );
         await chooseAndPay();
         fireEvent.click(

@@ -93,5 +93,24 @@ describe("Ask AI's page and common questions", () => {
             true,
         );
         expect(isAskAiStarter("What's my busiest day this year?")).toBe(false);
+        expect(
+            isAskAiStarter("How could this section's words be clearer?"),
+        ).toBe(true);
+    });
+
+    it("takes a page, a section and a post of the website", () => {
+        for (const about of [
+            { kind: "site_page", id: "s1:p1", label: "Home page" },
+            {
+                kind: "site_section",
+                id: "s1:p1:hero-1",
+                label: "Home · Top of the page",
+            },
+            { kind: "post", id: "s1:post1", label: "Our new menu" },
+        ]) {
+            expect(
+                askAiTurnBody.parse({ question: "Hi", about }).about,
+            ).toEqual(about);
+        }
     });
 });

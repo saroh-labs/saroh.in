@@ -76,6 +76,25 @@ describe("the shared style rule", () => {
         expect(colourwayOfPalette(undefined, colourways)).toBe(null);
     });
 
+    it("never charges a component style (DEC-237, KD4: free on every plan)", () => {
+        const withComponents = {
+            ...stored,
+            components: { buttons: "square", cards: "raised" },
+        } as StyleChoiceHeld;
+        expect(
+            paidStyleParts(withComponents, {
+                stored,
+                templateId: F.templateId,
+                colourways,
+                free,
+            }),
+        ).toEqual([]);
+        // The paid kinds name no component (`StyleKind`).
+        expect(Object.keys(heldStyleIds(withComponents, colourways))).toEqual(
+            Object.keys(heldStyleIds(stored, colourways)),
+        );
+    });
+
     it("charges no colourway on a site with no template", () => {
         expect(
             paidStyleParts(next("colourway", "paid"), {

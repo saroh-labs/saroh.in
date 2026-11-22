@@ -58,6 +58,10 @@ import {
 } from "@/content/templates";
 import { SOLUTION_SLUGS } from "@/content/types";
 import { UPDATED as WAITLIST_UPDATED } from "@/content/waitlist";
+import {
+    LIBRARY_PATH,
+    UPDATED as LIBRARY_UPDATED,
+} from "@/content/website-library";
 import { docPages } from "@/lib/docs-pages";
 import { helpArticles } from "@/lib/help-docs";
 import { integrationMeta } from "@/lib/integration-docs";
@@ -187,6 +191,7 @@ const PAGE_DAYS: Readonly<Record<string, string>> = {
     "/changelog": CHANGELOG_UPDATED,
     [TEMPLATES_PATH]: TEMPLATES_UPDATED,
     [DEVELOPERS_PATH]: DEVELOPERS_UPDATED,
+    [LIBRARY_PATH]: LIBRARY_UPDATED,
     "/tools/link-preview": LINK_PREVIEW_UPDATED,
     "/tools/qr-code-maker": QR_CODE_MAKER_UPDATED,
 };

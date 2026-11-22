@@ -147,7 +147,7 @@ describe("what the pages say", () => {
         expect(templateDetail.notes.look(gym).body).toBe(
             "Set in Archivo Narrow and Archivo, in two colourways: Acid and Ice. Nothing in it is Saroh's.",
         );
-        expect(templateDetail.notes.pages(must("bakery")).title).toBe(
+        expect(templateDetail.notes.pages(must("clinic")).title).toBe(
             "One page",
         );
     });

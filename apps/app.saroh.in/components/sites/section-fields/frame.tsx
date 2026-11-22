@@ -15,6 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
+import { useState } from "react";
 
 import type { Section } from "@/lib/sites/service";
 
@@ -52,9 +53,12 @@ const BANDS = [
 export function SectionFrameFields({
     section,
     onChange,
+    band: showBand = true,
 }: {
     section: Section;
     onChange: (next: Section) => void;
+    /** The band; the new inspector's Style › Background replaces it (U47). */
+    band?: boolean;
 }) {
     const content = section.content as Record<string, unknown>;
     const anchor = section.content.anchor ?? "";
@@ -79,21 +83,29 @@ export function SectionFrameFields({
     const chosen = BANDS.find((b) => b.id === band);
 
     const eyebrow = typeof content.eyebrow === "string" ? content.eyebrow : "";
+    // "Label above" is kept where a section already has one, never offered
+    // on a new one (R17). Decided once, so clearing it while typing doesn't
+    // take the field away; the inspector remounts this per section.
+    const [showEyebrow] = useState(eyebrow !== "");
 
     return (
         <div className="grid gap-3 border-t pt-4">
-            <Field label="Label above the heading">
-                <Input
-                    value={eyebrow}
-                    maxLength={EYEBROW_MAX}
-                    placeholder="Classes and services"
-                    onChange={(e) => set({ eyebrow: e.target.value })}
-                />
-            </Field>
-            <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-                Small capitals over the block's heading. The Quiet, Folio and
-                Live looks show it.
-            </p>
+            {showEyebrow ? (
+                <>
+                    <Field label="Label above the heading">
+                        <Input
+                            value={eyebrow}
+                            maxLength={EYEBROW_MAX}
+                            placeholder="Classes and services"
+                            onChange={(e) => set({ eyebrow: e.target.value })}
+                        />
+                    </Field>
+                    <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                        Small capitals over the block's heading. The Quiet,
+                        Folio and Live looks show it.
+                    </p>
+                </>
+            ) : null}
             <Field label="Menu label">
                 <Input
                     value={navLabel}
@@ -114,8 +126,8 @@ export function SectionFrameFields({
                 />
             </Field>
             <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-                On the home page, a block with a menu label is listed in your
-                site's menu, and the entry jumps to it.
+                On the home page, a section with a menu label is listed in your
+                site's menu, and tapping it there jumps here.
             </p>
             <Field label="Link name">
                 <Input
@@ -133,26 +145,33 @@ export function SectionFrameFields({
                 {problem ??
                     (anchor
                         ? `A button can link here with #${anchor}.`
-                        : "Give the block a link name to jump to it from a button or the menu.")}
+                        : "Give the section a link name to jump to it from a button or the menu.")}
             </p>
-            <Field label="Background">
-                <Select value={band} onValueChange={(id) => set({ band: id })}>
-                    <SelectTrigger>
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {BANDS.map((b) => (
-                            <SelectItem key={b.id} value={b.id}>
-                                {b.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
-            {chosen ? (
-                <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-                    {chosen.note}
-                </p>
+            {showBand ? (
+                <>
+                    <Field label="Background">
+                        <Select
+                            value={band}
+                            onValueChange={(id) => set({ band: id })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {BANDS.map((b) => (
+                                    <SelectItem key={b.id} value={b.id}>
+                                        {b.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                    {chosen ? (
+                        <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                            {chosen.note}
+                        </p>
+                    ) : null}
+                </>
             ) : null}
         </div>
     );

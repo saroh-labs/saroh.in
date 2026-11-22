@@ -7,6 +7,7 @@ import type { RenderedHero } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import { dateText } from "../booking-flow/model";
+import { EditableText } from "../editable-text";
 import { clockWords } from "../lib/clock";
 import type { OpeningHoursDay } from "../lib/opening-hours";
 import { isOpeningWeek, openState, openStateText } from "../lib/opening-hours";
@@ -17,6 +18,7 @@ import { CtaButton } from "./cta";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
 import PlainHero from "./hero-plain";
+import { PhoneText } from "./phone-text";
 
 /**
  * The hero with "On today" beside it (G18, R15), as the Customer Site design
@@ -131,11 +133,12 @@ function subLine(item: PublicTodayItem): string {
 
 interface Tag {
     text: string;
-    tone: "free" | "left" | "full";
+    tone: "open" | "left" | "full";
 }
 
 function tagOf(item: PublicTodayItem): Tag {
-    if (item.kind === "one") return { text: "Free", tone: "free" };
+    // "Open", never "Free": beside a price it read as free of charge (U8).
+    if (item.kind === "one") return { text: "Open", tone: "open" };
     const left = item.placesLeft ?? 0;
     return left > 0
         ? { text: `${left} left`, tone: "left" }
@@ -143,12 +146,12 @@ function tagOf(item: PublicTodayItem): Tag {
 }
 
 /*
- * The design's pills are green for Free and red for Full. A merchant's page
- * has only its own palette, so: Free wears the accent, a class with places the
+ * The design's pills are green for Open and red for Full. A merchant's page
+ * has only its own palette, so: Open wears the accent, a class with places the
  * quiet fill, and Full reads muted — the word carries the meaning.
  */
 const TAG_TONE: Record<Tag["tone"], string> = {
-    free: "bg-[color-mix(in_srgb,hsl(var(--site-accent))_16%,hsl(var(--site-surface)))] text-site-fg",
+    open: "bg-[color-mix(in_srgb,hsl(var(--site-accent))_16%,hsl(var(--site-surface)))] text-site-fg",
     left: "bg-[color-mix(in_srgb,hsl(var(--site-fg))_7%,hsl(var(--site-surface)))] text-site-fg",
     full: "bg-[color-mix(in_srgb,hsl(var(--site-fg))_7%,hsl(var(--site-surface)))] text-site-muted",
 };
@@ -266,7 +269,7 @@ export default function OnTodayHero({
     return (
         <SplitHero content={content} level={level} line={line}>
             <Panel
-                title={today.classes ? "On today" : "Free today"}
+                title={today.classes ? "On today" : "Open today"}
                 sub={dateText(today.date, true)}
             >
                 {today.items.length > 0 ? (
@@ -340,11 +343,16 @@ function SplitHero({
                         level={level}
                         className="font-site-heading text-balance text-[clamp(calc(38px*var(--site-heading-scale)),9vw,calc(64px*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]"
                     >
-                        {content.heading}
+                        <EditableText field="heading">
+                            {content.heading}
+                        </EditableText>
                     </HeroHeading>
                     {content.subheading ? (
                         <p className="mt-3.5 max-w-[44ch] text-pretty text-base leading-[1.55] opacity-75">
-                            {content.subheading}
+                            <PhoneText
+                                text={content.subheading}
+                                phone={content.phoneLine}
+                            />
                         </p>
                     ) : null}
                     {content.cta ? (
@@ -426,7 +434,7 @@ function Row({ item, bookHref }: { item: PublicTodayItem; bookHref?: string }) {
             </span>
             <span
                 className={cn(
-                    "whitespace-nowrap rounded-full px-[9px] py-[3px] text-[11.5px] font-bold",
+                    "whitespace-nowrap rounded-full px-[9px] py-[3px] text-[12px] font-bold",
                     TAG_TONE[tag.tone],
                 )}
             >

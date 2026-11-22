@@ -81,6 +81,8 @@ const REACHED_BY_HOLD_AWARE: Record<string, string> = {
         "Deletes no row. Imported by `domains.service.ts` for where a domain stands against the plan (DEC-139); its `.delete(` drops its own in-memory answer for a business (a Map).",
     "bookings/waitlist-merge.ts":
         "`removeWaitlistInTx`, called by `removeDetailsInTx` and so inside the eraser's `inEraseTx`; the eraser empties the waitlist first, so it finds nothing to pass on.",
+    "content/post-revision-retention.ts":
+        "`prunePostRevisions` takes the held businesses from `analytics.retention`, which reads the hold, and leaves their revisions out of the read and of the delete.",
     "site-accounts/sign-in-codes.service.ts":
         "Imported for `destinationHashFor` only. Its own deletes spend a one-time sign-in code when a customer signs in: a request, never a job.",
 };

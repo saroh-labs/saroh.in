@@ -1,4 +1,5 @@
 import type { RenderedTestimonials } from "@saroh/block-contract";
+import { EditableText } from "../editable-text";
 import type { LookProps } from "../look-context";
 import LookTestimonials from "./testimonials-look";
 
@@ -28,7 +29,9 @@ export default function TestimonialsSection({
                     data-site-title=""
                     className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </h2>
             ) : null}
 

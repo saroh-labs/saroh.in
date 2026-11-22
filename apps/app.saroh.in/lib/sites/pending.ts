@@ -21,6 +21,7 @@ export const SITE_CHANGE_KINDS = [
     "footer",
     "menu",
     "pages",
+    "redirects",
 ] as const;
 export type SiteChangeKind = (typeof SITE_CHANGE_KINDS)[number];
 
@@ -34,6 +35,7 @@ const LABELS: Record<SiteChangeKind, string> = {
     footer: "the footer",
     menu: "the menu",
     pages: "the page list",
+    redirects: "the old links that forward",
 };
 
 function isKind(value: string): value is SiteChangeKind {
@@ -79,6 +81,7 @@ const SHORT_LABELS: Record<SiteChangeKind, string> = {
     footer: "footer",
     menu: "menu",
     pages: "pages",
+    redirects: "old links",
 };
 
 /**
@@ -101,11 +104,18 @@ export function shortPendingChanges(
     return parts.length > 0 ? parts.join(", ") : null;
 }
 
-/** How many things publishing would change: sections plus site-level settings. */
+/**
+ * How many things publishing would change. The API's change-unit count
+ * (`pendingChanges`, U7) when it sent one, so every surface shows the
+ * Publish sheet's number; else, from an older API, sections plus
+ * site-level settings.
+ */
 export function pendingChangeCount(
     sections: number | null | undefined,
     site: readonly string[] | null | undefined,
+    units?: number | null,
 ): number {
+    if (typeof units === "number") return units;
     return (sections ?? 0) + (site ?? []).filter(isKind).length;
 }
 
@@ -120,6 +130,7 @@ const AREA_ROWS: Record<SiteChangeKind, { area: string; detail: string }> = {
     footer: { area: "Footer", detail: "Changed" },
     menu: { area: "Menu", detail: "Changed" },
     pages: { area: "Pages", detail: "Added, removed or renamed" },
+    redirects: { area: "Old links that forward", detail: "Added or removed" },
 };
 
 /**

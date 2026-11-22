@@ -333,6 +333,8 @@ describe("timetable", () => {
                 content={{ variant: "list", serviceIds: ["a", "b"] }}
                 siteId="site_gym"
                 apiUrl="https://api.test"
+                // Before the sample week: a live read marks started classes Done.
+                now={new Date("2026-10-01T00:00:00Z")}
             />,
         );
         await waitFor(() => expect(screen.getByText("Full")).toBeTruthy());

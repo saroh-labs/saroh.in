@@ -15,6 +15,7 @@ import {
 import { isDeepStrictEqual } from "node:util";
 
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
+import { stampDraftEditors, SYSTEM_EDITOR } from "./draft-editors";
 import { lockSite } from "./live-pointer";
 import { planTemplateFooter, planTemplateStyle } from "./site-create";
 import type { SiteFooter } from "./site-footer";
@@ -381,6 +382,12 @@ export async function upgradeSite(
                     : {}),
             },
         });
+        // No person did it: stamped as Saroh's, so the new look waits for
+        // approval and never rides on an owner's older stamp.
+        await stampDraftEditors(tx, site.id, SYSTEM_EDITOR, [
+            ...(look.nextStyle ? ["site:style"] : []),
+            ...(look.nextFooter ? ["site:footer"] : []),
+        ]);
         await tx.auditEvent.create({
             data: {
                 action: AuditAction.SiteTemplateUpgrade,

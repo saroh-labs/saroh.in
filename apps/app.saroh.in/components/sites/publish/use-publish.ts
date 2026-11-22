@@ -4,8 +4,10 @@ import { useCallback, useRef, useState } from "react";
 import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
 import { runAction } from "@/lib/api/run-action";
 import { getSiteFlags, publishSite } from "@/lib/sites/actions";
+import { readSiteChanges } from "@/lib/sites/changes-read";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import {
+    SITE_CHANGE_KINDS,
     describePendingChanges,
     shortPendingChanges,
 } from "@/lib/sites/pending";
@@ -30,6 +32,10 @@ export interface WentLive {
     record: string | null;
     /** The site's name as it went live. */
     siteName: string;
+    /** How many changes stayed in the draft (U11). */
+    leftOut?: number;
+    /** Left out with them, because they needed one of them (U8). */
+    alsoLeftOut?: string[];
 }
 
 /**
@@ -44,6 +50,7 @@ export function usePublish({
     initialNeverPublished,
     initialPendingChanges,
     initialPendingSiteChanges,
+    initialPendingUnits = null,
     refreshReview,
     initialNeedsApproval = false,
     canOverride = false,
@@ -55,6 +62,11 @@ export function usePublish({
     initialNeverPublished: boolean;
     initialPendingChanges: number | null;
     initialPendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * The change units waiting (U7), the number Overview and the chip show
+     * (RULES §2, KTD-E3). Absent or null: the two counts above, summed.
+     */
+    initialPendingUnits?: number | null;
     /** Publishing moves the review state too; the review hook re-reads it. */
     refreshReview: () => Promise<void>;
     /**
@@ -102,6 +114,27 @@ export function usePublish({
     const [pendingSiteChanges, setPendingSiteChanges] = useState<
         SiteChangeKind[] | null
     >(initialPendingSiteChanges);
+    /*
+     * The status chip's number (KTD-E3): the API's count of change units,
+     * the one Overview reads. Each save answers it; a site setting saved
+     * on its own clock is read again from `…/changes`, never guessed.
+     */
+    const [pendingUnits, setPendingUnits] = useState<number | null>(
+        initialPendingUnits,
+    );
+    const unitsRequest = useRef(0);
+    const refreshUnits = useCallback(async () => {
+        const request = ++unitsRequest.current;
+        const read = await readSiteChanges(siteId).catch(() => null);
+        if (request !== unitsRequest.current) return;
+        setPendingUnits(read ? read.units.length : null);
+        // A setting changed back to its live value stops waiting: Brand's
+        // Undo used to leave "brand" in Publish's line (editor audit F12).
+        if (read && read.count !== null) {
+            const keys = read.units.map((u) => u.key);
+            setPendingSiteChanges((prev) => siteKindsFromUnits(prev, keys));
+        }
+    }, [siteId]);
     const [checking, setChecking] = useState(false);
     /*
      * Whether anything is live yet (#288).
@@ -169,9 +202,14 @@ export function usePublish({
     function recordSaved(
         sections: number | null,
         site: SiteChangeKind[] | null,
+        units?: number | null,
     ) {
         setPendingChanges(sections);
         setPendingSiteChanges(site);
+        if (typeof units === "number") {
+            unitsRequest.current++;
+            setPendingUnits(units);
+        } else void refreshUnits();
     }
 
     /**
@@ -180,11 +218,15 @@ export function usePublish({
      * pill read "Published" (review). Stable, so the autosaves can depend on
      * it. The next section save recounts, and its answer replaces this.
      */
-    const markSitePending = useCallback((kind: SiteChangeKind) => {
-        setPendingSiteChanges((prev) =>
-            prev === null || prev.includes(kind) ? prev : [...prev, kind],
-        );
-    }, []);
+    const markSitePending = useCallback(
+        (kind: SiteChangeKind) => {
+            setPendingSiteChanges((prev) =>
+                prev === null || prev.includes(kind) ? prev : [...prev, kind],
+            );
+            void refreshUnits();
+        },
+        [refreshUnits],
+    );
     const markStylePending = useCallback(
         () => markSitePending("style"),
         [markSitePending],
@@ -224,16 +266,32 @@ export function usePublish({
         if (!read) setChecking(false);
     }
 
-    /** `siteName` is the name as it is now: the inspector can change it (G6). */
-    async function onPublish(siteName: string) {
+    /**
+     * `siteName` is the name as it is now: the inspector can change it (G6).
+     * `leaveOut`: change units that stay in the draft (U11); `overriding`:
+     * an owner put in a teammate's change that waits for approval (KTD-6).
+     */
+    async function onPublish(
+        siteName: string,
+        {
+            leaveOut = [],
+            overriding = false,
+        }: { leaveOut?: string[]; overriding?: boolean } = {},
+    ) {
         setPublishError(null);
         setPublishing(true);
         // With the setting on, only an owner's Publish goes through, and it
         // is sent as the override it is, so the record is written (T9).
-        const override = needsApproval && canOverride;
-        const res = await runAction(() => publishSite(siteId, override), {
-            setBusy: setPublishing,
-        });
+        const override = (needsApproval || overriding) && canOverride;
+        const res = await runAction(
+            () => publishSite(siteId, override, leaveOut),
+            {
+                setBusy: setPublishing,
+                // Never got there: said in the foot, beside Try again.
+                quiet: true,
+                onUnreached: (message) => setPublishError({ message }),
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             if (res.code === "APPROVAL_REQUIRED") {
@@ -243,8 +301,8 @@ export function usePublish({
                 setPublishError({
                     message: res.error,
                     detail: canOverride
-                        ? "Make a test release and get it approved, or publish without approval."
-                        : "Make a test release and get it approved, then go live with it.",
+                        ? "Make a test link and get it approved, or publish without approval."
+                        : "Make a test link and get it approved, then go live with it.",
                 });
                 return;
             }
@@ -261,7 +319,13 @@ export function usePublish({
               : null;
         // The sheet turns into the result: where the site is, and how to
         // pass it on. The site's name is the one on screen (G6).
-        setWentLive({ address: siteAddress, record, siteName });
+        setWentLive({
+            address: siteAddress,
+            record,
+            siteName,
+            leftOut: leaveOut.length,
+            alsoLeftOut: res.data.alsoLeftOut,
+        });
         /*
          * Everything the bar counted just went live, so the count is zero —
          * set here rather than left for the next autosave to recount, which
@@ -270,9 +334,16 @@ export function usePublish({
          * a bypass record, and the approval line should say so now rather
          * than after a reload. Flags are re-read for the same reason.
          */
-        setPendingChanges(0);
-        // The site-level settings went live too.
-        setPendingSiteChanges([]);
+        if (leaveOut.length === 0) {
+            setPendingChanges(0);
+            // The site-level settings went live too.
+            setPendingSiteChanges([]);
+            unitsRequest.current++;
+            setPendingUnits(0);
+        } else {
+            // What was left out still waits: counted afresh, never guessed.
+            await recountLeftOut();
+        }
         // Something is live now, so the button stops offering to publish the
         // site and the "nothing's live yet" line goes (#288).
         setNeverPublished(false);
@@ -296,7 +367,27 @@ export function usePublish({
         setNeverPublished(false);
         setPendingChanges(pending?.sections ?? null);
         setPendingSiteChanges(pending?.site ?? null);
-        await Promise.all([refreshFlags(), refreshReview()]);
+        await Promise.all([refreshFlags(), refreshReview(), refreshUnits()]);
+    }
+
+    /** After a publish that left some out: the count is what still waits. */
+    async function recountLeftOut() {
+        const left = await readSiteChanges(siteId).catch(() => null);
+        unitsRequest.current++;
+        if (!left) {
+            setPendingChanges(null);
+            setPendingSiteChanges(null);
+            setPendingUnits(null);
+            return;
+        }
+        setPendingUnits(left.units.length);
+        const kinds = new Set<string>(SITE_CHANGE_KINDS);
+        setPendingChanges(left.units.filter((u) => u.kind !== "site").length);
+        setPendingSiteChanges(
+            left.units
+                .map((u) => u.key.replace(/^site:/, ""))
+                .filter((k): k is SiteChangeKind => kinds.has(k)),
+        );
     }
 
     /** Leave the check, and its finished state with it. */
@@ -313,6 +404,7 @@ export function usePublish({
         setSiteAddress,
         pendingChanges,
         pendingSiteChanges,
+        pendingUnits,
         closeCheck,
         needsApproval,
         canOverride,
@@ -335,3 +427,29 @@ export function usePublish({
 }
 
 export type EditorPublish = ReturnType<typeof usePublish>;
+
+/**
+ * The site settings still waiting, as the change units have them: a
+ * `site:<kind>` unit is a kind waiting. Pages and old links are counted
+ * per page there, so they stay as the last save said.
+ */
+export function siteKindsFromUnits(
+    prev: SiteChangeKind[] | null,
+    unitKeys: readonly string[],
+): SiteChangeKind[] | null {
+    if (prev === null) return prev;
+    const site = new Set(
+        unitKeys
+            .filter((k) => k.startsWith("site:"))
+            .map((k) => k.slice("site:".length) as SiteChangeKind),
+    );
+    const kept = prev.filter(
+        (k) => k === "pages" || k === "redirects" || site.has(k),
+    );
+    site.forEach((k) => {
+        if (!kept.includes(k)) kept.push(k);
+    });
+    return kept.length === prev.length && kept.every((k, i) => k === prev[i])
+        ? prev
+        : kept;
+}

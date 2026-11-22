@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import { accountAreaOn, isAccountPath } from "@/lib/account-area-switch";
 import { TEST_HOST_ROBOTS } from "@/lib/crawl";
+import { withSitePolicy } from "@/lib/csp";
 import { isPayPath, TENANT_HOST_HEADER } from "@/lib/pay-host";
 import { privatePathHeaders } from "@/lib/private-paths";
 import { REQUEST_PATH_HEADER, requestPathOf } from "@/lib/request-path";
@@ -62,7 +63,11 @@ function isApexHost(hostname: string): boolean {
     );
 }
 
-export default function middleware(req: NextRequest) {
+// Every answer enforces the sites' Content-Security-Policy with a fresh
+// script nonce (`lib/csp.ts`).
+export default withSitePolicy(middleware);
+
+function middleware(req: NextRequest): NextResponse {
     const url = req.nextUrl;
 
     /*

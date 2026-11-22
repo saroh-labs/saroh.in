@@ -1,7 +1,15 @@
 jest.mock("@saroh/database", () => {
     const db: Record<string, unknown> = {
         store: { findFirst: jest.fn() },
-        site: { findFirst: jest.fn().mockResolvedValue({ id: "site_1" }) },
+        site: {
+            findFirst: jest.fn().mockResolvedValue({ id: "site_1" }),
+            // A verdict reads whether approval applies (21 Nov review): off.
+            findFirstOrThrow: jest.fn().mockResolvedValue({
+                id: "site_1",
+                publishNeedsApproval: false,
+            }),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
         page: {
             // The page, with the draft section a note can be pinned to (#277):
             // createComment refuses a key that is not on the page.

@@ -48,6 +48,32 @@ export interface BlockMeta<T extends SectionType> {
      * stays in `fixtures`, so adding a case never moves a published snapshot.
      */
     cases?: Record<string, RenderedContent<T>>;
+    /**
+     * Set when this block is one layout of a family (KD5, DEC-228): Contact
+     * and Hours are layouts of Visit us, Class packs of Plans. A catalogue
+     * view only: a stored section keeps its own type and bytes, and picking
+     * a layout inserts this type as before. The family's head is the type
+     * named by `of`; its `label` is the family's name.
+     */
+    family?: BlockFamilyRef;
+    /** Other names a merchant may search by: old labels stay findable (R5). */
+    aliases?: readonly string[];
+}
+
+/** Where a block sits in its family. */
+export interface BlockFamilyRef {
+    of: "visitUs" | "plans";
+    /** Stable layout id (KD14). */
+    layout: string;
+    /** The layout's name in Add and MCP. */
+    label: string;
+}
+
+/** One catalogue entry: a family head with its layouts (one for a lone block). */
+export interface BlockFamily {
+    head: SectionType;
+    name: string;
+    layouts: { type: SectionType; label: string }[];
 }
 
 /**
@@ -87,6 +113,12 @@ const heroVariants = [
         label: "No hero",
         description:
             "Just the page's heading and a line under it, small, for pages that go straight to a list.",
+    },
+    {
+        id: "answer",
+        label: "Answer panel",
+        description:
+            "The heading beside a panel that answers first: today's classes with places, the next free time, a same-day call, one consultation's price or when to pick up.",
     },
 ] as const;
 
@@ -158,7 +190,9 @@ const PROJECT_ITEMS = [
  */
 export const BLOCK_META = {
     hero: {
-        label: "Hero",
+        // RULES §1: a merchant's words. Search still finds the old name.
+        label: "Top of the page",
+        aliases: ["Hero"],
         description:
             "The opening statement of a page — a headline, an optional line beneath it, an optional button and image.",
         variants: heroVariants,
@@ -218,6 +252,20 @@ export const BLOCK_META = {
                 subheading:
                     "Notes on building small things, about once a month.",
             },
+            answer: {
+                variant: "answer",
+                heading: "Strength classes, small groups",
+                subheading:
+                    "Twelve to a class, coached from the first rep to the last.",
+                cta: {
+                    label: "See the timetable",
+                    href: "/timetable",
+                    style: "primary",
+                    action: { kind: "page" },
+                },
+                panel: { kind: "today" },
+                answerRow: true,
+            },
         },
         cases: {
             // A slot shipped as a brief (KTD-5): no photo yet, so the live
@@ -228,10 +276,36 @@ export const BLOCK_META = {
                 imageBrief:
                     "Morning light on the counter, loaves stacked, steam rising",
             },
+            // Same-day call with the owner's number and the default words.
+            sameDayCall: {
+                variant: "answer",
+                heading: "Dental care in Aundh",
+                cta: {
+                    label: "Book a check-up",
+                    href: "/book",
+                    style: "primary",
+                    action: { kind: "page" },
+                    phoneLabel: "Book",
+                },
+                panel: { kind: "sameDayCall", phone: "00000 01001" },
+                byline: { name: "Dr Meera Rao", role: "Dentist" },
+                phoneLine: "Check-ups and same-day care.",
+            },
+            // Pickup: the owner's order-by line and where.
+            pickup: {
+                variant: "answer",
+                heading: "Cakes to order",
+                panel: {
+                    kind: "pickup",
+                    orderBy: "Order by 9 pm for tomorrow",
+                    where: "From the counter, MG Road",
+                },
+            },
         },
     },
     richText: {
-        label: "Rich text",
+        label: "Text",
+        aliases: ["Rich text"],
         description:
             "A block of written copy. Sanitized at publish, so what reaches a page is already clean.",
         /*
@@ -300,7 +374,8 @@ export const BLOCK_META = {
         },
     },
     cta: {
-        label: "Call to action",
+        label: "Big button",
+        aliases: ["Call to action", "CTA"],
         description: "A band with one button, asking for the next step.",
         variants: soleVariant("A centred button on the call-to-action colour."),
         fixtures: {
@@ -340,11 +415,36 @@ export const BLOCK_META = {
                 description:
                     "Columns that keep each image's own proportions rather than cropping to a grid.",
             },
+            {
+                id: "lookbook",
+                label: "Lookbook",
+                description:
+                    "Large photos, each with a name, a from-price and a link to the service, product or page it shows.",
+            },
         ] as const,
         fixtures: {
             grid: { variant: "grid", images: [...GALLERY_IMAGES] },
             carousel: { variant: "carousel", images: [...GALLERY_IMAGES] },
             masonry: { variant: "masonry", images: [...GALLERY_IMAGES] },
+            lookbook: {
+                variant: "lookbook",
+                images: [
+                    {
+                        ...GALLERY_IMAGES[0],
+                        name: "Sourdough, whole",
+                        fromPrice: "From 180",
+                        link: {
+                            kind: "product",
+                            productId: "sample-sourdough",
+                        },
+                    },
+                    {
+                        ...GALLERY_IMAGES[1],
+                        name: "Bread class, Saturday",
+                        link: { kind: "service", serviceId: "fixture-class" },
+                    },
+                ],
+            },
         },
         cases: {
             // A line under each photo (U2), as the studio design writes them.
@@ -398,7 +498,8 @@ export const BLOCK_META = {
         },
     },
     features: {
-        label: "Features",
+        label: "Highlights",
+        aliases: ["Features"],
         description:
             "A heading over a set of short, titled points — what you do, or what a visitor gets.",
         /*
@@ -431,6 +532,12 @@ export const BLOCK_META = {
                 label: "Facts row",
                 description:
                     "Short facts side by side: each point's figure set large, its title as the label under it. For a few numbers worth knowing first.",
+            },
+            {
+                id: "band",
+                label: "Band",
+                description:
+                    "The facts row on a full-width band of colour, for a promise worth stopping on: delivery, pickup, how it works.",
             },
         ] as const,
         fixtures: {
@@ -490,6 +597,14 @@ export const BLOCK_META = {
                     },
                 ],
             },
+            band: {
+                variant: "band",
+                items: [
+                    { title: "Order by", value: "9 pm" },
+                    { title: "Ready from", value: "7 am" },
+                    { title: "Delivered within", value: "5 km" },
+                ],
+            },
             facts: {
                 variant: "facts",
                 items: [
@@ -528,8 +643,23 @@ export const BLOCK_META = {
         label: "Booking",
         description:
             "A widget a visitor reserves a slot through, against one bookable Service.",
-        variants: soleVariant("A date and slot picker with a confirm button."),
+        variants: [
+            ...soleVariant("A date and slot picker with a confirm button."),
+            {
+                id: "nextOpen",
+                label: "Next open",
+                description:
+                    "The next three open days with their times, and a month strip for the rest. Opens the booking page.",
+            },
+        ] as const,
         fixtures: {
+            nextOpen: {
+                variant: "nextOpen",
+                serviceId: "fixture-service",
+                title: "Book a consultation",
+                beforeYouBook:
+                    "Bring any recent reports. The first visit takes about 45 minutes.",
+            },
             default: {
                 variant: "default",
                 // A booking block with no `serviceId` renders NOTHING at all
@@ -557,7 +687,9 @@ export const BLOCK_META = {
      * later, not a new block.
      */
     faq: {
-        label: "FAQ",
+        // RULES §1: the merchant's words; the old name still finds it.
+        label: "Questions and answers",
+        aliases: ["FAQ"],
         description:
             "Questions a visitor would otherwise call to ask, each answer one tap away.",
         variants: soleVariant(
@@ -570,7 +702,7 @@ export const BLOCK_META = {
                 items: [
                     {
                         question: "Do you deliver outside the city?",
-                        answer: "Yes, anywhere on the mainland. Orders over £150 go free; below that it is a flat £12.",
+                        answer: "Yes, anywhere in the country. Larger orders go free; below that there is a flat delivery charge.",
                     },
                     {
                         question: "Can I collect instead?",
@@ -585,7 +717,8 @@ export const BLOCK_META = {
         },
     },
     testimonials: {
-        label: "Testimonials",
+        label: "What customers say",
+        aliases: ["Testimonials", "Reviews"],
         description:
             "What customers said, in their words and under their names.",
         variants: soleVariant(
@@ -616,6 +749,8 @@ export const BLOCK_META = {
     },
     contact: {
         label: "Contact",
+        family: { of: "visitUs", layout: "talk", label: "Talk to us" },
+        aliases: ["Contact", "Contact us"],
         description:
             "Where to find you and how to reach you: address, hours, phone, email and WhatsApp.",
         variants: soleVariant(
@@ -653,8 +788,42 @@ export const BLOCK_META = {
                 description:
                     "One appointment as a card — its price set large, how long it takes and a button — beside what it includes. For a practice with a single consultation.",
             },
+            {
+                id: "cards",
+                label: "Cards",
+                description:
+                    "Services side by side as cards, each with its price, how long it takes and Book.",
+            },
+            {
+                id: "menu",
+                label: "Menu",
+                description:
+                    "Services under headings you name, like a salon's price list: Hair, Colour, Nails. Anything not in a heading goes under More.",
+            },
         ] as const,
         fixtures: {
+            cards: {
+                variant: "cards",
+                heading: "Services",
+                serviceIds: [
+                    "fixture-cut",
+                    "fixture-colour",
+                    "fixture-consult",
+                ],
+            },
+            menu: {
+                variant: "menu",
+                heading: "Price list",
+                serviceIds: [
+                    "fixture-cut",
+                    "fixture-colour",
+                    "fixture-consult",
+                ],
+                groups: [
+                    { name: "Hair", serviceIds: ["fixture-cut"] },
+                    { name: "Colour", serviceIds: ["fixture-colour"] },
+                ],
+            },
             priceCard: {
                 variant: "priceCard",
                 heading: "One consultation",
@@ -692,12 +861,32 @@ export const BLOCK_META = {
     },
     visitUs: {
         label: "Visit us",
+        family: {
+            of: "visitUs",
+            layout: "address",
+            label: "Address and hours",
+        },
+        aliases: ["Address", "Location", "Directions"],
         description:
             "One shop's address, opening hours and phone, with Open now and Get directions, read live from the storefront.",
-        variants: soleVariant(
-            "A card with the address and the week's hours, a call button and a directions link.",
-        ),
+        variants: [
+            ...soleVariant(
+                "A card with the address and the week's hours, a call button and a directions link.",
+            ),
+            {
+                id: "map",
+                label: "With map",
+                description:
+                    "A wide band: the shop's photo or map beside the address, today's hours and Directions.",
+            },
+        ] as const,
         fixtures: {
+            map: {
+                variant: "map",
+                title: "Find us",
+                storeId: "fixture-shop",
+                extraLine: "Parking at the back",
+            },
             default: {
                 variant: "default",
                 title: "Come and see us",
@@ -766,14 +955,41 @@ export const BLOCK_META = {
     },
     plans: {
         label: "Plans",
+        family: { of: "plans", layout: "plans", label: "Plans" },
         description:
             "The business's subscription plans on sale, with price and how often, read live from Payments.",
-        variants: soleVariant(
-            "Cards with how often, the plan's name, its description and price, and a button; the first can be highlighted.",
-        ),
+        variants: [
+            ...soleVariant(
+                "Cards with how often, the plan's name, its description and price, and a button; the first can be highlighted.",
+            ),
+            {
+                id: "compare",
+                label: "Compare",
+                description:
+                    "A table of what each plan includes, row by row, every cell in words, with the buttons under it.",
+            },
+        ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component sample plans.
             default: { variant: "default", title: "Memberships" },
+            compare: {
+                variant: "compare",
+                title: "Which one fits",
+                show: "both",
+                includes: [
+                    {
+                        label: "Evening classes",
+                        cells: [{ id: "sample-full", words: "Every one" }],
+                    },
+                    {
+                        label: "Open gym",
+                        cells: [
+                            { id: "sample-off-peak", words: "When staffed" },
+                            { id: "sample-full", words: "When staffed" },
+                        ],
+                    },
+                ],
+            },
         },
         cases: {
             // No highlight, no descriptions, the merchant's own button.
@@ -840,10 +1056,20 @@ export const BLOCK_META = {
                 showAvailability: true,
                 note: "Baked this morning. What is gone usually goes before ten.",
             },
+            // Add in place, a Pre-order tag and the cut-off line (DEC-237).
+            preorder: {
+                variant: "default",
+                title: "Cakes for the weekend",
+                addInPlace: true,
+                preorderWords: "Pre-order for Saturday",
+                cutOff: "Order by 9 pm Thursday",
+            },
         },
     },
     packs: {
         label: "Class packs",
+        family: { of: "plans", layout: "packs", label: "Class packs" },
+        aliases: ["Class packs", "Packs"],
         description:
             "The business's class packs on sale, with how many classes, how long they last and the price, read live.",
         variants: soleVariant(
@@ -1017,6 +1243,12 @@ export const BLOCK_META = {
                     "Each day in turn, its classes one per row. Better for a short week.",
             },
             {
+                id: "today",
+                label: "Today",
+                description:
+                    "Today's classes in order, with the places left and a link to the whole week. The page carries the week; the browser marks today.",
+            },
+            {
                 id: "accent",
                 label: "Bold week",
                 description:
@@ -1027,6 +1259,7 @@ export const BLOCK_META = {
             // The catalog and the snapshot hand the component a sample week.
             grid: { variant: "grid", title: "This week" },
             list: { variant: "list", title: "This week" },
+            today: { variant: "today", title: "Today", placesFrom: 3 },
             accent: {
                 variant: "accent",
                 title: "This week",
@@ -1038,6 +1271,8 @@ export const BLOCK_META = {
     },
     hours: {
         label: "Opening hours",
+        family: { of: "visitUs", layout: "hours", label: "Hours" },
+        aliases: ["Opening hours", "Hours"],
         description:
             "The week's opening hours as a table, read live from Settings › Hours. Closed days are said, not left out.",
         variants: soleVariant(
@@ -1058,7 +1293,8 @@ export const BLOCK_META = {
         },
     },
     person: {
-        label: "Person",
+        label: "People",
+        aliases: ["Person", "Team"],
         description:
             "One practitioner: a photo, their name, what they do, their qualifications and a few lines about them.",
         /*
@@ -1186,6 +1422,47 @@ export function listBlockMeta(): {
         type,
         meta: BLOCK_META[type],
     }));
+}
+
+/**
+ * What the editor and MCP call a section: "Visit us · Hours" for a family
+ * member, the block's label otherwise ("Plans" where layout and family agree).
+ */
+export function blockHeading(type: SectionType): string {
+    const meta: BlockMeta<SectionType> = BLOCK_META[type];
+    if (!meta.family) return meta.label;
+    const name = BLOCK_META[meta.family.of].label;
+    return meta.family.label === name ? name : `${name} · ${meta.family.label}`;
+}
+
+/** Everything a search for a block should match, lower-cased. */
+export function blockSearchText(type: SectionType): string {
+    const meta: BlockMeta<SectionType> = BLOCK_META[type];
+    return [blockHeading(type), meta.label, ...(meta.aliases ?? [])]
+        .join(" ")
+        .toLowerCase();
+}
+
+/**
+ * `types` grouped one entry per family, in the order given; the head's
+ * layout leads its family, and a family whose head is missing from `types`
+ * still groups its other layouts under the head's name.
+ */
+export function blockFamilies(types: readonly SectionType[]): BlockFamily[] {
+    const byHead = new Map<SectionType, BlockFamily>();
+    for (const type of types) {
+        const meta: BlockMeta<SectionType> = BLOCK_META[type];
+        const head = meta.family?.of ?? type;
+        let entry = byHead.get(head);
+        if (!entry) {
+            entry = { head, name: BLOCK_META[head].label, layouts: [] };
+            byHead.set(head, entry);
+        }
+        const layout = { type, label: meta.family?.label ?? meta.label };
+        if (type === head) entry.layouts.unshift(layout);
+        else entry.layouts.push(layout);
+    }
+    return Array.from(byHead.values());
 }
 
 /**

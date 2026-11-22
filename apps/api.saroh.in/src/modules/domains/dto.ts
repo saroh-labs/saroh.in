@@ -47,7 +47,7 @@ const HOSTNAME_MSG =
 export const TEST_RESERVED_HOSTNAME_RE = /^test(?:\.|--)/;
 
 export const TEST_RESERVED_HOSTNAME_MSG =
-    "Addresses starting with test. are kept for test releases. Choose another.";
+    "Addresses starting with test. are kept for test links. Choose another.";
 
 /** True for a hostname {@link TEST_RESERVED_HOSTNAME_RE} keeps back. */
 export function isTestReservedHostname(hostname: string): boolean {

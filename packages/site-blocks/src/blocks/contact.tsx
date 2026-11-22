@@ -1,5 +1,6 @@
 import type { RenderedContact } from "@saroh/block-contract";
 import { ctaHref, isSafeHref } from "@saroh/block-contract";
+import { EditableText } from "../editable-text";
 import type { LookProps } from "../look-context";
 
 /**
@@ -89,12 +90,14 @@ export default function ContactSection({
                     data-site-title=""
                     className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </h2>
             ) : null}
             {content.intro ? (
                 <p className="text-site-body mt-3 max-w-2xl text-lg">
-                    {content.intro}
+                    <EditableText field="intro">{content.intro}</EditableText>
                 </p>
             ) : null}
 

@@ -1,5 +1,5 @@
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { onTransaction, prisma } from "@saroh/database";
 
 import { keptByCut, pausedByCut } from "../billing/over-limit";
 import { overLimit } from "../billing/over-limit.service";
@@ -12,14 +12,20 @@ import { pausedByPlan } from "../billing/paused-errors";
  * (unpublish) and deleting it stay allowed. A draft is never counted, so
  * never paused. Nothing pauses with `PLAN_ENFORCEMENT` off or off the
  * catalogue.
+ *
+ * Inside a transaction, pass it as `tx`: every read then runs on that
+ * connection, never a second one while it is held (04 W5, A-01).
  */
 export async function assertPostEditable(
     organizationId: string,
     postId: string,
+    tx?: Prisma.TransactionClient,
 ): Promise<void> {
-    const paused = await overLimit.pausedNow(organizationId);
+    const paused = tx
+        ? await onTransaction(tx, () => overLimit.pausedNow(organizationId))
+        : await overLimit.pausedNow(organizationId);
     if (!paused?.posts) return;
-    const post = await prisma.post.findFirst({
+    const post = await (tx ?? prisma).post.findFirst({
         where: { id: postId, site: { organizationId, deletedAt: null } },
         select: { id: true, createdAt: true, currentPublicationId: true },
     });

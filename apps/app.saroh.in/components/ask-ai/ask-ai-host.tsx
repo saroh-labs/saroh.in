@@ -41,29 +41,59 @@ export function AskAiHost({
     businessName: string;
     zone: string;
 }) {
+    // Nothing is read until it is first opened.
+    const [seen, setSeen] = useState(false);
+    const ai = useAskAi({ state, active: seen });
+    return (
+        <AskAiSheet
+            ai={ai}
+            businessName={businessName}
+            zone={zone}
+            onSeen={() => setSeen(true)}
+        />
+    );
+}
+
+/**
+ * The sheet alone, on a conversation held above it: the shell's host, and
+ * the editors' on a phone or a narrow window (`EditorAskAiProvider`), whose
+ * conversation is also the one docked in the right column at the desk.
+ */
+export function AskAiSheet({
+    ai,
+    businessName,
+    zone,
+    onSeen,
+}: {
+    ai: ReturnType<typeof useAskAi>;
+    businessName: string;
+    zone: string;
+    onSeen: () => void;
+}) {
     const desk = useSyncExternalStore(
         subscribe,
         () => window.matchMedia(DESK).matches,
         () => true,
     );
     const [open, setOpen] = useState(false);
-    // Nothing is read until it is first opened.
-    const [seen, setSeen] = useState(false);
-    const ai = useAskAi({ state, active: seen });
+    const seen = useRef(onSeen);
+    useEffect(() => {
+        seen.current = onSeen;
+    });
     const box = useRef<HTMLTextAreaElement>(null);
     const back = useRef<HTMLElement | null>(null);
 
     useEffect(() => {
         const show = () => {
             back.current ??= document.activeElement as HTMLElement | null;
-            setSeen(true);
+            seen.current();
             setOpen(true);
         };
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 if (onAskPage()) return;
-                setSeen(true);
+                seen.current();
                 setOpen((o) => {
                     if (!o) {
                         back.current =
@@ -91,6 +121,7 @@ export function AskAiHost({
                 side={desk ? "right" : "bottom"}
                 // Close lives in the panel's header row (board 17).
                 closeButton={false}
+                data-ask-ai-panel=""
                 // Ask AI's own size on the shared sheet: 480 wide at the
                 // desk, the whole screen on a phone; the panel pads itself.
                 className={

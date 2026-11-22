@@ -28,6 +28,7 @@ export const browserEnv = {
     NEXT_PUBLIC_SOCIAL: process.env.NEXT_PUBLIC_SOCIAL,
     NEXT_PUBLIC_DEVELOPERS: process.env.NEXT_PUBLIC_DEVELOPERS,
     NEXT_PUBLIC_DOCS: process.env.NEXT_PUBLIC_DOCS,
+    NEXT_PUBLIC_WEBSITE_LIBRARY: process.env.NEXT_PUBLIC_WEBSITE_LIBRARY,
     // The claim switches (DEC-221), for the claims drawn in client components.
     NEXT_PUBLIC_CLAIM_SOCIAL_POSTING:
         process.env.NEXT_PUBLIC_CLAIM_SOCIAL_POSTING,
@@ -67,6 +68,7 @@ export const browserEnv = {
     | "NEXT_PUBLIC_SOCIAL"
     | "NEXT_PUBLIC_DEVELOPERS"
     | "NEXT_PUBLIC_DOCS"
+    | "NEXT_PUBLIC_WEBSITE_LIBRARY"
     | "NEXT_PUBLIC_CLAIM_SOCIAL_POSTING"
     | "NEXT_PUBLIC_CLAIM_SHARE_EVERY_PLAN"
     | "NEXT_PUBLIC_CLAIM_ASK_AI_STOCK"

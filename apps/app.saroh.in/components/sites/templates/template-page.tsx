@@ -68,8 +68,6 @@ export function TemplatePage({
                     look={look}
                     footer={render.footer}
                     name={render.name}
-                    navigation={render.navigation}
-                    shopServes={render.shopServes}
                 />
             </div>
         </SiteThemeScope>

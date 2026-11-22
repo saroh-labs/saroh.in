@@ -7,7 +7,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 /**
  * A list screen's search and filters, as a GET form: the query string is
@@ -37,6 +37,9 @@ export function FilterBar({
     const [open, setOpen] = useState(false);
     const [picked, setPicked] = useState(0);
     const formRef = useRef<HTMLFormElement>(null);
+    // The old rows stay, greyed, until the new ones land: a search-param
+    // change shows no loading.tsx, and the frame must never blank.
+    const [pending, startTransition] = useTransition();
 
     const submit = (form: HTMLFormElement) => {
         const params = new URLSearchParams();
@@ -45,7 +48,11 @@ export function FilterBar({
                 params.set(key, value.trim());
         }
         const query = params.toString();
-        router.push(query ? `${action}?${query}` : action);
+        startTransition(() =>
+            router.push(query ? `${action}?${query}` : action, {
+                scroll: false,
+            }),
+        );
     };
     const onSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -72,8 +79,20 @@ export function FilterBar({
             onSubmit={onSubmit}
             onChange={onChange}
             ref={formRef}
-            className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(160px,320px))]"
+            aria-busy={pending || undefined}
+            data-pending={pending ? "" : undefined}
+            className="relative grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(160px,320px))] [&[data-pending]~*]:opacity-60 [&~*]:transition-opacity"
         >
+            {pending ? (
+                // The sweep in a span of its own: `.skeleton-sweep` sets
+                // `position: relative`, which would make it a grid cell.
+                <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-3 bottom-0 h-0.5"
+                >
+                    <span className="skeleton-sweep block h-full rounded-full bg-muted-foreground/40" />
+                </span>
+            ) : null}
             {search}
             <Button
                 type="button"

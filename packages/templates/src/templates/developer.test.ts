@@ -10,7 +10,13 @@ import { describe, expect, it } from "vitest";
 import { instantiateTemplate } from "../instantiate";
 import type { TemplateContext } from "../manifest";
 import { getTemplate, listTemplates } from "../registry";
-import { DEVELOPER_TEMPLATE_ID, developerTemplate } from "./developer";
+import {
+    DEVELOPER_CASE_STUDY_PATH,
+    DEVELOPER_TEMPLATE_ID,
+    developerTemplateV1 as developerTemplate,
+    developerTemplate as developerV2,
+} from "./developer";
+import { firstSection, redesignChecks } from "./redesign-checks";
 
 /** Every string anywhere in a section's content, however deeply nested. */
 function strings(value: unknown): string[] {
@@ -69,10 +75,10 @@ function copyOf(ctx: TemplateContext): string {
 }
 
 describe("developer@1 (industry templates U9)", () => {
-    it("is registered as the latest developer template", () => {
+    it("is registered, and kept for the sites made from it", () => {
         expect(DEVELOPER_TEMPLATE_ID).toBe("developer");
-        expect(getTemplate("developer")).toBe(developerTemplate);
-        expect(listTemplates()).toContain(developerTemplate);
+        expect(getTemplate("developer", 1)).toBe(developerTemplate);
+        expect(listTemplates()).not.toContain(developerTemplate);
     });
 
     it("says what the gallery shows: a portfolio for creators, taking enquiries", () => {
@@ -366,5 +372,46 @@ describe("developer@1 (industry templates U9)", () => {
                 { name: "message", type: "textarea" },
             ],
         });
+    });
+});
+
+describe("developer@2 (U10, overdrive)", () => {
+    const all = profiles.map(([, ctx]) => ctx);
+    redesignChecks(developerV2, developerTemplate, all);
+
+    it("opens on Work with me, then when the owner is free", () => {
+        const ctx = profiles[0][1];
+        const hero = firstSection(developerV2, ctx);
+        expect(hero?.content).toMatchObject({
+            cta: { label: "Work with me", href: "/#hire" },
+            secondaryCta: {
+                label: "Read the case study",
+                href: DEVELOPER_CASE_STUDY_PATH,
+            },
+        });
+        const [home] = instantiateTemplate(developerV2, ctx).pages;
+        expect(home.sections[1]?.content).toMatchObject({
+            anchor: "availability",
+        });
+        // The enquiry is where Work with me lands.
+        expect(home.sections.at(-1)).toMatchObject({ type: "enquiry" });
+        expect(home.sections.at(-1)?.content).toMatchObject({ anchor: "hire" });
+    });
+
+    it("tells the case study on a page of its own, in the menu", () => {
+        const page = instantiateTemplate(
+            developerV2,
+            profiles[0][1],
+        ).pages.find((p) => p.path === DEVELOPER_CASE_STUDY_PATH);
+        expect(page?.inMenu).toBe(true);
+        expect(page?.sections.map((s) => s.type)).toEqual([
+            "hero",
+            "richText",
+            "cta",
+        ]);
+        expect(page?.sections[1]?.content).toMatchObject({
+            partLabels: true,
+        });
+        expect(page?.sections[1]?.content).not.toHaveProperty("navLabel");
     });
 });

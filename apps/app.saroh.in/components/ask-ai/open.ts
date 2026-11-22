@@ -26,3 +26,15 @@ export function openAskAi() {
 export function sayAskAiShown(open: boolean) {
     window.dispatchEvent(new CustomEvent(ASK_AI_SHOWN, { detail: open }));
 }
+
+/**
+ * Ask AI applied or undid a change to a website's draft (owner, 21 Nov):
+ * the open editor reads its draft again. `detail` is the site's id.
+ */
+export const SITE_DRAFT_CHANGED = "saroh:site-draft-changed";
+
+export function saySiteDraftChanged(siteId: string) {
+    window.dispatchEvent(
+        new CustomEvent(SITE_DRAFT_CHANGED, { detail: siteId }),
+    );
+}
