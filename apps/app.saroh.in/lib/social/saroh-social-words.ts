@@ -152,6 +152,13 @@ export const SOCIAL_WORDS = {
     cancelledDone: "Post cancelled.",
     moved: (when: string) => `Moved to ${when}.`,
     scheduledFor: (when: string) => `Scheduled for ${when}.`,
+    /**
+     * Who holds a scheduled post (owner, 22 Nov 2026): Saroh, for every
+     * channel. Instagram and Threads can't schedule from an app, so their
+     * own apps never list it; one rule says so for all three.
+     */
+    heldBySaroh: (channels: string, when: string) =>
+        `Saroh posts this to ${channels} on ${when}. Until then it's only here: it won't show in their own apps.`,
     postingNow: "Posting now. It shows here as each channel answers.",
     tryingAgain: "Trying again.",
     captionSaved: "Caption changed.",

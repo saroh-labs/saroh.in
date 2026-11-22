@@ -597,6 +597,42 @@ describe("a post's sheet (S5, S6)", () => {
         expect(q("[data-post-results]")?.textContent).toContain("Nothing yet");
     });
 
+    it("says Saroh holds a scheduled post, with Move and Post now beside it (owner, 22 Nov 2026)", async () => {
+        const waiting = {
+            reason: null,
+            retryAfter: null,
+            permalink: null,
+            postedAt: null,
+            status: "WAITING" as const,
+        };
+        await act(async () => {
+            await Promise.resolve();
+            root.render(
+                <PostSheet
+                    post={{
+                        ...post("x2", "SCHEDULED", "2026-11-24T14:10:00.000Z"),
+                        channels: [
+                            { kind: "INSTAGRAM", ...waiting },
+                            { kind: "FACEBOOK", ...waiting },
+                        ],
+                    }}
+                    access={ON}
+                    channels={[channel("INSTAGRAM", "CONNECTED")]}
+                    canPost
+                    narrow={false}
+                    onClose={() => undefined}
+                />,
+            );
+        });
+        const line = q("[data-held-by-saroh]")?.textContent ?? "";
+        expect(line).toMatch(
+            /^Saroh posts this to Instagram and Facebook Page on Tue 24 Nov, /,
+        );
+        expect(line).toContain("it won't show in their own apps");
+        expect(q("[data-post-action=time]")?.textContent).toBe("Move");
+        expect(q("[data-post-action=now]")?.textContent).toBe("Post now");
+    });
+
     it("says results couldn't be read, never 0", async () => {
         actions.postResults.mockResolvedValue({ ok: false });
         await act(async () => {
