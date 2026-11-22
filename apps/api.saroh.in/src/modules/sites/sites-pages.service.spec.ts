@@ -21,6 +21,8 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
             create: jest.fn(),
         },
+        // Where Our team is (ER3Team T4).
+        section: { findFirst: jest.fn() },
         // Who deleted a page (change units, U7).
         $executeRaw: jest.fn().mockResolvedValue(1),
         // A page write and its forwards run in one transaction.
@@ -977,5 +979,33 @@ describe("SitesService.buildSnapshot: old links and a page's own head", () => {
             shareImageUrl: "https://cdn.example.com/bridal.jpg",
             noindex: true,
         });
+    });
+});
+
+describe("teamPage (ER3Team T4)", () => {
+    const sectionFindFirst = prisma.section.findFirst as jest.Mock;
+
+    it("names the draft page holding the team look, in this business", async () => {
+        sectionFindFirst.mockResolvedValue({
+            pageVersion: { page: { id: "page_team", siteId: "site_1" } },
+        });
+        await expect(service.teamPage(ctx())).resolves.toEqual({
+            siteId: "site_1",
+            pageId: "page_team",
+        });
+        expect(sectionFindFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    type: "person",
+                    content: { path: ["variant"], equals: "team" },
+                }),
+            }),
+        );
+    });
+
+    it("is null with no Our team section", async () => {
+        sectionFindFirst.mockResolvedValue(null);
+        await expect(service.teamPage(ctx())).resolves.toBeNull();
     });
 });

@@ -56,6 +56,8 @@ export function PersonFields({
     const team = resolveVariant("person", c) === "team";
     const hintId = useId();
     const image = c.image?.src ? c.image : undefined;
+    // Our team with nobody on it: no first person to give a photo or words.
+    const empty = team && c.name === "" && !c.people?.length;
 
     return (
         <div className="grid gap-3">
@@ -66,45 +68,50 @@ export function PersonFields({
                     onChange={(content) => onChange({ ...section, content })}
                 />
             ) : null}
-            <Field label="Photo">
-                <div className="flex items-start gap-2.5">
-                    {image ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photo, a thumbnail outside next/image's allowlist
-                        <img
-                            src={image.src}
-                            alt=""
-                            className="h-14 w-11 flex-none rounded-md border border-border object-cover"
+            {empty ? null : (
+                <Field label="Photo">
+                    <div className="flex items-start gap-2.5">
+                        {image ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photo, a thumbnail outside next/image's allowlist
+                            <img
+                                src={image.src}
+                                alt=""
+                                className="h-14 w-11 flex-none rounded-md border border-border object-cover"
+                            />
+                        ) : null}
+                        <MediaPicker
+                            className="min-w-0 flex-1"
+                            label={image ? "Replace…" : "Upload a photo…"}
+                            onPick={(picked) =>
+                                patch({
+                                    image: {
+                                        src: picked.src,
+                                        alt: image?.alt,
+                                        width: picked.width,
+                                        height: picked.height,
+                                        ...pickedSizes(picked),
+                                    },
+                                })
+                            }
                         />
-                    ) : null}
-                    <MediaPicker
-                        className="min-w-0 flex-1"
-                        label={image ? "Replace…" : "Upload a photo…"}
-                        onPick={(picked) =>
-                            patch({
-                                image: {
-                                    src: picked.src,
-                                    alt: image?.alt,
-                                    width: picked.width,
-                                    height: picked.height,
-                                    ...pickedSizes(picked),
-                                },
-                            })
-                        }
+                    </div>
+                    <ImageBrief
+                        brief={c.imageBrief}
+                        hasImage={Boolean(image)}
                     />
-                </div>
-                <ImageBrief brief={c.imageBrief} hasImage={Boolean(image)} />
-                {image ? (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="justify-self-end text-destructive hover:text-destructive"
-                        onClick={() => patch({ image: undefined })}
-                    >
-                        Remove photo
-                    </Button>
-                ) : null}
-            </Field>
+                    {image ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="justify-self-end text-destructive hover:text-destructive"
+                            onClick={() => patch({ image: undefined })}
+                        >
+                            Remove photo
+                        </Button>
+                    ) : null}
+                </Field>
+            )}
             {image ? (
                 <div className="grid gap-1">
                     <Field label="Describe the photo">
@@ -127,30 +134,37 @@ export function PersonFields({
                 </div>
             ) : null}
 
-            <Field
-                label="Name"
-                hint={
-                    c.staffId
-                        ? "From Team: their name as Team has it."
-                        : undefined
-                }
-            >
-                <Input
-                    value={c.name}
-                    readOnly={Boolean(c.staffId)}
-                    onChange={(e) => patch({ name: e.target.value })}
-                    placeholder="Their name, as they'd introduce themselves"
-                />
-            </Field>
-            <Field label="What they do">
-                <Input
-                    value={c.role ?? ""}
-                    onChange={(e) =>
-                        patch({ role: e.target.value || undefined })
+            {/* On Our team the People list names each person and holds the
+                words under them (EBTeamPicker 1); a name typed by hand is
+                still changed here. */}
+            {team && (c.staffId || empty) ? null : (
+                <Field
+                    label="Name"
+                    hint={
+                        c.staffId
+                            ? "From Team: their name as Team has it."
+                            : undefined
                     }
-                    placeholder="Clinical dietician"
-                />
-            </Field>
+                >
+                    <Input
+                        value={c.name}
+                        readOnly={Boolean(c.staffId)}
+                        onChange={(e) => patch({ name: e.target.value })}
+                        placeholder="Their name, as they'd introduce themselves"
+                    />
+                </Field>
+            )}
+            {team ? null : (
+                <Field label="What they do">
+                    <Input
+                        value={c.role ?? ""}
+                        onChange={(e) =>
+                            patch({ role: e.target.value || undefined })
+                        }
+                        placeholder="Clinical dietician"
+                    />
+                </Field>
+            )}
 
             {team ? null : (
                 <>
@@ -258,28 +272,33 @@ export function PersonFields({
                 </>
             )}
 
-            <Field optional label="About them">
-                <Textarea
-                    value={c.bio ?? ""}
-                    onChange={(e) =>
-                        patch({ bio: e.target.value || undefined })
-                    }
-                    rows={4}
-                    maxLength={PERSON_BIO_MAX}
-                    placeholder="A few lines in their own words."
-                />
-            </Field>
+            {empty ? null : (
+                <Field optional label="About them">
+                    <Textarea
+                        value={c.bio ?? ""}
+                        onChange={(e) =>
+                            patch({ bio: e.target.value || undefined })
+                        }
+                        rows={4}
+                        maxLength={PERSON_BIO_MAX}
+                        placeholder="A few lines in their own words."
+                    />
+                </Field>
+            )}
 
-            <Field label="Button label">
-                <Input
-                    value={c.cta?.label ?? ""}
-                    onChange={(e) =>
-                        patch({ cta: withCtaLabel(c.cta, e.target.value) })
-                    }
-                    placeholder="Book a consultation"
-                />
-            </Field>
-            {c.cta?.label.trim() ? (
+            {/* The team look draws no button. */}
+            {team ? null : (
+                <Field label="Button label">
+                    <Input
+                        value={c.cta?.label ?? ""}
+                        onChange={(e) =>
+                            patch({ cta: withCtaLabel(c.cta, e.target.value) })
+                        }
+                        placeholder="Book a consultation"
+                    />
+                </Field>
+            )}
+            {!team && c.cta?.label.trim() ? (
                 <CtaActionFields
                     action={actionOf(c.cta)}
                     pages={pages}
@@ -288,7 +307,7 @@ export function PersonFields({
                     }
                 />
             ) : null}
-            {c.cta?.label.trim() ? (
+            {!team && c.cta?.label.trim() ? (
                 <PhoneTextField
                     label="Button"
                     value={c.cta.phoneLabel}
@@ -431,14 +450,6 @@ function TeamFields({
                             aria-label={`Person ${i + 2}'s name`}
                             onChange={(e) => set(i, { name: e.target.value })}
                             placeholder="Their name"
-                        />
-                        <Input
-                            value={p.role ?? ""}
-                            aria-label={`What person ${i + 2} does`}
-                            onChange={(e) =>
-                                set(i, { role: e.target.value || undefined })
-                            }
-                            placeholder="What they do"
                         />
                         <Textarea
                             value={p.bio ?? ""}

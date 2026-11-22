@@ -1150,6 +1150,36 @@ export class SitesService {
      * count would risk disagreeing with the editor's; the answer to that was to
      * have one count rather than to withhold it.
      */
+    /**
+     * Where the business's Our team section is (ER3Team T4): the first
+     * draft page holding a team-look person section, for Bookings' "Change
+     * in Website". Null when there is none.
+     */
+    async teamPage(
+        ctx: OrganizationContext,
+    ): Promise<{ siteId: string; pageId: string } | null> {
+        authorize(ctx, "site:read");
+        const found = await prisma.section.findFirst({
+            where: {
+                organizationId: ctx.organizationId,
+                type: "person",
+                content: { path: ["variant"], equals: "team" },
+                pageVersion: {
+                    status: "DRAFT",
+                    page: { site: { deletedAt: null, ...reviewerScope(ctx) } },
+                },
+            },
+            orderBy: { pageVersion: { page: { createdAt: "asc" } } },
+            select: {
+                pageVersion: {
+                    select: { page: { select: { id: true, siteId: true } } },
+                },
+            },
+        });
+        const page = found?.pageVersion.page;
+        return page ? { siteId: page.siteId, pageId: page.id } : null;
+    }
+
     async listSites(ctx: OrganizationContext) {
         authorize(ctx, "site:read");
         const sites = await prisma.site.findMany({

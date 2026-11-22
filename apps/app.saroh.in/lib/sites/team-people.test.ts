@@ -46,13 +46,19 @@ describe("team people", () => {
         const out = syncChosen(membersOf(content), [
             { id: "st_1", name: "Asha", title: "Other" },
         ]);
-        expect(out?.[0]).toMatchObject({
+        expect(out[0]).toMatchObject({
             staffId: "st_1",
             role: "Warehouse lead",
         });
     });
 
-    it("says nobody would be left", () => {
-        expect(syncChosen([{ staffId: "st_1", name: "A" }], [])).toBeNull();
+    it("lets everyone go, leaving the team look empty (ER3 bug 1)", () => {
+        expect(syncChosen([{ staffId: "st_1", name: "A" }], [])).toEqual([]);
+        const empty = withMembers(content, []);
+        expect(empty).toMatchObject({ variant: "team", title: "Our team" });
+        expect(empty.name).toBe("");
+        expect(empty.staffId).toBeUndefined();
+        expect(empty.people).toBeUndefined();
+        expect(membersOf(empty)).toEqual([]);
     });
 });

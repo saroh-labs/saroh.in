@@ -32,6 +32,8 @@ const content = {
     people: [{ staffId: "st_2", name: "Farah Sheikh" }],
 };
 
+const only = { variant: "team", staffId: "st_1", name: "Asha Rao" };
+
 let root: Root;
 let host: HTMLDivElement;
 beforeEach(() => {
@@ -80,6 +82,33 @@ describe("TeamPeople", () => {
         expect(onChange).toHaveBeenCalledWith(
             expect.objectContaining({ staffId: "st_2", name: "Farah Sheikh" }),
         );
+    });
+
+    it("takes the last person off too, leaving the team empty (ER3 bug 1)", async () => {
+        setTeamPage.mockResolvedValue({ ok: true, data: { staffIds: [] } });
+        read.mockResolvedValue({
+            canChoose: true,
+            team: [person("st_1", "Asha Rao")],
+        });
+        const onChange = vi.fn();
+        await act(async () => {
+            root.render(<TeamPeople content={only} onChange={onChange} />);
+            await Promise.resolve();
+        });
+        const x = host.querySelector<HTMLButtonElement>(
+            'button[aria-label="Take Asha Rao off this page"]',
+        );
+        expect(x?.disabled).toBe(false);
+        await act(async () => {
+            x?.click();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(setTeamPage).toHaveBeenCalledWith([]);
+        expect(onChange).toHaveBeenCalledWith(
+            expect.objectContaining({ variant: "team", name: "" }),
+        );
+        const sent = onChange.mock.calls[0]?.[0] as { staffId?: string };
+        expect(sent.staffId).toBeUndefined();
     });
 
     it("anyone else reads the list, with nothing to change", async () => {

@@ -1103,6 +1103,33 @@ export async function getNewSiteDefaults(): Promise<NewSiteDefaults | null> {
     }
 }
 
+/**
+ * The page holding Our team (`GET …/sites/team-page`, ER3Team T4), or null
+ * when there is none or it can't be read: Bookings' "Change in Website"
+ * then opens the Website list.
+ */
+export async function getTeamPage(): Promise<{
+    siteId: string;
+    pageId: string;
+} | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/team-page`);
+        if (!res.ok) return null;
+        const data = (await res.json()) as {
+            siteId?: unknown;
+            pageId?: unknown;
+        } | null;
+        return typeof data?.siteId === "string" &&
+            typeof data.pageId === "string"
+            ? { siteId: data.siteId, pageId: data.pageId }
+            : null;
+    } catch {
+        return null;
+    }
+}
+
 /** A site + its pages, or null when missing / no active org (throws on a real
  * failure). */
 export async function getSite(siteId: string): Promise<SiteDetail | null> {

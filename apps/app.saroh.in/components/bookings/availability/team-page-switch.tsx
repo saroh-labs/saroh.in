@@ -31,7 +31,7 @@ export function TeamPageSwitch({
             </span>
             {canManage ? (
                 <Link
-                    href="/sites"
+                    href="/sites/our-team"
                     className="shrink-0 whitespace-nowrap font-semibold underline decoration-border underline-offset-[3px] hover:decoration-foreground"
                 >
                     Change in Website

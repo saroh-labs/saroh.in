@@ -24,18 +24,29 @@ function pick(from: PersonMember | PersonContent): PersonMember {
 }
 
 export function membersOf(c: PersonContent): PersonMember[] {
+    // An Our team section everyone was taken off holds an empty name.
+    if (c.name === "" && !c.people?.length) return [];
     return [pick(c), ...(c.people ?? []).map(pick)];
 }
 
-/** The section with these people, in this order. Needs at least one. */
+/**
+ * The section with these people, in this order. None leaves the team look
+ * empty (its name blank, which the contract allows only there).
+ */
 export function withMembers(
     c: PersonContent,
     members: PersonMember[],
 ): PersonContent {
     const [first, ...rest] = members as [PersonMember?, ...PersonMember[]];
-    if (first === undefined) return c;
     const out = { ...c } as Record<string, unknown>;
     for (const k of MEMBER_KEYS) delete out[k];
+    if (first === undefined) {
+        return {
+            ...(out as Omit<PersonContent, keyof PersonMember>),
+            name: "",
+            people: undefined,
+        };
+    }
     return {
         ...(out as Omit<PersonContent, keyof PersonMember>),
         ...pick(first),
@@ -59,7 +70,7 @@ export interface ChosenPerson {
 export function syncChosen(
     members: PersonMember[],
     chosen: ChosenPerson[],
-): PersonMember[] | null {
+): PersonMember[] {
     const ids = new Set(chosen.map((p) => p.id));
     const kept = members.filter((m) => !m.staffId || ids.has(m.staffId));
     const have = new Set(kept.map((m) => m.staffId).filter(Boolean));
@@ -70,6 +81,5 @@ export function syncChosen(
             name: p.name,
             ...(p.title ? { role: p.title } : {}),
         }));
-    const out = [...kept, ...added];
-    return out.length > 0 ? out : null;
+    return [...kept, ...added];
 }

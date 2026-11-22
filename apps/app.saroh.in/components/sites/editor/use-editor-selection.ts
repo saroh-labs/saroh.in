@@ -65,6 +65,14 @@ export function useEditorSelection({
      */
     const [element, setElement] = useState<SelectedElement | null>(null);
     const [elementScope, setElementScope] = useState<StyleScope>("element");
+    /*
+     * A section drawn on the canvas but not saved: a custom colour being
+     * picked for one button (CSI-C states 2 and 3). The picker clears it.
+     */
+    const [trial, setTrial] = useState<{
+        index: number;
+        section: Section;
+    } | null>(null);
     const setSelectedIndex = (next: number | null) => {
         setElement(null);
         setPlace(siteId, sectionCount, { selectedIndex: next, chrome: null });
@@ -98,6 +106,8 @@ export function useEditorSelection({
         clearElement: () => setElement(null),
         elementScope,
         setElementScope,
+        trial,
+        setTrial,
         selectChrome,
         setRail,
         setInspector,

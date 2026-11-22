@@ -319,3 +319,79 @@ export function lookCorners(
     if (n >= 999) return "as pills";
     return `with ${Math.round(n)}px corners`;
 }
+
+/** Hue (0–360), saturation and value (0–1): the custom picker's square and strip. */
+export interface Hsv {
+    h: number;
+    s: number;
+    v: number;
+}
+
+/** A `#RRGGBB` colour as {@link Hsv}. */
+export function hexToHsv(hex: string): Hsv {
+    const n = Number.parseInt(hex.slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(
+        (c) => c / 255,
+    ) as [number, number, number];
+    const max = Math.max(r, g, b);
+    const d = max - Math.min(r, g, b);
+    let h = 0;
+    if (d > 0) {
+        if (max === r) h = ((g - b) / d + 6) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+    }
+    return { h: h * 60, s: max === 0 ? 0 : d / max, v: max };
+}
+
+/** {@link Hsv} as a `#RRGGBB` colour in capitals. */
+export function hsvToHex({ h, s, v }: Hsv): string {
+    const f = (k: number) => {
+        const m = (k + h / 60) % 6;
+        return v - v * s * Math.max(0, Math.min(m, 4 - m, 1));
+    };
+    return `#${[f(5), f(3), f(1)]
+        .map((c) =>
+            Math.round(c * 255)
+                .toString(16)
+                .padStart(2, "0"),
+        )
+        .join("")}`.toUpperCase();
+}
+
+/*
+ * Recent custom colours, newest first (CSI-C "Recent"). A per-browser
+ * convenience, so localStorage, which may throw or come back empty.
+ */
+const RECENT_KEY = "saroh.recent-colours";
+const RECENT_MAX = 6;
+
+export function recentColours(): string[] {
+    try {
+        const raw: unknown = JSON.parse(
+            window.localStorage.getItem(RECENT_KEY) ?? "[]",
+        );
+        return Array.isArray(raw)
+            ? raw
+                  .map(normalizeHex)
+                  .filter((h): h is string => h !== null)
+                  .slice(0, RECENT_MAX)
+            : [];
+    } catch {
+        return [];
+    }
+}
+
+/** Puts `hex` first in Recent; the list it now holds. */
+export function rememberColour(hex: string): string[] {
+    const next = [hex, ...recentColours().filter((h) => h !== hex)].slice(
+        0,
+        RECENT_MAX,
+    );
+    try {
+        window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+    } catch {
+        // Private window or blocked storage: Recent stays as it was.
+    }
+    return next;
+}

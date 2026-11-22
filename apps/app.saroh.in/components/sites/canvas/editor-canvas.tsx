@@ -118,6 +118,7 @@ export function EditorCanvas({
     previewing,
     setPreviewing,
     narrow = false,
+    roomBelow = false,
     siteId,
     pageId,
     address,
@@ -182,6 +183,8 @@ export function EditorCanvas({
     setPreviewing: (on: boolean) => void;
     /** Below the desk width: the design's tighter padding (G4). */
     narrow?: boolean;
+    /** A phone's sheet covers the lower page: the page can scroll past its end. */
+    roomBelow?: boolean;
     /** For the blocks that read live data on the canvas (G8). */
     siteId: string;
     /** The open page, so a link to it in Preview stays here. */
@@ -443,6 +446,10 @@ export function EditorCanvas({
                 </div>
             </div>
 
+            {/* Room for a chosen button to rise above the phone's sheet. */}
+            {roomBelow && !previewing ? (
+                <div aria-hidden data-room-below="" className="h-[30rem]" />
+            ) : null}
             {previewing ? (
                 <PreviewBar
                     notSent={notSent}

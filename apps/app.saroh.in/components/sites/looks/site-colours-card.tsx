@@ -44,6 +44,7 @@ export function SiteColoursCard({
     readOnly = false,
     onChange,
     onTry,
+    onBrand,
 }: {
     style: SiteStyle;
     options: SiteStyleOptions;
@@ -51,6 +52,8 @@ export function SiteColoursCard({
     readOnly?: boolean;
     onChange: (next: SiteStyle) => void;
     onTry: (next: SiteStyle | null) => void;
+    /** Change, when the look has no colourways: Brand's colours. */
+    onBrand?: () => void;
 }) {
     const [open, setOpen] = useState(false);
     const [trying, setTrying] = useState<StyleColourway | null>(null);
@@ -87,7 +90,19 @@ export function SiteColoursCard({
         >
             <div className="flex items-center gap-2">
                 <h3 className="flex-1 text-sm font-semibold">Site colours</h3>
-                {readOnly || colourways.length === 0 ? null : (
+                {readOnly ? null : colourways.length === 0 ? (
+                    onBrand ? (
+                        <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 font-semibold"
+                            onClick={onBrand}
+                        >
+                            Change
+                        </Button>
+                    ) : null
+                ) : (
                     <Button
                         type="button"
                         variant="link"

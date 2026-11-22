@@ -96,6 +96,8 @@ export function SectionSheet({
     const [own, setOwn] =
         useState<Exclude<InspectorTab, "feedback">>("content");
     const [priceFor, setPriceFor] = useState<string | null>(null);
+    // A tapped button opens on its Style (CSI-C phone).
+    const [elTab, setElTab] = useState<"content" | "style">("style");
     const [text, setText] = useState<TextField | null>(null);
     // The field the text sheet just gave back focus to: not reopened.
     const returned = useRef<HTMLElement | null>(null);
@@ -230,47 +232,94 @@ export function SectionSheet({
                 onClose={onClose}
             />
         );
-        footer = false;
-        body = (
-            <ElementStyleTab
-                element={el}
-                section={section}
-                sectionName={sectionTitle(section)}
-                scope={selection.elementScope}
-                onScope={selection.setElementScope}
-                style={model.siteStyle.style}
-                styleOptions={model.styleOptions}
-                onChange={(next) => draft.replaceAt(index, next)}
-                onSiteStyle={model.siteStyle.setStyle}
-                foot={(line, reset) => (
-                    <div
-                        data-element-foot=""
-                        className="sticky bottom-0 -mx-4 grid gap-2 border-t bg-background px-4 pb-3 pt-2.5"
-                    >
-                        <p className="text-xs text-muted-foreground">{line}</p>
-                        <div className="flex gap-2">
-                            {reset ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="h-12 min-w-0 flex-1"
-                                    onClick={reset.run}
-                                >
-                                    {reset.word}
-                                </Button>
-                            ) : null}
-                            <Button
-                                type="button"
-                                className="h-12 min-w-0 flex-1"
-                                onClick={onClose}
-                            >
-                                Done
-                            </Button>
-                        </div>
-                    </div>
-                )}
+        // Content · Style, as on a desk (CSI-C phone).
+        tabs = (
+            <TabStrip<"content" | "style">
+                label={word}
+                idPrefix="phone-element"
+                tabs={[
+                    { value: "content", label: "Content" },
+                    { value: "style", label: "Style" },
+                ]}
+                value={elTab}
+                onValueChange={setElTab}
+                listClassName="px-1 [&>button]:px-3"
             />
         );
+        footer = elTab === "content" && !readOnly;
+        body =
+            elTab === "content" ? (
+                <div
+                    className="grid gap-4"
+                    onFocusCapture={(e) => openText(e, title)}
+                    onClickCapture={(e) => openText(e, title)}
+                >
+                    <SaveFailedNotice draft={draft} />
+                    <ContentTab
+                        siteId={siteId}
+                        section={section}
+                        pages={pages}
+                        services={services}
+                        flags={activeFlags}
+                        unreadable={false}
+                        error={
+                            draft.errorIndex === index
+                                ? draft.errorMessage
+                                : null
+                        }
+                        heldBack={draft.heldBackAt(index)}
+                        onChange={(next) => draft.replaceAt(index, next)}
+                        onPrice={setPriceFor}
+                        onAddNote={() => openTab("feedback")}
+                    />
+                </div>
+            ) : (
+                <ElementStyleTab
+                    element={el}
+                    section={section}
+                    sectionName={sectionTitle(section)}
+                    scope={selection.elementScope}
+                    onScope={selection.setElementScope}
+                    style={model.siteStyle.style}
+                    styleOptions={model.styleOptions}
+                    onChange={(next) => draft.replaceAt(index, next)}
+                    onSiteStyle={model.siteStyle.setStyle}
+                    onTry={(next) =>
+                        selection.setTrial(
+                            next ? { index, section: next } : null,
+                        )
+                    }
+                    foot={(line, reset) => (
+                        <div
+                            data-element-foot=""
+                            className="sticky bottom-0 -mx-4 grid gap-2 border-t bg-background px-4 pb-3 pt-2.5"
+                        >
+                            <p className="text-xs text-muted-foreground">
+                                {line}
+                            </p>
+                            <div className="flex gap-2">
+                                {reset ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-12 min-w-0 flex-1"
+                                        onClick={reset.run}
+                                    >
+                                        {reset.word}
+                                    </Button>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    className="h-12 min-w-0 flex-1"
+                                    onClick={onClose}
+                                >
+                                    Done
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                />
+            );
     } else if (active) {
         const { index, section } = active;
         const Icon = SECTION_ICONS[section.type];

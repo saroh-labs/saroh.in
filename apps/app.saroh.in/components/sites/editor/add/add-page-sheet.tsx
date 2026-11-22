@@ -182,8 +182,12 @@ export function AddPageSheet({
     const menuId = useId();
 
     const offer = offers.find((o) => o.kind === start);
+    // Our team may go without a name: it is then "Our team" (EBTeamPicker:
+    // choosing the tile opens the picker before anything is typed).
+    const named =
+        title.trim() || (start === "TEAM" ? PAGE_TYPES.TEAM.name : "");
     // The link follows the name until it is typed in.
-    const link = path ?? (title.trim() ? `/${slugify(title)}` : "");
+    const link = path ?? (named ? `/${slugify(named)}` : "");
 
     // Said as it is typed (A8); the API still decides on Add page.
     const typedLink = link.trim();
@@ -241,20 +245,26 @@ export function AddPageSheet({
                   : g,
         );
 
+    /** Opens Add people when this person may choose; says whether it did. */
+    async function pickTeam(): Promise<boolean> {
+        setBusy(true);
+        const read = await readTeamForPicker().catch(() => null);
+        setBusy(false);
+        if (read?.canChoose && read.team && read.team.length > 0) {
+            setPicking(read.team);
+            return true;
+        }
+        return false;
+    }
+
     async function add(picked = false) {
         setRefusal(null);
         if (start === "TEAM" && !picked) {
-            if (title.trim() === "" || link.trim() === "") {
+            if (link.trim() === "") {
                 setMissing(true);
                 return;
             }
-            setBusy(true);
-            const read = await readTeamForPicker().catch(() => null);
-            setBusy(false);
-            if (read?.canChoose && read.team && read.team.length > 0) {
-                setPicking(read.team);
-                return;
-            }
+            if (await pickTeam()) return;
         }
         let res;
         if (start === "copy") {
@@ -265,7 +275,7 @@ export function AddPageSheet({
         } else {
             let input: CreatePageInput;
             if (ownLink(start)) {
-                const t = title.trim();
+                const t = named;
                 if (t === "" || link.trim() === "") {
                     setMissing(true);
                     return;
@@ -331,9 +341,9 @@ export function AddPageSheet({
                     <>
                         <Field
                             label="Page name"
-                            optional={!ownLink(start)}
+                            optional={!ownLink(start) || start === "TEAM"}
                             error={
-                                missing && ownLink(start) && !title.trim()
+                                missing && ownLink(start) && !named
                                     ? "Give the page a name."
                                     : undefined
                             }
@@ -458,7 +468,11 @@ export function AddPageSheet({
                             }),
                         )}
                         value={isType(start) ? start : null}
-                        onChange={choose}
+                        onChange={(t) => {
+                            choose(t);
+                            // Choosing Our team opens the picker (EBTeamPicker).
+                            if (t === "TEAM") void pickTeam();
+                        }}
                         itemClassName={tile}
                     />
                 ) : group === "ready" ? (

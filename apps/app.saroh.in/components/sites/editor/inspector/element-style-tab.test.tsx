@@ -72,7 +72,7 @@ const wrote = (fn: { mock: { calls: [Section][] } }, n = 0) =>
 const press = (el: Element | null | undefined) =>
     act(() => (el as HTMLElement).click());
 const radio = (name: string) =>
-    Array.from(host.querySelectorAll("button")).find(
+    Array.from(document.querySelectorAll("button")).find(
         (b) => b.textContent.trim() === name,
     );
 
@@ -159,7 +159,20 @@ describe("a button's Style tab (CSI-C, CS1)", () => {
             host.querySelector('[data-style-changed="corners"]'),
         ).not.toBeNull();
         expect(host.textContent).toContain("2 changes from Classic");
-        press(radio("Reset this button"));
+        // Reset asks which level (CSI-C states 4); only this button has any.
+        const trigger = host.querySelector("[data-reset-levels]");
+        act(() => {
+            trigger?.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+            );
+        });
+        const level = (l: string) =>
+            document.querySelector(`[data-reset-level="${l}"]`);
+        expect(level("section")?.hasAttribute("data-disabled")).toBe(true);
+        expect(level("site")?.textContent).toContain(
+            "Back to Classic across the site",
+        );
+        press(level("element"));
         expect(wrote(onChange, 0).cta).toEqual({
             label: "Browse the catalogue",
             action: { kind: "page", pageId: "p" },
@@ -177,5 +190,63 @@ describe("a button's Style tab (CSI-C, CS1)", () => {
         expect(wrote(onChange, 0).image.elementStyle).toEqual({
             corners: "arch",
         });
+    });
+
+    it("counts the buttons a section's choice reaches", () => {
+        draw({ scope: "section" });
+        expect(host.textContent).toContain("1 button in Hero.");
+    });
+
+    it("tries a custom colour on the canvas, uses it and keeps it in Recent", () => {
+        window.localStorage.clear();
+        const onTry = vi.fn<(next: Section | null) => void>();
+        const { onChange } = draw({ onTry });
+        press(host.querySelector("[data-colour-custom]"));
+        const picker = () => document.querySelector("[data-button-colour]");
+        expect(picker()?.textContent).toContain("Button colour");
+        expect(picker()?.textContent).toContain("Site colours");
+        expect(document.querySelector("[data-colour-square]")).not.toBeNull();
+        expect(document.querySelector("[data-colour-hue]")).not.toBeNull();
+
+        const hex = picker()?.querySelector<HTMLInputElement>(
+            "input[aria-invalid]",
+        );
+        act(() => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )?.set?.call(hex, "#1F5F8B");
+            hex?.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        // Drawn on the page, unsaved.
+        const tried = onTry.mock.calls.at(-1)?.[0]?.content as Record<
+            string,
+            Record<string, unknown>
+        >;
+        expect(tried.cta.elementStyle).toEqual({ colour: "#1F5F8B" });
+        expect(onChange).not.toHaveBeenCalled();
+
+        press(radio("Use this colour"));
+        expect(wrote(onChange, 0).cta.elementStyle).toEqual({
+            colour: "#1F5F8B",
+        });
+        expect(onTry.mock.calls.at(-1)?.[0]).toBeNull();
+
+        press(host.querySelector("[data-colour-custom]"));
+        expect(
+            document.querySelector('[aria-label="Recent colour #1F5F8B"]'),
+        ).not.toBeNull();
+    });
+
+    it("picks a site colour from the picker's first tab", () => {
+        const { onChange } = draw();
+        press(host.querySelector("[data-colour-custom]"));
+        press(
+            Array.from(document.querySelectorAll('[role="radio"]')).find(
+                (b) => b.textContent.trim() === "Site colours",
+            ),
+        );
+        press(document.querySelector('[data-role-row="fg"]'));
+        expect(wrote(onChange, 0).cta.elementStyle).toEqual({ colour: "fg" });
     });
 });

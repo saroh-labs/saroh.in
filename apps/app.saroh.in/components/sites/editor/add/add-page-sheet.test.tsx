@@ -55,7 +55,7 @@ async function type(input: HTMLInputElement | null, value: string) {
     });
 }
 
-async function open(start: "blank" | "TEAM", taken: string[] = []) {
+async function open(start: "blank" | "TEAM" | "SERVICE", taken: string[] = []) {
     await act(async () => {
         root.render(
             <AddPageSheet
@@ -184,6 +184,47 @@ describe("Add a page: Our team's picker (round 3, EBTeamPicker)", () => {
             "site_1",
             expect.objectContaining({ starter: "TEAM" }),
         );
+    });
+});
+
+describe("Add a page: choosing Our team opens the picker (ER3Team T4)", () => {
+    it("opens Add people at once, and Save makes the page under its own name", async () => {
+        readTeam.mockResolvedValue({
+            canChoose: true,
+            team: [
+                {
+                    id: "st_1",
+                    name: "Asha Rao",
+                    title: null,
+                    status: "ACTIVE",
+                    showOnTeamPage: true,
+                    membership: null,
+                },
+            ],
+        });
+        setTeamPage.mockResolvedValue({ ok: true, data: { staffIds: [] } });
+        await open("SERVICE");
+        const tile = Array.from(
+            document.querySelectorAll<HTMLButtonElement>(
+                '[aria-label="Template pages"] [role=radio]',
+            ),
+        ).find((r) => r.textContent.startsWith("Our team"));
+        await act(async () => {
+            tile?.click();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(text()).toContain("Add people to Our team");
+        await act(async () => {
+            document.querySelector("form")?.requestSubmit();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(setTeamPage).toHaveBeenCalledWith(["st_1"]);
+        expect(createPage).toHaveBeenCalledWith("site_1", {
+            title: "Our team",
+            path: "/our-team",
+            inMenu: true,
+            starter: "TEAM",
+        });
     });
 });
 

@@ -46,6 +46,10 @@ describe("TeamPageSwitch", () => {
         );
         expect(host.textContent).toContain("On the website's Our team page");
         expect(host.querySelector("a")?.textContent).toBe("Change in Website");
+        // To the Our team page itself, not the Website list (ER3Team T4).
+        expect(host.querySelector("a")?.getAttribute("href")).toBe(
+            "/sites/our-team",
+        );
         expect(host.querySelector("[role=switch]")).toBeNull();
         act(() =>
             root.render(

@@ -395,7 +395,7 @@ describe("the desk post editor for a reader (DEC-200 U8)", () => {
 });
 
 describe("postTrailTabs", () => {
-    it("is Posts · Add · History · Feedback (Ask AI is the right column's tab), a reader's Posts · Feedback", () => {
+    it("is Post · Add · History · Feedback (Ask AI is the right column’s tab; Post names the In this post panel, ER3Post P2), a reader’s Post · Feedback", () => {
         const keys = (o: Parameters<typeof postTrailTabs>[0]) =>
             postTrailTabs(o).map((t) => t.label);
         expect(
@@ -405,7 +405,7 @@ describe("postTrailTabs", () => {
                 openNotes: 2,
                 feedback: true,
             }),
-        ).toEqual(["Posts", "Add", "History", "Feedback"]);
+        ).toEqual(["Post", "Add", "History", "Feedback"]);
         expect(
             keys({
                 readOnly: true,
@@ -413,7 +413,7 @@ describe("postTrailTabs", () => {
                 openNotes: 0,
                 feedback: true,
             }),
-        ).toEqual(["Posts", "Feedback"]);
+        ).toEqual(["Post", "Feedback"]);
     });
 });
 
@@ -529,6 +529,8 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         const list = el("[data-left-panel]");
         const right = column();
         expect(bar.textContent).toContain("Bridal trial");
+        // 264px, as EBPostLeftPanel draws it (ER3Post P3).
+        expect(list.className).toContain("w-[264px]");
 
         // Another post asked for: the segment's loader stands in its place.
         draw(loader);

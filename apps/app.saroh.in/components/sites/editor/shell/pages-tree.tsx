@@ -364,6 +364,7 @@ export function PagesTree({
                     readOnly={readOnly}
                     onChange={model.siteStyle.setStyle}
                     onTry={model.siteStyle.tryStyle}
+                    onBrand={() => model.openRail("brand")}
                 />
             </div>
 

@@ -204,6 +204,21 @@ describe("person (U2)", () => {
         expect(parseSectionContent("person", 1, {}).success).toBe(false);
     });
 
+    it("lets an Our team section be empty, and only that", () => {
+        const team = (more: object) =>
+            parseSectionContent("person", 1, {
+                variant: "team",
+                name: "",
+                ...more,
+            }).success;
+        expect(team({})).toBe(true);
+        expect(team({ people: [{ name: "Asha" }] })).toBe(false);
+        expect(
+            parseSectionContent("person", 1, { variant: "portrait", name: "" })
+                .success,
+        ).toBe(false);
+    });
+
     it("caps the qualifications and the bio", () => {
         expect(
             parseSectionContent("person", 1, {

@@ -40,6 +40,9 @@ import { useTestReleases } from "@/components/sites/test-releases/use-test-relea
 import { useWebsiteArea } from "@/components/sites/website-area";
 import { colourName } from "@/lib/share-item/share";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
+import type { SelectedElement } from "@/lib/sites/element-style";
+import { elementMark } from "@/lib/sites/element-style";
+import type { Section } from "@/lib/sites/service";
 import { siteStatus } from "@/lib/sites/site-status";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
@@ -346,13 +349,20 @@ export function SiteEditor({
      * it. The canvas alone scrolls: `scrollIntoView` would scroll the
      * phone's whole window too, and the bar with it.
      */
-    const scrollToBlock = (index: number) =>
+    /*
+     * A block, or a button or photo in it, to the top of the canvas. On a
+     * phone a chosen button sits above its sheet, in view (CSI-C phone).
+     */
+    const scrollToBlock = (index: number, element?: SelectedElement) =>
         requestAnimationFrame(() => {
             const canvas = viewport.canvasRef.current;
             if (!canvas) return;
+            const inBlock = `[data-block-index="${index}"]`;
             const block = queryCanvas<HTMLElement>(
                 canvas,
-                `[data-block-index="${index}"]`,
+                element
+                    ? `${inBlock} [data-site-el="${elementMark(element)}"]`
+                    : inBlock,
             );
             if (!block) return;
             // A block in the device frame is measured from the frame.
@@ -362,7 +372,7 @@ export function SiteEditor({
                 (frame ? frame.getBoundingClientRect().top : 0) -
                 canvas.getBoundingClientRect().top;
             canvas.scrollTo({
-                top: canvas.scrollTop + top - 8,
+                top: canvas.scrollTop + top - (element ? 48 : 8),
                 behavior: "smooth",
             });
         });
@@ -679,6 +689,9 @@ export function SiteEditor({
                     : setSelectedIndex
             }
             {...draft}
+            // A custom colour being picked draws on the page unsaved.
+            sections={withTrial(sections, selection.trial)}
+            roomBelow={layout === "phone" && selection.element !== null}
             {...{
                 siteId,
                 pageId,
@@ -699,7 +712,16 @@ export function SiteEditor({
             textEdit={textEdit}
             // One button or photo is selectable on its own (DEC-251),
             // where its Style tab exists: the Website area's inspector.
-            selectElement={areaOn ? selection.selectElement : undefined}
+            selectElement={
+                !areaOn
+                    ? undefined
+                    : layout === "phone"
+                      ? (index: number, el: SelectedElement) => {
+                            selection.selectElement(index, el);
+                            scrollToBlock(index, el);
+                        }
+                      : selection.selectElement
+            }
             // A typeface being tried draws on the page unsaved.
             style={siteStyle.trying ?? style}
             trying={triedLine(siteStyle.trying, style, styleOptions)}
@@ -1096,4 +1118,14 @@ function triedFace(
     const pairs = options.fontPairs ?? [];
     const key = trying.fontPair ?? pairs[0]?.key;
     return pairs.find((p) => p.key === key)?.name ?? null;
+}
+
+/** The sections with one drawn as it is being tried, unsaved. */
+function withTrial(
+    sections: Section[],
+    trial: { index: number; section: Section } | null,
+): Section[] {
+    return trial
+        ? sections.map((s, i) => (i === trial.index ? trial.section : s))
+        : sections;
 }

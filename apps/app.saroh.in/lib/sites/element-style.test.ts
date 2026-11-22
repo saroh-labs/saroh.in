@@ -4,6 +4,8 @@ import {
     buttonLevels,
     changedFields,
     elementAt,
+    hexToHsv,
+    hsvToHex,
     inForce,
     parseElementMark,
     readableLine,
@@ -94,5 +96,21 @@ describe("one element in a section's content (DEC-251)", () => {
         const line = readableLine("accent", vars);
         expect(line?.light).toBe(true);
         expect(line?.ratio).toBeGreaterThan(4);
+    });
+});
+
+describe("the custom picker's square and strip (CSI-C)", () => {
+    it("turns a colour into hue, saturation and value and back", () => {
+        for (const hex of [
+            "#1F5F8B",
+            "#F2C94C",
+            "#000000",
+            "#FFFFFF",
+            "#A65E3F",
+        ]) {
+            expect(hsvToHex(hexToHsv(hex))).toBe(hex);
+        }
+        expect(hexToHsv("#FF0000")).toEqual({ h: 0, s: 1, v: 1 });
+        expect(hsvToHex({ h: 240, s: 1, v: 1 })).toBe("#0000FF");
     });
 });

@@ -35,8 +35,8 @@ export type { PostTrailKey } from "./post-trail";
  * The post editor at desk (U15; `blogdesk/WXWWrite`, `WXWInsert`,
  * `WXWSearch`, `WXWStates`), in the editor shell's pieces (the rail, the
  * inspector frame): the bar, the rail | the left panel | the writing
- * surface | the inspector. 64 | 280 | page | 360 at 1920; 292 and 340
- * at 1440 (`fix/WXEEditor`); at 1200 and below the left panel folds away.
+ * surface | the inspector. 64 | 264 | page | 360 at 1920; 264 and 340
+ * at 1440 (`EBPostLeftPanel`, ER3Post P3); at 1200 and below the left panel folds away.
  *
  * Every write is today's (`usePostDraft`): autosave, ⌘S, Publish, Take off
  * the site, Delete. Publish post is `usePublishPost` (U18 fills its sheet)

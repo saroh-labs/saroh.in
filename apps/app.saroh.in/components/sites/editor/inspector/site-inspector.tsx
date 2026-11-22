@@ -199,6 +199,11 @@ export function SiteInspector({
                     styleOptions={model.styleOptions}
                     onChange={onChange}
                     onSiteStyle={model.siteStyle.setStyle}
+                    onTry={(next) =>
+                        selection.setTrial(
+                            next ? { index, section: next } : null,
+                        )
+                    }
                 />
             ) : (
                 <ContentTab

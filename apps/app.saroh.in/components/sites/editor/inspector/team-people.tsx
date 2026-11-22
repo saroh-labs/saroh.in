@@ -62,7 +62,6 @@ export function TeamPeople({
 
     async function remove(i: number) {
         const m = members[i];
-        if (members.length < 2) return;
         if (m.staffId && read?.team) {
             const chosen = read.team
                 .filter((p) => p.showOnTeamPage === true && p.id !== m.staffId)
@@ -137,8 +136,11 @@ export function TeamPeople({
                         <span className="grid min-w-0 flex-1 gap-0.5">
                             <b className="truncate text-[0.84rem]">{m.name}</b>
                             {can ? (
+                                // The grey line under the name, typed into
+                                // in place (EBTeamPicker 1).
                                 <Input
                                     dense
+                                    className="h-6 border-transparent bg-transparent px-1 text-xs text-muted-foreground hover:border-input focus-visible:text-foreground"
                                     value={m.role ?? ""}
                                     aria-label={`The words under ${m.name}`}
                                     placeholder="What they do"
@@ -168,7 +170,7 @@ export function TeamPeople({
                                 type="button"
                                 variant="ghost"
                                 size="icon-sm"
-                                disabled={busy || members.length < 2}
+                                disabled={busy}
                                 aria-label={`Take ${m.name} off this page`}
                                 onClick={() => void remove(i)}
                             >
@@ -218,8 +220,7 @@ export function TeamPeople({
                                 ),
                             })),
                         });
-                        const next = syncChosen(members, chosen);
-                        if (next) set(next);
+                        set(syncChosen(members, chosen));
                     }}
                 />
             ) : null}

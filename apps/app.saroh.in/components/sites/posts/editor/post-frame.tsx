@@ -337,7 +337,7 @@ export function PostFrame({ children }: { children: ReactNode }) {
                     {side ? (
                         <div
                             data-left-panel={trail}
-                            className="flex w-[292px] shrink-0 flex-col border-r bg-card max-[1200px]:hidden min-[1600px]:w-[280px]"
+                            className="flex w-[264px] shrink-0 flex-col border-r bg-card max-[1200px]:hidden"
                         >
                             {left}
                         </div>

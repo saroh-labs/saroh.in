@@ -115,7 +115,7 @@ type BrandColourState = ReturnType<typeof useBrandColour>;
 interface EyeDropperLike {
     open: () => Promise<{ sRGBHex: string }>;
 }
-function eyeDropper(): EyeDropperLike | null {
+export function eyeDropper(): EyeDropperLike | null {
     if (typeof window === "undefined" || !("EyeDropper" in window)) {
         return null;
     }

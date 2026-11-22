@@ -115,6 +115,11 @@ test.describe("Rail › Add at 1920", () => {
         await panel.getByRole("button", { name: "Blank page" }).click();
         const sheet = page.getByRole("dialog", { name: "Add a page" });
         await sheet.getByText("Our team", { exact: true }).click();
+        // Choosing it opens Add people first (ER3Team T4); Cancel goes back.
+        await page
+            .getByRole("dialog", { name: "Add people to Our team" })
+            .getByRole("button", { name: "Cancel" })
+            .click();
         await expect(
             sheet.locator("[data-page-type-starts=TEAM]"),
         ).toContainText("Starts with, filled from your business");

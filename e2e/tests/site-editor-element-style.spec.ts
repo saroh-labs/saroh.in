@@ -46,9 +46,12 @@ test("one button, styled on its own", async ({ page }, testInfo) => {
     );
 
     if (!phone) {
-        await expect(page.locator("[data-site-colours]")).toContainText(
-            "Site colours",
-        );
+        const card = page.locator("[data-site-colours]");
+        await expect(card).toContainText("Site colours");
+        // Change is always there: the colourways, or Brand's colours.
+        await expect(
+            card.getByRole("button", { name: "Change" }),
+        ).toBeVisible();
     }
 
     await button.click();
@@ -70,7 +73,46 @@ test("one button, styled on its own", async ({ page }, testInfo) => {
         page.locator("style").filter({ hasText: mark ?? "" }),
     ).toHaveCount(1);
     await panel.getByRole("radio", { name: "This section" }).click();
-    await expect(panel).toContainText("Every button in");
+    await expect(panel).toContainText(/\d+ buttons? in /);
+    await panel.getByRole("radio", { name: "This button" }).click();
+
+    if (phone) {
+        // Content · Style, and the button stays in view above the sheet.
+        await expect(page.getByRole("tab", { name: "Style" })).toBeVisible();
+        await expect(page.getByRole("tab", { name: "Content" })).toBeVisible();
+        const sheetTop = await page
+            .locator("[data-section-sheet]")
+            .evaluate((el) => el.getBoundingClientRect().top);
+        await expect
+            .poll(async () => {
+                const box = await button.boundingBox();
+                return box
+                    ? box.y + box.height <= sheetTop && box.y >= 0
+                    : false;
+            })
+            .toBe(true);
+    } else {
+        // A custom colour is drawn on the page as it is picked, unsaved.
+        const before = await button.evaluate(
+            (el) => getComputedStyle(el).backgroundColor,
+        );
+        await panel.locator("[data-colour-custom]").click();
+        const picker = page.locator("[data-button-colour]");
+        await expect(picker).toContainText("Site colours");
+        await expect(picker.locator("[data-colour-square]")).toBeVisible();
+        await picker.locator("input[aria-invalid]").fill("#1F5F8B");
+        await expect
+            .poll(() =>
+                button.evaluate((el) => getComputedStyle(el).backgroundColor),
+            )
+            .toBe("rgb(31, 95, 139)");
+        await picker.getByRole("button", { name: "Cancel" }).click();
+        await expect
+            .poll(() =>
+                button.evaluate((el) => getComputedStyle(el).backgroundColor),
+            )
+            .toBe(before);
+    }
 
     if (phone) {
         await expect(page.locator("[data-element-foot]")).toContainText("Done");

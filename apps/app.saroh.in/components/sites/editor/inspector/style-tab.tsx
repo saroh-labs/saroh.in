@@ -139,10 +139,16 @@ export function StyleTab({
                 </div>
 
                 <div className="grid gap-2">
+                    <p id="section-spacing" className="text-sm font-semibold">
+                        Spacing
+                    </p>
+                    {/* One line down to 320: the four fill the row (CSCards). */}
                     <Segmented<SpacingChoice>
                         label="Spacing"
+                        aria-labelledby="section-spacing"
                         value={spacing}
                         size="sm"
+                        block
                         onValueChange={(next) =>
                             onChange(
                                 withFrame(section, {
@@ -151,12 +157,18 @@ export function StyleTab({
                             )
                         }
                         options={[
-                            { value: "site", label: "Same as the site" },
+                            {
+                                value: "site" as SpacingChoice,
+                                label: "Same as the site",
+                            },
                             ...COMPONENT_STYLE_OPTIONS.spacing.map((s) => ({
                                 value: s,
                                 label: COMPONENT_OPTION_LABELS.spacing[s],
                             })),
-                        ]}
+                        ].map((o) => ({
+                            ...o,
+                            className: "px-1.5 coarse:px-1.5",
+                        }))}
                     />
                     <p className="text-xs text-muted-foreground">
                         The site uses {siteSpacingWord}.
