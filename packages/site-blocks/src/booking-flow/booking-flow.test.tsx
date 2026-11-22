@@ -228,6 +228,9 @@ beforeEach(() => {
 afterEach(() => {
     globalThis.fetch = realFetch;
     vi.useRealTimers();
+    // The flow keeps a visit's booking by address, and every test shares
+    // one: a choice left behind could open the next test (CI flake, 22 Nov 2026).
+    window.sessionStorage.clear();
 });
 
 async function chooseOneToOne() {
