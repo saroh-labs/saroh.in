@@ -76,7 +76,8 @@ export function catalogueRows(
             key: p.id,
             id: p.id,
             name: p.name,
-            image: p.image,
+            // The cover's small copy where it has one (DEC-246).
+            image: p.thumb ?? p.image,
             sku: p.sku,
             variantCount: p.variantCount,
             variants: p.variants,

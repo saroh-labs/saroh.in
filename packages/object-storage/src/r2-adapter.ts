@@ -10,7 +10,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import { buildObjectKey, stripTrailingSlashes } from "./keys";
+import { assertTenantKey, buildObjectKey, stripTrailingSlashes } from "./keys";
 import type {
     ContentTypeAllowlist,
     CreateSignedUploadUrlInput,
@@ -158,12 +158,15 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
             // Validate at the boundary: allowlist + size cap enforced here.
             const parsed = uploadSchema.parse(input);
 
-            const key = buildObjectKey({
-                organizationId: parsed.organizationId,
-                filename: parsed.filename,
-                purpose: parsed.purpose,
-                uuid: randomUUID(),
-            });
+            const key =
+                input.key === undefined
+                    ? buildObjectKey({
+                          organizationId: parsed.organizationId,
+                          filename: parsed.filename,
+                          purpose: parsed.purpose,
+                          uuid: randomUUID(),
+                      })
+                    : assertTenantKey(parsed.organizationId, input.key);
 
             const command = new PutObjectCommand({
                 Bucket: config.bucket,
@@ -282,6 +285,27 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
                 // In Node the SDK's body is a Readable: chunks as they come.
                 const body = out.Body as AsyncIterable<Uint8Array> | undefined;
                 return body ?? null;
+            } catch (error) {
+                if (isNotFound(error)) return null;
+                throw error;
+            }
+        },
+
+        async readObjectEnd(
+            key: string,
+            length: number,
+        ): Promise<Uint8Array | null> {
+            try {
+                const out = await client.send(
+                    new GetObjectCommand({
+                        Bucket: config.bucket,
+                        Key: key,
+                        Range: `bytes=-${Math.max(1, length)}`,
+                    }),
+                );
+                if (!out.Body) return null;
+                const bytes = await out.Body.transformToByteArray();
+                return bytes.subarray(Math.max(0, bytes.length - length));
             } catch (error) {
                 if (isNotFound(error)) return null;
                 throw error;

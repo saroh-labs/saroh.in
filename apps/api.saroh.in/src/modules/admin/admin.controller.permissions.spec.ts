@@ -166,14 +166,16 @@ describe("Admin console permission assignments", () => {
         return route ? permissionsOf(route.handler) : undefined;
     };
 
-    it.each(["suspend", "reinstate", "scheduleDeletion"] as const)(
-        "protects %s with lifecycle write",
-        (method) => {
-            expect(perms(method)).toEqual([
-                AdminPermission.OrganizationLifecycleWrite,
-            ]);
-        },
-    );
+    it.each([
+        "suspend",
+        "reinstate",
+        "scheduleDeletion",
+        "removeUpload",
+    ] as const)("protects %s with lifecycle write", (method) => {
+        expect(perms(method)).toEqual([
+            AdminPermission.OrganizationLifecycleWrite,
+        ]);
+    });
 
     it.each(["changePlan", "trial", "raiseLimit", "revokeLimit"] as const)(
         "protects %s with subscription override",

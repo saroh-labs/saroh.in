@@ -281,12 +281,14 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 
 ## Unconfirmed uploads — **Current** (DEC-227)
 
-- **`media.pending-sweep`** is hourly and self-rescheduling (one waiting run
-  under `job-chain:media.pending-sweep`, restarted by `MediaModule` every six
-  hours). An upload holds its space against the plan's storage from its
-  start; one still PENDING two hours on (`PENDING_UPLOAD_STALE_MS`, well past
-  the signed URL's ten minutes) loses its object and its row, each in its own
-  transaction that takes the row only while it is still PENDING. READY and
+- **`media.pending-sweep`** runs every 15 minutes and reschedules itself (one
+  waiting run under `job-chain:media.pending-sweep`, restarted by
+  `MediaModule` every six hours). An upload holds its space against the
+  plan's storage from its start, for every file it signed (the photo and its
+  smaller copies, DEC-246); one still PENDING 15 minutes on
+  (`PENDING_UPLOAD_STALE_MS`, past the signed URLs' ten minutes) loses all
+  its objects and its row, each in its own transaction that takes the row
+  only while it is still PENDING. READY and
   FAILED rows are never touched; a business on legal hold is left out.
 
 ## Retention — **Current** (DEC-122)

@@ -92,7 +92,14 @@ export interface ShopListingCard {
      * itself the amount to pay (`cardSaving`).
      */
     saving?: MrpSaving | null;
-    image: { url: string; alt: string } | null;
+    /** Its photo; its own width, blur and copies' widths when made at upload (DEC-246). */
+    image: {
+        url: string;
+        alt: string;
+        width?: number | null;
+        placeholder?: string | null;
+        widths?: readonly number[] | null;
+    } | null;
     variantTitles: string[];
     /**
      * What the options are ("Size", DEC-073 #12). Absent from an API before
@@ -364,6 +371,10 @@ export default function ShopListing({
                                                         : "below",
                                                     {
                                                         src: p.image.url,
+                                                        width: p.image.width,
+                                                        placeholder:
+                                                            p.image.placeholder,
+                                                        widths: p.image.widths,
                                                         sizes: "(min-width: 1024px) 25vw, 50vw",
                                                     },
                                                 )}

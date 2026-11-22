@@ -404,15 +404,22 @@ describe("what each count asks", () => {
 
     it("sums checked uploads, in GB rounded up to the hundredth", async () => {
         tx.media.aggregate.mockResolvedValue({
-            _sum: { sizeBytes: 1_234_567_890 },
+            _sum: { sizeBytes: 1_234_567_890, variantBytes: null },
         });
         expect(await countUsage(tx as never, "org", "storageGb", now)).toBe(
             1.24,
         );
         expect(tx.media.aggregate).toHaveBeenCalledWith({
             where: { organizationId: "org", status: { not: "FAILED" } },
-            _sum: { sizeBytes: true },
+            _sum: { sizeBytes: true, variantBytes: true },
         });
+        // A photo's smaller copies count too (DEC-246).
+        tx.media.aggregate.mockResolvedValue({
+            _sum: { sizeBytes: 1_000_000_000, variantBytes: 234_567_890 },
+        });
+        expect(await countUsage(tx as never, "org", "storageGb", now)).toBe(
+            1.24,
+        );
         tx.media.aggregate.mockResolvedValue({ _sum: { sizeBytes: null } });
         expect(await countUsage(tx as never, "org", "storageGb", now)).toBe(0);
     });

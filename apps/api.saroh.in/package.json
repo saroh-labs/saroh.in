@@ -13,6 +13,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "catalogue:import": "tsx src/cli/catalogue-import.cli.ts",
+    "media:variants": "node dist/cli/media-variants.cli.js",
     "catalogue:global-free": "tsx src/cli/catalogue-global-free.cli.ts",
     "eval:ask-ai": "tsx eval/ask-ai/cli.ts",
     "eval:ask-ai:load": "tsx eval/ask-ai/load/cli.ts",
@@ -63,6 +64,8 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "sanitize-html": "2.18.1",
+    "sharp": "0.35.5",
+    "thumbhash": "0.1.1",
     "tldts": "^6.1.86",
     "uqr": "^0.1.3",
     "zod": "catalog:"

@@ -5,17 +5,19 @@ import type { ObjectStorage } from "@saroh/object-storage";
 
 import { heldOrganizationIds } from "../organizations/legal-hold";
 import { OBJECT_STORAGE } from "./object-storage.provider";
+import { mediaFileKeys } from "./variants";
 
-/** The hourly sweep of uploads started and never confirmed (M-5). */
+/** The sweep, every 15 minutes, of uploads started and never confirmed (M-5). */
 export const PENDING_UPLOAD_SWEEP_TYPE = "media.pending-sweep";
 
-export const PENDING_UPLOAD_SWEEP_EVERY_MS = 60 * 60 * 1000;
+export const PENDING_UPLOAD_SWEEP_EVERY_MS = 15 * 60 * 1000;
 
 /**
- * How long an unconfirmed upload is left before it is swept: well past the
- * signed URL's ten minutes, so an upload still finishing is never taken.
+ * How long an unconfirmed upload is left before it is swept: past the
+ * signed URLs' ten minutes, so an upload still finishing is never taken
+ * (DEC-246: 15 minutes, down from two hours).
  */
-export const PENDING_UPLOAD_STALE_MS = 2 * 60 * 60 * 1000;
+export const PENDING_UPLOAD_STALE_MS = 15 * 60 * 1000;
 
 const CHAIN_LOCK = `job-chain:${PENDING_UPLOAD_SWEEP_TYPE}`;
 const BATCH = 100;
@@ -24,7 +26,7 @@ const BATCH = 100;
  * `media.pending-sweep` (M-5, owner 20 Nov 2026): an upload whose URL was
  * signed but which was never confirmed holds its space against the plan's
  * storage (`billing/metering.ts`) until this deletes its object and its
- * row, two hours after it started. A READY or FAILED row is never touched;
+ * row, fifteen minutes after it started. A READY or FAILED row is never touched;
  * a business on legal hold keeps everything (DEC-122).
  *
  * Each row goes in its own transaction: the row is taken only while still
@@ -85,7 +87,7 @@ export class PendingUploadSweepJob {
                         ? { id: { notIn: failedIds } }
                         : {}),
                 },
-                select: { id: true, key: true },
+                select: { id: true, key: true, variants: true },
                 orderBy: { id: "asc" },
                 take: this.batch,
             });
@@ -97,7 +99,10 @@ export class PendingUploadSweepJob {
                             where: { id: row.id, status: "PENDING" },
                         });
                         if (taken.count > 0) {
-                            await this.storage.deleteObject(row.key);
+                            // The photo and every copy the browser sent.
+                            for (const key of mediaFileKeys(row)) {
+                                await this.storage.deleteObject(key);
+                            }
                         }
                         return taken.count;
                     });

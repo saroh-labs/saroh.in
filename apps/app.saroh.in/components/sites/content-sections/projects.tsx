@@ -12,6 +12,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import { pickedSizes } from "@/components/shared/fields/picked-image";
 import type { ProjectItem, ProjectsContent } from "@/lib/sites/service";
 
 import { ImageBrief } from "@/components/sites/section-fields/image-brief";
@@ -213,6 +214,7 @@ function ProjectPhoto({
                                     alt: image?.alt,
                                     width: picked.width,
                                     height: picked.height,
+                                    ...pickedSizes(picked),
                                 },
                             })
                         }

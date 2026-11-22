@@ -1,5 +1,6 @@
 "use client";
 
+import { thumbnailSrc } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { FailedRead } from "@saroh/ui/failed-read";
@@ -102,7 +103,14 @@ export function LibraryPanel({
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos */}
                                     <img
-                                        src={item.url ?? ""}
+                                        src={
+                                            item.url
+                                                ? thumbnailSrc(
+                                                      item.url,
+                                                      item.widths,
+                                                  )
+                                                : ""
+                                        }
                                         alt=""
                                         className="aspect-[4/3] w-full object-cover"
                                     />

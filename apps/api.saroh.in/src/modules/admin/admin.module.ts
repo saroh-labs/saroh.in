@@ -54,6 +54,7 @@ import { AdminHomeService } from "./admin-home.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
 import { AdminMachineryController } from "./admin-machinery.controller";
 import { AdminMachineryService } from "./admin-machinery.service";
+import { AdminMediaService } from "./admin-media.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminOperationsService } from "./admin-operations.service";
 import { AdminOrganizationOverviewController } from "./admin-organization-overview.controller";
@@ -182,6 +183,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminLifecycleService,
         AdminOverridesService,
         AdminSiteTrackersService,
+        AdminMediaService,
         AdminStaffService,
         // Account managers: assign, reassign, end, share out (U25).
         AdminAccountManagersService,

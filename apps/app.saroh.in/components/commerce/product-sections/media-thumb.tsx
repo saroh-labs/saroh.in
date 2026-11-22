@@ -1,3 +1,4 @@
+import { thumbnailSrc } from "@saroh/block-contract";
 import { cn } from "@saroh/ui/lib/utils";
 import { Play } from "lucide-react";
 
@@ -22,6 +23,8 @@ export function MediaThumb({
         kind?: "photo" | "video";
         durationSec?: number | null;
         posterUrl?: string | null;
+        /** Its stored copies' widths: the thumbnail is the small one. */
+        widths?: readonly number[] | null;
     };
     /** What it shows; "" for a thumbnail beside its own words. */
     alt: string;
@@ -35,7 +38,11 @@ export function MediaThumb({
     if (item.kind !== "video") {
         return (
             /* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */
-            <img src={mediaSrc(item.url)} alt={alt} className={fill} />
+            <img
+                src={mediaSrc(thumbnailSrc(item.url, item.widths))}
+                alt={alt}
+                className={fill}
+            />
         );
     }
     const length = formatDuration(item.durationSec);

@@ -27,7 +27,7 @@ module.exports = {
         "^.+\\.[tj]s$": ["ts-jest", { tsconfig: { allowJs: true } }],
     },
     transformIgnorePatterns: [
-        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|ai|@ai-sdk[+/][^/]+|@vercel[+/]oidc|@workflow[+/]serde|zod)(?:@|/))",
+        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|ai|@ai-sdk[+/][^/]+|@vercel[+/]oidc|@workflow[+/]serde|thumbhash|zod)(?:@|/))",
     ],
     testEnvironment: "node",
     rootDir: ".",

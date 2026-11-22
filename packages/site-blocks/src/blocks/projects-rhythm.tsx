@@ -162,6 +162,8 @@ function Tile({
                     {...siteImage("below", {
                         src,
                         width: item.image?.width,
+                        placeholder: item.image?.placeholder,
+                        widths: item.image?.widths,
                         sizes: "(min-width: 768px) 50vw, 100vw",
                     })}
                     className="absolute inset-0 h-full w-full object-cover"

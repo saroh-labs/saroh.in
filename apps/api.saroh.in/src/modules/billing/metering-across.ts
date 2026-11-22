@@ -331,11 +331,14 @@ export async function countUsageAcross(
             const rows = await db.media.groupBy({
                 by: ["organizationId"],
                 where: { organizationId: { in: ids }, ...STORED_MEDIA },
-                _sum: { sizeBytes: true },
+                _sum: { sizeBytes: true, variantBytes: true },
             });
             const out = new Map<string, number>();
             for (const r of rows) {
-                const gb = bytesToGb(Number(r._sum.sizeBytes ?? 0));
+                const gb = bytesToGb(
+                    Number(r._sum.sizeBytes ?? 0) +
+                        Number(r._sum.variantBytes ?? 0),
+                );
                 if (gb > 0) out.set(r.organizationId, gb);
             }
             return out;

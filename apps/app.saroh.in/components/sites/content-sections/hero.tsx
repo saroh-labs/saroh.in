@@ -1,6 +1,7 @@
 "use client";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import { pickedSizes } from "@/components/shared/fields/picked-image";
 import { PhotoSheetButton } from "@/components/sites/editor/sheets/photo-sheet-opener";
 import type { HeroPanelKind } from "@saroh/block-contract";
 import { resolveVariant, SAME_DAY_CALL_WORDS } from "@saroh/block-contract";
@@ -353,6 +354,7 @@ export function HeroFields({
                                 alt: c.image?.alt,
                                 width: img.width,
                                 height: img.height,
+                                ...pickedSizes(img),
                             },
                         })
                     }
@@ -458,6 +460,7 @@ function BylineFields({
                                         alt: "",
                                         width: img.width,
                                         height: img.height,
+                                        ...pickedSizes(img),
                                     },
                                 })
                             }

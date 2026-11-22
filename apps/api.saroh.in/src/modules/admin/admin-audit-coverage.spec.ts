@@ -39,6 +39,7 @@ const AUDITED = new Set([
     "admin-organizations.controller.ts#raiseLimit",
     "admin-organizations.controller.ts#reinstate",
     "admin-organizations.controller.ts#removeOverride",
+    "admin-organizations.controller.ts#removeUpload",
     "admin-organizations.controller.ts#repairModules",
     "admin-organizations.controller.ts#revokeLimit",
     "admin-organizations.controller.ts#revokeOrganizationAccess",

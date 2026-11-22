@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { buildObjectKey, stripTrailingSlashes } from "./keys";
+import { assertTenantKey, buildObjectKey, stripTrailingSlashes } from "./keys";
 import type {
     ContentTypeAllowlist,
     CreateSignedUploadUrlInput,
@@ -99,12 +99,15 @@ export function createMemoryStorage(
             input: CreateSignedUploadUrlInput,
         ): Promise<SignedUploadUrl> {
             const parsed = uploadSchema.parse(input);
-            const key = buildObjectKey({
-                organizationId: parsed.organizationId,
-                filename: parsed.filename,
-                purpose: parsed.purpose,
-                uuid: generateId(),
-            });
+            const key =
+                input.key === undefined
+                    ? buildObjectKey({
+                          organizationId: parsed.organizationId,
+                          filename: parsed.filename,
+                          purpose: parsed.purpose,
+                          uuid: generateId(),
+                      })
+                    : assertTenantKey(parsed.organizationId, input.key);
 
             store.set(key, {
                 key,
@@ -160,6 +163,13 @@ export function createMemoryStorage(
             return Promise.resolve(bytes ? bytes.slice(0, length) : null);
         },
 
+        readObjectEnd(key: string, length: number): Promise<Uint8Array | null> {
+            const bytes = bytesByKey.get(key);
+            return Promise.resolve(
+                bytes ? bytes.slice(Math.max(0, bytes.length - length)) : null,
+            );
+        },
+
         async putObject(
             key: string,
             body: PutObjectBody,
@@ -204,11 +214,14 @@ export function createMemoryStorage(
         headObject(key: string): Promise<HeadObjectResult | null> {
             const stored = store.get(key);
             if (stored === undefined) return Promise.resolve(null);
+            // The bytes a test "uploaded", when it did, as R2 reports them.
+            const length =
+                bytesByKey.get(key)?.byteLength ?? stored.contentLength;
             return Promise.resolve({
                 key,
                 contentType: stored.contentType,
-                contentLength: stored.contentLength,
-                etag: `"fake-etag-${stored.contentLength}"`,
+                contentLength: length,
+                etag: `"fake-etag-${length}"`,
             });
         },
 

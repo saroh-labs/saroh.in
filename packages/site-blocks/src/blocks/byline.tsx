@@ -40,6 +40,8 @@ export function HeroByline({
                         {...siteImage("below", {
                             src: photo.src,
                             width: photo.width,
+                            placeholder: photo.placeholder,
+                            widths: photo.widths,
                             sizes: "44px",
                         })}
                         className="bg-site-surface block size-11 rounded-full object-cover"

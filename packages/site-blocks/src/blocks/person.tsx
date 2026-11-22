@@ -116,6 +116,8 @@ export default function PersonSection({
                         {...siteImage("below", {
                             src,
                             width: content.image?.width,
+                            placeholder: content.image?.placeholder,
+                            widths: content.image?.widths,
                             sizes: "(min-width: 640px) 384px, 100vw",
                         })}
                         className={
@@ -271,6 +273,8 @@ function PortraitColumn({
                                 {...siteImage("below", {
                                     src,
                                     width: content.image?.width,
+                                    placeholder: content.image?.placeholder,
+                                    widths: content.image?.widths,
                                     sizes: "300px",
                                 })}
                                 className={
@@ -361,6 +365,9 @@ function TeamGrid({ content }: { content: RenderedPerson }) {
                                             {...siteImage("below", {
                                                 src,
                                                 width: m.image?.width,
+                                                placeholder:
+                                                    m.image?.placeholder,
+                                                widths: m.image?.widths,
                                                 sizes: "(min-width: 1024px) 25vw, 50vw",
                                             })}
                                             className="h-full w-full object-cover"

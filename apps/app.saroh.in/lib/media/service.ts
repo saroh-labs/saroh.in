@@ -20,6 +20,23 @@ export interface UploadTicket {
     headers: Record<string, string>;
     key: string;
     expiresAt: string;
+    /** One signed PUT per smaller copy asked for (DEC-246). */
+    variants?: {
+        width: number;
+        uploadUrl: string;
+        method: "PUT";
+        headers: Record<string, string>;
+        key: string;
+    }[];
+}
+
+/** What the browser made of a photo before it went up (DEC-246). */
+export interface UploadSizes {
+    width?: number;
+    height?: number;
+    placeholder?: string;
+    /** The smaller copies, narrowest first: their widths and exact sizes. */
+    variants?: { width: number; contentLength: number }[];
 }
 
 export interface CompletedUpload {
@@ -57,13 +74,15 @@ function messageOf(data: unknown, fallback: string): string {
     return fallback;
 }
 
-export async function createUpload(input: {
-    contentType: string;
-    contentLength: number;
-    filename: string;
-    /** The library bucket; site images unless said. */
-    purpose?: "site-image" | "business-logo" | "product-video";
-}): Promise<MediaResult<UploadTicket>> {
+export async function createUpload(
+    input: {
+        contentType: string;
+        contentLength: number;
+        filename: string;
+        /** The library bucket; site images unless said. */
+        purpose?: "site-image" | "business-logo" | "product-video";
+    } & UploadSizes,
+): Promise<MediaResult<UploadTicket>> {
     const base = await mediaBase();
     if (!base)
         return {
@@ -116,6 +135,11 @@ export interface LibraryItem {
     status: string;
     url: string | null;
     createdAt: string;
+    /** The widths of its smaller copies (DEC-246); empty for older photos. */
+    widths?: number[];
+    width?: number | null;
+    height?: number | null;
+    placeholder?: string | null;
 }
 
 /**

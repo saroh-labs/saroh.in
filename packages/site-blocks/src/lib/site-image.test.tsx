@@ -1,5 +1,5 @@
 import type { RenderedGallery, RenderedHero } from "@saroh/block-contract";
-import { BLOCK_META } from "@saroh/block-contract";
+import { BLOCK_META, placeholderFromRgba } from "@saroh/block-contract";
 import { render } from "@testing-library/react";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -146,6 +146,66 @@ describe("siteImage with a photo", () => {
                 decoding: "async",
             });
         }
+    });
+});
+
+/** Copies and a blur made at upload (DEC-246). */
+describe("siteImage with stored copies and a placeholder", () => {
+    const src = "https://media.saroh.in/org/a/site-image/u-shop.webp";
+    // An opaque photo: a see-through one gets no blur behind it.
+    const placeholder = placeholderFromRgba(
+        4,
+        3,
+        new Uint8Array(4 * 3 * 4).fill(255),
+    );
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("takes srcSet from the stored copies, with no Worker route", () => {
+        vi.stubEnv("NEXT_PUBLIC_SITE_MEDIA_URL", "https://media.saroh.in");
+        const props = siteImage("below", {
+            src,
+            width: 2560,
+            widths: [480, 1200, 1920],
+            sizes: "50vw",
+        });
+        expect(props.src).toBe(src);
+        expect(props.srcSet).toBe(
+            [
+                "https://media.saroh.in/org/a/site-image/u-shop@480.webp 480w",
+                "https://media.saroh.in/org/a/site-image/u-shop@1200.webp 1200w",
+                "https://media.saroh.in/org/a/site-image/u-shop@1920.webp 1920w",
+                `${src} 2560w`,
+            ].join(", "),
+        );
+        expect(props.sizes).toBe("50vw");
+        expect(props.srcSet).not.toContain("/_img/");
+    });
+
+    it("falls back to the Worker's ladder without copies, as before", () => {
+        vi.stubEnv("NEXT_PUBLIC_SITE_MEDIA_URL", "https://media.saroh.in");
+        expect(siteImage("below", { src, width: 2560 }).srcSet).toContain(
+            "/_img/",
+        );
+    });
+
+    it("draws the blur as a PNG in the background, behind the focus point", () => {
+        const props = siteImage("below", {
+            src,
+            placeholder,
+            focus: { x: 30, y: 20 },
+        });
+        expect(props.style?.objectPosition).toBe("30% 20%");
+        expect(props.style?.backgroundImage).toMatch(
+            /^url\("data:image\/png;base64,[A-Za-z0-9+/=]+"\)$/,
+        );
+        expect(props.style?.backgroundSize).toBe("cover");
+        expect(props.style?.backgroundPosition).toBe("30% 20%");
+    });
+
+    it("adds no style for a bad placeholder", () => {
+        expect(siteImage("below", { src, placeholder: "x" }).style).toBe(
+            undefined,
+        );
     });
 });
 

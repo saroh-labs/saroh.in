@@ -119,6 +119,10 @@ export const renderedImageSchema = z.object({
     height: z.number().int().positive().optional(),
     /** Its focus point (U46d); absent on every photo published before. */
     focus: imageFocusSchema.optional(),
+    /** Its blur while it loads (DEC-246); absent before then. */
+    placeholder: z.string().optional(),
+    /** The widths of its stored smaller copies (DEC-246). */
+    widths: z.array(z.number()).optional(),
 });
 
 const renderedHero = z.object({

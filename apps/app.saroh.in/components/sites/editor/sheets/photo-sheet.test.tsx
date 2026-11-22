@@ -9,7 +9,11 @@ import { PhotoSheet, sizeLine } from "./photo-sheet";
 
 const TOO_BIG =
     "That photo is over 10 MB. Export it smaller and upload it again.";
-vi.mock("@/components/shared/fields/media-picker", () => ({
+vi.mock("@/components/shared/fields/media-picker", async (actual) => ({
+    // The real words and fields; only the upload is stubbed.
+    ...(await actual<
+        typeof import("@/components/shared/fields/media-picker")
+    >()),
     // The API refuses an oversize photo before the bytes go up.
     useImageUpload: () => {
         const [error, setError] = useState<string | null>(null);
@@ -19,6 +23,7 @@ vi.mock("@/components/shared/fields/media-picker", () => ({
                 return Promise.resolve(null);
             },
             busy: false,
+            preparing: false,
             progress: null,
             error,
             setError,

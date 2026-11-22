@@ -430,6 +430,9 @@ export function LookShopListing({
                                 height={750}
                                 {...siteImage(index < 3 ? "above" : "below", {
                                     src: p.image.url,
+                                    width: p.image.width,
+                                    placeholder: p.image.placeholder,
+                                    widths: p.image.widths,
                                     sizes:
                                         look === "live"
                                             ? "(min-width: 700px) 33vw, 96px"

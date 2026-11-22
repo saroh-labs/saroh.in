@@ -8,7 +8,12 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { completeUpload, createUpload } from "@/lib/media/actions";
 import { mediaSrc } from "@/lib/media/media-src";
+import { preparePhoto } from "@/lib/media/prepare-photo";
+
 import { ProgressBar } from "@saroh/ui/progress-bar";
+import { pickedSizes, uploadWords } from "./picked-image";
+
+export { pickedSizes, uploadWords };
 
 /** What a picked image hands back — the shape the section contract accepts. */
 export interface PickedImage {
@@ -27,6 +32,10 @@ export interface PickedImage {
     /** A video's poster: a frame uploaded as a photo, when one could be taken. */
     posterMediaId?: string;
     posterSrc?: string;
+    /** Its blur while it loads, made on the device (DEC-246). */
+    placeholder?: string;
+    /** The widths of its stored smaller copies (DEC-246). */
+    widths?: number[];
 }
 
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime"]);
@@ -78,6 +87,7 @@ export function useImageUpload(
     } = {},
 ) {
     const [busy, setBusy] = useState(false);
+    const [preparing, setPreparing] = useState(false);
     const [progress, setProgress] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     /*
@@ -109,8 +119,8 @@ export function useImageUpload(
             return null;
         }
         setBusy(true);
-        setProgress(0);
         if (video) {
+            setProgress(0);
             try {
                 return await uploadVideo(file);
             } catch (e) {
@@ -130,54 +140,25 @@ export function useImageUpload(
             }
         }
         try {
-            // Dimensions first, from the bytes already on the device, so the
-            // upload never has to be followed by a second round trip to ask
-            // storage what it just received.
-            const dims = await readDimensions(file);
-
-            const ticket = await createUpload({
-                contentType: file.type,
-                contentLength: file.size,
-                filename: file.name,
-                ...(options.purpose ? { purpose: options.purpose } : {}),
-            });
-            if (!ticket.ok) {
-                if (mounted.current) setError(ticket.error);
-                return null;
-            }
-
-            await putWithProgress(
-                ticket.data.uploadUrl,
-                ticket.data.headers,
+            const sent = await sendPhoto(
                 file,
+                options.purpose ?? "site-image",
                 (pct) => {
                     if (mounted.current) setProgress(pct);
                 },
             );
-
-            const done = await completeUpload(ticket.data.mediaId);
             // Past the last wait: nothing below may reach a control that has
             // gone.
             if (!mounted.current) return null;
-            if (!done.ok) {
-                setError(done.error);
-                return null;
-            }
-            if (!done.data.url) {
-                // The upload succeeded and nothing can serve it. Say that,
-                // rather than writing a src nobody can fetch.
-                setError(
-                    options.unserved ??
-                        "Uploaded, but storage is not set up to serve images yet. Paste an image address below instead.",
-                );
-                return null;
-            }
             return {
-                src: done.data.url,
-                ...dims,
-                bytes: file.size,
-                mediaId: ticket.data.mediaId,
+                src: sent.url,
+                ...(sent.width
+                    ? { width: sent.width, height: sent.height }
+                    : {}),
+                bytes: sent.bytes,
+                mediaId: sent.mediaId,
                 filename: file.name,
+                ...pickedSizes(sent),
             };
         } catch (e) {
             if (!mounted.current) return null;
@@ -190,9 +171,115 @@ export function useImageUpload(
         } finally {
             if (mounted.current) {
                 setBusy(false);
+                setPreparing(false);
                 setProgress(null);
             }
         }
+    }
+
+    /**
+     * A photo, made ready on the device first (DEC-246): re-drawn without
+     * its metadata, a full copy and smaller ones, and a blur. Then a
+     * ticket for every file, each PUT (progress over all of them), and the
+     * confirm. A browser that can't re-draw it sends the original as it
+     * is, as before. Throws with the words to show.
+     */
+    async function sendPhoto(
+        file: File,
+        purpose: "site-image" | "business-logo",
+        onProgress: (pct: number) => void,
+    ): Promise<{
+        mediaId: string;
+        url: string;
+        bytes: number;
+        width?: number;
+        height?: number;
+        placeholder?: string;
+        widths?: number[];
+    }> {
+        if (mounted.current) setPreparing(true);
+        const prepared = await preparePhoto(file).finally(() => {
+            if (mounted.current) setPreparing(false);
+        });
+        const photo = prepared?.file ?? file;
+        // Dimensions from the bytes already on the device, so the upload
+        // never has to be followed by a second round trip to ask storage.
+        const dims = prepared
+            ? { width: prepared.width, height: prepared.height }
+            : await readDimensions(file);
+        const copies = prepared?.variants ?? [];
+        const ticket = await createUpload({
+            contentType: photo.type,
+            contentLength: photo.size,
+            filename: photo.name,
+            purpose,
+            ...(prepared
+                ? {
+                      ...dims,
+                      ...(prepared.placeholder
+                          ? { placeholder: prepared.placeholder }
+                          : {}),
+                      ...(copies.length > 0
+                          ? {
+                                variants: copies.map((c) => ({
+                                    width: c.width,
+                                    contentLength: c.blob.size,
+                                })),
+                            }
+                          : {}),
+                  }
+                : {}),
+        });
+        if (!ticket.ok) throw new Error(ticket.error);
+
+        const total = copies.reduce((n, c) => n + c.blob.size, photo.size);
+        let sentBytes = 0;
+        const put = async (
+            url: string,
+            headers: Record<string, string>,
+            body: Blob,
+        ) => {
+            await putWithProgress(url, headers, body, (pct) =>
+                onProgress(
+                    Math.round(
+                        ((sentBytes + (pct / 100) * body.size) / total) * 100,
+                    ),
+                ),
+            );
+            sentBytes += body.size;
+        };
+        await put(ticket.data.uploadUrl, ticket.data.headers, photo);
+        for (const copy of copies) {
+            const signed = ticket.data.variants?.find(
+                (v) => v.width === copy.width,
+            );
+            if (!signed)
+                throw new Error("The upload did not go through. Try again.");
+            await put(signed.uploadUrl, signed.headers, copy.blob);
+        }
+
+        const done = await completeUpload(ticket.data.mediaId);
+        if (!done.ok) throw new Error(done.error);
+        if (!done.data.url) {
+            // The upload succeeded and nothing can serve it. Say that,
+            // rather than writing a src nobody can fetch.
+            throw new Error(
+                options.unserved ??
+                    "Uploaded, but storage is not set up to serve images yet. Paste an image address below instead.",
+            );
+        }
+        return {
+            mediaId: ticket.data.mediaId,
+            url: done.data.url,
+            bytes: photo.size,
+            ...dims,
+            ...(prepared?.placeholder
+                ? { placeholder: prepared.placeholder }
+                : {}),
+            ...(copies.length > 0
+                ? { widths: copies.map((c) => c.width) }
+                : {}),
+        };
     }
 
     /**
@@ -212,11 +299,13 @@ export function useImageUpload(
         if (!isMounted()) return null;
         let poster: { mediaId: string; url: string } | null = null;
         if (meta.poster) {
-            poster = await send(
+            // The poster is a photo: made ready the same way (DEC-246).
+            poster = await sendPhoto(
                 new File([meta.poster], `${file.name}-poster.jpg`, {
                     type: "image/jpeg",
                 }),
                 "site-image",
+                () => undefined,
             ).catch(() => null);
         }
         // Read again: the poster's upload is one more wait.
@@ -240,7 +329,7 @@ export function useImageUpload(
     /** Ticket, PUT, confirm — for one file. Throws with the words to show. */
     async function send(
         file: File,
-        purpose: "site-image" | "product-video",
+        purpose: "product-video",
         onProgress?: (pct: number) => void,
     ): Promise<{ mediaId: string; url: string }> {
         const ticket = await createUpload({
@@ -267,7 +356,7 @@ export function useImageUpload(
         return { mediaId: ticket.data.mediaId, url: done.data.url };
     }
 
-    return { upload, busy, progress, error, setError };
+    return { upload, busy, preparing, progress, error, setError };
 }
 
 /**
@@ -354,9 +443,10 @@ export function MediaPicker({
 }) {
     const inputId = useId();
     const inputRef = useRef<HTMLInputElement>(null);
-    const { upload, busy, progress, error, setError } = useImageUpload({
-        allowVideo,
-    });
+    const { upload, busy, preparing, progress, error, setError } =
+        useImageUpload({
+            allowVideo,
+        });
     const [over, setOver] = useState(false);
 
     async function handleFile(file: File) {
@@ -415,11 +505,7 @@ export function MediaPicker({
                     variant="outline"
                     size="sm"
                     busy={busy}
-                    busyLabel={
-                        progress === null
-                            ? "Uploading…"
-                            : `Uploading ${progress}%`
-                    }
+                    busyLabel={uploadWords({ preparing, progress })}
                     onClick={() => inputRef.current?.click()}
                 >
                     <ImagePlus className="mr-1.5 size-3.5" />
@@ -472,7 +558,7 @@ function readDimensions(
 function putWithProgress(
     url: string,
     headers: Record<string, string>,
-    file: File,
+    file: Blob,
     onProgress: (pct: number) => void,
 ): Promise<void> {
     return new Promise((resolve, reject) => {

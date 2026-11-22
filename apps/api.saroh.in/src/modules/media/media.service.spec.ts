@@ -73,6 +73,7 @@ function fakeStorage(over: Partial<ObjectStorage> = {}): ObjectStorage {
         deleteObject: jest.fn().mockResolvedValue(undefined),
         headObject: jest.fn().mockResolvedValue(null),
         readObjectStart: jest.fn().mockResolvedValue(null),
+        readObjectEnd: jest.fn().mockResolvedValue(null),
         // Local development's storage unless a test says otherwise.
         seesUploads: false,
         ...over,
@@ -136,6 +137,7 @@ describe("MediaService.createUpload", () => {
             headers: SIGNED.headers,
             key: SIGNED.key,
             expiresAt: SIGNED.expiresAt,
+            variants: [],
         });
     });
 

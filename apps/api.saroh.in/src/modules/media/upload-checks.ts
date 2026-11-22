@@ -1,10 +1,17 @@
 import { BadRequestException } from "@nestjs/common";
 import {
+    IMAGE_FULL_MAX_BYTES,
+    IMAGE_FULL_MAX_EDGE,
+    isValidPlaceholder,
+    variantWidthsFor,
+} from "@saroh/block-contract";
+import {
     DEFAULT_ALLOWED_CONTENT_TYPES,
     DEFAULT_MAX_UPLOAD_BYTES,
     DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
     hasImageSignature,
     hasIsoBmffSignature,
+    imageEndsCleanly,
     isAllowedContentType,
     isVideoContentType,
     VIDEO_UPLOAD_PURPOSE,
@@ -46,12 +53,79 @@ export const NOTHING_UPLOADED_MESSAGE =
 /** The purpose the business logo is uploaded under. */
 export const LOGO_UPLOAD_PURPOSE = "business-logo";
 
+/**
+ * What a merchant reads when the copies the browser made don't add up — a
+ * fault in the app, not something they did, so it says to try again.
+ */
+export const BAD_SIZES_MESSAGE =
+    "We couldn't get that photo ready. Choose it again.";
+
+/** What a browser re-draws a photo as: WebP, or JPEG where it can't. */
+const COPY_TYPES = new Set(["image/webp", "image/jpeg"]);
+
 /** Input for issuing an upload URL — the validated `CreateUploadDto` shape. */
 export interface CreateUploadInput {
     contentType: string;
     contentLength: number;
     filename: string;
     purpose?: string;
+    /** The stored copy's size in pixels, and its ThumbHash (DEC-246). */
+    width?: number;
+    height?: number;
+    placeholder?: string;
+    /** The smaller WebP copies the browser made, narrowest first. */
+    variants?: { width: number; contentLength: number }[];
+}
+
+/**
+ * Do the sizes and copies an upload declares agree (DEC-246)? Checked
+ * before anything is signed:
+ *
+ * - a size is both width and height, the longest side within the full
+ *   copy's cap; a placeholder is a ThumbHash;
+ * - copies come only with a photo the browser re-drew, under 4 MB, (WebP, or JPEG where
+ *   it can't write WebP) of known width, and are exactly
+ *   the ladder's widths below it, narrowest first (none missing, none
+ *   extra, none out of order), each smaller in bytes than the photo.
+ */
+export function uploadSizesProblem(input: CreateUploadInput): string | null {
+    const sized = input.width !== undefined || input.height !== undefined;
+    if (sized) {
+        if (input.width === undefined || input.height === undefined) {
+            return BAD_SIZES_MESSAGE;
+        }
+        if (isVideoContentType(input.contentType)) return BAD_SIZES_MESSAGE;
+    }
+    if (
+        input.placeholder !== undefined &&
+        !isValidPlaceholder(input.placeholder)
+    ) {
+        return BAD_SIZES_MESSAGE;
+    }
+    const variants = input.variants;
+    if (variants === undefined || variants.length === 0) return null;
+    if (!COPY_TYPES.has(input.contentType) || input.width === undefined) {
+        return BAD_SIZES_MESSAGE;
+    }
+    // The browser's full copy stays well under the 5 MB Ask AI takes.
+    if (
+        Math.max(input.width, input.height ?? 0) > IMAGE_FULL_MAX_EDGE ||
+        input.contentLength > IMAGE_FULL_MAX_BYTES
+    ) {
+        return BAD_SIZES_MESSAGE;
+    }
+    const expected = variantWidthsFor(input.width);
+    if (
+        variants.length !== expected.length ||
+        variants.some(
+            (v, i) =>
+                v.width !== expected[i] ||
+                v.contentLength >= input.contentLength,
+        )
+    ) {
+        return BAD_SIZES_MESSAGE;
+    }
+    return null;
 }
 
 /**
@@ -123,6 +197,30 @@ export function storedBytesProblem(
         return seesUploads ? NOTHING_UPLOADED_MESSAGE : null;
     }
     if (hasImageSignature(media.contentType, start)) return null;
+    return media.purpose === LOGO_UPLOAD_PURPOSE
+        ? NOT_A_LOGO_MESSAGE
+        : NOT_AN_IMAGE_MESSAGE;
+}
+
+/**
+ * Why a stored file is not the whole of what its format says, or null when
+ * it is (DEC-246): the bytes past where the image ends are refused — a zip
+ * or a page tucked after a photo. Every image, from the browser or the API.
+ * `end` null means its tail could not be read: refused where storage sees
+ * uploads, let through on local development's in-memory storage.
+ */
+export function storedEndProblem(
+    media: { contentType: string; purpose: string | null },
+    start: Uint8Array | null,
+    end: Uint8Array | null,
+    size: number | undefined,
+    seesUploads: boolean,
+): string | null {
+    if (isVideoContentType(media.contentType)) return null;
+    if (start === null || end === null || size === undefined) {
+        return seesUploads ? NOTHING_UPLOADED_MESSAGE : null;
+    }
+    if (imageEndsCleanly(media.contentType, start, end, size)) return null;
     return media.purpose === LOGO_UPLOAD_PURPOSE
         ? NOT_A_LOGO_MESSAGE
         : NOT_AN_IMAGE_MESSAGE;

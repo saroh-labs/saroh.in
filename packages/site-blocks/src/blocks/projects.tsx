@@ -163,6 +163,8 @@ function ProjectCard({ item, over }: { item: Project; over: boolean }) {
                     {...siteImage("below", {
                         src,
                         width: item.image?.width,
+                        placeholder: item.image?.placeholder,
+                        widths: item.image?.widths,
                         sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
                     })}
                     className="mb-1.5 aspect-[4/3] w-full object-cover"
@@ -185,6 +187,8 @@ function ProjectRow({ item }: { item: Project }) {
                     {...siteImage("below", {
                         src,
                         width: item.image?.width,
+                        placeholder: item.image?.placeholder,
+                        widths: item.image?.widths,
                         sizes: "(min-width: 640px) 240px, 40vw",
                     })}
                     className={listPhoto}
@@ -216,6 +220,8 @@ function ProjectPlate({ item, src }: { item: Project; src: string }) {
                     {...siteImage("below", {
                         src,
                         width: item.image?.width,
+                        placeholder: item.image?.placeholder,
+                        widths: item.image?.widths,
                         sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
                     })}
                     className="aspect-[4/3] w-full object-cover"

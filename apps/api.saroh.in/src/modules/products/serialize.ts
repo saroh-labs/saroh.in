@@ -6,9 +6,12 @@
  * `Decimal` across the pnpm boundary and trip TS2883.
  */
 
+import { thumbnailSrc } from "@saroh/block-contract";
+
 import { toMoneyString } from "../../common/money";
 import { bpsToRate, rateToBps } from "../invoices/gst";
 import { isGstPriceMode } from "../invoices/gst-price";
+import { variantWidths } from "../media/variants";
 import type { ProductFulfilmentType } from "../orders/fulfilment";
 import { productTypesOf } from "../orders/fulfilment";
 import { sanitizeRichHtml } from "../sites/sanitize";
@@ -60,6 +63,8 @@ export interface ProductImageDto {
     /** A video's poster, from the library; null when it has none. */
     posterMediaId: string | null;
     posterUrl: string | null;
+    /** Its stored smaller copies' widths (DEC-246); empty when none. */
+    widths: number[];
 }
 
 /** Which switches say "on the shop"; a key missing is treated as shown. */
@@ -132,6 +137,8 @@ export interface ListStockDto {
  * and high for wedding cakes).
  */
 export interface ProductListItemDto extends ProductDto {
+    /** The cover's smallest stored copy, for a list's thumbnail (DEC-246). */
+    thumb: string | null;
     variantCount: number;
     /** The first variant's SKU; `null` for a product with no variants. */
     sku: string | null;
@@ -221,6 +228,8 @@ interface RawImage {
     durationSec?: number | null;
     posterMediaId?: string | null;
     posterUrl?: string | null;
+    /** The library photo, when read with it, for its copies (DEC-246). */
+    media?: { variants: unknown } | null;
 }
 
 interface RawProduct {
@@ -307,6 +316,8 @@ export function serializeImage(image: RawImage): ProductImageDto {
         durationSec: image.durationSec ?? null,
         posterMediaId: image.posterMediaId ?? null,
         posterUrl: image.posterUrl ?? null,
+        widths:
+            image.kind === "video" ? [] : variantWidths(image.media?.variants),
     };
 }
 
@@ -405,6 +416,21 @@ interface RawProductListItem extends RawProduct {
     stockLevels: StockRowLike[];
     /** Its listing at the storefront read from, for the hand-marked Sold out. */
     listings?: RawListingLike[];
+    /** Its photos' addresses and copies, for the cover's thumbnail. */
+    images?: { url: string; media: { variants: unknown } | null }[];
+}
+
+/** What a list reads of a product's photos: {@link coverThumb}. */
+export const COVER_THUMB = {
+    where: { kind: "photo" },
+    select: { url: true, media: { select: { variants: true } } },
+} as const;
+
+/** The cover's smallest stored copy, or the cover itself (DEC-246). */
+function coverThumb(product: RawProductListItem): string | null {
+    if (!product.image) return null;
+    const cover = product.images?.find((i) => i.url === product.image);
+    return thumbnailSrc(product.image, variantWidths(cover?.media?.variants));
 }
 
 /** Whether a listing at `storeId` is marked Sold out by hand (#515). */
@@ -451,6 +477,7 @@ export function serializeProductListItem(
 ): ProductListItemDto {
     return {
         ...serializeProduct(product, storeId),
+        thumb: coverThumb(product),
         variantCount: product._count.variants,
         sku: product.variants[0]?.sku ?? null,
         // An order is taken only for a variant this storefront sells.

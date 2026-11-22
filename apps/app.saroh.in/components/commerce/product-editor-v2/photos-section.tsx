@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { AddressPanel } from "@/components/commerce/product-sections/photos-field";
 import { useImageUpload } from "@/components/shared/fields/media-picker";
+import { uploadWords } from "@/components/shared/fields/picked-image";
 import type { LibraryItem } from "@/lib/media/service";
 import { replaceProductImages } from "@/lib/products/actions";
 import type { PhotoDraft } from "@/lib/products/editor-sections";
@@ -68,9 +69,10 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
     const [library, setLibrary] = useState(false);
     const [byAddress, setByAddress] = useState(false);
     const [over, setOver] = useState(false);
-    const { upload, busy, progress, error, setError } = useImageUpload({
-        allowVideo: true,
-    });
+    const { upload, busy, preparing, progress, error, setError } =
+        useImageUpload({
+            allowVideo: true,
+        });
     const fileRef = useRef<HTMLInputElement>(null);
 
     const n = draft.length;
@@ -168,6 +170,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                     durationSec: picked.durationSec ?? null,
                     posterMediaId: picked.posterMediaId ?? null,
                     posterUrl: picked.posterSrc ?? null,
+                    widths: picked.widths ?? [],
                 },
             ];
         });
@@ -387,7 +390,10 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                     <Upload aria-hidden className="size-[18px]" />
                     <span>
                         {busy
-                            ? `Uploading ${progress ?? 0}%`
+                            ? uploadWords({
+                                  preparing,
+                                  progress: progress ?? 0,
+                              })
                             : "Upload a photo or video"}
                     </span>
                 </button>

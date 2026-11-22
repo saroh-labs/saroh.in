@@ -857,6 +857,14 @@ admin health page says so; a deployed API must not run that way.
   `seesUploads` (R2), no bytes at all is a failed upload too; only the
   in-memory adapter of local development, which never sees the browser's
   PUT, lets an unread photo through (#873).
+- **Checked to the last byte, and sized at upload (DEC-246).** Every image
+  must also end where its format ends (`imageEndsCleanly`: JPEG, PNG, GIF,
+  WebP); bytes appended after the picture fail the upload. A photo from the
+  app arrives re-drawn in the browser (no metadata) with WebP copies beside
+  it at `<key>@<width>.webp` (`variantKey`, `@saroh/block-contract`), signed
+  at keys the server makes; `Media.variants` lists them and the plan's
+  storage counts them (`variantBytes`). Pages build `srcset` from them and
+  draw the ThumbHash `placeholder` as the blur.
 - **A presigned upload fixes its type and size.** The adapter signs
   `content-type` and `content-length`, so R2 refuses any other. When a test
   fakes the presigner, keep one that signs for real and reads the URL.
@@ -874,6 +882,10 @@ admin health page says so; a deployed API must not run that way.
   on `media.saroh.in` and `media.saroh.io` sets `Content-Security-Policy:
 default-src 'none'; img-src 'self'; media-src 'self'; sandbox` and
   `X-Content-Type-Options: nosniff`, so even a mislabelled file is inert.
+  The values live in `MEDIA_HEADERS` (`scripts/check-media-headers.mjs`);
+  change both together. The deploy-api workflow's `media-headers` job checks
+  the target's domain live after each rollout (`pnpm check:media-headers`
+  checks both by hand).
 
 ## Razorpay recurring payments (D11 spike) — **Current**
 

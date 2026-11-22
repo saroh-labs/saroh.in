@@ -12,6 +12,7 @@ import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminBusinessModulesService } from "./admin-business-modules.service";
 import { ServedEdition } from "./admin-edition";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
+import { AdminMediaService } from "./admin-media.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
 import { AdminOverridesService } from "./admin-overrides.service";
@@ -55,6 +56,7 @@ export class AdminOrganizationsController {
         private readonly idempotency: IdempotencyService,
         private readonly siteTrackers: AdminSiteTrackersService,
         private readonly businessModules: AdminBusinessModulesService,
+        private readonly media: AdminMediaService,
     ) {}
 
     /**
@@ -591,6 +593,34 @@ export class AdminOrganizationsController {
                 this.lifecycle.repairModules({
                     staff,
                     organizationId,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
+    /**
+     * Take one of a business's uploads down (owner, 22 Nov 2026): the object,
+     * its smaller copies, then the row. The same permission as suspending:
+     * both act on a business for what it put on Saroh.
+     */
+    @Delete("organizations/:organizationId/media/:mediaId")
+    @RequireAdminPermission(AdminPermission.OrganizationLifecycleWrite)
+    removeUpload(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Param("mediaId") mediaId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.once(
+            "media.remove",
+            staff,
+            organizationId,
+            { ...dto, mediaId },
+            () =>
+                this.media.remove({
+                    staff,
+                    organizationId,
+                    mediaId,
                     reason: dto.reason,
                 }),
         );

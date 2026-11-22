@@ -1,3 +1,4 @@
+import { placeholderDataUrl, storedSrcSet } from "@saroh/block-contract";
 import { preload } from "react-dom";
 
 import { resizedSources } from "./image-sizes";
@@ -38,6 +39,14 @@ import { resizedSources } from "./image-sizes";
  * SVG), nothing is added and the `<img>` keeps the `src` it was given:
  * exactly the markup it had before.
  *
+ * Copies made at upload come first (DEC-246): a photo whose snapshot names
+ * the widths of its stored smaller copies (`widths`) gets its `srcSet`
+ * straight from them, on the media domain, with no Worker or Cloudflare
+ * Images. A photo with a `placeholder` (its ThumbHash) gets its blur as a
+ * tiny PNG in the `<img>`'s background, drawn here on the server, so a
+ * lazy photo shows it until it paints, without script. A photo with
+ * neither keeps exactly the markup above.
+ *
  * The first hero is also preloaded from the head (React's `preload`, with
  * the same `srcset` and `sizes`), so the browser starts on it before it
  * reaches the `<img>`.
@@ -51,8 +60,16 @@ export interface SiteImageProps {
     src?: string;
     srcSet?: string;
     sizes?: string;
-    /** The focus point as `object-position`, only when the photo has one. */
-    style?: { objectPosition: string };
+    /**
+     * The focus point as `object-position`, only when the photo has one;
+     * its blur as the background, only when it has a placeholder.
+     */
+    style?: {
+        objectPosition?: string;
+        backgroundImage?: string;
+        backgroundSize?: string;
+        backgroundPosition?: string;
+    };
 }
 
 /** The photo an `<img>` draws, for sizing it. */
@@ -68,6 +85,10 @@ export interface SiteImageSource {
      * block crops it. Absent, nothing is added and the photo stays centred.
      */
     focus?: { x: number; y: number } | null;
+    /** Its ThumbHash, made at upload (DEC-246); the blur while it loads. */
+    placeholder?: string | null;
+    /** The widths of its smaller copies stored beside it (DEC-246). */
+    widths?: readonly number[] | null;
 }
 
 /**
@@ -92,18 +113,33 @@ export function siteImage(
               };
     const src = image?.src?.trim();
     if (!image || !src) return loading;
-    const focused: SiteImageProps = image.focus
-        ? {
-              ...loading,
-              style: {
-                  objectPosition: `${image.focus.x}% ${image.focus.y}%`,
-              },
-          }
-        : loading;
-    const sized = resizedSources(
-        { src, width: image.width, sizes: image.sizes },
-        siteMediaBase(),
-    );
+    const position = image.focus
+        ? `${image.focus.x}% ${image.focus.y}%`
+        : undefined;
+    const blur = placeholderDataUrl(image.placeholder);
+    const style: SiteImageProps["style"] = {
+        ...(position ? { objectPosition: position } : {}),
+        ...(blur
+            ? {
+                  backgroundImage: `url("${blur}")`,
+                  backgroundSize: "cover",
+                  backgroundPosition: position ?? "50% 50%",
+              }
+            : {}),
+    };
+    const focused: SiteImageProps =
+        position || blur ? { ...loading, style } : loading;
+    const stored = storedSrcSet({
+        src,
+        width: image.width,
+        widths: image.widths,
+    });
+    const sized = stored
+        ? { src, srcSet: stored, sizes: image.sizes ?? "100vw" }
+        : resizedSources(
+              { src, width: image.width, sizes: image.sizes },
+              siteMediaBase(),
+          );
     if (place === "first-hero") {
         // Called while rendering, as React means it to be: it lands once in
         // the head, however many times the page renders the hero.

@@ -196,3 +196,57 @@ export function hasImageSignature(
             return false;
     }
 }
+
+/** How many trailing bytes {@link imageEndsCleanly} needs. */
+export const IMAGE_END_BYTES = 12;
+
+const PNG_END = [
+    0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+];
+
+/**
+ * Does the file end where its format says it ends (DEC-246)? Anything after
+ * that (a zip, a page, a second file: the polyglot trick) is refused. Byte
+ * level only, never a decode:
+ *
+ * - JPEG: the last two bytes are the end-of-image marker `FF D9`.
+ * - PNG: the last twelve are the empty `IEND` chunk and its fixed CRC.
+ * - GIF: the last byte is the trailer `3B`.
+ * - WebP: the RIFF header's size plus its 8 bytes is the file's length.
+ *
+ * `start` is at least {@link IMAGE_SNIFF_BYTES} from the front, `end` at
+ * least {@link IMAGE_END_BYTES} from the back, `size` the stored length.
+ * AVIF (an ISO-BMFF box chain) and video are not checked here: true.
+ */
+export function imageEndsCleanly(
+    contentType: string,
+    start: Uint8Array,
+    end: Uint8Array,
+    size: number,
+): boolean {
+    const tail = (n: number) => end.subarray(end.length - n);
+    switch (contentType) {
+        case "image/jpeg":
+            return (
+                end.length >= 2 && tail(2)[0] === 0xff && tail(2)[1] === 0xd9
+            );
+        case "image/png":
+            return (
+                end.length >= PNG_END.length &&
+                PNG_END.every((b, i) => tail(PNG_END.length)[i] === b)
+            );
+        case "image/gif":
+            return end.length >= 1 && tail(1)[0] === 0x3b;
+        case "image/webp": {
+            if (start.length < 12) return false;
+            const view = new DataView(
+                start.buffer,
+                start.byteOffset,
+                start.byteLength,
+            );
+            return view.getUint32(4, true) + 8 === size;
+        }
+        default:
+            return true;
+    }
+}

@@ -73,6 +73,8 @@ export interface ProductImage {
     /** A video's poster, from the library. */
     posterMediaId: string | null;
     posterUrl: string | null;
+    /** Its stored copies' widths (DEC-246); empty for older photos. */
+    widths?: number[];
 }
 
 /**
@@ -80,6 +82,8 @@ export interface ProductImage {
  * SKU it is known by, and its stock against its own low-stock threshold.
  */
 export interface ProductListItem extends Product {
+    /** The cover's smallest stored copy, for a row's thumbnail (DEC-246). */
+    thumb?: string | null;
     /**
      * The price's GST rate in percent and its own way of carrying GST, as
      * the row is read; the counter's preview prices by them. Absent from

@@ -34,6 +34,12 @@ export interface CreateSignedUploadUrlInput {
      * `avatar`, `post-cover`. Sanitized to `[a-z0-9-]`.
      */
     purpose?: string;
+    /**
+     * A key the SERVER made for this upload: a photo's smaller copy, beside
+     * the photo it belongs to (DEC-246). Never one from a request. It must
+     * sit under the organization's own prefix, or the call throws.
+     */
+    key?: string;
 }
 
 /** A minted presigned upload URL plus everything the client needs to PUT. */
@@ -133,6 +139,13 @@ export interface ObjectStorage {
      * the key does not exist or its bytes cannot be read.
      */
     readObjectStart(key: string, length: number): Promise<Uint8Array | null>;
+
+    /**
+     * Read the last `length` bytes of an object (a suffix range), to check a
+     * file ends where its format says it ends (DEC-246). Resolves `null`
+     * when the key does not exist or its bytes cannot be read.
+     */
+    readObjectEnd(key: string, length: number): Promise<Uint8Array | null>;
 
     /**
      * Does {@link readObjectStart} see what a browser PUT to a signed URL?

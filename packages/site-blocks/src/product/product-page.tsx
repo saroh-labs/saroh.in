@@ -67,6 +67,9 @@ export interface ProductPageImage {
     durationSec?: number | null;
     /** A video's poster; shown before it plays and when it can't. */
     posterUrl?: string | null;
+    /** Its blur and its stored copies' widths (DEC-246). */
+    placeholder?: string | null;
+    widths?: readonly number[] | null;
 }
 
 /** A video's length as its badge shows it: "0:24". */
@@ -869,6 +872,8 @@ export default function ProductPage({
                                     {...siteImage("above", {
                                         src: shown.url,
                                         width: shown.width,
+                                        placeholder: shown.placeholder,
+                                        widths: shown.widths,
                                         sizes: "(min-width: 1024px) 50vw, 100vw",
                                     })}
                                     className="aspect-[4/5] w-full object-cover"

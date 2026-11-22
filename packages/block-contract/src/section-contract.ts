@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { COMPONENT_STYLE_OPTIONS } from "./component-styles";
+import { imagePlaceholderSchema, imageWidthsSchema } from "./image-variants";
 import { parseSectionFrame } from "./section-frame";
 
 /**
@@ -357,6 +358,10 @@ const imageSchema = z.object({
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
     focus: imageFocusSchema.optional(),
+    /** Its blur while it loads (DEC-246): a ThumbHash made at upload. */
+    placeholder: imagePlaceholderSchema.optional(),
+    /** The widths of its stored smaller copies (DEC-246). */
+    widths: imageWidthsSchema.optional(),
 });
 
 /** How long an image brief may run (KTD-5). */
