@@ -2,8 +2,9 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { openReviewedSite } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
-import { NORTHWIND_ORG, REVIEWED_SITE, urls } from "../playwright.config";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The site editor on a phone (round 2, G4): the page fills the screen, the
@@ -26,14 +27,8 @@ async function signIn(page: Page) {
 /** Northwind's site, opened in the editor. */
 async function openEditor(page: Page) {
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
-    await page.goto(`${urls.APP_URL}/sites`);
-    await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-    await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
-        timeout: 30_000,
-    });
-    const id = /\/sites\/([^/]+)\//.exec(page.url())?.[1];
-    if (id === undefined) throw new Error(`no site id in ${page.url()}`);
-    await page.goto(`${urls.APP_URL}/sites/${id}`);
+    // The business's one site, in its editor (Website area on or off).
+    await openReviewedSite(page);
     await expect(page.locator("[data-layout=phone]")).toBeVisible({
         timeout: 30_000,
     });

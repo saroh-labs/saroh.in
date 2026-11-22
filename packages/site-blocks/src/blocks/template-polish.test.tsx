@@ -779,6 +779,8 @@ describe("the shared chrome fixes (U8)", () => {
             expect(row?.className).toContain("min-[700px]:hidden");
             for (const a of Array.from(row?.querySelectorAll("a") ?? [])) {
                 expect(a.className).toContain("min-h-11");
+                // 44px wide too: "Home" alone drew 40px (CI, 21 Nov 2026).
+                expect(a.className).toContain("min-w-11");
             }
         },
     );

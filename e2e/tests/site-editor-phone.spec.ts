@@ -121,8 +121,9 @@ for (const size of SIZES) {
                     page.getByRole("tab", { name: tab }),
                 ).toBeVisible();
             }
+            // Nothing saved yet: "Saved" only follows a save (21 Nov audit).
             await expect(page.locator("[data-save-footer]")).toContainText(
-                "Saved · goes live when you publish",
+                "Goes live when you publish",
             );
             expect(await noSideScroll(page)).toBe(true);
             await page.getByRole("button", { name: "Cancel" }).click();

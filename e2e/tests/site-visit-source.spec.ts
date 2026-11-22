@@ -289,9 +289,11 @@ test.describe("where a visit came from", { tag: "@serial" }, () => {
             await expect
                 .poll(() => ofType(sent, "site.started").length)
                 .toBe(1);
+            // A start names the site page it began on, path only (DEC-235).
             expect(ofType(sent, "site.started")[0]?.properties).toEqual({
                 source: "instagram",
                 ref,
+                path: `/shop/${slug}`,
             });
 
             // Pick-up, the email's code, pay at pick-up, place it.

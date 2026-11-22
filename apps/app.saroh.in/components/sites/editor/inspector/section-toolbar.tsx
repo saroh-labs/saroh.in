@@ -84,7 +84,7 @@ export function SectionToolbar({
             data-section-toolbar=""
             data-folded={folded || undefined}
             onClick={(e) => e.stopPropagation()}
-            className="absolute -top-6 right-3 z-20 flex flex-nowrap items-center gap-0.5 whitespace-nowrap rounded-[11px] border bg-card p-1 font-sans text-foreground shadow-[0_2px_4px_hsl(var(--shadow-color)/0.06),0_8px_22px_hsl(var(--shadow-color)/0.12)]"
+            className="absolute -top-6 right-3 z-[35] flex flex-nowrap items-center gap-0.5 whitespace-nowrap rounded-[11px] border bg-card p-1 font-sans text-foreground shadow-[0_2px_4px_hsl(var(--shadow-color)/0.06),0_8px_22px_hsl(var(--shadow-color)/0.12)]"
         >
             <DropdownMenu>
                 {tool(

@@ -2,7 +2,11 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { brandTab, openFromPill } from "../fixtures/phone-editor";
+import {
+    brandTab,
+    openDeskBrand,
+    openFromPill,
+} from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { setNorthwindLook } from "../fixtures/site-look";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
@@ -36,11 +40,7 @@ async function openBrand(page: Page, siteId: string, phone: boolean) {
         await openFromPill(page, "Brand");
         return;
     }
-    const brand = page.getByRole("tab", { name: "Brand" });
-    await expect(brand).toBeVisible({ timeout: 30_000 });
-    if ((await brand.getAttribute("aria-selected")) !== "true") {
-        await brand.click();
-    }
+    await openDeskBrand(page);
 }
 
 test.describe("one Brand panel", { tag: "@serial" }, () => {

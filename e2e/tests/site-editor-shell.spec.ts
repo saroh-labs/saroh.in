@@ -69,7 +69,7 @@ for (const size of SIZES) {
                 bar.getByRole("button", { name: "Undo" }),
             ).toBeDisabled();
             await expect(
-                bar.getByRole("button", { name: "Preview" }),
+                bar.getByRole("button", { name: "Preview", exact: true }),
             ).toBeVisible();
             await expect(
                 bar.getByRole("button", { name: /^(Publish|Needs approval)$/ }),

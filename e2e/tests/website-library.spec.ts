@@ -66,7 +66,8 @@ test("a toolbar choice moves the previews and the address, and a reload keeps it
     await page.getByTitle(/^Top of the page, /).scrollIntoViewIfNeeded();
     const frame = page.frameLocator('iframe[title^="Top of the page, "]');
     await expect(
-        frame.locator("[data-library-preview] *").first(),
+        // SiteTheme's <style> comes first, and is never shown.
+        frame.locator("[data-library-preview] :not(style)").first(),
     ).toBeVisible();
     await expect(page.getByText("Preview could not load")).toHaveCount(0);
 });

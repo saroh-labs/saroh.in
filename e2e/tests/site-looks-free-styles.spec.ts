@@ -2,7 +2,12 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { lookGallery, openFromPill, typefaces } from "../fixtures/phone-editor";
+import {
+    lookGallery,
+    openDeskBrand,
+    openFromPill,
+    typefaces,
+} from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import {
     grantNorthwindThemes,
@@ -56,11 +61,7 @@ async function openBrand(page: Page, phone: boolean) {
         await openFromPill(page, "Brand");
         return;
     }
-    const brand = page.getByRole("tab", { name: "Brand" });
-    await expect(brand).toBeVisible({ timeout: 30_000 });
-    if ((await brand.getAttribute("aria-selected")) !== "true") {
-        await brand.click();
-    }
+    await openDeskBrand(page);
 }
 
 /** Northwind's editor on its site, Brand open, on the page's own clock. */

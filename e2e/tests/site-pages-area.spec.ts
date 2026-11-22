@@ -147,6 +147,8 @@ test.describe("Pages", () => {
             page
                 .getByText(/No text for Google|No share image|Broken link/)
                 .or(page.getByText(/pages look good/))
+                // A row says it twice: a phone line and a desk column.
+                .filter({ visible: true })
                 .first(),
         ).toBeVisible();
     });

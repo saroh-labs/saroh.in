@@ -69,7 +69,7 @@ for (const size of SIZES) {
                 .locator("[data-pages-tree] [data-section-row]")
                 .first()
                 .click();
-            await expect(inspector).toContainText(/section · 1 of \d+/);
+            await expect(inspector).toContainText(/section 1 of \d+/);
             const tab = (name: string | RegExp) =>
                 inspector.getByRole("tab", { name });
             await expect(tab("Content")).toHaveAttribute(

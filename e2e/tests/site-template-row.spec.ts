@@ -3,10 +3,16 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind } from "../fixtures/own-data";
-import { brandTab, openFromPill } from "../fixtures/phone-editor";
+import {
+    brandTab,
+    openDeskBrand,
+    openFromPill,
+    phoneSheet,
+} from "../fixtures/phone-editor";
 import { pressUntil } from "../fixtures/press";
 import { openReviewedSite } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
@@ -37,6 +43,19 @@ async function openBrand(page: Page, phone: boolean, reviewer = false) {
         await brandTab(page, "Look");
         return;
     }
+    if (phone && (await websiteAreaOn(page))) {
+        // The area's reader has no bar: Brand is a row of the page's sheet.
+        const pages = phoneSheet(page, "Pages");
+        await pressUntil(
+            page.getByRole("button", { name: /^Page: .*Choose another page/ }),
+            pages,
+        );
+        await pressUntil(
+            pages.getByRole("button", { name: "Brand", exact: true }),
+            phoneSheet(page, "Brand"),
+        );
+        return;
+    }
     if (phone) {
         const sheet = await openFromPill(page, "Blocks");
         const tab = sheet.getByRole("tab", { name: "Brand" });
@@ -46,11 +65,7 @@ async function openBrand(page: Page, phone: boolean, reviewer = false) {
         );
         return;
     }
-    const brand = page.getByRole("tab", { name: "Brand" });
-    await expect(brand).toBeVisible({ timeout: 30_000 });
-    if ((await brand.getAttribute("aria-selected")) !== "true") {
-        await brand.click();
-    }
+    await openDeskBrand(page);
 }
 
 test.describe("the editor's Template row (DEC-216)", () => {
@@ -101,7 +116,9 @@ test.describe("the editor's Template row (DEC-216)", () => {
         await useSession(page, "reviewer");
         await openReviewedSite(page);
         await openBrand(page, phone, true);
-        const brand = page.getByRole("region", { name: "Template" });
+        // Its own group, or with the Website area on the Look group's
+        // "Started from" line.
+        const brand = page.getByRole("region", { name: /^(Template|Look)$/ });
         // Northwind's seeded site records no template (KTD-7).
         await expect(brand.filter({ visible: true }).first()).toContainText(
             "Your own pages",

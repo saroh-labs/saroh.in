@@ -26,7 +26,14 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * the image's address is the one the API gives. On a stack with real
  * storage the PUT simply goes there and this stub is never met. The icon's
  * bytes are never fetched: the assertions are on what the page declares.
+ *
+ * The app enforces its CSP (DEC-244), whose connect-src names real storage
+ * (`*.r2.cloudflarestorage.com`) only, and a browser refuses a PUT to the
+ * stub's host before `page.route` can answer it. So this spec, the one
+ * that uploads to the stub, runs with the page's CSP bypassed.
  */
+test.use({ bypassCSP: true });
+
 const renderer = new URL(urls.RENDERER_URL);
 const LIVE = `${renderer.protocol}//northwind.${renderer.host}`;
 const UPLOAD_HOST = /^https:\/\/memory\.object-storage\.test\//;

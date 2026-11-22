@@ -6,12 +6,27 @@ import { pressUntil } from "./press";
 /**
  * The site editor on a phone (DEC-185): no bottom tabs, one floating pill
  * (Blocks · + · Brand), and ⋯ More in the bar. Each opens a sheet from the
- * foot, a dialog named by its title.
+ * foot, a dialog named by its title. With the Website area on (CI's stack,
+ * `fixtures/website-area.ts`) the pill is the foot's bar instead (U49):
+ * Sections · Add · Brand · Publish, whose sheets are "Sections on this
+ * page", "Add" and "Brand".
  */
 
-/** The pill over the page. */
+/** The pill over the page, or with the Website area on the foot's bar. */
 export const editPill = (page: Page): Locator =>
-    page.getByRole("toolbar", { name: "Edit page" });
+    page
+        .getByRole("toolbar", { name: "Edit page" })
+        .or(page.getByRole("navigation", { name: "Editor", exact: true }));
+
+/** Each pill button's name, and its sheet's: today's, then the area's. */
+const PILL = {
+    Blocks: { button: /^(Blocks|Sections)$/, sheet: /^(Blocks|Sections) on / },
+    "Add a block": {
+        button: /^(Add a block|Add)$/,
+        sheet: /^(Add a block|Add)$/,
+    },
+    Brand: { button: /^Brand$/, sheet: /^Brand$/ },
+} as const;
 
 /**
  * Until no sheet is on its way out: one closing still matches by its name
@@ -33,13 +48,35 @@ export async function openFromPill(
     which: "Blocks" | "Add a block" | "Brand",
 ): Promise<Locator> {
     await settled(page);
-    const sheet = phoneSheet(page, which === "Blocks" ? /^Blocks on / : which);
+    const sheet = phoneSheet(page, PILL[which].sheet);
     if (await sheet.isVisible()) return sheet;
     await pressUntil(
-        editPill(page).getByRole("button", { name: which, exact: true }),
+        editPill(page).getByRole("button", { name: PILL[which].button }),
         sheet,
     );
     return sheet;
+}
+
+/**
+ * The desk editor's Brand panel, opened: the rail's Brand tab, or with the
+ * Website area on the left trail's Brand (U46).
+ */
+export async function openDeskBrand(page: Page): Promise<void> {
+    const brand = page
+        .getByRole("tab", { name: "Brand" })
+        .or(
+            page
+                .getByRole("navigation", { name: "Editor panels" })
+                .getByRole("button", { name: "Brand", exact: true }),
+        )
+        .first();
+    await expect(brand).toBeVisible({ timeout: 30_000 });
+    await pressUntil(
+        brand,
+        async () =>
+            (await brand.getAttribute("aria-selected")) === "true" ||
+            (await brand.getAttribute("aria-current")) === "true",
+    );
 }
 
 /** Open ⋯ More, pressed until it shows. */

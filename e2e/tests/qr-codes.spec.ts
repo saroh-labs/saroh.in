@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { northwind, stamp } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -269,12 +270,14 @@ test("the Website header's QR button opens the code Settings › Share lists", a
         page.getByRole("heading", { name: /^(Website|Pages)$/, level: 1 }),
     ).toBeVisible();
 
-    await page
-        .getByRole("button", { name: "QR code for your website" })
-        .click();
     const panel = page.getByRole("dialog", {
         name: "QR code for your website",
     });
+    // The first press after a goto: a press before hydration is lost.
+    await pressUntil(
+        page.getByRole("button", { name: "QR code for your website" }),
+        panel,
+    );
     const link = panel.locator("[data-qr-link]");
     await expect(link).toHaveText(/\/q\/[0-9a-z]{3,6}$/);
     const shown = (await link.textContent()) ?? "";

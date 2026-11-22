@@ -71,7 +71,7 @@ for (const size of SIZES) {
             const panel = await openHistory(page);
             await expect(panel).toContainText("Waiting to publish");
             await expect(
-                panel.getByRole("button", { name: "Whole site" }),
+                panel.getByRole("radio", { name: "Whole site" }),
             ).toBeVisible();
             await expect(
                 panel.getByRole("link", { name: "See all versions" }),
@@ -105,7 +105,7 @@ for (const size of SIZES) {
             );
             await page
                 .locator("[data-editor-bar]")
-                .getByRole("button", { name: "Preview" })
+                .getByRole("button", { name: "Preview", exact: true })
                 .click();
             const frames = page.locator("[data-preview-frame]");
             await expect(frames).toHaveCount(3);
@@ -118,12 +118,16 @@ for (const size of SIZES) {
             await expect(together).toBeChecked();
             await together.click();
             await expect(together).not.toBeChecked();
-            await page.getByRole("button", { name: "Desktop" }).click();
+            await page.getByRole("radio", { name: "Desktop" }).click();
             await expect(frames).toHaveCount(1);
-            await page.getByRole("button", { name: "All three" }).click();
+            await page.getByRole("radio", { name: "All three" }).click();
             await expect(frames).toHaveCount(3);
             expect(await noSideScroll(page)).toBe(true);
-            await page.getByRole("button", { name: "Back to editing" }).click();
+            // The preview's own bar; the editor bar's Preview toggle is named so too.
+            await page
+                .getByRole("main", { name: "Page canvas" })
+                .getByRole("button", { name: "Back to editing" })
+                .click();
             await expect(page.locator("[data-preview-frames]")).toHaveCount(0);
             await expect(page.locator("[data-pages-tree]")).toBeVisible();
         });

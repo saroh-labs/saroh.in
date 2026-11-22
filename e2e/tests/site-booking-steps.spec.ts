@@ -194,7 +194,7 @@ test.describe("the booking step in the address", () => {
                     .click();
             }
             const read = page.waitForResponse((r) =>
-                /\/public\/services\/[^/]+\/days/.test(r.url()),
+                /\/public\/sites\/[^/]+\/services\/[^/]+\/days/.test(r.url()),
             );
             await services.getByRole("radio").nth(i).click();
             const res = await read;
@@ -222,7 +222,8 @@ test.describe("the booking step in the address", () => {
             const part = (type: string) =>
                 parts.find((p) => p.type === type)?.value ?? "";
             session = {
-                serviceId: new URL(res.url()).pathname.split("/")[3] ?? "",
+                // /public/sites/:siteId/services/:id/days (site-scoped, 4773e7b12)
+                serviceId: new URL(res.url()).pathname.split("/")[5] ?? "",
                 date: `${part("year")}-${part("month")}-${part("day")}`,
                 time: `${part("hour")}:${part("minute")}`,
             };
@@ -343,7 +344,9 @@ test.describe("the booking step in the address", () => {
                 page.on("request", (r) => {
                     if (
                         r.resourceType() === "document" ||
-                        /\/public\/services\/[^/]+\/days/.test(r.url())
+                        /\/public\/sites\/[^/]+\/services\/[^/]+\/days/.test(
+                            r.url(),
+                        )
                     ) {
                         asked.push(r.url());
                     }

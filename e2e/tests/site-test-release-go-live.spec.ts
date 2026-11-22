@@ -3,7 +3,8 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
-import { openMore } from "../fixtures/phone-editor";
+import { pressUntil } from "../fixtures/press";
+import { openPhoneMenu as phoneMenu } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -30,10 +31,28 @@ interface Section {
 
 const onPhone = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
-/** A choice in the phone's ⋯ More sheet (DEC-185), the sheet opened first. */
+/** A choice in the phone's menu (⋯ More, or the page menu in the area). */
 async function openPhoneMenu(page: Page, inside: string | RegExp) {
     // In the sheet only: the ⋯ button's own name says "preview" too.
-    return (await openMore(page)).getByRole("button", { name: inside }).first();
+    return (await phoneMenu(page))
+        .getByRole("button", { name: inside })
+        .first();
+}
+
+/**
+ * A choice in the desk's test link split, or with the Website area on, in
+ * ⋯ More (`fix/WXKRest`): `split` opens it today, `item` in More.
+ */
+async function deskChoice(
+    page: Page,
+    split: () => Promise<void>,
+    item: RegExp,
+) {
+    const more = page.getByRole("button", { name: /^More: find/ });
+    if (!(await more.isVisible())) return split();
+    const row = page.getByRole("menuitem", { name: item });
+    await pressUntil(more, row);
+    await row.click();
 }
 
 /** "Make a test release": the split's main half, or the phone's menu. */
@@ -43,10 +62,15 @@ async function openMake(page: Page) {
         if (onPhone(page)) {
             await (await openPhoneMenu(page, "Make a test link")).click();
         } else {
-            await page
-                .getByRole("group", { name: "Test link" })
-                .getByRole("button", { name: "Test link", exact: true })
-                .click();
+            await deskChoice(
+                page,
+                () =>
+                    page
+                        .getByRole("group", { name: "Test link" })
+                        .getByRole("button", { name: "Test link", exact: true })
+                        .click(),
+                /^Share a test link/,
+            );
         }
         await expect(sheet).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 30_000 });
@@ -60,10 +84,18 @@ async function openPanel(page: Page) {
     if (onPhone(page)) {
         await (await openPhoneMenu(page, /^Test links/)).click();
     } else {
-        await page
-            .getByRole("button", { name: "More test link actions" })
-            .click();
-        await page.getByRole("menuitem", { name: /^Test links/ }).click();
+        await deskChoice(
+            page,
+            async () => {
+                await page
+                    .getByRole("button", { name: "More test link actions" })
+                    .click();
+                await page
+                    .getByRole("menuitem", { name: /^Test links/ })
+                    .click();
+            },
+            /^Test links/,
+        );
     }
     await expect(panel).toBeVisible();
     return panel;
@@ -191,9 +223,18 @@ test.describe("test links in the editor (T11)", { tag: "@serial" }, () => {
             if (onPhone(page)) {
                 await openPhoneMenu(page, "Preview");
             }
-            await expect(
-                page.getByText(readout).locator("visible=true").first(),
-            ).toBeVisible();
+            // The Website area's desk bar is the status chip alone
+            // (`fix/WXKRest`), with no line: there the row above says it.
+            const areaDesk =
+                !onPhone(page) &&
+                (await page
+                    .getByRole("button", { name: /^More: find/ })
+                    .isVisible());
+            if (!areaDesk) {
+                await expect(
+                    page.getByText(readout).locator("visible=true").first(),
+                ).toBeVisible();
+            }
             if (onPhone(page)) await page.keyboard.press("Escape");
 
             // Cancel it: ready again.
@@ -234,6 +275,20 @@ test.describe("test links in the editor (T11)", { tag: "@serial" }, () => {
                 )
                 .toBe(true);
         } finally {
+            // Its own release, discarded (a schedule cancelled first): left
+            // scheduled by a run that stopped half way, it refuses the next
+            // run's schedule ("already scheduled … Cancel that first").
+            const { releases } = await nw.get<{
+                releases: { id: string; name: string; status: string }[];
+            }>(`/sites/${siteId}/test-releases`);
+            for (const r of releases) {
+                if (r.name !== name || r.status === "discarded") continue;
+                const at = `/sites/${siteId}/test-releases/${r.id}`;
+                if (r.status === "scheduled") {
+                    await nw.delete(`${at}/schedule`).catch(() => undefined);
+                }
+                await nw.post(`${at}/discard`).catch(() => undefined);
+            }
             // Put back what this changed: the draft's sections, and the
             // version that was live before.
             const now = await nw.get<{ revision: number }>(draftPath);

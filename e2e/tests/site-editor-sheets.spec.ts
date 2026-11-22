@@ -10,8 +10,9 @@ import {
     phoneSheet,
 } from "../fixtures/phone-editor";
 import { pressUntil } from "../fixtures/press";
+import { openReviewedSite } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
-import { NORTHWIND_ORG, REVIEWED_SITE, urls } from "../playwright.config";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The site editor's sheets (DEC-185): Publish as one sheet on a desk (from
@@ -32,17 +33,8 @@ const onPhone = (testInfo: TestInfo) =>
 async function openEditor(page: Page) {
     await useSession(page);
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
-    await page.goto(`${urls.APP_URL}/sites`);
-    await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-    await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
-        timeout: 30_000,
-    });
-    const id = /\/sites\/([^/]+)\//.exec(page.url())?.[1];
-    if (id === undefined) throw new Error(`no site id in ${page.url()}`);
-    await page.goto(`${urls.APP_URL}/sites/${id}`);
-    await expect(page.locator("[data-layout]")).toBeVisible({
-        timeout: 30_000,
-    });
+    // The business's one site, in its editor (Website area on or off).
+    await openReviewedSite(page);
 }
 
 const publishSheet = (page: Page) => page.locator("[data-publish-sheet]");

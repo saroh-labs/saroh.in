@@ -23,8 +23,11 @@ export function InspectorFrame({
         >
             {header}
             {tabs}
-            {/* A grid row, so the body (today's InspectorHost) fills and scrolls. */}
-            <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)]">
+            {/*
+             * A grid row, so the body fills and scrolls; a 0-min column,
+             * so a wide body never pushes the column past the window.
+             */}
+            <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
                 {children}
             </div>
         </div>

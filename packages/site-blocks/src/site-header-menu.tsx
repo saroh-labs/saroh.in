@@ -238,8 +238,8 @@ export const PHONE_ROW_MAX = 3;
 
 /**
  * The phone header's second row (U8, board TPSystem): the first three
- * pages as plain 44px links, so the pages someone came for are one tap
- * away without opening Menu. Menu still lists every page. The caller hides
+ * pages as plain links, 44px each way (a short "Home" too), so the pages
+ * someone came for are one tap away without opening Menu. Menu still lists every page. The caller hides
  * it from 700px up (`min-[700px]:hidden`); Classic's pills start at 820px,
  * so between the two its Menu alone has them. In-page entries whose section isn't
  * on the page leave, as in the desk row.
@@ -267,7 +267,7 @@ export function PhonePageRow({
                     aria-current={
                         isCurrent(item.href, current) ? "page" : undefined
                     }
-                    className={`text-site-body hover:text-site-fg aria-[current=page]:text-site-fg focus-visible:ring-site-fg inline-flex min-h-11 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-sm text-[15px] font-semibold decoration-1 underline-offset-[6px] hover:underline focus-visible:outline-none focus-visible:ring-2 active:opacity-70 aria-[current=page]:underline ${MOVES}`}
+                    className={`text-site-body hover:text-site-fg aria-[current=page]:text-site-fg focus-visible:ring-site-fg inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-sm text-[15px] font-semibold decoration-1 underline-offset-[6px] hover:underline focus-visible:outline-none focus-visible:ring-2 active:opacity-70 aria-[current=page]:underline ${MOVES}`}
                 >
                     {item.label}
                 </Link>
