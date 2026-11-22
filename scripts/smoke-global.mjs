@@ -27,16 +27,21 @@ export function hostAnswers(status) {
 
 /** The API's readiness: ready, with migrations up. */
 export function apiReady(json) {
-    if (json?.status !== "ready") return `status is ${json?.status ?? "missing"}`;
+    if (json?.status !== "ready")
+        return `status is ${json?.status ?? "missing"}`;
     const migrations = json.checks?.find((c) => c.name === "migrations");
     return migrations?.status === "up" ? null : "migrations aren't up";
 }
 
 /** Free-only: no amount to pay, and paid plans say so. */
 export function pricingFreeOnly(html) {
-    const text = html.replace(/<[^>]+>/g, " ");
+    // What a visitor reads: Next's inline page data ("$2", "$L3") isn't a price.
+    const text = html
+        .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+        .replace(/<[^>]+>/g, " ");
     if (/(?:\$|US\$|USD|€|£|₹)\s?\d/.test(text)) return "shows an amount";
-    if (!text.includes("Not available yet")) return "paid plans don't say Not available yet";
+    if (!/Not available yet|Coming soon/.test(text))
+        return "paid plans don't say Coming soon";
     if (!text.includes("Tell me when")) return "no Tell me when";
     return null;
 }
@@ -50,7 +55,9 @@ export function noIndiaLinks(html) {
 /** robots.txt and the sitemap name saroh.tech, not a local or India host. */
 export function namesSarohTech(body) {
     if (!body.includes("saroh.tech")) return "doesn't name saroh.tech";
-    if (/localhost|saroh\.io|https:\/\/(?:www\.)?saroh\.in\b/.test(body)) {
+    // A page's India twin, named for search engines, is meant (hreflang).
+    const own = body.replace(/<xhtml:link\b[^>]*hreflang="en-IN"[^>]*\/>/g, "");
+    if (/localhost|saroh\.io|https:\/\/(?:www\.)?saroh\.in\b/.test(own)) {
         return "names another host";
     }
     return null;
@@ -58,7 +65,8 @@ export function namesSarohTech(body) {
 
 /** Admin and accounts stay out of search. */
 export function noindex(headers, html) {
-    const header = headers.get?.("x-robots-tag") ?? headers["x-robots-tag"] ?? "";
+    const header =
+        headers.get?.("x-robots-tag") ?? headers["x-robots-tag"] ?? "";
     if (/noindex/i.test(header)) return null;
     return /<meta[^>]+name=["']robots["'][^>]+noindex/i.test(html)
         ? null
@@ -83,14 +91,22 @@ async function get(url) {
 async function main() {
     const failures = [];
     const check = (name, problem) => {
-        console.log(`${problem ? "FAIL" : "ok  "} ${name}${problem ? `: ${problem}` : ""}`);
+        console.log(
+            `${problem ? "FAIL" : "ok  "} ${name}${problem ? `: ${problem}` : ""}`,
+        );
         if (problem) failures.push(name);
     };
 
     for (const [name, base] of Object.entries(HOSTS)) {
         const path = name === "api" ? "/health/ready" : "/";
-        const r = await get(base + path).catch((e) => ({ status: 0, error: e }));
-        check(`${name} answers`, r.status ? hostAnswers(r.status) : String(r.error));
+        const r = await get(base + path).catch((e) => ({
+            status: 0,
+            error: e,
+        }));
+        check(
+            `${name} answers`,
+            r.status ? hostAnswers(r.status) : String(r.error),
+        );
     }
     const ready = await get(`${HOSTS.api}/health/ready`);
     check("api ready", apiReady(JSON.parse(ready.body || "{}")));
@@ -98,22 +114,34 @@ async function main() {
     const pricing = await get(`${HOSTS.site}/pricing`);
     check("pricing is Free-only", pricingFreeOnly(pricing.body));
     for (const path of ["/", "/pricing", "/features"]) {
-        const page = path === "/pricing" ? pricing : await get(HOSTS.site + path);
+        const page =
+            path === "/pricing" ? pricing : await get(HOSTS.site + path);
         check(`${path} has no India links`, noIndiaLinks(page.body));
     }
-    check("robots.txt", namesSarohTech((await get(`${HOSTS.site}/robots.txt`)).body));
-    check("sitemap.xml", namesSarohTech((await get(`${HOSTS.site}/sitemap.xml`)).body));
+    check(
+        "robots.txt",
+        namesSarohTech((await get(`${HOSTS.site}/robots.txt`)).body),
+    );
+    check(
+        "sitemap.xml",
+        namesSarohTech((await get(`${HOSTS.site}/sitemap.xml`)).body),
+    );
 
     for (const name of ["accounts", "admin"]) {
         const page = await get(`${HOSTS[name]}/login`);
-        if (page.status < 300) check(`${name} is noindex`, noindex(page.headers, page.body));
+        if (page.status < 300)
+            check(`${name} is noindex`, noindex(page.headers, page.body));
     }
     const options = await get(`${HOSTS.api}/public/sign-in-options`);
     const opts = JSON.parse(options.body || "{}");
     check("sign-in options", signInOptions(opts));
-    console.log(`     sign-in providers: ${(opts.providers ?? []).join(", ") || "email only"}`);
+    console.log(
+        `     sign-in providers: ${(opts.providers ?? []).join(", ") || "email only"}`,
+    );
 
-    console.log(failures.length ? `\n${failures.length} failed` : "\nall passed");
+    console.log(
+        failures.length ? `\n${failures.length} failed` : "\nall passed",
+    );
     process.exit(failures.length ? 1 : 0);
 }
 
