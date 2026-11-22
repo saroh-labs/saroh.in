@@ -96,8 +96,9 @@ lists only where Global differs (DEC-221).
   where the gallery has the trade. No Global screen of these trades is
   captured, so their problems are words alone. The hub, the Solutions menu
   and the footer list every trade in six groups (`HUB_GROUPS`); "See all
-  trades" still leads to `/solutions`. Every new page is noindex
-  (`unreviewed`) until the owner reads it, and has no hreflang pair: its
+  trades" still leads to `/solutions`. Every new page was noindex
+  (`unreviewed`) at first; all pages were released to search on
+  22 Nov 2026. A new page has no hreflang pair: its
   India page, where there is one, is published one by one under /for/.
   Claims are only what Global's Free plan does today: no online ordering
   from the site, no card payments online, no reminders, memberships or

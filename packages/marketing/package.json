@@ -43,6 +43,7 @@
         "./menu-panel": "./src/nav/menu-panel.tsx",
         "./phone-sheet": "./src/nav/phone-sheet.tsx",
         "./sentence-list": "./src/sentence-list.ts",
+        "./sitemap-xml": "./src/sitemap-xml.ts",
         "./breadcrumbs": "./src/nav/breadcrumbs.tsx",
         "./shot": "./src/media/shot.ts",
         "./shot-image": "./src/media/shot-image.tsx",

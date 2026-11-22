@@ -60,7 +60,7 @@ describe("the site map", () => {
         }
     });
 
-    it("has a page for each feature and solution, unreviewed, with its trail", () => {
+    it("has a page for each feature and solution, indexed, with its trail", () => {
         const product = PAGES.filter(
             (p) => p.type === "feature" || p.type === "solution",
         );
@@ -78,7 +78,7 @@ describe("the site map", () => {
         for (const p of product) {
             expect(p.title.length, p.path).toBeLessThan(60);
             expect(p.description.length, p.path).toBeLessThan(155);
-            expect(p.unreviewed, p.path).toBe(true);
+            expect(p.unreviewed, p.path).toBeUndefined();
             expect(
                 pageSchema(p).some((ld) => ld["@type"] === "BreadcrumbList"),
                 p.path,
@@ -90,9 +90,15 @@ describe("the site map", () => {
         }
     });
 
-    it("keeps the sitemap to its eleven pages", () => {
-        // /features is drawn and indexed (DEC-221), as on saroh.in.
-        expect(indexedPages()).toHaveLength(11);
+    it("lists every built page, all released on 22 Nov 2026", () => {
+        // Document templates stay held by their own data until a person reads them.
+        expect(
+            PAGES.filter(
+                (p) =>
+                    !indexedPages().includes(p) &&
+                    !p.type.startsWith("template"),
+            ),
+        ).toEqual([]);
     });
 
     it("every tool card on Home lands on a built page", () => {
