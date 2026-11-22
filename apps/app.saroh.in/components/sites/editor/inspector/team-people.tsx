@@ -10,6 +10,7 @@ import {
     TeamAvatar,
     TeamPicker,
 } from "@/components/sites/editor/add/team-picker";
+import { addPeople } from "@/components/sites/editor/inspector/team-empty";
 import { runAction } from "@/lib/api/run-action";
 import type { PersonContent, PersonMember } from "@/lib/sites/service";
 import { membersOf, syncChosen, withMembers } from "@/lib/sites/team-people";
@@ -43,12 +44,26 @@ export function TeamPeople({
     useEffect(() => {
         let live = true;
         readTeamForPicker()
-            .then((r) => live && setRead(r))
+            .then((r) => {
+                if (!live) return;
+                setRead(r);
+                if (addPeople.asked && r.canChoose && r.team) setPicking(true);
+                addPeople.asked = false;
+            })
             .catch(() => live && setRead({ team: null, canChoose: false }));
         return () => {
             live = false;
         };
     }, []);
+
+    const canPick = read?.canChoose === true && read.team !== null;
+    useEffect(() => {
+        if (!canPick) return;
+        addPeople.open = () => setPicking(true);
+        return () => {
+            addPeople.open = null;
+        };
+    }, [canPick]);
 
     const members = membersOf(content);
     const can = read?.canChoose === true;

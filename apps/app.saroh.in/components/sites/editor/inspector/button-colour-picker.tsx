@@ -101,6 +101,9 @@ export function CustomColour({
     const [typed, setTyped] = useState(value ?? start);
     const [fix, setFix] = useState<"dark" | "darken" | null>(null);
     const [recent, setRecent] = useState<string[]>([]);
+    // Beside the inspector on a desk, where the whole height is free;
+    // above the tile on a phone.
+    const [side, setSide] = useState<"left" | "top">("left");
     const hex = typedHex(typed);
     const hsv: Hsv = hex ? hexToHsv(hex) : { h: 0, s: 0, v: 0 };
     // A grey has no hue of its own: the strip keeps the last one chosen.
@@ -121,7 +124,12 @@ export function CustomColour({
     useEffect(() => {
         tryRef.current = onTry;
     });
-    const trying = open && chosen !== null && chosen !== (value ?? start);
+    // Only the Custom tab previews: Site colours ends the trial (ER3 re-check).
+    const trying =
+        open &&
+        tab === "custom" &&
+        chosen !== null &&
+        chosen !== (value ?? start);
     useEffect(() => {
         if (!trying || !chosen) return;
         tryRef.current?.(chosen);
@@ -142,6 +150,11 @@ export function CustomColour({
             setFix(null);
             setTab("custom");
             setRecent(recentColours());
+            setSide(
+                window.matchMedia("(min-width: 768px)").matches
+                    ? "left"
+                    : "top",
+            );
         }
         setOpen(next);
     };
@@ -178,27 +191,31 @@ export function CustomColour({
         pickHsv({ h: hue, s: clamp(hsv.s + d[0]), v: clamp(hsv.v + d[1]) });
     };
 
-    const recentRow =
-        recent.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2" data-recent="">
-                <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Recent
+    const recentRow = (
+        <div className="flex flex-wrap items-center gap-2" data-recent="">
+            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Recent
+            </span>
+            {recent.length === 0 ? (
+                <span className="text-xs text-muted-foreground">
+                    Colours you use land here.
                 </span>
-                {recent.map((h) => (
-                    <button
-                        key={h}
-                        type="button"
-                        aria-label={`Recent colour ${h}`}
-                        onClick={() => {
-                            pick(h);
-                            setTab("custom");
-                        }}
-                        className="size-[22px] rounded-md border border-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        style={{ background: h }}
-                    />
-                ))}
-            </div>
-        ) : null;
+            ) : null}
+            {recent.map((h) => (
+                <button
+                    key={h}
+                    type="button"
+                    aria-label={`Recent colour ${h}`}
+                    onClick={() => {
+                        pick(h);
+                        setTab("custom");
+                    }}
+                    className="size-[22px] rounded-md border border-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    style={{ background: h }}
+                />
+            ))}
+        </div>
+    );
 
     return (
         <Popover open={open} onOpenChange={openWith}>
@@ -229,12 +246,16 @@ export function CustomColour({
                 </button>
             </PopoverTrigger>
             <PopoverContent
-                align="start"
+                side={side}
+                align={side === "left" ? "center" : "start"}
+                sideOffset={8}
+                collisionPadding={12}
                 aria-label="Button colour"
                 data-button-colour=""
-                className="grid max-h-[var(--radix-popover-content-available-height)] w-80 max-w-[calc(100vw-24px)] gap-3 overflow-y-auto p-0 pb-3"
+                // Never past the screen: the body scrolls, the actions stay.
+                className="flex max-h-[var(--radix-popover-content-available-height)] w-80 max-w-[calc(100vw-24px)] flex-col gap-3 overflow-hidden p-0"
             >
-                <div className="flex items-center gap-2 pl-3.5 pr-2 pt-2">
+                <div className="flex shrink-0 items-center gap-2 pl-3.5 pr-2 pt-2">
                     <p className="flex-1 text-sm font-semibold">
                         Button colour
                     </p>
@@ -246,7 +267,7 @@ export function CustomColour({
                         onClick={() => setOpen(false)}
                     />
                 </div>
-                <div className="px-3.5">
+                <div className="shrink-0 px-3.5">
                     <Segmented<"site" | "custom">
                         label="Colours"
                         block
@@ -261,7 +282,10 @@ export function CustomColour({
                 </div>
 
                 {tab === "site" ? (
-                    <div className="grid gap-3 px-3.5">
+                    <div
+                        data-picker-body=""
+                        className="grid min-h-0 gap-3 overflow-y-auto px-3.5 pb-3"
+                    >
                         <div className="grid gap-0.5">
                             {roles.map((r) => (
                                 <button
@@ -297,138 +321,154 @@ export function CustomColour({
                         {recentRow}
                     </div>
                 ) : (
-                    <div className="grid gap-3 px-3.5">
+                    <>
                         <div
-                            ref={square}
-                            role="slider"
-                            tabIndex={0}
-                            aria-label="Saturation and brightness"
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={Math.round(hsv.s * 100)}
-                            aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`}
-                            data-colour-square=""
-                            onPointerDown={(e) => {
-                                e.currentTarget.setPointerCapture(e.pointerId);
-                                fromPointer(e);
-                            }}
-                            onPointerMove={(e) => {
-                                if (e.buttons === 1) fromPointer(e);
-                            }}
-                            onKeyDown={onSquareKey}
-                            className="relative h-[150px] touch-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            style={{
-                                background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hue} 100% 50%))`,
-                            }}
+                            data-picker-body=""
+                            className="grid min-h-0 gap-3 overflow-y-auto px-3.5"
                         >
-                            <span
-                                aria-hidden
-                                className="pointer-events-none absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,.5)]"
-                                style={{
-                                    left: `${hsv.s * 100}%`,
-                                    top: `${(1 - hsv.v) * 100}%`,
+                            <div
+                                ref={square}
+                                role="slider"
+                                tabIndex={0}
+                                aria-label="Saturation and brightness"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.round(hsv.s * 100)}
+                                aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`}
+                                data-colour-square=""
+                                onPointerDown={(e) => {
+                                    e.currentTarget.setPointerCapture(
+                                        e.pointerId,
+                                    );
+                                    fromPointer(e);
                                 }}
-                            />
-                        </div>
-                        <input
-                            type="range"
-                            min={0}
-                            max={359}
-                            value={Math.round(hue)}
-                            aria-label="Hue"
-                            data-colour-hue=""
-                            onChange={(e) =>
-                                pickHsv({
-                                    h: Number(e.target.value),
-                                    s: hsv.s,
-                                    v: hsv.v,
-                                })
-                            }
-                            className="h-3 w-full cursor-pointer appearance-none rounded-full [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(0,0,0,.5)]"
-                            style={{
-                                background:
-                                    "linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)",
-                            }}
-                        />
-                        <div className="flex items-center gap-1.5">
-                            <Label
-                                htmlFor={`${id}-hex`}
-                                className="text-xs text-muted-foreground"
+                                onPointerMove={(e) => {
+                                    if (e.buttons === 1) fromPointer(e);
+                                }}
+                                onKeyDown={onSquareKey}
+                                className="relative h-[150px] touch-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                style={{
+                                    background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hue} 100% 50%))`,
+                                }}
                             >
-                                Hex
-                            </Label>
-                            <Input
-                                id={`${id}-hex`}
-                                dense
-                                value={typed}
-                                onChange={(e) => pick(e.target.value)}
-                                aria-invalid={!hex}
-                                autoComplete="off"
-                                spellCheck={false}
-                                className="min-w-0 flex-1 font-mono uppercase"
-                            />
-                            {eyeDropper() ? (
-                                <IconButton
-                                    label="Pick a colour from the page"
-                                    icon={<Pipette />}
-                                    variant="outline"
-                                    className="size-8 shrink-0 coarse:size-11"
-                                    onClick={async () => {
-                                        try {
-                                            const got =
-                                                await eyeDropper()?.open();
-                                            if (got) pick(got.sRGBHex);
-                                        } catch {
-                                            // Esc: nothing picked.
-                                        }
+                                <span
+                                    aria-hidden
+                                    className="pointer-events-none absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,.5)]"
+                                    style={{
+                                        left: `${hsv.s * 100}%`,
+                                        top: `${(1 - hsv.v) * 100}%`,
                                     }}
                                 />
-                            ) : null}
-                        </div>
-                        {hex && whiteReads ? (
-                            <ReadableLine
-                                ratio={words.ratio}
-                                light
-                                className=""
+                            </div>
+                            <input
+                                type="range"
+                                min={0}
+                                max={359}
+                                value={Math.round(hue)}
+                                aria-label="Hue"
+                                data-colour-hue=""
+                                onChange={(e) =>
+                                    pickHsv({
+                                        h: Number(e.target.value),
+                                        s: hsv.s,
+                                        v: hsv.v,
+                                    })
+                                }
+                                className="h-3 w-full cursor-pointer appearance-none rounded-full [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(0,0,0,.5)]"
+                                style={{
+                                    background:
+                                        "linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)",
+                                }}
                             />
-                        ) : null}
-                        {hex && words && !whiteReads ? (
-                            <div
-                                role="alert"
-                                className="grid gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-                            >
-                                <span>
-                                    <b>
-                                        White words on this colour are hard to
-                                        read
-                                    </b>{" "}
-                                    ({contrastRatio("#FFFFFF", hex).toFixed(1)}{" "}
-                                    : 1, it needs 4.5 : 1). Pick one:
-                                </span>
-                                {words.words === "dark" && words.readable ? (
-                                    <FixRow
-                                        on={fix === "dark"}
-                                        onClick={() => setFix("dark")}
-                                        fill={hex}
-                                        ink={words.ink}
-                                        text="Keep the colour, dark words"
-                                        ratio={words.ratio}
-                                    />
-                                ) : null}
-                                {shade ? (
-                                    <FixRow
-                                        on={fix === "darken"}
-                                        onClick={() => setFix("darken")}
-                                        fill={shade}
-                                        ink="#FFFFFF"
-                                        text={`Darken it to ${shade}`}
-                                        ratio={customColourWords(shade).ratio}
+                            <div className="flex items-center gap-1.5">
+                                <Label
+                                    htmlFor={`${id}-hex`}
+                                    className="text-xs text-muted-foreground"
+                                >
+                                    Hex
+                                </Label>
+                                <Input
+                                    id={`${id}-hex`}
+                                    dense
+                                    value={typed}
+                                    onChange={(e) => pick(e.target.value)}
+                                    aria-invalid={!hex}
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    className="min-w-0 flex-1 font-mono uppercase"
+                                />
+                                {eyeDropper() ? (
+                                    <IconButton
+                                        label="Pick a colour from the page"
+                                        icon={<Pipette />}
+                                        variant="outline"
+                                        className="size-8 shrink-0 coarse:size-11"
+                                        onClick={async () => {
+                                            try {
+                                                const got =
+                                                    await eyeDropper()?.open();
+                                                if (got) pick(got.sRGBHex);
+                                            } catch {
+                                                // Esc: nothing picked.
+                                            }
+                                        }}
                                     />
                                 ) : null}
                             </div>
-                        ) : null}
-                        {recentRow}
-                        <div className="flex justify-end gap-2">
+                            {hex && whiteReads ? (
+                                <ReadableLine
+                                    ratio={words.ratio}
+                                    light
+                                    className=""
+                                />
+                            ) : null}
+                            {hex && words && !whiteReads ? (
+                                <div
+                                    role="alert"
+                                    className="grid gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive"
+                                >
+                                    <span>
+                                        <b>
+                                            White words on this colour are hard
+                                            to read
+                                        </b>{" "}
+                                        (
+                                        {contrastRatio("#FFFFFF", hex).toFixed(
+                                            1,
+                                        )}{" "}
+                                        : 1, it needs 4.5 : 1). Pick one:
+                                    </span>
+                                    {words.words === "dark" &&
+                                    words.readable ? (
+                                        <FixRow
+                                            on={fix === "dark"}
+                                            onClick={() => setFix("dark")}
+                                            fill={hex}
+                                            ink={words.ink}
+                                            text="Keep the colour, dark words"
+                                            ratio={words.ratio}
+                                        />
+                                    ) : null}
+                                    {shade ? (
+                                        <FixRow
+                                            on={fix === "darken"}
+                                            onClick={() => setFix("darken")}
+                                            fill={shade}
+                                            ink="#FFFFFF"
+                                            text={`Darken it to ${shade}`}
+                                            ratio={
+                                                customColourWords(shade).ratio
+                                            }
+                                        />
+                                    ) : null}
+                                </div>
+                            ) : null}
+                            {recentRow}
+                        </div>
+                        <div
+                            data-picker-actions=""
+                            className="flex shrink-0 justify-end gap-2 border-t px-3.5 py-2.5"
+                        >
                             <Button
                                 type="button"
                                 variant="outline"
@@ -446,7 +486,7 @@ export function CustomColour({
                                 Use this colour
                             </Button>
                         </div>
-                    </div>
+                    </>
                 )}
             </PopoverContent>
         </Popover>

@@ -17,6 +17,11 @@ import { ElementStyleTab } from "./element-style-tab";
 let host: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
+    // jsdom has no matchMedia: the picker asks it which side to open on.
+    window.matchMedia = ((q: string) => ({
+        matches: true,
+        media: q,
+    })) as unknown as typeof window.matchMedia;
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -248,5 +253,48 @@ describe("a button's Style tab (CSI-C, CS1)", () => {
         );
         press(document.querySelector('[data-role-row="fg"]'));
         expect(wrote(onChange, 0).cta.elementStyle).toEqual({ colour: "fg" });
+    });
+
+    it("shows Recent even before a colour is used", () => {
+        window.localStorage.clear();
+        draw();
+        press(host.querySelector("[data-colour-custom]"));
+        expect(document.querySelector("[data-recent]")?.textContent).toContain(
+            "Colours you use land here.",
+        );
+    });
+
+    it("keeps Use this colour out of the scrolling body, so it stays in reach", () => {
+        draw();
+        press(host.querySelector("[data-colour-custom]"));
+        const actions = document.querySelector("[data-picker-actions]");
+        expect(actions?.textContent).toContain("Use this colour");
+        expect(actions?.closest("[data-picker-body]")).toBeNull();
+        expect(
+            document.querySelector("[data-button-colour]")?.className,
+        ).toContain("max-h-[var(--radix-popover-content-available-height)]");
+    });
+
+    it("ends the custom preview when Site colours is chosen", () => {
+        const onTry = vi.fn<(next: Section | null) => void>();
+        draw({ onTry });
+        press(host.querySelector("[data-colour-custom]"));
+        const hex = document.querySelector<HTMLInputElement>(
+            "[data-button-colour] input[aria-invalid]",
+        );
+        act(() => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )?.set?.call(hex, "#1F5F8B");
+            hex?.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        expect(onTry.mock.calls.at(-1)?.[0]).not.toBeNull();
+        press(
+            Array.from(document.querySelectorAll('[role="radio"]')).find(
+                (b) => b.textContent.trim() === "Site colours",
+            ),
+        );
+        expect(onTry.mock.calls.at(-1)?.[0]).toBeNull();
     });
 });

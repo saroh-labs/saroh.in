@@ -1,7 +1,7 @@
 // Our team's People list (round 3): one list, the first as the block's own.
 import { describe, expect, it } from "vitest";
 
-import { membersOf, syncChosen, withMembers } from "./team-people";
+import { isEmptyTeam, membersOf, syncChosen, withMembers } from "./team-people";
 
 const content = {
     variant: "team",
@@ -60,5 +60,15 @@ describe("team people", () => {
         expect(empty.staffId).toBeUndefined();
         expect(empty.people).toBeUndefined();
         expect(membersOf(empty)).toEqual([]);
+    });
+
+    it("knows an empty Our team, and only that (canvas placeholder)", () => {
+        const empty = withMembers(content, []);
+        expect(isEmptyTeam({ type: "person", content: empty })).toBe(true);
+        expect(isEmptyTeam({ type: "person", content })).toBe(false);
+        expect(isEmptyTeam({ type: "person", content: { name: "" } })).toBe(
+            false,
+        );
+        expect(isEmptyTeam({ type: "hero", content: empty })).toBe(false);
     });
 });

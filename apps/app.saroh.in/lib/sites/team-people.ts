@@ -29,6 +29,16 @@ export function membersOf(c: PersonContent): PersonMember[] {
     return [pick(c), ...(c.people ?? []).map(pick)];
 }
 
+/** An Our team section everyone was taken off (ER3, 22 Nov 2026). */
+export function isEmptyTeam(section: { type: string; content: unknown }) {
+    const c = section.content as PersonContent & { variant?: string };
+    return (
+        section.type === "person" &&
+        c.variant === "team" &&
+        membersOf(c).length === 0
+    );
+}
+
 /**
  * The section with these people, in this order. None leaves the team look
  * empty (its name blank, which the contract allows only there).

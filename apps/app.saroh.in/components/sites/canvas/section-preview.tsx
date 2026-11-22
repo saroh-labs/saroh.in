@@ -27,9 +27,11 @@ import {
     SECTION_ICONS,
     SECTION_LABELS,
 } from "@/components/sites/editor/editor-constants";
+import { TeamEmptyOnCanvas } from "@/components/sites/editor/inspector/team-empty";
 import { useEditorReadOnly } from "@/components/sites/editor/read-only";
 import { env } from "@/env";
 import { merchantLinkUrl, previewLinkTarget } from "@/lib/sites/merchant-link";
+import { isEmptyTeam } from "@/lib/sites/team-people";
 
 import { useSiteFaces } from "@/components/sites/looks/site-faces";
 import type { Section, SitePage } from "@/lib/sites/service";
@@ -370,7 +372,9 @@ export function DraftPreview({
                                 : undefined
                         }
                     >
-                        {host ? (
+                        {isEmptyTeam(section) ? (
+                            <TeamEmptyOnCanvas onAdd={() => onSelect(index)} />
+                        ) : host ? (
                             <EditableTextContext.Provider value={host}>
                                 {rendered}
                             </EditableTextContext.Provider>

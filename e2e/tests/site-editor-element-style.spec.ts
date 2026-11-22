@@ -106,6 +106,13 @@ test("one button, styled on its own", async ({ page }, testInfo) => {
                 button.evaluate((el) => getComputedStyle(el).backgroundColor),
             )
             .toBe("rgb(31, 95, 139)");
+        // The guard makes the picker its tallest; it stays on screen.
+        await picker.locator("input[aria-invalid]").fill("#F2C94C");
+        await expect(picker.getByRole("alert")).toBeVisible();
+        await expect(
+            picker.getByRole("button", { name: "Use this colour" }),
+        ).toBeInViewport({ ratio: 1 });
+        await expect(picker.locator("[data-recent]")).toBeVisible();
         await picker.getByRole("button", { name: "Cancel" }).click();
         await expect
             .poll(() =>

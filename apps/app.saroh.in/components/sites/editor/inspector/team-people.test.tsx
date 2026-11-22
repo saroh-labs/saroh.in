@@ -15,6 +15,7 @@ vi.mock("@/lib/staff/actions", () => ({
     setTeamPage: (...a: unknown[]) => setTeamPage(...a) as unknown,
 }));
 
+import { TeamEmptyOnCanvas } from "./team-empty";
 import { TeamPeople } from "./team-people";
 
 const person = (id: string, name: string) => ({
@@ -117,5 +118,64 @@ describe("TeamPeople", () => {
         expect(host.querySelector('button[aria-label^="Take"]')).toBeNull();
         expect(host.textContent).not.toContain("Add people");
         expect(host.textContent).toContain("Others see this list read-only.");
+    });
+
+    it("the canvas's empty Our team asks for people, and the list opens the picker", async () => {
+        const onAdd = vi.fn();
+        act(() => root.render(<TeamEmptyOnCanvas onAdd={onAdd} />));
+        expect(host.textContent).toContain("Nobody is on Our team yet");
+        const add = Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent === "Add people",
+        );
+        act(() => add?.click());
+        expect(onAdd).toHaveBeenCalled();
+        // The section is selected; its People list opens Add people.
+        read.mockResolvedValue({
+            canChoose: true,
+            team: [person("st_1", "Asha Rao")],
+        });
+        await act(async () => {
+            root.render(
+                <TeamPeople
+                    content={{ name: "", title: "Our team" }}
+                    onChange={vi.fn()}
+                />,
+            );
+            await Promise.resolve();
+        });
+        expect(document.body.textContent).toContain("Add people to Our team");
+    });
+
+    it("opens the picker at once when the People list is already open", async () => {
+        read.mockResolvedValue({
+            canChoose: true,
+            team: [person("st_1", "Asha Rao")],
+        });
+        const side = document.createElement("div");
+        document.body.append(side);
+        const sideRoot = createRoot(side);
+        await act(async () => {
+            root.render(
+                <TeamPeople
+                    content={{ name: "", title: "Our team" }}
+                    onChange={vi.fn()}
+                />,
+            );
+            await Promise.resolve();
+        });
+        expect(document.body.textContent).not.toContain(
+            "Add people to Our team",
+        );
+        act(() => sideRoot.render(<TeamEmptyOnCanvas onAdd={vi.fn()} />));
+        const add = Array.from(side.querySelectorAll("button")).find(
+            (b) => b.textContent === "Add people",
+        );
+        await act(async () => {
+            add?.click();
+            await Promise.resolve();
+        });
+        expect(document.body.textContent).toContain("Add people to Our team");
+        act(() => sideRoot.unmount());
+        side.remove();
     });
 });
