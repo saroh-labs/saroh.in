@@ -1,7 +1,10 @@
+import { Check, ChevronDown, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { ButtonSize, ButtonVariant } from "../buttons/button";
 import { cn } from "../cn";
+import { Pill } from "../links/pill";
+import { ring } from "../ring";
 import type { PlanCardView } from "./pricing-model";
 
 /** How a card's button looks; the button itself, its label and address are the site's. */
@@ -51,53 +54,100 @@ function Changed() {
     return <span className="sr-only"> (changed)</span>;
 }
 
+/** Lines a phone shows before "All N in ‹plan›" (PHONE.md: fold in the DOM). */
+const PHONE_LINES = 4;
+
 function PlanCard({ plan: p, cta }: { plan: PlanCardView; cta: PlanCta }) {
     const f = p.featured;
     const muted = f ? "text-mk-on-ink-muted" : "text-muted-foreground";
     const ch = p.changed;
+    const tick = (l: { t: string }) => (
+        <li
+            key={l.t}
+            className={cn("flex gap-2.5", ch?.lines.includes(l.t) && MARK)}
+        >
+            <Check
+                aria-hidden
+                strokeWidth={2.4}
+                className={cn(
+                    "mt-[3px] size-4 shrink-0",
+                    f ? "text-mk-saffron" : "text-brand-500",
+                )}
+            />
+            {l.t}
+            {ch?.lines.includes(l.t) ? <Changed /> : null}
+        </li>
+    );
+    const shown = p.lines.slice(0, PHONE_LINES);
+    const folded = p.lines.slice(PHONE_LINES);
+    const listClass = cn(
+        "m-0 grid list-none gap-2.5 p-0 text-[15px] leading-[1.45]",
+        f ? "text-mk-on-ink" : "text-mk-copy",
+    );
+    const head = cn("font-semibold", f ? "text-background" : "text-foreground");
     return (
         <div
             data-plan={p.id}
             className={cn(
-                "grid content-start gap-3.5 rounded-[18px] border p-7",
+                "flex flex-col gap-3.5 rounded-[18px] border px-5 py-[22px] min-[760px]:px-6 min-[760px]:py-[26px]",
                 f
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-card text-foreground",
             )}
         >
-            <div className="grid gap-1">
-                <h3 className="m-0 text-[17px] font-semibold leading-normal">
+            <div>
+                <h3 className="m-0 flex flex-wrap items-center gap-2 text-[17px] font-semibold leading-normal">
                     <span className={cn(ch?.name && MARK)}>{p.name}</span>
                     {ch?.name ? <Changed /> : null}
+                    {p.tag ? (
+                        <Pill
+                            tone="soon"
+                            className={cn(
+                                "px-[9px] py-[3px] text-[12px]",
+                                f && "bg-mk-ink-hover text-mk-on-ink-accent",
+                            )}
+                        >
+                            {p.tag}
+                        </Pill>
+                    ) : null}
                 </h3>
                 {p.tagline ? (
-                    <span className={cn("text-[14.5px]", muted)}>
+                    <p
+                        className={cn(
+                            "m-0 mt-1 text-[14.5px] min-[760px]:min-h-[46px]",
+                            muted,
+                        )}
+                    >
                         {p.tagline}
-                    </span>
+                    </p>
                 ) : null}
             </div>
-            <div className="grid gap-1.5">
-                <span
+            <div>
+                <p
                     className={cn(
-                        "font-display text-mk-price-lg font-bold",
+                        "m-0 flex flex-wrap items-baseline gap-x-1.5 font-display text-mk-price-lg font-bold leading-none",
                         ch?.price && MARK,
                     )}
                 >
                     {p.was ? (
+                        <span className="sr-only">Offer price </span>
+                    ) : null}
+                    {p.price}
+                    {p.was ? (
                         <>
+                            {/* The struck price starts the next line (the board's break). */}
+                            <span aria-hidden className="h-0 basis-full" />
                             <s
                                 className={cn(
-                                    "mr-2 font-sans text-[18px] font-medium tracking-normal",
+                                    "mt-1 text-[17px] font-medium tracking-[-0.01em] decoration-[1.5px]",
                                     muted,
                                 )}
                             >
-                                <span className="sr-only">Regular price </span>
+                                <span className="sr-only">regular price </span>
                                 {p.was}
                             </s>
-                            <span className="sr-only">offer price </span>
                         </>
                     ) : null}
-                    {p.price}
                     {p.per ? (
                         <span
                             className={cn(
@@ -105,73 +155,95 @@ function PlanCard({ plan: p, cta }: { plan: PlanCardView; cta: PlanCta }) {
                                 ch?.price ? "text-muted-foreground" : muted,
                             )}
                         >
-                            {" "}
                             {p.per}
                         </span>
                     ) : null}
                     {ch?.price ? <Changed /> : null}
-                </span>
-                <span className={cn("text-mk-note", muted)}>{p.sub}</span>
+                </p>
+                {p.sub ? (
+                    <p className={cn("m-0 mt-1.5 text-mk-note", muted)}>
+                        {p.sub}
+                    </p>
+                ) : null}
+                {p.then ? (
+                    <p
+                        className={cn(
+                            "m-0 mt-2 text-[14px] leading-[1.45]",
+                            f ? "text-mk-on-ink" : "text-mk-copy",
+                        )}
+                    >
+                        {p.trial ? (
+                            <>
+                                <b
+                                    className={cn(
+                                        "font-semibold",
+                                        f
+                                            ? "text-mk-on-ink-accent"
+                                            : "text-brand-700",
+                                    )}
+                                >
+                                    {p.trial}
+                                </b>
+                                {" · "}
+                            </>
+                        ) : null}
+                        {p.then}
+                    </p>
+                ) : null}
             </div>
             {cta(p, {
                 size: "md",
                 variant: f ? "saffron" : "secondary",
                 className: cn(
-                    "focus-visible:outline-brand-500 active:scale-[0.98]",
+                    "w-full focus-visible:outline-brand-500 active:scale-[0.98]",
                     f && "h-12",
                     !f && "hover:bg-background",
                 ),
             })}
-            <ul
+            {p.note ? (
+                <p
+                    className={cn(
+                        "m-0 flex gap-1.5 text-[13px] leading-[1.45]",
+                        muted,
+                    )}
+                >
+                    <ShieldCheck
+                        aria-hidden
+                        strokeWidth={2}
+                        className="mt-0.5 size-3.5 shrink-0"
+                    />
+                    {p.note}
+                </p>
+            ) : null}
+            <div
                 className={cn(
-                    "m-0 mt-1 grid list-none gap-2.5 border-t p-0 pt-4 text-[15px] leading-[1.45]",
-                    f
-                        ? "border-mk-ink-hover text-mk-on-ink"
-                        : "border-mk-line-soft text-mk-copy",
+                    "mt-0.5 grid gap-2.5 border-t pt-4",
+                    f ? "border-mk-ink-hover" : "border-mk-line-soft",
                 )}
             >
-                {p.lead ? (
-                    <li
-                        className={cn(
-                            "font-semibold",
-                            f ? "text-background" : "text-foreground",
-                        )}
-                    >
-                        {p.lead}
-                    </li>
-                ) : null}
-                {p.trial ? (
-                    <li
-                        className={cn(
-                            "font-semibold",
-                            f ? "text-background" : "text-foreground",
-                        )}
-                    >
-                        {p.trial}
-                    </li>
-                ) : null}
-                {p.lines.map((l) => (
-                    <li
-                        key={l.t}
-                        className={cn(
-                            "flex gap-2.5",
-                            ch?.lines.includes(l.t) && MARK,
-                        )}
-                    >
-                        <span
-                            aria-hidden
-                            className={cn(
-                                "font-bold",
-                                f ? "text-mk-saffron" : "text-brand-500",
-                            )}
+                <ul className={listClass}>
+                    {p.lead ? <li className={head}>{p.lead}</li> : null}
+                    {p.trial && !p.then ? (
+                        <li className={head}>{p.trial}</li>
+                    ) : null}
+                    {shown.map(tick)}
+                </ul>
+                {folded.length ? (
+                    // Open from 760px without script (`.mk-fold`); folded on a phone.
+                    <details className="mk-fold group">
+                        <summary
+                            className={`flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-sm text-[15px] font-semibold min-[760px]:hidden [&::-webkit-details-marker]:hidden ${ring()}`}
                         >
-                            ✓
-                        </span>
-                        {l.t}
-                        {ch?.lines.includes(l.t) ? <Changed /> : null}
-                    </li>
-                ))}
-            </ul>
+                            All {p.lines.length} in {p.name}
+                            <ChevronDown
+                                aria-hidden
+                                className="size-4 transition-transform duration-base group-open:rotate-180 motion-reduce:transition-none"
+                            />
+                        </summary>
+                        <ul className={listClass}>{folded.map(tick)}</ul>
+                    </details>
+                ) : null}
+            </div>
         </div>
     );
 }

@@ -1,9 +1,13 @@
-import { Fragment } from "react";
+"use client";
+
+import { Check } from "lucide-react";
+import { Fragment, useState } from "react";
 
 import { Pill } from "../links/pill";
 import { Section } from "../sections/section";
 import { PlanTable } from "./plan-table";
 import type { CompareRow, PlanCardView } from "./pricing-model";
+import { SegmentPairs } from "./segment-pairs";
 
 /**
  * "Compare the plans": the catalogue's modules by group in a `PlanTable`,
@@ -23,13 +27,34 @@ export function CompareTable({
     /** What a screen reader hears for such a cell. */
     placeholderNote: string;
 }) {
+    // A phone compares two plans side by side (the boards' pair switch);
+    // it starts on the highlighted plan and the one after it.
+    const featured = Math.max(
+        0,
+        plans.findIndex((p) => p.featured),
+    );
+    const [pair, setPair] = useState(
+        Math.max(1, Math.min(featured + 1, plans.length - 1)),
+    );
+    const pairs = plans.slice(1).map((p, i) => `${plans[i].name} vs ${p.name}`);
     return (
         <Section
             titleId="compare-title"
             title="Compare the plans"
-            className="grid gap-[22px] pt-[72px]"
+            lead="Words here match the cards."
+            size="kit-h2"
+            className="grid gap-6 pt-[72px] min-[760px]:pt-[120px]"
         >
+            {pairs.length > 1 ? (
+                <SegmentPairs
+                    label="Plans to compare"
+                    items={pairs}
+                    chosen={pair - 1}
+                    onChoose={(i) => setPair(i + 1)}
+                />
+            ) : null}
             <PlanTable
+                phoneShows={plans.length > 2 ? [pair - 1, pair] : undefined}
                 label="Plan comparison table"
                 corner="Feature"
                 plans={plans}
@@ -42,6 +67,11 @@ export function CompareTable({
                                 Coming soon
                             </Pill>
                         ) : null}
+                        {r.what ? (
+                            <span className="mt-0.5 block text-[13.5px] font-normal text-muted-foreground">
+                                {r.what}
+                            </span>
+                        ) : null}
                     </>
                 )}
                 cellClassName={(c, r) =>
@@ -50,14 +80,15 @@ export function CompareTable({
                 }
                 cell={(c, r) => (
                     <>
-                        {c.yes ? (
-                            <span className="inline-flex items-baseline gap-2">
-                                <span
+                        {c.yes && c.t !== "Included" ? (
+                            c.t
+                        ) : c.yes ? (
+                            <span className="inline-flex items-start gap-1.5 text-foreground">
+                                <Check
                                     aria-hidden
-                                    className="font-bold text-brand-500"
-                                >
-                                    ✓
-                                </span>
+                                    strokeWidth={2.4}
+                                    className="mt-[3px] size-4 shrink-0 text-mk-ok"
+                                />
                                 {c.t}
                             </span>
                         ) : (

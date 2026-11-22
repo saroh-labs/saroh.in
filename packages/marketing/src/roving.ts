@@ -1,3 +1,6 @@
+import type { KeyboardEvent } from "react";
+import { useRef } from "react";
+
 const STEP: Partial<Record<string, number>> = {
     ArrowDown: 1,
     ArrowRight: 1,
@@ -17,4 +20,20 @@ export function nextIndex(
 ): number | null {
     const step = STEP[key];
     return step ? (i + step + count) % count : null;
+}
+
+/**
+ * A radio group's keys (WAI-ARIA): the arrow keys choose the next option
+ * as they move focus to it. `refs` holds each option's button.
+ */
+export function useRovingChoice(count: number, choose: (i: number) => void) {
+    const refs = useRef<(HTMLButtonElement | null)[]>([]);
+    const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+        const next = nextIndex(e.key, i, count);
+        if (next === null) return;
+        e.preventDefault();
+        choose(next);
+        refs.current[next]?.focus();
+    };
+    return { refs, onKeyDown };
 }

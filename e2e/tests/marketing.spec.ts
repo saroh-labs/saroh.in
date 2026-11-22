@@ -580,9 +580,7 @@ test.describe("pricing", () => {
         const plans = page.getByRole("region", { name: "Plans" });
         await expect(plans.locator("[data-plan]").first()).toBeVisible();
         const billing = plans.getByRole("radiogroup", { name: "Billing" });
-        const gst = plans.getByRole("checkbox", {
-            name: "Show prices with GST",
-        });
+        const gst = plans.getByRole("radiogroup", { name: "Show prices" });
 
         if ((await billing.count()) === 0 && (await gst.count()) === 0) {
             // No catalogue on this stack: names and the placeholder only.
@@ -605,11 +603,12 @@ test.describe("pricing", () => {
             await expect(monthly).toBeFocused();
         }
         if (await gst.count()) {
-            const was = await gst.isChecked();
-            await gst.click();
-            await expect(gst).toBeChecked({ checked: !was });
-            await page.keyboard.press("Space");
-            await expect(gst).toBeChecked({ checked: was });
+            const before = gst.getByRole("radio").first();
+            const withGst = gst.getByRole("radio").last();
+            await withGst.click();
+            await expect(withGst).toHaveAttribute("aria-checked", "true");
+            await page.keyboard.press("ArrowLeft");
+            await expect(before).toHaveAttribute("aria-checked", "true");
         }
         await expect(plans.locator("[data-plan]").first()).toBeVisible();
     });

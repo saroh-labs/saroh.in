@@ -41,6 +41,7 @@ const view = (ids: string[], suffix: string): PricingView => ({
         notes: ["A note"],
     },
     footnote: "A footnote",
+    notice: null,
 });
 
 const model = (

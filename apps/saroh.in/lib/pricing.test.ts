@@ -219,4 +219,17 @@ describe("parseOffers", () => {
         ]);
         expect(parseOffers(undefined)).toEqual([]);
     });
+
+    it("keeps an end date only when it reads as one", () => {
+        const end = "2030-01-01T00:00:00.000Z";
+        expect(
+            parseOffers([
+                { planId: "b", discountPaise: 300, months: 3, endsAt: end },
+                { planId: "c", discountPaise: 300, months: 3, endsAt: "soon" },
+            ]),
+        ).toEqual([
+            { planId: "b", discountPaise: 300, months: 3, endsAt: end },
+            { planId: "c", discountPaise: 300, months: 3 },
+        ]);
+    });
 });

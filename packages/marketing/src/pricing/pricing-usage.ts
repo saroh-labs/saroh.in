@@ -205,14 +205,36 @@ export function usageNotes(
     withTax: boolean,
     site: PricingSite,
 ): string[] {
-    const plans = offeredPlans(catalog);
-    const paid = plans.filter((p) => p.pricePaise > 0);
     const notes = [
         // `addon-charges.ts`: charged after the period, prorated part-way.
         "What you add is billed with your plan after the month it covers, or after the year on a yearly plan. Added part-way through, it costs only the days left.",
         // `PUT …/billing/addons/:id`: limits move at once.
         "Add or remove it any time in Settings › Plan and billing, and your allowance changes at once.",
     ];
+    notes.push(...pastAllowanceNotes(catalog, modules));
+    if (site.tax) {
+        notes.push(withTax ? site.tax.noteIncl : site.tax.noteExcl);
+    }
+    return notes;
+}
+
+/**
+ * What happens past a plan's allowance, each true of the product today:
+ * soft monthly rows still come in on paid plans (`rowGate`), and a free
+ * plan's allowance is what it gets. Under the usage table and in the
+ * pricing questions.
+ */
+export function pastAllowanceNotes(
+    catalog: Catalog,
+    modules: CatalogModule[] = usageRows(catalog, false, {
+        money: String,
+        count: String,
+        tax: null,
+    }).modules,
+): string[] {
+    const plans = offeredPlans(catalog);
+    const paid = plans.filter((p) => p.pricePaise > 0);
+    const notes: string[] = [];
     // A soft cell counts and tells, and never refuses (`rowGate`): said
     // for the monthly rows customers fill (orders, bookings) whose every
     // cap on a paid plan is soft.
@@ -241,9 +263,6 @@ export function usageNotes(
         notes.push(
             `On ${sentenceList(free.map((p) => p.name))}, the allowance is what you get: adding more is for paid plans.`,
         );
-    }
-    if (site.tax) {
-        notes.push(withTax ? site.tax.noteIncl : site.tax.noteExcl);
     }
     return notes;
 }

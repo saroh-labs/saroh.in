@@ -6,6 +6,10 @@ import { PRICING_COPY } from "@/content/pricing";
 import { demoHref } from "@/lib/demos";
 
 import { PageHero } from "@saroh/marketing/page-hero";
+import { PricingFaq } from "@saroh/marketing/pricing-faq";
+import { TalkToUs } from "@saroh/marketing/talk-to-us";
+
+import { SAROH_CONTACT_EMAIL } from "@/content/contact";
 import { CtaLink } from "../shared/buttons/cta-link";
 import { DemoLink } from "../shared/buttons/demo-link";
 import { PricingPlans } from "./pricing-plans";
@@ -16,11 +20,35 @@ import { PricingPlans } from "./pricing-plans";
  * kit h1 and its mark) and closing; the plan cards stay, the one place a
  * plan strip is drawn (KIT.md, PlanLine).
  */
-export function PricingPage({ model }: { model: PricingPageModel }) {
+export function PricingPage({
+    model,
+    questions = [],
+}: {
+    model: PricingPageModel;
+    /** "Questions about paying" (`lib/pricing-faq.ts`); none on the placeholder. */
+    questions?: readonly { q: string; a: string }[];
+}) {
     return (
         <>
             <PricingHero />
-            <PricingPlans model={model} />
+            <PricingPlans
+                model={model}
+                talk={
+                    model.placeholder ? null : (
+                        <TalkToUs
+                            body={PRICING_COPY.talk}
+                            email={SAROH_CONTACT_EMAIL}
+                        />
+                    )
+                }
+                faq={
+                    <PricingFaq
+                        title={PRICING_COPY.faqTitle}
+                        items={questions}
+                        email={SAROH_CONTACT_EMAIL}
+                    />
+                }
+            />
             <ClosingCTA
                 id="pricing-start"
                 className="mt-[72px] min-[760px]:mt-[120px]"

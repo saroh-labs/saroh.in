@@ -25,7 +25,7 @@ export const cell = (t: string) =>
     t.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s+/g, " ");
 
 const priceLine = (p: PlanCardView) =>
-    `**${p.price}**${p.was ? ` ~~${p.was}~~` : ""} ${p.per} (${p.sub})`;
+    `**${p.price}**${p.was ? ` ~~${p.was}~~` : ""} ${p.per}${p.sub ? ` (${p.sub})` : ""}`;
 
 /** The file's text, its links absolute on `base` (`SITE_URL`). */
 export function pricingMarkdown(

@@ -17,6 +17,8 @@ export function PricingPlans({
     usageTitle,
     usageLead,
     placeholderNote,
+    talk,
+    faq,
 }: {
     model: PricingPageModel;
     switches: PricingSwitches;
@@ -25,19 +27,24 @@ export function PricingPlans({
     usageLead: string;
     /** What a screen reader hears in a table cell with no catalogue. */
     placeholderNote: string;
+    /** Under the cards: the site's "Talk to us". */
+    talk?: ReactNode;
+    /** Last: the site's questions about paying. */
+    faq?: ReactNode;
 }) {
     return (
         <>
             <Container
                 as="section"
                 aria-labelledby="plans-title"
-                className="grid gap-3.5 pt-14"
+                className="grid gap-4"
             >
                 {/* For the outline only: the cards' names are h3s under it. */}
                 <h2 id="plans-title" className="sr-only">
                     Plans
                 </h2>
                 {cards}
+                {talk}
             </Container>
             {/* Compare first, then usage (owner, 6 Nov 2026). */}
             <CompareTable
@@ -52,6 +59,7 @@ export function PricingPlans({
                 title={usageTitle}
                 lead={usageLead}
             />
+            {faq}
         </>
     );
 }

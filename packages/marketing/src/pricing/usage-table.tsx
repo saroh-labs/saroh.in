@@ -29,8 +29,8 @@ export function UsageTable({
             titleId="usage-title"
             title={title}
             lead={lead}
-            size="sm"
-            className="grid scroll-mt-6 gap-[18px] pt-[110px]"
+            size="kit-h2"
+            className="grid scroll-mt-6 gap-6 pt-[72px] min-[760px]:pt-[120px]"
         >
             <PlanTable
                 label="Usage table"
@@ -62,7 +62,7 @@ export function UsageTable({
                     )
                 }
             />
-            <ul className="m-0 grid list-disc gap-1.5 pl-5 text-mk-note text-muted-foreground marker:text-mk-on-ink-muted">
+            <ul className="m-0 -mt-2.5 grid list-disc gap-1.5 pl-5 text-mk-note text-muted-foreground marker:text-mk-on-ink-muted">
                 {usage.notes.map((n) => (
                     <li key={n}>{n}</li>
                 ))}

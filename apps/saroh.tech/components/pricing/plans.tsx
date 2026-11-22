@@ -6,6 +6,7 @@ import { PricingCards } from "@saroh/marketing/pricing-cards";
 import type { PricingPageModel } from "@saroh/marketing/pricing-model";
 import { PricingPlans } from "@saroh/marketing/pricing-plans";
 import { usePricingSwitches } from "@saroh/marketing/use-pricing-switches";
+import type { ReactNode } from "react";
 
 import { TellMeWhen } from "@/components/pricing/tell-me-when";
 import { planWords } from "@/content/plan-words";
@@ -77,9 +78,11 @@ export function Plans({
 export function PricingTables({
     model,
     on,
+    talk,
 }: {
     model: PricingPageModel;
     on: boolean;
+    talk?: ReactNode;
 }) {
     const switches = usePricingSwitches(model);
     return (
@@ -90,6 +93,7 @@ export function PricingTables({
             usageTitle={PRICING.usageTitle}
             usageLead={PRICING.usageLead}
             placeholderNote={PRICING.priceNote}
+            talk={talk}
         />
     );
 }

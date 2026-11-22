@@ -52,6 +52,8 @@ export interface PublicOffer {
     months: number;
     /** A percent coupon's whole percent; absent: an amount coupon. */
     percentOff?: number;
+    /** When the coupon stops being given (ISO); absent: no end set. */
+    endsAt?: string;
 }
 
 /** The visitor's view of a snapshot. */
