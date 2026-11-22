@@ -69,3 +69,18 @@ export const xmlResponse = (body: string) =>
     new Response(body, {
         headers: { "Content-Type": "application/xml; charset=utf-8" },
     });
+
+/**
+ * One group's sitemap for `/sitemap/<group>.xml`, or a 404 for an address
+ * that isn't `<a built group>.xml`. Both sites' group routes answer with it.
+ */
+export function groupSitemapResponse(
+    groups: ReadonlyMap<string, readonly SitemapEntry[]>,
+    file: string,
+): Response {
+    const entries = file.endsWith(".xml")
+        ? groups.get(file.slice(0, -4))
+        : undefined;
+    if (!entries) return new Response("Not found", { status: 404 });
+    return xmlResponse(urlsetXml(entries));
+}
