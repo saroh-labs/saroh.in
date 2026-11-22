@@ -19,6 +19,10 @@ jest.mock("@saroh/database", () => {
             store: { count: jest.fn().mockResolvedValue(0) },
             // Sites using it as their own icon (DEC-124); default "none".
             site: { count: jest.fn().mockResolvedValue(0) },
+            // The business's edition, for its bucket; India unless a test says.
+            organization: {
+                findUnique: jest.fn().mockResolvedValue({ edition: "INDIA" }),
+            },
             // The delete guard counts publications referencing a key. Default
             // to "none", so existing remove tests keep their meaning.
             $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
@@ -42,6 +46,7 @@ import type {
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { MediaService } from "./media.service";
+import { mediaStorages } from "./object-storage.provider";
 import { NOT_AN_IMAGE_MESSAGE } from "./upload-checks";
 
 const create = prisma.media.create as jest.Mock;
@@ -50,6 +55,7 @@ const findMany = prisma.media.findMany as jest.Mock;
 const update = prisma.media.update as jest.Mock;
 const del = prisma.media.delete as jest.Mock;
 const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
+const orgFind = prisma.organization.findUnique as jest.Mock;
 const productImageCount = prisma.productImage.count as jest.Mock;
 const logoCount = prisma.businessProfile.count as jest.Mock;
 const locationLogoCount = prisma.store.count as jest.Mock;
@@ -95,7 +101,7 @@ describe("MediaService.createUpload", () => {
     it("issues a signed URL and writes a PENDING row scoped to the ctx org", async () => {
         const createSignedUploadUrl = jest.fn().mockResolvedValue(SIGNED);
         const storage = fakeStorage({ createSignedUploadUrl });
-        const service = new MediaService(storage);
+        const service = new MediaService(mediaStorages(storage, null));
         create.mockResolvedValue({ id: "media_1", key: SIGNED.key });
 
         const result = await service.createUpload(ctx(), {
@@ -144,7 +150,7 @@ describe("MediaService.createUpload", () => {
     it("denies a MEMBER (media:write is OWNER/ADMIN-only) before any I/O", async () => {
         const createSignedUploadUrl = jest.fn();
         const service = new MediaService(
-            fakeStorage({ createSignedUploadUrl }),
+            mediaStorages(fakeStorage({ createSignedUploadUrl }), null),
         );
 
         await expect(
@@ -171,7 +177,9 @@ describe("MediaService.completeUpload", () => {
             contentLength: 2048,
         };
         const headObject = jest.fn().mockResolvedValue(head);
-        const service = new MediaService(fakeStorage({ headObject }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ headObject }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_1",
             organizationId: "org_1",
@@ -201,13 +209,16 @@ describe("MediaService.completeUpload", () => {
     it("meters the plan's storage with only what the real size adds past the stated one (DEC-227)", async () => {
         const withRoom = jest.spyOn(planMeter, "withRoom");
         const service = new MediaService(
-            fakeStorage({
-                headObject: jest.fn().mockResolvedValue({
-                    key: SIGNED.key,
-                    contentType: "image/png",
-                    contentLength: 250_000_000,
+            mediaStorages(
+                fakeStorage({
+                    headObject: jest.fn().mockResolvedValue({
+                        key: SIGNED.key,
+                        contentType: "image/png",
+                        contentLength: 250_000_000,
+                    }),
                 }),
-            }),
+                null,
+            ),
         );
         findUnique.mockResolvedValue({
             id: "media_1",
@@ -242,7 +253,7 @@ describe("MediaService.completeUpload", () => {
     });
 
     it("rejects a cross-tenant complete with 404 and never updates", async () => {
-        const service = new MediaService(fakeStorage());
+        const service = new MediaService(mediaStorages(fakeStorage(), null));
         // Row exists but belongs to another org.
         findUnique.mockResolvedValue({
             id: "media_1",
@@ -270,7 +281,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
     it("signs an MP4 or MOV up to 50 MB under the video purpose", async () => {
         const createSignedUploadUrl = jest.fn().mockResolvedValue(SIGNED);
         const service = new MediaService(
-            fakeStorage({ createSignedUploadUrl }),
+            mediaStorages(fakeStorage({ createSignedUploadUrl }), null),
         );
         create.mockResolvedValue({ id: "media_v", key: SIGNED.key });
         for (const contentType of ["video/mp4", "video/quicktime"]) {
@@ -287,7 +298,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
     it("refuses a 60 MB video in the merchant's words, before signing", async () => {
         const createSignedUploadUrl = jest.fn();
         const service = new MediaService(
-            fakeStorage({ createSignedUploadUrl }),
+            mediaStorages(fakeStorage({ createSignedUploadUrl }), null),
         );
         await expect(
             service.createUpload(ctx(), {
@@ -303,7 +314,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
     });
 
     it("refuses a PDF sent as product media", async () => {
-        const service = new MediaService(fakeStorage());
+        const service = new MediaService(mediaStorages(fakeStorage(), null));
         await expect(
             service.createUpload(ctx(), {
                 contentType: "application/pdf",
@@ -317,7 +328,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
     });
 
     it("refuses a video outside the video purpose", async () => {
-        const service = new MediaService(fakeStorage());
+        const service = new MediaService(mediaStorages(fakeStorage(), null));
         await expect(
             service.createUpload(ctx(), {
                 contentType: "video/mp4",
@@ -331,7 +342,9 @@ describe("MediaService — a file is what its type says (#517)", () => {
 
     it("completes a video whose first bytes are an ftyp box", async () => {
         const readObjectStart = jest.fn().mockResolvedValue(ftyp);
-        const service = new MediaService(fakeStorage({ readObjectStart }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ readObjectStart }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_v",
             organizationId: "org_1",
@@ -358,7 +371,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
         const readObjectStart = jest.fn().mockResolvedValue(html);
         const deleteObject = jest.fn().mockResolvedValue(undefined);
         const service = new MediaService(
-            fakeStorage({ readObjectStart, deleteObject }),
+            mediaStorages(fakeStorage({ readObjectStart, deleteObject }), null),
         );
         findUnique.mockResolvedValue({
             id: "media_x",
@@ -386,7 +399,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
     });
 
     it("fails a video whose bytes can't be read at all", async () => {
-        const service = new MediaService(fakeStorage());
+        const service = new MediaService(mediaStorages(fakeStorage(), null));
         findUnique.mockResolvedValue({
             id: "media_y",
             organizationId: "org_1",
@@ -406,7 +419,9 @@ describe("MediaService — a file is what its type says (#517)", () => {
 
     it("won't complete a FAILED upload a second time", async () => {
         const readObjectStart = jest.fn();
-        const service = new MediaService(fakeStorage({ readObjectStart }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ readObjectStart }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_x",
             organizationId: "org_1",
@@ -427,7 +442,9 @@ describe("MediaService — a file is what its type says (#517)", () => {
             0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d,
         ]);
         const readObjectStart = jest.fn().mockResolvedValue(png);
-        const service = new MediaService(fakeStorage({ readObjectStart }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ readObjectStart }), null),
+        );
         findUnique.mockResolvedValue(photo("m1"));
         update.mockResolvedValue({
             id: "m1",
@@ -448,7 +465,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
         const readObjectStart = jest.fn().mockResolvedValue(html);
         const deleteObject = jest.fn().mockResolvedValue(undefined);
         const service = new MediaService(
-            fakeStorage({ readObjectStart, deleteObject }),
+            mediaStorages(fakeStorage({ readObjectStart, deleteObject }), null),
         );
         findUnique.mockResolvedValue(photo("m2"));
         await expect(service.completeUpload(ctx(), "m2")).rejects.toThrow(
@@ -462,7 +479,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
     });
 
     it("completes a photo whose bytes can't be read, as local storage never has them", async () => {
-        const service = new MediaService(fakeStorage());
+        const service = new MediaService(mediaStorages(fakeStorage(), null));
         findUnique.mockResolvedValue(photo("m3"));
         update.mockResolvedValue({
             id: "m3",
@@ -481,7 +498,10 @@ describe("MediaService — a file is what its type says (#517)", () => {
     it("marks a photo nothing was stored for FAILED, where storage sees uploads (#873)", async () => {
         const deleteObject = jest.fn().mockResolvedValue(undefined);
         const service = new MediaService(
-            fakeStorage({ seesUploads: true, deleteObject }),
+            mediaStorages(
+                fakeStorage({ seesUploads: true, deleteObject }),
+                null,
+            ),
         );
         findUnique.mockResolvedValue(photo("m4"));
         await expect(service.completeUpload(ctx(), "m4")).rejects.toThrow(
@@ -502,7 +522,7 @@ describe("MediaService — a file is what its type says (#517)", () => {
     it("refuses an SVG logo before signing anything (#873)", async () => {
         const createSignedUploadUrl = jest.fn();
         const service = new MediaService(
-            fakeStorage({ createSignedUploadUrl }),
+            mediaStorages(fakeStorage({ createSignedUploadUrl }), null),
         );
         await expect(
             service.createUpload(ctx(), {
@@ -549,7 +569,7 @@ describe("MediaService.completeUpload — the url", () => {
         const storage = fakeStorage({
             getPublicUrl: jest.fn((k: string) => `https://cdn.test/${k}`),
         });
-        const svc = new MediaService(storage);
+        const svc = new MediaService(mediaStorages(storage, null));
         const out = await svc.completeUpload(ctx(), "m1");
         expect(out.url).toBe("https://cdn.test/org/org_1/site-image/a.png");
     });
@@ -575,7 +595,7 @@ describe("MediaService.completeUpload — the url", () => {
                 throw new Error("publicBaseUrl is not configured");
             }),
         });
-        const svc = new MediaService(storage);
+        const svc = new MediaService(mediaStorages(storage, null));
         const out = await svc.completeUpload(ctx(), "m1");
         expect(out.status).toBe("READY");
         expect(out.url).toBeNull();
@@ -595,7 +615,7 @@ describe("MediaService.remove — a published image stays", () => {
         });
         queryRaw.mockResolvedValueOnce([{ count: 2 }]);
         const storage = fakeStorage();
-        const svc = new MediaService(storage);
+        const svc = new MediaService(mediaStorages(storage, null));
 
         await expect(svc.remove(ctx(), "m1")).rejects.toThrow(
             ConflictException,
@@ -610,7 +630,9 @@ describe("MediaService.remove", () => {
 
     it("deletes the object then the row for an owned media", async () => {
         const deleteObject = jest.fn().mockResolvedValue(undefined);
-        const service = new MediaService(fakeStorage({ deleteObject }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ deleteObject }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_1",
             organizationId: "org_1",
@@ -627,7 +649,9 @@ describe("MediaService.remove", () => {
 
     it("refuses to delete an image a product still shows", async () => {
         const deleteObject = jest.fn();
-        const service = new MediaService(fakeStorage({ deleteObject }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ deleteObject }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_1",
             organizationId: "org_1",
@@ -644,7 +668,9 @@ describe("MediaService.remove", () => {
 
     it("refuses to delete the business logo", async () => {
         const deleteObject = jest.fn();
-        const service = new MediaService(fakeStorage({ deleteObject }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ deleteObject }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_1",
             organizationId: "org_1",
@@ -664,7 +690,9 @@ describe("MediaService.remove", () => {
 
     it("refuses to delete a location's own logo", async () => {
         const deleteObject = jest.fn();
-        const service = new MediaService(fakeStorage({ deleteObject }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ deleteObject }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_1",
             organizationId: "org_1",
@@ -684,7 +712,9 @@ describe("MediaService.remove", () => {
 
     it("refuses to delete a site's icon, published or not", async () => {
         const deleteObject = jest.fn();
-        const service = new MediaService(fakeStorage({ deleteObject }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ deleteObject }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_1",
             organizationId: "org_1",
@@ -704,7 +734,9 @@ describe("MediaService.remove", () => {
 
     it("rejects a cross-tenant remove with 404 and touches neither storage nor the row", async () => {
         const deleteObject = jest.fn();
-        const service = new MediaService(fakeStorage({ deleteObject }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ deleteObject }), null),
+        );
         findUnique.mockResolvedValue({
             id: "media_1",
             organizationId: "org_OTHER",
@@ -723,7 +755,7 @@ describe("MediaService.list", () => {
     beforeEach(() => jest.clearAllMocks());
 
     it("scopes the query to the ctx org, newest first", async () => {
-        const service = new MediaService(fakeStorage());
+        const service = new MediaService(mediaStorages(fakeStorage(), null));
         findMany.mockResolvedValue([]);
 
         await service.list(ctx());
@@ -748,7 +780,9 @@ describe("MediaService.readReadyObjectStart — the logo's bytes", () => {
     it("reads a READY object of this business from storage, not its URL", async () => {
         const bytes = new Uint8Array([0x89, 0x50]);
         const readObjectStart = jest.fn().mockResolvedValue(bytes);
-        const service = new MediaService(fakeStorage({ readObjectStart }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ readObjectStart }), null),
+        );
         findUnique.mockResolvedValue(row);
 
         await expect(
@@ -763,7 +797,9 @@ describe("MediaService.readReadyObjectStart — the logo's bytes", () => {
         ["a missing", null],
     ])("%s object is null, and storage is not read", async (_, found) => {
         const readObjectStart = jest.fn();
-        const service = new MediaService(fakeStorage({ readObjectStart }));
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ readObjectStart }), null),
+        );
         findUnique.mockResolvedValue(found);
 
         await expect(
@@ -773,10 +809,129 @@ describe("MediaService.readReadyObjectStart — the logo's bytes", () => {
     });
 
     it("bytes gone from storage are null", async () => {
-        const service = new MediaService(fakeStorage());
+        const service = new MediaService(mediaStorages(fakeStorage(), null));
         findUnique.mockResolvedValue(row);
         await expect(
             service.readReadyObjectStart("org_1", "m_1", 100),
         ).resolves.toBeNull();
     });
+});
+
+/*
+ * Global businesses' media in their own bucket (owner, 22 Nov 2026). A new
+ * file goes to the business's edition's bucket; a stored one is read and
+ * deleted only in the bucket its row says. Never the other.
+ */
+describe("MediaService — two buckets, never mixed", () => {
+    const INDIA_BASE = "https://media.saroh.in";
+    const GLOBAL_BASE = "https://media.saroh.tech";
+    const bucketStorage = (base: string) =>
+        fakeStorage({
+            createSignedUploadUrl: jest.fn().mockResolvedValue(SIGNED),
+            getPublicUrl: jest.fn((key: string) => `${base}/${key}`),
+            readObjectStart: jest.fn().mockResolvedValue(new Uint8Array([1])),
+        });
+    let india: ObjectStorage;
+    let global: ObjectStorage;
+    beforeEach(() => {
+        jest.clearAllMocks();
+        india = bucketStorage(INDIA_BASE);
+        global = bucketStorage(GLOBAL_BASE);
+        create.mockImplementation(({ data }: { data: object }) =>
+            Promise.resolve({ id: "media_1", ...data }),
+        );
+    });
+    const upload = (service: MediaService) =>
+        service.createUpload(ctx(), {
+            contentType: "image/png",
+            contentLength: 1234,
+            filename: "img.png",
+        });
+
+    it("chooses the bucket by the business's edition", () => {
+        const both = mediaStorages(india, global);
+        expect(both.forEdition("INDIA")).toEqual({
+            bucket: "MAIN",
+            storage: india,
+        });
+        expect(both.forEdition("GLOBAL")).toEqual({
+            bucket: "GLOBAL",
+            storage: global,
+        });
+        // R2_GLOBAL_BUCKET unset: Global uses the main bucket, as before.
+        expect(mediaStorages(india, null).forEdition("GLOBAL")).toEqual({
+            bucket: "MAIN",
+            storage: india,
+        });
+        expect(both.all.map((b) => b.bucket)).toEqual(["MAIN", "GLOBAL"]);
+    });
+
+    it("refuses a Global file when the Global bucket is not set, never main in its place", () => {
+        expect(() => mediaStorages(india, null).of("GLOBAL")).toThrow(
+            /R2_GLOBAL_BUCKET/,
+        );
+    });
+
+    it("finds the bucket that serves an address, and none for another host", () => {
+        const both = mediaStorages(india, global);
+        const key = "org/org_1/site-image/a.png";
+        expect(both.servingUrl(key, `${GLOBAL_BASE}/${key}`)).toBe(global);
+        expect(both.servingUrl(key, `${INDIA_BASE}/${key}`)).toBe(india);
+        expect(both.servingUrl(key, `https://evil.test/${key}`)).toBeNull();
+    });
+
+    it("signs a Global business's upload in the Global bucket only, and records it", async () => {
+        orgFind.mockResolvedValue({ edition: "GLOBAL" });
+        await upload(new MediaService(mediaStorages(india, global)));
+        expect(global.createSignedUploadUrl).toHaveBeenCalled();
+        expect(india.createSignedUploadUrl).not.toHaveBeenCalled();
+        expect(create.mock.calls[0][0].data.bucket).toBe("GLOBAL");
+    });
+
+    it("signs an India business's upload in the main bucket only", async () => {
+        orgFind.mockResolvedValue({ edition: "INDIA" });
+        await upload(new MediaService(mediaStorages(india, global)));
+        expect(india.createSignedUploadUrl).toHaveBeenCalled();
+        expect(global.createSignedUploadUrl).not.toHaveBeenCalled();
+        expect(create.mock.calls[0][0].data.bucket).toBe("MAIN");
+    });
+
+    it("signs a Global business's upload in main, without a read, while the Global bucket is unset", async () => {
+        await upload(new MediaService(mediaStorages(india, null)));
+        expect(india.createSignedUploadUrl).toHaveBeenCalled();
+        expect(orgFind).not.toHaveBeenCalled();
+        expect(create.mock.calls[0][0].data.bucket).toBe("MAIN");
+    });
+
+    it.each([
+        ["GLOBAL", () => global, () => india, GLOBAL_BASE],
+        ["MAIN", () => india, () => global, INDIA_BASE],
+    ] as const)(
+        "reads, addresses and deletes a %s file in its own bucket only",
+        async (bucket, own, other, base) => {
+            const service = new MediaService(mediaStorages(india, global));
+            const row = {
+                id: "m_1",
+                organizationId: "org_1",
+                key: "org/org_1/site-image/a.png",
+                bucket,
+                status: "READY",
+                contentType: "image/png",
+                sizeBytes: 10,
+                variants: null,
+            };
+            findUnique.mockResolvedValue(row);
+            await service.readReadyObjectStart("org_1", "m_1", 100);
+            expect(own().readObjectStart).toHaveBeenCalledWith(row.key, 100);
+            expect(other().readObjectStart).not.toHaveBeenCalled();
+
+            const ready = await service.readyObject("org_1", "m_1");
+            expect(ready.url).toBe(`${base}/${row.key}`);
+
+            del.mockResolvedValue({ id: "m_1" });
+            await service.remove(ctx(), "m_1");
+            expect(own().deleteObject).toHaveBeenCalledWith(row.key);
+            expect(other().deleteObject).not.toHaveBeenCalled();
+        },
+    );
 });

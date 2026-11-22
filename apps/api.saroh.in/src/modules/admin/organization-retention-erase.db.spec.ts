@@ -10,6 +10,7 @@ import { createMemoryStorage } from "@saroh/object-storage";
 
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import { RETENTION_AFTER_DELETION_DAYS } from "../organizations/retention";
 import {
     ORGANIZATION_RETENTION_ERASE_ACTION,
@@ -29,7 +30,9 @@ const uniq = (label: string) => `${label}-${tag}-${++seq}`;
 const DAY = 86_400_000;
 
 const storage = createMemoryStorage();
-const eraser = new OrganizationRetentionEraseHandler(new MediaService(storage));
+const eraser = new OrganizationRetentionEraseHandler(
+    new MediaService(mediaStorages(storage, null)),
+);
 
 const NOW = new Date("2027-06-01T06:00:00.000Z");
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * DAY);

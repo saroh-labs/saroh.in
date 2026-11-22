@@ -23,6 +23,7 @@ import { createMemoryStorage } from "@saroh/object-storage";
 import { isRlsTestMode } from "../../../test/rls-mode";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { renderCard } from "./cards/card-renderer";
 import { PublicShareService } from "./public-share.service";
@@ -31,7 +32,7 @@ import { SharePostsService } from "./share-posts.service";
 const storage = createMemoryStorage({
     publicBaseUrl: "https://media.saroh.test",
 });
-const media = new MediaService(storage);
+const media = new MediaService(mediaStorages(storage, null));
 const posts = new SharePostsService(media);
 
 let seq = 0;
@@ -139,7 +140,7 @@ function publicShare(): PublicShareService {
         {} as never,
         {} as never,
         media,
-        storage,
+        mediaStorages(storage, null),
     );
 }
 

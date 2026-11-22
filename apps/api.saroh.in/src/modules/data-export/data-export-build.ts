@@ -9,6 +9,7 @@ import { open, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { MediaStorages } from "../media/object-storage.provider";
 import {
     csvCell,
     csvLine,
@@ -138,7 +139,10 @@ export async function buildDataExport(input: {
     /** For the README's money and tax words; absent, India's. */
     edition?: Edition;
     currency?: string | null;
+    /** Where the zip goes: the business's edition's bucket. */
     storage: ObjectStorage;
+    /** Where each file is read from: the bucket it was written to. */
+    storages: Pick<MediaStorages, "of">;
     now?: Date;
 }): Promise<BuiltDataExport> {
     const { organizationId, exportId, storage } = input;
@@ -179,7 +183,12 @@ export async function buildDataExport(input: {
                 { compress: true, modified: made },
             );
         }
-        const listed = await addMedia(zip, organizationId, storage, counts);
+        const listed = await addMedia(
+            zip,
+            organizationId,
+            input.storages,
+            counts,
+        );
         await zip.add("media.csv", listed, { compress: true, modified: made });
         counts.files["media.csv"] =
             counts.media.included + counts.media.leftOut;
@@ -224,7 +233,7 @@ const MEDIA_COLUMNS = [
 async function addMedia(
     zip: ZipFile,
     organizationId: string,
-    storage: ObjectStorage,
+    storages: Pick<MediaStorages, "of">,
     counts: DataExportCounts,
 ): Promise<string[]> {
     const lines = [csvLine(MEDIA_COLUMNS.map((c) => csvCell(c)))];
@@ -236,6 +245,7 @@ async function addMedia(
                 select: {
                     id: true,
                     key: true,
+                    bucket: true,
                     filename: true,
                     contentType: true,
                     sizeBytes: true,
@@ -256,7 +266,9 @@ async function addMedia(
             ) {
                 state = "no: past what one download holds";
             } else {
-                const body = await storage.readObject(media.key);
+                const body = await storages
+                    .of(media.bucket)
+                    .readObject(media.key);
                 if (body) {
                     counts.media.bytes += await zip.add(path, body, {
                         compress: false,

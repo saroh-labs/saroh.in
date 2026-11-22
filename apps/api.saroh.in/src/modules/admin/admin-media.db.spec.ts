@@ -10,15 +10,17 @@
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 
+import { mediaStorages } from "../media/object-storage.provider";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminMediaService } from "./admin-media.service";
 import { AdminPermission } from "./admin-permissions";
 
 const tag = `${process.pid}-${Date.now()}`;
 const deleteObject = jest.fn().mockResolvedValue(undefined);
-const service = new AdminMediaService(new AdminAuditService(), {
-    deleteObject,
-} as unknown as ObjectStorage);
+const service = new AdminMediaService(
+    new AdminAuditService(),
+    mediaStorages({ deleteObject } as unknown as ObjectStorage, null),
+);
 
 let staffId: string;
 let organizationId: string;

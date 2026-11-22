@@ -46,10 +46,13 @@ export async function sharePhoto(
     host: string,
     self: SelfFetch | null = selfFetch(),
 ): Promise<string | null> {
-    const key = mediaKeyOf(url, env.NEXT_PUBLIC_SITE_MEDIA_URL);
+    const key = mediaKeyOf(url, {
+        main: env.NEXT_PUBLIC_SITE_MEDIA_URL,
+        global: env.NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL,
+    });
     if (key && self) {
         const drawn = await photoData(
-            `https://${host}${resizedPath(key.key, PHOTO_WIDTH)}`,
+            `https://${host}${resizedPath(key.key, PHOTO_WIDTH, key.global)}`,
             (address) =>
                 self(
                     new Request(address, {

@@ -20,6 +20,7 @@ import { createMemoryStorage } from "@saroh/object-storage";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { MediaService } from "./media.service";
+import { mediaStorages } from "./object-storage.provider";
 import type { CreateUploadInput } from "./upload-checks";
 import {
     BAD_SIZES_MESSAGE,
@@ -185,7 +186,10 @@ describe("MediaService with copies", () => {
         });
         // R2 sees what the browser PUT; here putBytes stands in for it.
         const storage: ObjectStorage = { ...memory, seesUploads: true };
-        return { memory, service: new MediaService(storage) };
+        return {
+            memory,
+            service: new MediaService(mediaStorages(storage, null)),
+        };
     }
 
     it("signs each copy at a key it makes beside the photo, and meters every file", async () => {

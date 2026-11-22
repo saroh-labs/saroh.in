@@ -32,6 +32,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AuditService } from "../audit/audit.service";
 import { FlagKey } from "../feature-flags/flags";
 import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import {
     PENDING_UPLOAD_STALE_MS,
     PendingUploadSweepJob,
@@ -189,7 +190,7 @@ const photo = (bytes: number) => ({
 describe("storage follows its catalogue cell (DEC-227)", () => {
     it("refuses an upload at its start when a hard cell would be passed, writing nothing", async () => {
         const b = await business(HARD);
-        const media = new MediaService(storage());
+        const media = new MediaService(mediaStorages(storage(), null));
         await media.createUpload(ctxOf(b), photo(9 * MB));
         await media.createUpload(ctxOf(b), photo(9 * MB));
         await expect(
@@ -202,7 +203,7 @@ describe("storage follows its catalogue cell (DEC-227)", () => {
 
     it("lets uploads started side by side pass the cap no further than one at a time would", async () => {
         const b = await business(HARD);
-        const media = new MediaService(storage());
+        const media = new MediaService(mediaStorages(storage(), null));
         const results = await Promise.allSettled(
             [0, 1, 2, 3].map(() => media.createUpload(ctxOf(b), photo(9 * MB))),
         );
@@ -219,7 +220,7 @@ describe("storage follows its catalogue cell (DEC-227)", () => {
                 contentLength: real,
             }),
         });
-        const media = new MediaService(store);
+        const media = new MediaService(mediaStorages(store, null));
         const started = await media.createUpload(ctxOf(b), photo(9 * MB));
         await prisma.media.create({
             data: {
@@ -243,7 +244,7 @@ describe("storage follows its catalogue cell (DEC-227)", () => {
 
     it("on a soft cell, takes every upload and tells the business once it passes", async () => {
         const b = await business(SOFT);
-        const media = new MediaService(storage());
+        const media = new MediaService(mediaStorages(storage(), null));
         for (let i = 0; i < 3; i++) {
             await media.createUpload(ctxOf(b), photo(9 * MB));
         }
@@ -285,7 +286,7 @@ describe("storage follows its catalogue cell (DEC-227)", () => {
         const ready = await row(b.orgId, "READY", old);
         const kept = await row(held.orgId, "PENDING", old);
         const store = storage();
-        const sweep = new PendingUploadSweepJob(store);
+        const sweep = new PendingUploadSweepJob(mediaStorages(store, null));
         const r = await sweep.sweep(new Date());
         expect(r.removed).toBeGreaterThanOrEqual(1);
         const left = await prisma.media.findMany({
@@ -835,7 +836,9 @@ function seeingStorage() {
 describe("a photo's copies against a real Postgres (DEC-246)", () => {
     it("counts every file of an upload against the plan's storage", async () => {
         const b = await business(HARD);
-        const media = new MediaService(seeingStorage().store);
+        const media = new MediaService(
+            mediaStorages(seeingStorage().store, null),
+        );
         // 4 MB for the photo, 10.4 MB for its copies: two would pass 20 MB.
         const one = madePhoto(4 * MB, [3 * MB, 3.5 * MB, 3.9 * MB]);
         await media.createUpload(ctxOf(b), one);
@@ -872,7 +875,7 @@ describe("a photo's copies against a real Postgres (DEC-246)", () => {
         async (_what, change) => {
             const b = await business(HARD);
             const { memory, store } = seeingStorage();
-            const media = new MediaService(store);
+            const media = new MediaService(mediaStorages(store, null));
             const started = await media.createUpload(
                 ctxOf(b),
                 madePhoto(4_000, [900, 1_800, 2_700]),
@@ -907,7 +910,7 @@ describe("a photo's copies against a real Postgres (DEC-246)", () => {
     it("confirms a photo whose every file is whole", async () => {
         const b = await business(HARD);
         const { memory, store } = seeingStorage();
-        const media = new MediaService(store);
+        const media = new MediaService(mediaStorages(store, null));
         const started = await media.createUpload(
             ctxOf(b),
             madePhoto(4_000, [900, 1_800, 2_700]),
@@ -944,7 +947,9 @@ describe("a photo's copies against a real Postgres (DEC-246)", () => {
             },
         });
         const store = storage();
-        await new PendingUploadSweepJob(store).sweep(new Date());
+        await new PendingUploadSweepJob(mediaStorages(store, null)).sweep(
+            new Date(),
+        );
         expect(
             await prisma.media.findUnique({ where: { id: stale.id } }),
         ).toBeNull();

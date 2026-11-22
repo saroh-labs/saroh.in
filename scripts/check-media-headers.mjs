@@ -6,7 +6,7 @@
  * any path proves the rule is on. This fetches one per domain and fails if a
  * header is missing or differs.
  *
- *   node scripts/check-media-headers.mjs                  # both domains
+ *   node scripts/check-media-headers.mjs                  # every domain
  *   node scripts/check-media-headers.mjs media.saroh.io   # one
  *
  * Live network check: not in prepush. Runs after every API deploy
@@ -21,7 +21,11 @@ export const MEDIA_HEADERS = {
     "x-content-type-options": "nosniff",
 };
 
-export const MEDIA_HOSTS = ["media.saroh.in", "media.saroh.io"];
+export const MEDIA_HOSTS = [
+    "media.saroh.in",
+    "media.saroh.io",
+    "media.saroh.tech",
+];
 
 /** Problems with one answer's headers (a Headers or a plain object); [] when right. */
 export function headerProblems(headers) {

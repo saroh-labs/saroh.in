@@ -62,13 +62,20 @@ export const PRODUCT_CARD_TOOLS = new Set([
 
 /**
  * `url` when it is on Saroh's own media host (`base`, the storage's public
- * address), else null: a tenant's pasted or library URL never reaches a
- * card. No base configured: none.
+ * address, or one of the buckets' when several), else null: a tenant's
+ * pasted or library URL never reaches a card. No base configured: none.
  */
 export function ownMediaUrl(
     url: string | null | undefined,
-    base: string | undefined,
+    base: string | readonly string[] | undefined,
 ): string | null {
+    if (typeof base === "object") {
+        for (const one of base) {
+            const own = ownMediaUrl(url, one);
+            if (own) return own;
+        }
+        return null;
+    }
     if (!url || !base) return null;
     try {
         const u = new URL(url);
@@ -226,7 +233,7 @@ export function answerCard(
     tool: string,
     data: unknown,
     facts: ReadonlyMap<string, ProductFacts>,
-    mediaBase: string | undefined,
+    mediaBase: string | readonly string[] | undefined,
     /** What the tool was called with: a list's link carries its filters. */
     input?: unknown,
 ): AskAiInfoCard | null {

@@ -25,7 +25,7 @@ import { Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import sharp from "sharp";
 
-import { createObjectStorage } from "../modules/media/object-storage.provider";
+import { createMediaStorages } from "../modules/media/object-storage.provider";
 import { backfillMediaVariants } from "./media-variants";
 
 const TAG = "[media-variants]";
@@ -59,15 +59,16 @@ async function main(argv: string[]): Promise<number> {
         console.error(`${TAG} usage: media-variants [--dry-run] [--limit=N]`);
         return 2;
     }
-    const storage = createObjectStorage(new Logger("ObjectStorage"));
-    if (!storage.seesUploads && !args.dryRun) {
+    // Both buckets: each row is read and written where it was stored.
+    const storages = createMediaStorages(new Logger("ObjectStorage"));
+    if (!storages.of("MAIN").seesUploads && !args.dryRun) {
         console.error(`${TAG} no R2 credentials: nothing to read or write`);
         return 2;
     }
     // One image at a time, no cache: memory stays flat in a small container.
     sharp.concurrency(1);
     sharp.cache(false);
-    const report = await backfillMediaVariants(prisma, storage, {
+    const report = await backfillMediaVariants(prisma, storages, {
         ...args,
         log: (line) => console.info(`${TAG} ${line}`),
     });

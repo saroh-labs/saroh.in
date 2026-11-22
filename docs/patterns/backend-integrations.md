@@ -835,11 +835,31 @@ What the review (GC-01 to GC-18) settled:
 
 ## Media storage — **Current**
 
-One R2 bucket per environment in the Saroh labs Cloudflare account:
-`saroh-media` (`media.saroh.in`) and `saroh-media-dev` (`media.saroh.io`),
-each with its own Object Read & Write key that can't reach the other. With
-the `R2_*` variables unset the API falls back to in-memory storage and the
-admin health page says so; a deployed API must not run that way.
+R2 buckets in the Saroh labs Cloudflare account, each with its own Object
+Read & Write key that can't reach the others: `saroh-media`
+(`media.saroh.in`) for India, `saroh-global-media` (`media.saroh.tech`) for
+Global-edition businesses in production (DEC-247), and `saroh-media-dev`
+(`media.saroh.io`) for development, both editions. With the `R2_*`
+variables unset the API falls back to in-memory storage and the admin
+health page says so; a deployed API must not run that way.
+
+- **The bucket follows the business's edition, then the file.** The
+  `OBJECT_STORAGE` token gives `MediaStorages`
+  (`media/object-storage.provider.ts`), never one adapter. A new file goes
+  to `forOrganization(id)` / `forEdition(edition)` — the edition read from
+  the organization row, never the request — and its row records the
+  bucket (`Media.bucket`, `DataExport.bucket`: `MAIN` or `GLOBAL`). Every
+  later read, check, delete, sweep, erasure, export and backfill goes to
+  `of(row.bucket)`; a social post's picture, which has no row, by its
+  address (`servingUrl(key, url)`). Never pick a stored file's bucket by
+  the edition: Global media from before the split stays in `saroh-media`.
+- **`R2_GLOBAL_*` are all four or none** (`env.ts`). Unset (development,
+  local, CI), Global businesses use the main bucket exactly as before and
+  `forOrganization` makes no read. A `GLOBAL` row with them unset throws
+  rather than falling back to the main bucket.
+- **saroh.app's image route** names Global's bucket in the path
+  (`/_img/<w>/g/<key>`, from `NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL`) and
+  fetches only from that bucket's address.
 
 - **Public by address, never listable.** Everything in these buckets is meant
   to be seen (logos, site and product images). Keys are server-built and carry
@@ -879,13 +899,13 @@ admin health page says so; a deployed API must not run that way.
   if Saroh ever accepts other file types. Stored URLs (`logoUrl`, site
   content) would then need rewriting, so it is cheapest early.
 - **The media domains can't run a page.** A Cloudflare response-header rule
-  on `media.saroh.in` and `media.saroh.io` sets `Content-Security-Policy:
+  on `media.saroh.in`, `media.saroh.tech` and `media.saroh.io` sets `Content-Security-Policy:
 default-src 'none'; img-src 'self'; media-src 'self'; sandbox` and
   `X-Content-Type-Options: nosniff`, so even a mislabelled file is inert.
   The values live in `MEDIA_HEADERS` (`scripts/check-media-headers.mjs`);
   change both together. The deploy-api workflow's `media-headers` job checks
-  the target's domain live after each rollout (`pnpm check:media-headers`
-  checks both by hand).
+  the target's domains live after each rollout (`pnpm check:media-headers`
+  checks all three by hand).
 
 ## Razorpay recurring payments (D11 spike) — **Current**
 

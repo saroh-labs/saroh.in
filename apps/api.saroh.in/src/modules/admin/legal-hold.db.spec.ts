@@ -20,6 +20,7 @@ import { PrivacyRemovalService } from "../customer-workspace/privacy-removal.ser
 import { DataExportStatus } from "../data-export/data-export-types";
 import { DataExportHandler } from "../data-export/data-export.handler";
 import { DataExportService } from "../data-export/data-export.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import { LEGAL_HOLD_MESSAGE } from "../organizations/legal-hold";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { AdminAuditService } from "./admin-audit.service";
@@ -44,8 +45,11 @@ const lifecycle = new AdminLifecycleService(
 );
 const sweep = new OrganizationDeletionHandler(new AdminAuditService());
 const storage = createMemoryStorage();
-const dataExports = new DataExportService(storage, new AuditService());
-const exportJobs = new DataExportHandler(storage);
+const dataExports = new DataExportService(
+    mediaStorages(storage, null),
+    new AuditService(),
+);
+const exportJobs = new DataExportHandler(mediaStorages(storage, null));
 const removals = new PrivacyRemovalService();
 
 const operator: PlatformAdminInfo = {

@@ -16,6 +16,7 @@ import { createMemoryStorage } from "@saroh/object-storage";
 import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import { invoicePaper } from "../payments/public-invoices.service";
 import { paperView } from "./invoice-paper-view";
 import { InvoicePdfService } from "./invoice-pdf.service";
@@ -28,7 +29,10 @@ const invoices = new InvoicesService();
 const pdfs = new InvoicePdfService(
     invoices,
     new MediaService(
-        createMemoryStorage({ publicBaseUrl: "https://media.saroh.test" }),
+        mediaStorages(
+            createMemoryStorage({ publicBaseUrl: "https://media.saroh.test" }),
+            null,
+        ),
     ),
 );
 

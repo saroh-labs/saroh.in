@@ -16,6 +16,7 @@ import { AuditService } from "../../audit/audit.service";
 import type { EntitlementService } from "../../billing/entitlement.service";
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { MediaService } from "../../media/media.service";
+import { mediaStorages } from "../../media/object-storage.provider";
 import type { OrgAction } from "../../organizations/organization-actions";
 import { OrganizationContextService } from "../../organizations/organization-context.service";
 import { SitePreviewLinksService } from "../../sites/site-preview-links.service";
@@ -50,8 +51,7 @@ const fetchImage = jest.fn();
 const deps: SiteToolDeps = {
     sites,
     previews: new SitePreviewLinksService(sites),
-    media: new MediaService(createMemoryStorage({})),
-    storage: createMemoryStorage({}),
+    media: new MediaService(mediaStorages(createMemoryStorage({}), null)),
     restorePoints: new RestorePointService(),
     queue: {
         enqueue: (input) =>
@@ -70,8 +70,6 @@ const requests = new PublishRequestsService(
     new TestReleasesService(sites, new FeatureFlagService()),
     new AuditService(),
 );
-// The media service and the tool share one store, as in Nest.
-deps.media = new MediaService(deps.storage);
 
 const registry = new McpToolRegistry(
     new McpActivityService(new AuditService()),

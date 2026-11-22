@@ -27,6 +27,8 @@ import type { ObjectStorage } from "@saroh/object-storage";
 import sharp from "sharp";
 import { rgbaToThumbHash } from "thumbhash";
 
+import type { MediaStorages } from "../modules/media/object-storage.provider";
+
 /** The raster types an upload may be; SVG and video are left alone. */
 export const RASTER_TYPES = [
     "image/jpeg",
@@ -113,7 +115,7 @@ async function readAll(
 
 export async function backfillMediaVariants(
     db: PrismaClient,
-    storage: ObjectStorage,
+    storages: Pick<MediaStorages, "of">,
     opts: BackfillOptions,
 ): Promise<BackfillReport> {
     const log = opts.log ?? (() => undefined);
@@ -135,13 +137,21 @@ export async function backfillMediaVariants(
             where: { ...pending, ...(cursor ? { id: { gt: cursor } } : {}) },
             orderBy: { id: "asc" },
             take: Math.min(BATCH, limit - seen),
-            select: { id: true, key: true, contentType: true, purpose: true },
+            select: {
+                id: true,
+                key: true,
+                bucket: true,
+                contentType: true,
+                purpose: true,
+            },
         });
         if (rows.length === 0) break;
         for (const row of rows) {
             cursor = row.id;
             seen++;
             try {
+                // Its copies sit beside it, in the bucket it was written to.
+                const storage = storages.of(row.bucket);
                 const input = await readAll(storage, row.key);
                 if (!input) throw new Error("no bytes in storage");
                 const keepAsIs =

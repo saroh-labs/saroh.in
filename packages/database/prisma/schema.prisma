@@ -970,6 +970,14 @@ model OrganizationInvitation {
 }
 
 // ============================================================================
+/// Which media bucket a stored file is in (owner, 22 Nov 2026).
+enum MediaBucket {
+  /// The environment's main bucket (`R2_BUCKET`).
+  MAIN
+  /// Global businesses' own bucket (`R2_GLOBAL_BUCKET`).
+  GLOBAL
+}
+
 model Media {
   id             String       @id @default(cuid())
   organizationId String
@@ -990,6 +998,11 @@ model Media {
   variants    Json? // the smaller WebP copies: [{ width, key, bytes }], narrowest first
   // The copies' bytes together: the plan's storage counts sizeBytes + this.
   variantBytes Int @default(0)
+
+  // The bucket it was written to (owner, 22 Nov 2026): a Global business's
+  // own once R2_GLOBAL_BUCKET is set, the main one before and for India.
+  // Every later read or delete goes there, never by the business's edition.
+  bucket MediaBucket @default(MAIN)
 
   uploadedByUserId String?
 
@@ -1035,6 +1048,8 @@ model DataExport {
 
   // Where the zip is, once READY; cleared when it expires.
   storageKey String?
+  // The bucket the zip went to: its business's edition's (owner, 22 Nov 2026).
+  bucket     MediaBucket @default(MAIN)
   sizeBytes  BigInt?
   // What it holds: rows per file, and media files put in or left out.
   counts     Json?

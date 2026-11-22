@@ -8,7 +8,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import { variantKey } from "@saroh/block-contract";
-import type { Prisma } from "@saroh/database";
+import type { MediaBucket, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import {
@@ -27,6 +27,7 @@ import {
     logDeletionProviderCall,
 } from "../organizations/deletion-provider-log";
 import { authorize } from "../organizations/organization-policy";
+import type { MediaStorages } from "./object-storage.provider";
 import { OBJECT_STORAGE } from "./object-storage.provider";
 import type { CreateUploadInput } from "./upload-checks";
 import {
@@ -86,7 +87,7 @@ function goneAsNothing(error: unknown, onlyGone = false): void {
 @Injectable()
 export class MediaService {
     constructor(
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+        @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
     ) {}
 
     /**
@@ -107,7 +108,12 @@ export class MediaService {
         const sizesProblem = uploadSizesProblem(input);
         if (sizesProblem) throw new BadRequestException(sizesProblem);
 
-        const signed = await this.storage.createSignedUploadUrl({
+        // The business's edition's bucket; the row remembers which (owner,
+        // 22 Nov 2026).
+        const { bucket, storage } = await this.storages.forOrganization(
+            ctx.organizationId,
+        );
+        const signed = await storage.createSignedUploadUrl({
             organizationId: ctx.organizationId,
             contentType: input.contentType,
             contentLength: input.contentLength,
@@ -119,7 +125,7 @@ export class MediaService {
         const copies = await Promise.all(
             (input.variants ?? []).map(async (v) => {
                 const key = variantKey(signed.key, v.width) ?? "";
-                const put = await this.storage.createSignedUploadUrl({
+                const put = await storage.createSignedUploadUrl({
                     organizationId: ctx.organizationId,
                     // The same type as the photo (WebP, or JPEG).
                     contentType: input.contentType,
@@ -155,6 +161,7 @@ export class MediaService {
                     data: {
                         organizationId: ctx.organizationId,
                         key: signed.key,
+                        bucket,
                         contentType: input.contentType,
                         sizeBytes: input.contentLength,
                         filename: input.filename,
@@ -285,7 +292,7 @@ export class MediaService {
              * left them holding a key with no way to turn it into an <img src>
              * — an upload that completed and could not be used.
              */
-            url: this.publicUrlFor(updated.key),
+            url: this.publicUrlFor(updated),
         };
     }
 
@@ -298,9 +305,9 @@ export class MediaService {
         });
         // The copies' widths, not their keys: a copy's address is its
         // photo's, with the width beside it (`variantSrc`).
-        return rows.map(({ variants, ...row }) => ({
+        return rows.map(({ variants, bucket, ...row }) => ({
             ...row,
-            url: this.publicUrlFor(row.key),
+            url: this.publicUrlFor({ key: row.key, bucket }),
             widths: variantWidths(variants),
         }));
     }
@@ -315,9 +322,12 @@ export class MediaService {
      * up to serve images"); an exception here would have surfaced as a 500 on
      * an upload that succeeded.
      */
-    private publicUrlFor(key: string): string | null {
+    private publicUrlFor(media: {
+        key: string;
+        bucket: MediaBucket;
+    }): string | null {
         try {
-            return this.storage.getPublicUrl(key);
+            return this.storages.of(media.bucket).getPublicUrl(media.key);
         } catch {
             return null;
         }
@@ -455,7 +465,7 @@ export class MediaService {
                         ? { id: { notIn: failedIds } }
                         : {}),
                 },
-                select: { id: true, key: true, variants: true },
+                select: { id: true, key: true, variants: true, bucket: true },
                 orderBy: { id: "asc" },
                 take: 100,
             });
@@ -522,6 +532,7 @@ export class MediaService {
                 id: true,
                 organizationId: true,
                 key: true,
+                bucket: true,
                 status: true,
                 contentType: true,
                 sizeBytes: true,
@@ -539,7 +550,7 @@ export class MediaService {
         }
         return {
             id: media.id,
-            url: this.publicUrlFor(media.key),
+            url: this.publicUrlFor(media),
             contentType: media.contentType,
             sizeBytes: media.sizeBytes,
             width: media.width,
@@ -566,6 +577,7 @@ export class MediaService {
             select: {
                 organizationId: true,
                 key: true,
+                bucket: true,
                 status: true,
                 contentType: true,
             },
@@ -576,7 +588,9 @@ export class MediaService {
         ) {
             return null;
         }
-        const bytes = await this.storage.readObjectStart(media.key, length);
+        const bytes = await this.storages
+            .of(media.bucket)
+            .readObjectStart(media.key, length);
         return bytes ? { bytes, contentType: media.contentType } : null;
     }
 
@@ -590,6 +604,7 @@ export class MediaService {
      */
     private async checkStoredFiles(media: {
         key: string;
+        bucket: MediaBucket;
         contentType: string;
         purpose: string | null;
         sizeBytes: number;
@@ -598,14 +613,15 @@ export class MediaService {
         problem: string | null;
         head: Awaited<ReturnType<ObjectStorage["headObject"]>>;
     }> {
-        const seesUploads = this.storage.seesUploads;
+        const storage = this.storages.of(media.bucket);
+        const seesUploads = storage.seesUploads;
         const check = async (file: {
             key: string;
             contentType: string;
             purpose: string | null;
         }) => {
             const [start, end, head] = await Promise.all([
-                this.storage.readObjectStart(
+                storage.readObjectStart(
                     file.key,
                     isVideoContentType(file.contentType)
                         ? ISO_BMFF_SNIFF_BYTES
@@ -613,8 +629,8 @@ export class MediaService {
                 ),
                 isVideoContentType(file.contentType)
                     ? Promise.resolve(null)
-                    : this.storage.readObjectEnd(file.key, IMAGE_END_BYTES),
-                this.storage.headObject(file.key),
+                    : storage.readObjectEnd(file.key, IMAGE_END_BYTES),
+                storage.headObject(file.key),
             ]);
             const problem =
                 storedBytesProblem(file, start, seesUploads) ??
@@ -647,11 +663,31 @@ export class MediaService {
     /** Delete every file of an upload: the photo and its copies. Idempotent. */
     private async deleteFiles(media: {
         key: string;
+        bucket: MediaBucket;
         variants: unknown;
     }): Promise<void> {
+        const storage = this.storages.of(media.bucket);
         for (const key of mediaFileKeys(media)) {
-            await this.storage.deleteObject(key);
+            await storage.deleteObject(key);
         }
+    }
+
+    /**
+     * Put an upload's bytes from the server, for an image the API fetched
+     * itself (MCP `upload_image`): into the bucket its row was signed for.
+     * Then {@link completeUpload} checks them as any other.
+     */
+    async storeUploadBytes(
+        ctx: OrganizationContext,
+        mediaId: string,
+        body: Uint8Array,
+    ): Promise<void> {
+        authorize(ctx, "media:write");
+        const media = await this.requireOwned(ctx, mediaId);
+        await this.storages.of(media.bucket).putObject(media.key, body, {
+            contentType: media.contentType,
+            contentLength: media.sizeBytes,
+        });
     }
 
     /**

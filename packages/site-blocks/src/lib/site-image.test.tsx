@@ -6,7 +6,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PageSections } from "../section-renderer";
-import { IMAGE_WIDTHS, mediaKeyOf, resizedSources } from "./image-sizes";
+import {
+    IMAGE_WIDTHS,
+    mediaKeyOf,
+    parseResizedPath,
+    resizedSources,
+} from "./image-sizes";
 import { siteImage } from "./site-image";
 
 /** One rule for how every picture on a merchant's page is loaded. */
@@ -237,6 +242,36 @@ describe("image-sizes", () => {
         expect(resizedSources({ src: PHOTO, width: 400 }, MEDIA)?.src).toBe(
             `/_img/480/${PHOTO_KEY}`,
         );
+    });
+    it("reads a Global business's photo under Global's own address, marked for its bucket", () => {
+        const GLOBAL = "https://media-global.saroh.test";
+        const photo = `${GLOBAL}/${PHOTO_KEY}`;
+        expect(mediaKeyOf(photo, { main: MEDIA, global: GLOBAL })).toEqual({
+            key: PHOTO_KEY,
+            organizationId: "orgnorthwind1",
+            purpose: "site-image",
+            global: true,
+        });
+        // Global's address unset: its photos keep their plain src.
+        expect(mediaKeyOf(photo, { main: MEDIA })).toBeNull();
+        expect(mediaKeyOf(photo, MEDIA)).toBeNull();
+        // The main bucket's photo stays unmarked beside it.
+        expect(
+            mediaKeyOf(PHOTO, { main: MEDIA, global: GLOBAL })?.global,
+        ).toBeUndefined();
+        expect(
+            resizedSources({ src: photo }, { main: MEDIA, global: GLOBAL })
+                ?.src,
+        ).toBe(`/_img/780/g/${PHOTO_KEY}`);
+        expect(parseResizedPath(`/_img/780/g/${PHOTO_KEY}`)).toEqual({
+            width: 780,
+            image: {
+                key: PHOTO_KEY,
+                organizationId: "orgnorthwind1",
+                purpose: "site-image",
+                global: true,
+            },
+        });
     });
 });
 

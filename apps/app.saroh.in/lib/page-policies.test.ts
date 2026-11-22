@@ -38,6 +38,8 @@ describe("app.saroh.in page policies", () => {
         expect(sources("img-src")).toEqual(
             expect.arrayContaining([
                 "https://media.saroh.in",
+                // Global businesses' own bucket (owner, 22 Nov 2026).
+                "https://media.saroh.tech",
                 "https://images.unsplash.com",
             ]),
         );

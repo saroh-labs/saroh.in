@@ -23,6 +23,7 @@ import {
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { countUsage } from "../../billing/metering";
 import type { MediaService } from "../../media/media.service";
+import { mediaStorages } from "../../media/object-storage.provider";
 import type { PublicShareService } from "../../share-posts/public-share.service";
 import { SOCIAL_PUBLISH_TYPE } from "../shared/jobs";
 import { SocialPostsService } from "./posts.service";
@@ -45,7 +46,7 @@ const service = () =>
         socialAccessFor(world),
         share,
         {} as MediaService,
-        storage,
+        mediaStorages(storage, null),
     );
 
 beforeAll(socialEnv);

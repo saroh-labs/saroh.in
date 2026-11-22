@@ -10,6 +10,7 @@ import { Prisma, prisma } from "@saroh/database";
 import { createMemoryStorage } from "@saroh/object-storage";
 import sharp from "sharp";
 
+import { mediaStorages } from "../modules/media/object-storage.provider";
 import { backfillMediaVariants } from "./media-variants";
 
 const storage = createMemoryStorage();
@@ -75,9 +76,13 @@ const row = (name: string) =>
 
 describe("media variants backfill (real database)", () => {
     it("dry run counts the raster photos and writes nothing", async () => {
-        const report = await backfillMediaVariants(prisma, storage, {
-            dryRun: true,
-        });
+        const report = await backfillMediaVariants(
+            prisma,
+            mediaStorages(storage, null),
+            {
+                dryRun: true,
+            },
+        );
         expect(report).toMatchObject({ candidates: 5, done: 0, copies: 0 });
         expect((await row("photo")).variants).toBeNull();
         const copy = variantKey((await row("photo")).key, 480)!;
@@ -86,10 +91,14 @@ describe("media variants backfill (real database)", () => {
 
     it("fills size, blur and copies; keeps GIFs and logos as they are", async () => {
         const log: string[] = [];
-        const report = await backfillMediaVariants(prisma, storage, {
-            dryRun: false,
-            log: (l) => log.push(l),
-        });
+        const report = await backfillMediaVariants(
+            prisma,
+            mediaStorages(storage, null),
+            {
+                dryRun: false,
+                log: (l) => log.push(l),
+            },
+        );
         expect(report).toMatchObject({ candidates: 5, done: 4, copies: 2 });
         expect(report.failed).toEqual([ids.lost]);
         expect(log.join("\n")).toContain(`failed ${ids.lost}`);
@@ -141,13 +150,21 @@ describe("media variants backfill (real database)", () => {
 
     it("a second run finds only the failed photo and writes nothing new", async () => {
         const before = await row("photo");
-        const dry = await backfillMediaVariants(prisma, storage, {
-            dryRun: true,
-        });
+        const dry = await backfillMediaVariants(
+            prisma,
+            mediaStorages(storage, null),
+            {
+                dryRun: true,
+            },
+        );
         expect(dry.candidates).toBe(1);
-        const again = await backfillMediaVariants(prisma, storage, {
-            dryRun: false,
-        });
+        const again = await backfillMediaVariants(
+            prisma,
+            mediaStorages(storage, null),
+            {
+                dryRun: false,
+            },
+        );
         expect(again).toMatchObject({ done: 0, copies: 0 });
         expect((await row("photo")).updatedAt).toEqual(before.updatedAt);
     });
@@ -157,10 +174,14 @@ describe("media variants backfill (real database)", () => {
             where: { id: ids.photo },
             data: { variants: Prisma.DbNull },
         });
-        const report = await backfillMediaVariants(prisma, storage, {
-            dryRun: false,
-            limit: 1,
-        });
+        const report = await backfillMediaVariants(
+            prisma,
+            mediaStorages(storage, null),
+            {
+                dryRun: false,
+                limit: 1,
+            },
+        );
         expect(report.done + report.failed.length).toBe(1);
     });
 });

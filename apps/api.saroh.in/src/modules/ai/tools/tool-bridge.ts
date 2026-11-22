@@ -170,7 +170,12 @@ export class ToolBridge implements AiToolbox {
                           productIdsOf(name, data),
                       )
                     : new Map();
-            return answerCard(name, data, facts, env.R2_PUBLIC_BASE_URL, input);
+            // A cover may be in either bucket: where it was written.
+            const bases = [
+                env.R2_PUBLIC_BASE_URL,
+                env.R2_GLOBAL_PUBLIC_BASE_URL,
+            ].filter((b): b is string => Boolean(b));
+            return answerCard(name, data, facts, bases, input);
         } catch {
             return null;
         }

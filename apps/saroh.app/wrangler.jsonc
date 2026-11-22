@@ -158,7 +158,10 @@
                 // Photos sized for the screen (#1043) are on development
                 // only until the owner approves them for production: add
                 // "NEXT_PUBLIC_SITE_MEDIA_URL": "https://media.saroh.in" here
-                // then. Without it, sites keep plain photo addresses.
+                // then, with "NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL":
+                // "https://media.saroh.tech" for Global businesses' own
+                // bucket (owner, 22 Nov 2026). Without them, sites keep plain
+                // photo addresses.
             },
         },
     },

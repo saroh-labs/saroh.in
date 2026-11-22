@@ -7,7 +7,6 @@ import {
 } from "@nestjs/common";
 import type { DataExport } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { ObjectStorage } from "@saroh/object-storage";
 import { sanitizeFilename } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -16,6 +15,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import type { MediaStorages } from "../media/object-storage.provider";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
 import {
     LEGAL_HOLD_CODE,
@@ -90,7 +90,7 @@ export function toDataExportView(row: DataExport): DataExportView {
 @Injectable()
 export class DataExportService {
     constructor(
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+        @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
         private readonly audit: AuditService,
     ) {}
 
@@ -196,16 +196,15 @@ export class DataExportService {
             where: { id: ctx.organizationId },
             select: { slug: true },
         });
-        const signed = await this.storage.createSignedDownloadUrl(
-            row.storageKey,
-            {
+        const signed = await this.storages
+            .of(row.bucket)
+            .createSignedDownloadUrl(row.storageKey, {
                 expiresInSeconds: DATA_EXPORT_LINK_SECONDS,
                 downloadFilename: dataExportFilename(
                     organization?.slug ?? "business",
                     row.readyAt ?? row.createdAt,
                 ),
-            },
-        );
+            });
         await this.audit.record({
             action: AuditAction.DataExportDownloaded,
             actorUserId: ctx.userId,

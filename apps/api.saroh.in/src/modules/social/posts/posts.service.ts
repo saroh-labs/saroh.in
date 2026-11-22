@@ -10,13 +10,13 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { ObjectStorage } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { forgetOrganizationLinkLabels } from "../../analytics/site-link-labels";
 import { readLinkCounts } from "../../analytics/visit-sources";
 import { businessTimezone } from "../../bookings/staff-availability";
 import { MediaService } from "../../media/media.service";
+import type { MediaStorages } from "../../media/object-storage.provider";
 import { OBJECT_STORAGE } from "../../media/object-storage.provider";
 import { authorize } from "../../organizations/organization-policy";
 import { PublicShareService } from "../../share-posts/public-share.service";
@@ -66,7 +66,7 @@ export class SocialPostsService {
         private readonly access: SocialAccess,
         private readonly share: PublicShareService,
         private readonly media: MediaService,
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+        @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
     ) {}
 
     async list(
@@ -202,7 +202,7 @@ export class SocialPostsService {
      */
     async remove(ctx: OrganizationContext, id: string): Promise<void> {
         authorize(ctx, "social:post");
-        const imageKey = await prisma.$transaction(async (tx) => {
+        const picture = await prisma.$transaction(async (tx) => {
             const post = await lockPost(tx, ctx, id);
             const held = await heldState(tx, post);
             if (post.status === "PUBLISHING" && !held) throw postingNow();
@@ -237,9 +237,9 @@ export class SocialPostsService {
             } else {
                 await tx.socialPost.delete({ where: { id } });
             }
-            return post.imageKey;
+            return post;
         });
-        await removePicture(this.storage, imageKey);
+        await removePicture(this.storages, picture);
     }
 
     /**
@@ -445,7 +445,8 @@ export class SocialPostsService {
                   {
                       share: this.share,
                       media: this.media,
-                      storage: this.storage,
+                      storage: (await this.storages.forOrganization(org))
+                          .storage,
                   },
                   {
                       organizationId: org,
@@ -491,11 +492,10 @@ export class SocialPostsService {
                 return postId;
             });
         } catch (error) {
-            if (picture) await removePicture(this.storage, picture.imageKey);
+            await removePicture(this.storages, picture);
             throw error;
         }
-        if (picture && before?.imageKey)
-            await removePicture(this.storage, before.imageKey);
+        if (picture) await removePicture(this.storages, before);
         forgetOrganizationLinkLabels(org);
         return postView(await this.row(ctx, id));
     }
@@ -706,6 +706,7 @@ async function lockPost(
             status: true,
             publishJobId: true,
             imageKey: true,
+            imageUrl: true,
         },
     });
 }

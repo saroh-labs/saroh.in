@@ -96,8 +96,12 @@ export interface SiteImageSource {
  * Read as written (`process.env.NEXT_PUBLIC_…`) so Next inlines it into
  * the browser's bundle too, and server and browser draw the same markup.
  */
-function siteMediaBase(): string | undefined {
-    return process.env.NEXT_PUBLIC_SITE_MEDIA_URL;
+function siteMediaBase(): { main?: string; global?: string } {
+    return {
+        main: process.env.NEXT_PUBLIC_SITE_MEDIA_URL,
+        // Global businesses' own bucket (owner, 22 Nov 2026).
+        global: process.env.NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL,
+    };
 }
 
 export function siteImage(

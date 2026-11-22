@@ -15,11 +15,12 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import type { AuditService } from "../audit/audit.service";
 import { OrganizationSettingsService } from "../organizations/organization-settings.service";
 import { MediaService } from "./media.service";
+import { mediaStorages } from "./object-storage.provider";
 
 const storage = createMemoryStorage({
     publicBaseUrl: "https://media.saroh.test",
 });
-const media = new MediaService(storage);
+const media = new MediaService(mediaStorages(storage, null));
 const audit = {
     record: jest.fn().mockResolvedValue(undefined),
 } as unknown as AuditService;

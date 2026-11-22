@@ -181,4 +181,40 @@ describe("the export series' prefix (stage 9, KTD6)", () => {
             parseEnv({ ...BASE, SAROH_INVOICE_PREFIX_GLOBAL: "GX" }).success,
         ).toBe(true);
     });
+
+    // Global's media bucket (owner, 22 Nov 2026): all four or none.
+    describe("Global's media bucket", () => {
+        const GLOBAL = {
+            R2_ENDPOINT: "https://account.r2.example.test",
+            R2_GLOBAL_BUCKET: "global-media",
+            R2_GLOBAL_PUBLIC_BASE_URL: "https://media.example.test",
+            R2_GLOBAL_ACCESS_KEY_ID: "id",
+            R2_GLOBAL_SECRET_ACCESS_KEY: "secret",
+        };
+
+        it("boots with none of them, as development, local and CI do", () => {
+            expect(missing(BASE)).toEqual([]);
+        });
+
+        it("boots with all four and the endpoint", () => {
+            expect(missing({ ...BASE, ...GLOBAL })).toEqual([]);
+        });
+
+        it("refuses a partial set, naming each one missing", () => {
+            expect(
+                missing({
+                    ...BASE,
+                    R2_GLOBAL_BUCKET: "global-media",
+                    R2_GLOBAL_ACCESS_KEY_ID: "id",
+                }),
+            ).toEqual([
+                "R2_GLOBAL_PUBLIC_BASE_URL",
+                "R2_GLOBAL_SECRET_ACCESS_KEY",
+                "R2_ENDPOINT",
+            ]);
+            expect(
+                missing({ ...BASE, ...GLOBAL, R2_GLOBAL_BUCKET: undefined }),
+            ).toEqual(["R2_GLOBAL_BUCKET"]);
+        });
+    });
 });

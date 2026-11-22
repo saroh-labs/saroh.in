@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { ObjectStorage } from "@saroh/object-storage";
 
 import { heldOrganizationIds } from "../organizations/legal-hold";
+import type { MediaStorages } from "./object-storage.provider";
 import { OBJECT_STORAGE } from "./object-storage.provider";
 import { mediaFileKeys } from "./variants";
 
@@ -46,7 +46,7 @@ export class PendingUploadSweepJob {
     batch = BATCH;
 
     constructor(
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+        @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
     ) {}
 
     readonly handle = async (_job: Job): Promise<void> => {
@@ -87,7 +87,7 @@ export class PendingUploadSweepJob {
                         ? { id: { notIn: failedIds } }
                         : {}),
                 },
-                select: { id: true, key: true, variants: true },
+                select: { id: true, key: true, variants: true, bucket: true },
                 orderBy: { id: "asc" },
                 take: this.batch,
             });
@@ -99,9 +99,11 @@ export class PendingUploadSweepJob {
                             where: { id: row.id, status: "PENDING" },
                         });
                         if (taken.count > 0) {
-                            // The photo and every copy the browser sent.
+                            // The photo and every copy the browser sent, in
+                            // the bucket it was signed for (either one).
+                            const storage = this.storages.of(row.bucket);
                             for (const key of mediaFileKeys(row)) {
-                                await this.storage.deleteObject(key);
+                                await storage.deleteObject(key);
                             }
                         }
                         return taken.count;

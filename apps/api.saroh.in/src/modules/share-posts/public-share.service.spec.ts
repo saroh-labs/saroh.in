@@ -19,6 +19,7 @@ import "reflect-metadata";
 import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { mediaStorages } from "../media/object-storage.provider";
 import type { CardRender } from "./cards/card-renderer";
 import { renderCard } from "./cards/card-renderer";
 import {
@@ -137,7 +138,7 @@ function setup(org = ORG) {
         bookings as never,
         timetable as never,
         media as never,
-        storage as never,
+        mediaStorages(storage as never, null),
     );
     return { service, sites, catalogue, page, storage, media };
 }

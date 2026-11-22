@@ -3,6 +3,7 @@ import {
     IMAGE_ROUTE,
     mediaBaseOf,
     parseResizedPath,
+    resizedPath,
 } from "@saroh/site-blocks/image-sizes";
 
 import { classifySiteHost } from "../site-host-mode";
@@ -24,8 +25,10 @@ import { classifySiteHost } from "../site-host-mode";
  *   must be the one whose live site this host is (read from the public site
  *   read, kept a few minutes). A key of another organization's is a 404.
  * - **Only through the public media address** (`NEXT_PUBLIC_SITE_MEDIA_URL`,
- *   https), never a bucket binding or a signed read: what this route can
- *   fetch is what anyone could fetch already.
+ *   or `NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL` for a `/g/` path: Global
+ *   businesses' own bucket, owner, 22 Nov 2026; https), never a bucket
+ *   binding or a signed read: what this route can fetch is what anyone
+ *   could fetch already.
  * - **Bounded work.** Widths snap to the ladder, and each result is kept in
  *   the Cache API by host, key, width and format, for a year: a stored key
  *   never changes (a new upload is a new key).
@@ -53,6 +56,7 @@ export interface ImagesBindingLike {
 export interface SiteImagesEnv {
     IMAGES?: ImagesBindingLike;
     NEXT_PUBLIC_SITE_MEDIA_URL?: string;
+    NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL?: string;
     NEXT_PUBLIC_ROOT_DOMAIN?: string;
     API_URL?: string;
     NEXT_PUBLIC_API_URL?: string;
@@ -272,7 +276,12 @@ export async function handleSiteImage(
     const asked = parseResizedPath(url.pathname);
     // A search is never part of a photo's address: one URL per version.
     if (!asked || url.search) return notFound();
-    const base = mediaBaseOf(env.NEXT_PUBLIC_SITE_MEDIA_URL);
+    // From the bucket the path names; never the other one's address.
+    const base = mediaBaseOf(
+        asked.image.global
+            ? env.NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL
+            : env.NEXT_PUBLIC_SITE_MEDIA_URL,
+    );
     if (!base) return notFound();
     const source = `${base}/${asked.image.key}`;
 
@@ -318,7 +327,7 @@ async function resize(
     if (!env.IMAGES) return toOriginal(source, "unbound");
 
     const format = formatFor(request.headers.get("accept"));
-    const cacheKey = `https://${host}${IMAGE_ROUTE}/${asked.width}/${asked.image.key}?f=${format ?? "own"}`;
+    const cacheKey = `https://${host}${resizedPath(asked.image.key, asked.width, asked.image.global)}?f=${format ?? "own"}`;
     const kept = await cache.match(cacheKey);
     if (kept) {
         const out = new Response(kept.body, kept);

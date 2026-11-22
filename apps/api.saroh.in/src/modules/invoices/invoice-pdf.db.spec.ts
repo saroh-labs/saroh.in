@@ -33,6 +33,7 @@ import { createMemoryStorage } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import { invoicePaper } from "../payments/public-invoices.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import type { InvoiceSendService } from "./invoice-send.service";
@@ -44,7 +45,7 @@ const GSTIN = "29AAGCR1234M1Z5";
 const storage = createMemoryStorage({
     publicBaseUrl: "https://media.saroh.test",
 });
-const media = new MediaService(storage);
+const media = new MediaService(mediaStorages(storage, null));
 const invoices = new InvoicesService();
 const pdfs = new InvoicePdfService(invoices, media);
 const controller = new InvoicesController(

@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
-import type { ObjectStorage } from "@saroh/object-storage";
 
+import type { MediaStorages } from "../media/object-storage.provider";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
 import { mediaFileKeys } from "../media/variants";
 import { assertNotOnLegalHold } from "../organizations/legal-hold";
@@ -31,7 +31,7 @@ export interface RemoveUploadCommand extends OperatorCommand {
 export class AdminMediaService {
     constructor(
         private readonly audit: AdminAuditService,
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+        @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
     ) {}
 
     async remove(command: RemoveUploadCommand) {
@@ -43,6 +43,7 @@ export class AdminMediaService {
             select: {
                 id: true,
                 key: true,
+                bucket: true,
                 filename: true,
                 contentType: true,
                 sizeBytes: true,
@@ -54,7 +55,9 @@ export class AdminMediaService {
 
         // The photo and its smaller copies (DEC-246).
         const keys = mediaFileKeys(media);
-        for (const key of keys) await this.storage.deleteObject(key);
+        // In the bucket it was written to (owner, 22 Nov 2026).
+        const storage = this.storages.of(media.bucket);
+        for (const key of keys) await storage.deleteObject(key);
 
         await prisma.$transaction(async (tx) => {
             await tx.media.deleteMany({

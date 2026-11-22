@@ -171,4 +171,5 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: Media domains carry the sandbox headers
-              run: node scripts/check-media-headers.mjs "$([ "$TARGET" = production ] && echo media.saroh.in || echo media.saroh.io)"
+              # Production serves India's and Global's buckets (owner, 22 Nov 2026).
+              run: node scripts/check-media-headers.mjs $([ "$TARGET" = production ] && echo media.saroh.in media.saroh.tech || echo media.saroh.io)

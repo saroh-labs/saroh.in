@@ -6,7 +6,6 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
-import type { ObjectStorage } from "@saroh/object-storage";
 import { sanitizeSegment } from "@saroh/object-storage";
 
 import {
@@ -19,6 +18,7 @@ import { PublicTimetableService } from "../bookings/public-timetable";
 import { discountState } from "../discounts/discount-state";
 import { bpsToPercent } from "../discounts/serialize";
 import { MediaService } from "../media/media.service";
+import type { MediaStorages } from "../media/object-storage.provider";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
 import { parseGridQuery } from "../products/product-grid";
 import { PublicCatalogueService } from "../products/public-catalogue.service";
@@ -165,7 +165,7 @@ export class PublicShareService {
         private readonly bookings: PublicBookingsService,
         private readonly timetable: PublicTimetableService,
         private readonly media: MediaService,
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+        @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
         // Not a DI provider: a per-instance default tests can replace.
         @Optional()
         private readonly limiter: WindowLimiter = new SharedRateLimiter(
@@ -620,8 +620,10 @@ export class PublicShareService {
             if (!key.startsWith(`org/${sanitizeSegment(organizationId)}/`)) {
                 return null;
             }
-            if (this.storage.getPublicUrl(key) !== url) return null;
-            return await this.storage.readObjectStart(key, MAX_PHOTO_BYTES);
+            // Read from the bucket that serves that address, whichever it is.
+            const storage = this.storages.servingUrl(key, url);
+            if (!storage) return null;
+            return await storage.readObjectStart(key, MAX_PHOTO_BYTES);
         } catch {
             return null;
         }

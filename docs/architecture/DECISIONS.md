@@ -3256,3 +3256,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - The plan's storage counts every file of an upload. An upload never confirmed is swept after 15 minutes (was two hours), with all its files.
 - Images sent to Ask AI stay at 5 MB or less (Anthropic's per-image limit): the full copy is always made under 4 MB, lowering the quality and then the size until it fits.
 - Deferred: ClamAV scanning and a private holding bucket, until visitors or customers can upload, documents are accepted, or the first abuse report or real volume arrives.
+
+## DEC-247 Global businesses' media in their own bucket and domain
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026)
+
+- A Global-edition business's uploads go to their own R2 bucket, `saroh-global-media` (location Automatic), served at `https://media.saroh.tech`. India keeps `saroh-media` at `media.saroh.in`; development keeps `saroh-media-dev` at `media.saroh.io` for both editions.
+- The API picks the bucket by the business's edition from its organization row, never from the request (`R2_GLOBAL_*`, all four or none; unset, Global uses the main bucket as before). Every stored file keeps the bucket it was written to (`Media.bucket`, `DataExport.bucket`; a social post's picture by its address), and every later read, check, delete, sweep and erasure goes there. Nothing already in `saroh-media` moves.
+- `media.saroh.tech` carries the same sandbox CSP and `nosniff` as the other media domains, and is in the apps' `img-src`.
