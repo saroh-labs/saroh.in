@@ -211,11 +211,17 @@ export class SocialChannelsService {
             return { outcome: "connected" };
         }
         // Facebook Login: the Pages, or the Instagram accounts linked to them.
-        const { platformUserId, pages } = await meta.pageAccounts(
+        const { platformUserId, pages, seen } = await meta.pageAccounts(
             kind,
             code,
             redirectUri,
         );
+        if (pages.length === 0) {
+            // Said quietly to the merchant; the reason is here (22 Nov 2026).
+            this.logger.warn(
+                `social_connect_no_pages kind=${kind} direct=${seen?.direct ?? "?"} viaBusiness=${seen?.viaBusiness ?? "?"} granted=${seen?.granted?.join(",") ?? "?"} declined=${seen?.declined?.length ? seen.declined.join(",") : "-"}`,
+            );
+        }
         if (kind === "INSTAGRAM" && pages.length === 0) {
             return { outcome: "no-instagram" };
         }

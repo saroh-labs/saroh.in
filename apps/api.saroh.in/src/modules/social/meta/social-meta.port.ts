@@ -81,6 +81,17 @@ export interface ConnectedAccount {
 export interface FacebookPages {
     platformUserId: string;
     pages: ConnectedAccount[];
+    /**
+     * What Meta showed, for the log when no Page comes back (never tokens):
+     * Pages the person manages, Pages their business portfolios own, and
+     * the permissions they granted or declined (null: Meta didn't say).
+     */
+    seen?: {
+        direct: number;
+        viaBusiness: number;
+        granted: string[] | null;
+        declined: string[] | null;
+    };
 }
 
 /** A container's state on Instagram or Threads. */
@@ -181,16 +192,20 @@ export interface SocialMetaPort {
 export const SCOPES: Record<ChannelKind, readonly string[]> = {
     // Facebook Login for Business takes its permissions from the login
     // configuration (`config_id`); these are what each configuration holds.
+    // `business_management`: a Page a business portfolio owns is missing
+    // from `/me/accounts` without it (22 Nov 2026).
     INSTAGRAM: [
         "instagram_basic",
         "instagram_content_publish",
         "pages_show_list",
         "pages_read_engagement",
+        "business_management",
     ],
     FACEBOOK: [
         "pages_manage_posts",
         "pages_read_engagement",
         "pages_show_list",
+        "business_management",
     ],
     THREADS: ["threads_basic", "threads_content_publish"],
 };
