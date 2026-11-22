@@ -3236,3 +3236,12 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Policy: no `'strict-dynamic'` (a nonce-less injected script must stay blocked), no `'unsafe-inline'` scripts, `'unsafe-eval'` only in development, and `style-src` keeps `'unsafe-inline'` (React style props, Radix and next/font).
 - Third-party scripts only from named hosts; on merchant sites, those are the supported trackers' hosts and the payment and Turnstile hosts.
 - next.config sends no CSP (on Workers it would replace the middleware's nonce header); `check:security-headers` guards this.
+
+## DEC-245 Saroh holds every scheduled social post, and says so
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, after the first Instagram and Facebook connect on saroh.io)
+
+- A scheduled post on Instagram, Facebook or Threads is held by Saroh and published at its time by Saroh's job server. Until then it is only in Saroh, not in the platforms' own scheduled lists.
+- Why one rule: Meta's APIs let an app schedule a Facebook Page post natively, but not an Instagram or Threads post (every scheduling tool holds those). Scheduling Facebook natively and the others in Saroh was offered and turned down as two rules to explain.
+- A scheduled post's sheet says so in one line ("Saroh posts this to … on …. Until then it's only here: it won't show in their own apps."), with Move and Post now beside it. Changing or cancelling happens in Saroh.
+- Facebook Login for Business asks for `business_management` too, so Pages a business portfolio owns are offered (Advanced Access through App Review before merchants outside the app's roles can connect).
