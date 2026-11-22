@@ -14,6 +14,7 @@ import { useId } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
 import { pickedSizes } from "@/components/shared/fields/picked-image";
+import { TeamPeople } from "@/components/sites/editor/inspector/team-people";
 import type {
     PersonContent,
     PersonCredential,
@@ -58,6 +59,13 @@ export function PersonFields({
 
     return (
         <div className="grid gap-3">
+            {team ? (
+                // Who appears, in order (round 3, EBTeamPicker).
+                <TeamPeople
+                    content={c}
+                    onChange={(content) => onChange({ ...section, content })}
+                />
+            ) : null}
             <Field label="Photo">
                 <div className="flex items-start gap-2.5">
                     {image ? (
@@ -119,9 +127,17 @@ export function PersonFields({
                 </div>
             ) : null}
 
-            <Field label="Name">
+            <Field
+                label="Name"
+                hint={
+                    c.staffId
+                        ? "From Team: their name as Team has it."
+                        : undefined
+                }
+            >
                 <Input
                     value={c.name}
+                    readOnly={Boolean(c.staffId)}
                     onChange={(e) => patch({ name: e.target.value })}
                     placeholder="Their name, as they'd introduce themselves"
                 />
@@ -411,6 +427,7 @@ function TeamFields({
                         ) : null}
                         <Input
                             value={p.name}
+                            readOnly={Boolean(p.staffId)}
                             aria-label={`Person ${i + 2}'s name`}
                             onChange={(e) => set(i, { name: e.target.value })}
                             placeholder="Their name"

@@ -29,6 +29,11 @@ it("rings the changed and new paragraphs, and tells what the live copy had that 
     expect(marked).toHaveLength(1);
     expect(marked.item(0).textContent).toBe("It takes two hours with hair.");
     expect(host.textContent).toContain("Change 1 of 1");
+    // One ink edge on a layer 4px out: no ring with an offset fill (a second faint edge).
+    expect(marked.item(0).className).toContain(
+        "before:shadow-[0_0_0_1.5px_hsl(var(--site-fg))]",
+    );
+    expect(marked.item(0).className).not.toMatch(/\bring-/);
     const now = new Set(liveKeys(editor.getHTML()));
     expect(live.filter((k) => !now.has(k))).toHaveLength(1);
 });

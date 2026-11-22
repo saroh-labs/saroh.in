@@ -10,8 +10,8 @@ import { Switch } from "@saroh/ui/switch";
 import { ArrowLeft } from "lucide-react";
 import { useId, useState } from "react";
 
-import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { servicePriceWords } from "@/lib/services/price-words";
 
 export interface PickerService {
     id: string;
@@ -144,12 +144,10 @@ export function ServicesPicker({
                                             className="w-16 shrink-0 text-right text-xs tabular-nums"
                                             data-picker-price={s.id}
                                         >
-                                            {s.priceCents === null
-                                                ? "Free"
-                                                : formatMoney(
-                                                      s.priceCents,
-                                                      s.currency ?? null,
-                                                  )}
+                                            {servicePriceWords(
+                                                s.priceCents,
+                                                s.currency,
+                                            )}
                                         </span>
                                     ) : null}
                                 </Label>

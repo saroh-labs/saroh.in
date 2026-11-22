@@ -15,10 +15,11 @@ import type { DefaultSection } from "./module-page-sections";
  * - Offer: a top of the page, the services in it (read live), and a Book
  *   button to the Book page. It does not read Discount: a discount code is
  *   for the shop's checkout and never applies to a booking.
- * - Our team: a top of the page and the people who switched "Show on Our
- *   team" on (DEC-246), name and role only; staff carry no photo. Nobody
- *   is shown who did not opt in. The names are copied in when the page is
- *   made, so a person who switches it off later is taken off by hand.
+ * - Our team: a top of the page and the people an owner or admin picked
+ *   (round 3, EBTeamPicker; the picker opens before the page is made),
+ *   name and role; staff carry no photo. Each is bound to their team
+ *   member (`staffId`), so the public read shows them only while still
+ *   chosen, under their name as it is now (`team-live.ts`).
  *
  * Sample words are plain and claim nothing (no "free", no figures). Every
  * section is checked against its contract, so a page never starts with
@@ -54,7 +55,7 @@ const CARDS = {
     showDescriptions: true,
 } as const;
 
-/** The people a team page may show: active, and opted in. */
+/** The people a team page may show: active, and picked by an owner or admin. */
 export function teamPageWhere(organizationId: string) {
     return {
         organizationId,
@@ -175,10 +176,15 @@ export async function starterSections(
                 where: teamPageWhere(organizationId),
                 orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                 take: TEAM_MAX,
-                select: { name: true, title: true },
+                select: { id: true, name: true, title: true },
             });
             const [first, ...rest] = people;
-            const person = (p: { name: string; title: string | null }) => ({
+            const person = (p: {
+                id: string;
+                name: string;
+                title: string | null;
+            }) => ({
+                staffId: p.id,
                 name: p.name,
                 ...(p.title ? { role: p.title } : {}),
             });

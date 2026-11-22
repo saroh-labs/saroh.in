@@ -520,6 +520,7 @@ export function SiteEditor({
         ...{ shopOpen, packsOpen, active, draft, selection, sheets, viewport },
         ...{ edits, review, publish, publishChanges, siteStyle, chrome, add },
         releases,
+        styleRules,
         openPublish: () =>
             void openCheck({
                 dirty,
@@ -696,6 +697,9 @@ export function SiteEditor({
                 ) : undefined
             }
             textEdit={textEdit}
+            // One button or photo is selectable on its own (DEC-251),
+            // where its Style tab exists: the Website area's inspector.
+            selectElement={areaOn ? selection.selectElement : undefined}
             // A typeface being tried draws on the page unsaved.
             style={siteStyle.trying ?? style}
             trying={triedLine(siteStyle.trying, style, styleOptions)}

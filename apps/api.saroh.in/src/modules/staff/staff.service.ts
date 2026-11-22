@@ -29,6 +29,7 @@ import type { PersonRules } from "../bookings/person-rules";
 import { personRulesOf } from "../bookings/person-rules";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
 import { allows } from "../organizations/organization-policy";
+import { enqueueBusinessSitesRevalidation } from "../sites/page-cache-revalidate";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
 import type {
@@ -67,7 +68,7 @@ export interface StaffView {
     name: string;
     title: string | null;
     status: string;
-    /** "Show on Our team" (DEC-246): their name and role on a team page. */
+    /** Picked by an owner or admin for Our team (round 3). */
     showOnTeamPage: boolean;
     /** The team member they are, when they have an account. */
     membership: {
@@ -75,6 +76,8 @@ export interface StaffView {
         userId: string;
         name: string | null;
         email: string;
+        /** Their role's key ("OWNER", "ADMIN", …), for Our team's picker. */
+        role: string;
     } | null;
     serviceIds: string[];
     hours: { dayOfWeek: number; startMinute: number; endMinute: number }[];
@@ -127,6 +130,7 @@ const staffInclude = (since: Date) =>
             select: {
                 id: true,
                 userId: true,
+                role: true,
                 user: { select: { name: true, email: true } },
             },
         },
@@ -179,6 +183,7 @@ function toView(
                   userId: row.membership.userId,
                   name: row.membership.user.name,
                   email: row.membership.user.email,
+                  role: row.membership.role,
               }
             : null,
         serviceIds: row.services.map((s) => s.serviceId),
@@ -412,6 +417,18 @@ export class StaffService {
                 await planMeter.roomInTx(tx, ctx.organizationId, "members", {
                     adding: diarySeatDelta(person, after),
                 });
+                // On Our team, a new name or leaving shows on the live
+                // pages at once (team-live.ts), so they redraw.
+                if (
+                    person.showOnTeamPage &&
+                    (dto.name !== undefined || dto.status !== undefined)
+                ) {
+                    await enqueueBusinessSitesRevalidation(
+                        tx,
+                        ctx.organizationId,
+                        "team",
+                    );
+                }
                 return tx.staffMember.update({
                     where: { id: person.id },
                     data: {
@@ -441,38 +458,63 @@ export class StaffService {
     }
 
     /**
-     * Take someone off the diary for new bookings. Their bookings keep them
-     * (the diary still says who); their hours stay, in case they come back.
-     */
-    /**
-     * "Show on Our team" (A7, DEC-246): opt-in, off until switched on, by
-     * the person themselves or by whoever may change staff for them. Any
-     * other role is refused, even one that can read the team.
+     * Who appears on Our team (round 3, EBTeamPicker, replaces DEC-246's
+     * opt-in): an owner or admin (`service:write`) picks the people, the
+     * whole list at once; nobody adds themselves and nobody is told. The
+     * chosen set is read live by every Our team section (`sites/team-live.ts`),
+     * so the business's live pages are told to redraw.
      */
     async setTeamPage(
         ctx: OrganizationContext,
-        staffId: string,
-        shown: boolean,
-    ): Promise<StaffView> {
-        const person = await prisma.staffMember.findFirst({
-            where: { id: staffId, organizationId: ctx.organizationId },
-            select: { id: true, membership: { select: { userId: true } } },
-        });
-        if (!person) throw new NotFoundException("Staff member not found");
-        const self = person.membership?.userId === ctx.userId;
-        if (!self && !allows(ctx, "service:write")) {
+        staffIds: string[],
+    ): Promise<{ staffIds: string[] }> {
+        if (!allows(ctx, "service:write")) {
             throw new ForbiddenException(
-                "Only they, or someone who can change the team, can switch this.",
+                "Only an owner or admin can choose who appears on Our team.",
             );
         }
-        await prisma.staffMember.update({
-            where: { id: person.id },
-            data: { showOnTeamPage: shown },
-            select: { id: true },
+        const ids = [...new Set(staffIds)];
+        return prisma.$transaction(async (tx) => {
+            const found = await tx.staffMember.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    id: { in: ids },
+                    status: "ACTIVE",
+                },
+                select: { id: true },
+            });
+            if (found.length !== ids.length) {
+                throw new NotFoundException("Staff member not found");
+            }
+            await tx.staffMember.updateMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    id: { in: ids },
+                    showOnTeamPage: false,
+                },
+                data: { showOnTeamPage: true },
+            });
+            await tx.staffMember.updateMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    id: { notIn: ids },
+                    showOnTeamPage: true,
+                },
+                data: { showOnTeamPage: false },
+            });
+            await enqueueBusinessSitesRevalidation(
+                tx,
+                ctx.organizationId,
+                "team",
+            );
+            return { staffIds: ids };
         });
-        return this.read(ctx, person.id);
     }
 
+    /**
+     * Take someone off the diary for new bookings. Their bookings keep them
+     * (the diary still says who); their hours stay, in case they come back.
+     */
     async archive(
         ctx: OrganizationContext,
         staffId: string,
@@ -829,6 +871,7 @@ export class StaffService {
                 name: true,
                 status: true,
                 membershipId: true,
+                showOnTeamPage: true,
             },
         });
         if (!person) throw new NotFoundException("Staff member not found");

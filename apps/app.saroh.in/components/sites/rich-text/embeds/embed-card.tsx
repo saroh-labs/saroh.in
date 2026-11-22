@@ -10,7 +10,7 @@ import { BadgePercent, ShoppingBag, Tag, X } from "lucide-react";
 
 import { useServicesForPicker } from "@/components/sites/blocks/use-services-for-picker";
 import { useGridCatalogue } from "@/components/sites/selling-sections/use-grid-catalogue";
-import { formatMoney } from "@/lib/format/money";
+import { servicePriceWords } from "@/lib/services/price-words";
 
 import type { EmbedKind } from "./insert-embed";
 import { useOffersForPicker } from "./use-offers";
@@ -142,7 +142,7 @@ function ServiceWords({ id }: { id: string }) {
         s.durationMinutes ? formatDuration(s.durationMinutes) : null,
         s.priceCents == null
             ? null
-            : formatMoney(s.priceCents, s.currency ?? null),
+            : servicePriceWords(s.priceCents, s.currency),
         "Book now",
     ]
         .filter(Boolean)

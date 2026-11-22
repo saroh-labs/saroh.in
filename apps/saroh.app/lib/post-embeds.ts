@@ -56,7 +56,7 @@ export async function resolvePostEmbeds(
 }
 
 /**
- * Each offer's words (W2), from the API's share route: an ended offer is a
+ * Each offer's words (W2), from the site's public reads (not behind the Share switch): an ended offer is a
  * 404 and draws nothing. Read uncached, like the booking page, and the
  * page is kept no longer than an offer may run (`showsServicesOffered`).
  */
@@ -69,7 +69,7 @@ async function readOffers(
         offerIds.map(async (id) => {
             try {
                 const res = await fetch(
-                    `${API_URL}/public/share/${encodeURIComponent(siteId)}/offer/${encodeURIComponent(id)}`,
+                    `${API_URL}/public/sites/${encodeURIComponent(siteId)}/offers/${encodeURIComponent(id)}`,
                     {
                         cache: "no-store",
                         headers: { accept: "application/json" },

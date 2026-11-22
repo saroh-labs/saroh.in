@@ -22,6 +22,10 @@ import type {
     PageStarter,
     SitePage,
 } from "@/lib/sites/service";
+import { readTeamForPicker } from "@/lib/staff/team-picker-read";
+import type { StaffView } from "@/lib/staff/types";
+
+import { TeamPicker } from "./team-picker";
 
 /** What a new page starts from: blank, one ready page, a type, or a copy. */
 export type PageStart = "blank" | "copy" | ModulePageKind | PageStarter;
@@ -54,11 +58,11 @@ export const PAGE_TYPES: Record<
     },
     TEAM: {
         label: "Our team",
-        note: "People, their work, book with",
+        note: "Your team: you choose who appears",
         name: "Our team",
         starts: [
             "Top of the page, with Book",
-            "Your team, from those who switched on Show on Our team",
+            "Your team: you choose who appears",
         ],
     },
 };
@@ -172,6 +176,9 @@ export function AddPageSheet({
     const [busy, setBusy] = useState(false);
     const [refusal, setRefusal] = useState<Refusal | null>(null);
     const [missing, setMissing] = useState(false);
+    // Our team: an owner or admin picks who appears before the page is
+    // made (round 3, EBTeamPicker); anyone else gets those already chosen.
+    const [picking, setPicking] = useState<StaffView[] | null>(null);
     const menuId = useId();
 
     const offer = offers.find((o) => o.kind === start);
@@ -234,8 +241,21 @@ export function AddPageSheet({
                   : g,
         );
 
-    async function add() {
+    async function add(picked = false) {
         setRefusal(null);
+        if (start === "TEAM" && !picked) {
+            if (title.trim() === "" || link.trim() === "") {
+                setMissing(true);
+                return;
+            }
+            setBusy(true);
+            const read = await readTeamForPicker().catch(() => null);
+            setBusy(false);
+            if (read?.canChoose && read.team && read.team.length > 0) {
+                setPicking(read.team);
+                return;
+            }
+        }
         let res;
         if (start === "copy") {
             if (!page) return;
@@ -275,6 +295,19 @@ export function AddPageSheet({
             return;
         }
         setRefusal({ message: res.error, suggestion: res.suggestion });
+    }
+
+    if (picking) {
+        return (
+            <TeamPicker
+                team={picking}
+                onClose={() => setPicking(null)}
+                onSaved={() => {
+                    setPicking(null);
+                    void add(true);
+                }}
+            />
+        );
     }
 
     return (

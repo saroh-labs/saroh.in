@@ -91,7 +91,11 @@ const padding = z.number().int().min(24).max(96).optional();
 export const renderedCtaSchema = z.object({
     label: z.string().min(1),
     href: z.string(),
-    style: z.enum(["primary", "secondary", "link"]).optional(),
+    style: z.enum(["primary", "secondary", "soft", "link"]).optional(),
+    /** This button's own colour, corners and size (DEC-251). */
+    elementStyle: z.record(z.string(), z.string()).optional(),
+    /** The editor's canvas only: where it sits in the content. */
+    editorPath: z.string().optional(),
     action: z
         .object({
             kind: z.enum(["page", "url", "email", "call", "whatsapp"]),
@@ -123,6 +127,10 @@ export const renderedImageSchema = z.object({
     placeholder: z.string().optional(),
     /** The widths of its stored smaller copies (DEC-246). */
     widths: z.array(z.number()).optional(),
+    /** This photo's own corners (DEC-251). */
+    elementStyle: z.record(z.string(), z.string()).optional(),
+    /** The editor's canvas only: where it sits in the content. */
+    editorPath: z.string().optional(),
 });
 
 const renderedHero = z.object({
@@ -545,6 +553,8 @@ const renderedHours = z.object({
 const renderedPerson = z.object({
     variant,
     padding,
+    // Bound people are checked live on the public read (sites/team-live.ts).
+    staffId: z.string().optional(),
     image: renderedImageSchema.optional(),
     imageBrief: z.string().optional(),
     name: z.string(),
@@ -569,6 +579,7 @@ const renderedPerson = z.object({
     people: z
         .array(
             z.object({
+                staffId: z.string().optional(),
                 image: renderedImageSchema.optional(),
                 imageBrief: z.string().optional(),
                 name: z.string(),

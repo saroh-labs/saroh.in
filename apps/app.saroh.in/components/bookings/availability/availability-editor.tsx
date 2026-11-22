@@ -410,7 +410,6 @@ export function AvailabilityEditor({
                             <PersonRulesSection pr={pr} />
                             <TeamPageSwitch
                                 person={pr.subject}
-                                own={pr.isOwn(pr.subject)}
                                 canManage={canManage}
                             />
                         </div>

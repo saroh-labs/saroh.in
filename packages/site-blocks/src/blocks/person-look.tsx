@@ -1,5 +1,6 @@
 import type { LookId, RenderedPerson } from "@saroh/block-contract";
 
+import { withElement } from "../element-theme";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import {
@@ -92,16 +93,24 @@ export function PersonFace({
                 alt={member.image?.alt ?? ""}
                 width={member.image?.width}
                 height={member.image?.height}
-                {...siteImage("below", {
-                    src,
-                    width: member.image?.width,
-                    placeholder: member.image?.placeholder,
-                    widths: member.image?.widths,
-                    sizes,
-                })}
+                {...withElement(
+                    "image",
+                    member.image,
+                    siteImage("below", {
+                        src,
+                        width: member.image?.width,
+                        placeholder: member.image?.placeholder,
+                        widths: member.image?.widths,
+                        sizes,
+                    }),
+                )}
                 className={cn(
                     "bg-site-surface shrink-0 object-cover",
-                    look === "folio" ? "rounded-site-photo" : "rounded-full",
+                    look === "folio"
+                        ? "rounded-site-photo"
+                        : // The look's round face, until the merchant picks
+                          // other photo corners (DEC-253).
+                          "rounded-[var(--site-image-radius,9999px)]",
                     className,
                 )}
             />

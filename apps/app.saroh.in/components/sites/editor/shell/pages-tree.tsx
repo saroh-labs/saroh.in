@@ -22,6 +22,9 @@ import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 import { count } from "@/lib/format/plural";
 import type { Flag, Section } from "@/lib/sites/service";
 
+import { SiteColoursCard } from "@/components/sites/looks/site-colours-card";
+import { elementsOf } from "@/lib/sites/element-style";
+
 import { sectionTitle } from "../editor-constants";
 import { leavePageMessage } from "../use-editor-selection";
 import type { EditorModel } from "./editor-model";
@@ -220,7 +223,7 @@ export function PagesTree({
                                                         setDropIndex(null);
                                                     }}
                                                     className={cn(
-                                                        "group relative flex items-center rounded-md",
+                                                        "group relative flex flex-wrap items-center rounded-md",
                                                         dropIndex === index &&
                                                             dragIndex !==
                                                                 index &&
@@ -327,6 +330,14 @@ export function PagesTree({
                                                             </span>
                                                         ) : null}
                                                     </TreeRow>
+                                                    {selection.selectedIndex ===
+                                                    index ? (
+                                                        <ElementRows
+                                                            model={model}
+                                                            index={index}
+                                                            section={section}
+                                                        />
+                                                    ) : null}
                                                 </li>
                                             );
                                         })}
@@ -345,6 +356,15 @@ export function PagesTree({
                         );
                     })}
                 </ul>
+                {/* The site's palette in view under Pages (CSI-C). */}
+                <SiteColoursCard
+                    style={model.siteStyle.style}
+                    options={model.styleOptions}
+                    rules={model.styleRules}
+                    readOnly={readOnly}
+                    onChange={model.siteStyle.setStyle}
+                    onTry={model.siteStyle.tryStyle}
+                />
             </div>
 
             <div className="shrink-0 border-t px-3 pb-3 pt-2.5">
@@ -411,5 +431,57 @@ function TreeRow({
         >
             {children}
         </button>
+    );
+}
+
+/**
+ * The selected section's buttons and photos under its row (CSI-C,
+ * "Button · Browse the catalogue"), each selectable on its own (DEC-251).
+ */
+function ElementRows({
+    model,
+    index,
+    section,
+}: {
+    model: EditorModel;
+    index: number;
+    section: Section;
+}) {
+    const items = elementsOf(section.content);
+    if (items.length === 0 || model.layout !== "wide") return null;
+    const chosen = model.selection.element;
+    return (
+        <ul
+            aria-label={`Buttons and photos in ${sectionTitle(section)}`}
+            className="w-full basis-full"
+        >
+            {items.map((el) => {
+                const on = chosen?.kind === el.kind && chosen.path === el.path;
+                return (
+                    <li key={`${el.kind}:${el.path}`}>
+                        <button
+                            type="button"
+                            aria-pressed={on}
+                            data-element-row={`${el.kind}:${el.path}`}
+                            onClick={() => {
+                                model.selection.selectElement(index, el);
+                                model.scrollToSection(index);
+                            }}
+                            className={cn(
+                                "ml-[30px] flex h-8 w-[calc(100%-30px)] items-center rounded-md px-2.5 text-left text-[0.8125rem] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                on
+                                    ? "bg-card font-semibold text-foreground shadow-[inset_0_0_0_1.5px_hsl(var(--highlight))]"
+                                    : "hover:bg-muted",
+                            )}
+                        >
+                            <span className="truncate">
+                                {el.kind === "button" ? "Button" : "Photo"} ·{" "}
+                                {el.name}
+                            </span>
+                        </button>
+                    </li>
+                );
+            })}
+        </ul>
     );
 }

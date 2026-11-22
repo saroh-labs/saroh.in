@@ -262,6 +262,10 @@ function dateOf(key: string): Date {
 
 const H3 = "text-sm font-semibold";
 
+/** When's rows: focus is the row's inset ink edge; only this sheet's radios lose their ring. */
+const WHEN_FOCUS =
+    "has-[:focus-visible]:shadow-[inset_0_0_0_1px_hsl(var(--foreground))] [&_[role=radio]:focus-visible]:ring-0 [&_[role=radio]:focus-visible]:ring-offset-0";
+
 /**
  * Publish post (U18, `blogdesk/WXWPublish`, `blogphone/WXYPublish`): the post
  * and where it lives, the changes that go live (against the live copy, no
@@ -449,6 +453,10 @@ export function PublishPostSheet({
             </h3>
             <RadioCards
                 labelledBy={`${id}-when`}
+                // The sheet opens with the keyboard on the chosen radio:
+                // the board's light focus (`WXYPublish`, Y2·4), an inset
+                // ink edge on the row, not the radio's 2px offset ring.
+                rowClassName={WHEN_FOCUS}
                 value={when}
                 onChange={(v) => {
                     setWhen(v);

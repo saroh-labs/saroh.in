@@ -186,7 +186,8 @@ export function ReviewLegend({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className={`h-auto px-1.5 py-0.5 font-semibold coarse:min-h-11 ${onSite ? "text-site-fg hover:bg-site-surface hover:text-site-fg" : "text-foreground"}`}
+                // On the phone it lines up under the legend's words, no indent.
+                className={`h-auto py-0.5 font-semibold coarse:min-h-11 ${onSite ? "px-0 text-site-fg hover:bg-transparent hover:text-site-fg coarse:px-0" : "px-1.5 text-foreground"}`}
                 onClick={nextChange}
             >
                 Next change

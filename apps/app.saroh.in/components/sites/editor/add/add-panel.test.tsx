@@ -11,6 +11,14 @@ import { AddPanel } from "./add-panel";
 
 const push = vi.fn();
 const refresh = vi.fn();
+// Our team's People list and picker read the team on the server.
+vi.mock("@/lib/staff/team-picker-read", () => ({
+    readTeamForPicker: () => Promise.resolve({ team: [], canChoose: false }),
+}));
+vi.mock("@/lib/staff/actions", () => ({ setTeamPage: vi.fn() }));
+vi.mock("@/lib/product-reviews/picker-read", () => ({
+    readReviewsForPicker: () => Promise.resolve([]),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh }),
 }));

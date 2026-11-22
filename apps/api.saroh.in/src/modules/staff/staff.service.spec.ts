@@ -9,6 +9,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
+            updateMany: jest.fn(),
         },
         staffService: { createMany: jest.fn(), deleteMany: jest.fn() },
         staffHours: {
@@ -804,41 +805,54 @@ describe("StaffService — booking rules", () => {
     });
 });
 
-describe("StaffService — Show on Our team (A7, DEC-246)", () => {
-    it("is off until switched on", async () => {
+describe("StaffService — who appears on Our team (round 3)", () => {
+    it("is off until an owner or admin picks them", async () => {
         const list = await service.list(member);
         expect(list.staff[0]?.showOnTeamPage).toBe(false);
     });
 
-    it("lets the person switch it for themselves, whatever their role", async () => {
-        db.staffMember!.findFirst!.mockResolvedValue({
-            ...ROW,
-            showOnTeamPage: true,
-            membership: {
-                id: "mem_1",
-                userId: "user_1",
-                user: { name: "Asha", email: "asha@example.com" },
-            },
-        });
-        await service.setTeamPage(member, "staff_1", true);
-        expect(db.staffMember!.update).toHaveBeenCalledWith(
-            expect.objectContaining({ data: { showOnTeamPage: true } }),
+    it("lets an owner or admin set the whole list, in this business only", async () => {
+        db.staffMember!.findMany!.mockResolvedValueOnce([{ id: "staff_1" }]);
+        await expect(
+            service.setTeamPage(ctx(), ["staff_1", "staff_1"]),
+        ).resolves.toEqual({ staffIds: ["staff_1"] });
+        expect(db.staffMember!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    id: { in: ["staff_1"] },
+                }),
+            }),
+        );
+        expect(db.staffMember!.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ id: { in: ["staff_1"] } }),
+                data: { showOnTeamPage: true },
+            }),
+        );
+        expect(db.staffMember!.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    id: { notIn: ["staff_1"] },
+                }),
+                data: { showOnTeamPage: false },
+            }),
         );
     });
 
-    it("lets an owner or admin switch it for someone else", async () => {
-        await service.setTeamPage(ctx(), "staff_1", true);
-        expect(db.staffMember!.update).toHaveBeenCalled();
+    it("refuses someone not in the business, and writes nothing", async () => {
+        db.staffMember!.findMany!.mockResolvedValueOnce([]);
+        await expect(
+            service.setTeamPage(ctx(), ["staff_other"]),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(db.staffMember!.updateMany).not.toHaveBeenCalled();
     });
 
-    it("refuses anyone else, and writes nothing", async () => {
-        db.staffMember!.findFirst!.mockResolvedValue({
-            ...ROW,
-            membership: { userId: "someone_else" },
-        });
+    it("refuses anyone but an owner or admin, the person themselves too", async () => {
         await expect(
-            service.setTeamPage(member, "staff_1", true),
+            service.setTeamPage(member, ["staff_1"]),
         ).rejects.toBeInstanceOf(ForbiddenException);
-        expect(db.staffMember!.update).not.toHaveBeenCalled();
+        expect(db.staffMember!.updateMany).not.toHaveBeenCalled();
     });
 });

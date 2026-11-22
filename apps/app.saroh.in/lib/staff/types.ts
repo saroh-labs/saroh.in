@@ -35,13 +35,15 @@ export interface StaffView {
     name: string;
     title: string | null;
     status: "ACTIVE" | "ARCHIVED";
-    /** "Show on Our team" (DEC-246); absent from an older API. */
+    /** Picked for Our team by an owner or admin; absent from an older API. */
     showOnTeamPage?: boolean;
     membership: {
         id: string;
         userId: string;
         name: string | null;
         email: string;
+        /** Their role's key; absent from an older API. */
+        role?: string;
     } | null;
     serviceIds: string[];
     hours: WeeklyRange[];

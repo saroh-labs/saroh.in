@@ -29,6 +29,7 @@ import {
     resolveVariant,
     sectionFrameOf,
     sectionFrameSettingsOf,
+    sectionStylesOf,
 } from "@saroh/block-contract";
 
 import BookingSection from "./blocks/booking";
@@ -61,6 +62,8 @@ import TestimonialsSection from "./blocks/testimonials";
 import TimetableSection from "./blocks/timetable";
 import VisitUsSection from "./blocks/visit-us";
 import type { CreditFor } from "./booking-flow/api";
+import { ownedKinds, sectionStyleRules } from "./component-theme";
+import { stylesMark } from "./element-theme";
 import type { LookProps } from "./look-context";
 import { lookOf } from "./look-context";
 import type { ModulePageTopContent } from "./module-page-top";
@@ -693,11 +696,25 @@ export function PageSections({
         !packs.failed &&
         !nothing(i) &&
         !nothing(i + 1);
+    // Each styled section's rules (DEC-251), keyed by their mark: one
+    // sheet after the sections, so no wrapper's siblings change.
+    const sectionSheets = new Map<string, string>();
     return (
         <>
             {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
             {sections.map((section, i) => {
                 const frame = sectionFrameOf(section.content);
+                const styles = sectionStylesOf(
+                    sectionFrameSettingsOf(section.content).styles,
+                );
+                const styled = styles ? stylesMark(styles) : undefined;
+                if (styles && styled && !sectionSheets.has(styled)) {
+                    const at = `[data-site-styled="${styled}"]`;
+                    sectionSheets.set(
+                        styled,
+                        sectionStyleRules(`${at}${at}`, lookId, styles),
+                    );
+                }
                 // A feed-backed block with nothing to show (`section-empty`):
                 // no wrapper and so no anchor to jump to. The layout already
                 // left its entry out of the menu, and the header drops one
@@ -765,6 +782,8 @@ export function PageSections({
                         className={className}
                         style={style}
                         data-site-section=""
+                        data-site-styled={styled}
+                        data-site-own={styles ? ownedKinds(styles) : undefined}
                         data-site-band={own.band}
                         data-site-first-hero={
                             !top && i === 0 && opensOverPhoto(section, look)
@@ -776,6 +795,9 @@ export function PageSections({
                     </div>
                 );
             })}
+            {sectionSheets.size > 0 ? (
+                <style>{Array.from(sectionSheets.values()).join("")}</style>
+            ) : null}
         </>
     );
 }

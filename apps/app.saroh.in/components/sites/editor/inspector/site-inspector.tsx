@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { useServicesForPicker } from "@/components/sites/blocks/use-services-for-picker";
 import { count } from "@/lib/format/plural";
+import { elementAt, textOf } from "@/lib/sites/element-style";
 import type { Flag } from "@/lib/sites/service";
 
 import { SECTION_LABELS, sectionTitle } from "../editor-constants";
@@ -19,6 +20,7 @@ import { PriceSheet } from "../sheets/price-sheet";
 import type { EditorModel } from "../shell/editor-model";
 import { ChromePanel } from "./chrome-panel";
 import { ContentTab } from "./content-tab";
+import { ElementStyleTab } from "./element-style-tab";
 import { FeedbackTab } from "./feedback-tab";
 import { PageAtRest } from "./page-at-rest";
 import { sectionActions } from "./section-actions";
@@ -121,6 +123,15 @@ export function SiteInspector({
         useState<Exclude<InspectorTab, "feedback">>("content");
     const [priceFor, setPriceFor] = useState<string | null>(null);
     const [photoFor, setPhotoFor] = useState<PhotoTarget | null>(null);
+    // Picking a button or photo opens its Style (CSI-C).
+    const mark = selection.element
+        ? `${selection.element.kind}:${selection.element.path}`
+        : null;
+    const [seen, setSeen] = useState<string | null>(null);
+    if (mark !== seen) {
+        setSeen(mark);
+        if (mark) setOwn("style");
+    }
     const tab: InspectorTab =
         selection.inspector === "feedback" ? "feedback" : own;
     const openTab = (next: InspectorTab) => {
@@ -145,6 +156,67 @@ export function SiteInspector({
         );
         tabs = inspectorTabs(tab, openTab);
         body = <ChromePanel part={part} tab={tab} model={model} />;
+    } else if (active && selection.element) {
+        // One button or photo (DEC-251, CSI-C): Content · Style.
+        const { index, section } = active;
+        const el = selection.element;
+        const name = sectionTitle(section);
+        const own = elementAt(section.content, el.path);
+        header = (
+            <InspectorHeader
+                title={
+                    textOf(own?.label) ||
+                    (el.kind === "button" ? "Button" : "Photo")
+                }
+                kicker={`${name} › ${el.kind === "button" ? "Button" : "Photo"}`}
+                onClose={selection.clearElement}
+            />
+        );
+        const elTab = tab === "content" ? "content" : "style";
+        tabs = (
+            <TabStrip<"content" | "style">
+                label="Inspector"
+                idPrefix="inspector"
+                tabs={[
+                    { value: "content", label: "Content" },
+                    { value: "style", label: "Style" },
+                ]}
+                value={elTab}
+                onValueChange={openTab}
+                listClassName="px-2"
+            />
+        );
+        const onChange = (next: typeof section) => draft.replaceAt(index, next);
+        body =
+            elTab === "style" ? (
+                <ElementStyleTab
+                    element={el}
+                    section={section}
+                    sectionName={name}
+                    scope={selection.elementScope}
+                    onScope={selection.setElementScope}
+                    style={model.siteStyle.style}
+                    styleOptions={model.styleOptions}
+                    onChange={onChange}
+                    onSiteStyle={model.siteStyle.setStyle}
+                />
+            ) : (
+                <ContentTab
+                    siteId={siteId}
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    flags={activeFlags}
+                    unreadable={false}
+                    error={
+                        draft.errorIndex === index ? draft.errorMessage : null
+                    }
+                    heldBack={draft.heldBackAt(index)}
+                    onChange={onChange}
+                    onPrice={setPriceFor}
+                    onAddNote={() => openTab("feedback")}
+                />
+            );
     } else if (active) {
         const { index, section } = active;
         const notes =

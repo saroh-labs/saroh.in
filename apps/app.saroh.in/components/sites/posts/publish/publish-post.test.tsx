@@ -228,6 +228,21 @@ describe("Publish post (U18)", () => {
         expect(document.body.textContent).toContain("WhatsApp status");
     });
 
+    it("focuses Now with the row's light ink edge, not the radio's ring (Y2·4)", async () => {
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        await settle(() => named("Publish post")?.click());
+        const now = document.querySelector<HTMLElement>(
+            '[role="dialog"] [role="radiogroup"] label',
+        );
+        expect(now?.textContent).toContain("Now");
+        expect(now?.className).toContain(
+            "has-[:focus-visible]:shadow-[inset_0_0_0_1px_hsl(var(--foreground))]",
+        );
+        expect(now?.className).toContain(
+            "[&_[role=radio]:focus-visible]:ring-0",
+        );
+    });
+
     it("asks who to tell before it goes, and shows only those once live (Y2)", async () => {
         publishPost.mockResolvedValue({
             ok: true,

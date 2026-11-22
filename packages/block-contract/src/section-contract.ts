@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import { COMPONENT_STYLE_OPTIONS } from "./component-styles";
+import {
+    buttonElementStyleSchema,
+    imageStyleSchema,
+    sectionStylesSchema,
+} from "./element-styles";
 import { imagePlaceholderSchema, imageWidthsSchema } from "./image-variants";
 import { parseSectionFrame } from "./section-frame";
 
@@ -93,6 +98,8 @@ export const sectionFrameSettingsSchema = z
         hideOn: z.literal("phone").optional(),
         tone: z.enum(SECTION_TONES).optional(),
         spacing: z.enum(COMPONENT_STYLE_OPTIONS.spacing).optional(),
+        /** Its buttons', cards' and photos' styles (DEC-251). */
+        styles: sectionStylesSchema.optional(),
     })
     .strict();
 export type SectionFrameSettings = z.infer<typeof sectionFrameSettingsSchema>;
@@ -183,11 +190,20 @@ const linkHref = z
  */
 const phoneLabel = z.string().trim().max(40).optional();
 
+/**
+ * Filled, Outline, Soft or Link (DEC-252): Soft is new, a tint of the
+ * button's colour with the page's words.
+ */
+const ctaStyle = z
+    .enum(["primary", "secondary", "soft", "link"])
+    .default("primary");
+
 const ctaSchema = z.object({
     label: z.string().min(1),
     href: linkHref,
-    style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    style: ctaStyle,
     phoneLabel,
+    elementStyle: buttonElementStyleSchema.optional(),
 });
 
 /**
@@ -234,8 +250,9 @@ export type CtaAction = z.infer<typeof ctaActionSchema>;
 const ctaSchemaV2 = z.object({
     label: z.string().min(1),
     action: ctaActionSchema,
-    style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    style: ctaStyle,
     phoneLabel,
+    elementStyle: buttonElementStyleSchema.optional(),
 });
 
 /** Digits and a leading +, nothing else — what tel: and wa.me both want. */
@@ -362,6 +379,8 @@ const imageSchema = z.object({
     placeholder: imagePlaceholderSchema.optional(),
     /** The widths of its stored smaller copies (DEC-246). */
     widths: imageWidthsSchema.optional(),
+    /** This photo's own corners (DEC-251). */
+    elementStyle: imageStyleSchema.optional(),
 });
 
 /** How long an image brief may run (KTD-5). */
@@ -590,8 +609,9 @@ const ctaV1 = z.object({
     padding: paddingOverride,
     label: z.string().min(1),
     href: linkHref,
-    style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    style: ctaStyle,
     phoneLabel,
+    elementStyle: buttonElementStyleSchema.optional(),
 });
 
 /**
@@ -1437,7 +1457,17 @@ export const PERSON_TEAM_MAX = 11;
  * what they do and a line about them. Plain text and a photo, as the
  * block's own person is.
  */
+/**
+ * The team member a person is, when an owner or admin picked them for Our
+ * team (round 3, EBTeamPicker). A bound person shows only while they are
+ * still chosen and active, under their name as Team has it now; the name
+ * here is the fallback the editor draws. Absent: the merchant's own words,
+ * shown as typed.
+ */
+const staffIdSchema = z.string().trim().min(1).max(64).optional();
+
 const teamMemberSchema = z.object({
+    staffId: staffIdSchema,
     image: imageSchema.optional(),
     imageBrief,
     name: z.string().trim().min(1).max(120),
@@ -1448,6 +1478,8 @@ const teamMemberSchema = z.object({
 const personV1 = z.object({
     variant,
     padding: paddingOverride,
+    /** The block's own person's team member, as a member's (above). */
+    staffId: staffIdSchema,
     image: imageSchema.optional(),
     /** The photo this person wants, until it has one (KTD-5). */
     imageBrief,

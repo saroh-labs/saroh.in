@@ -158,7 +158,10 @@ function EditableSpan({
             // box per line (D1, `fix/WXKText`).
             className={
                 typing !== null
-                    ? "relative inline-block rounded-[6px] outline outline-[1.5px] outline-offset-4 outline-[hsl(var(--site-fg))]"
+                    ? // Room under the words for the bar while typing, so it
+                      // never lies over what follows, such as a button
+                      // (EBSite D1 · 1, round 3).
+                      "relative mb-11 inline-block rounded-[6px] outline outline-[1.5px] outline-offset-4 outline-[hsl(var(--site-fg))]"
                     : "relative"
             }
         >

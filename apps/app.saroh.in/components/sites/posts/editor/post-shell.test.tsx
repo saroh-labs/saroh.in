@@ -553,7 +553,7 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         expect(el('nav[aria-label="Editor panels"]')).toBe(rail);
         expect(el("[data-left-panel]")).toBe(list);
         expect(column()).toBe(right);
-        expect(list.textContent).toContain("Monsoon hair");
+        expect(list.textContent).toContain("In this post");
         const shapes = Array.from(
             document.querySelectorAll<HTMLElement>("[data-slot=page-loading]"),
         ).map((n) => n.dataset.shape);
@@ -566,6 +566,33 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         expect(bar.getAttribute("aria-busy")).toBeNull();
         expect(bar.textContent).toContain("Monsoon hair");
         expect(document.querySelector("[data-slot=page-loading]")).toBeNull();
+    });
+
+    it("switches posts only from the top picker, each row with its state (EBPostLeftPanel)", () => {
+        draw(<PostShell key="p1" data={listed} post={post} />);
+        const panel = el('aside[aria-label="In this post"]');
+        // The panel is this post only: its outline, no list of posts.
+        expect(panel.querySelector('a[href*="/write/"]')).toBeNull();
+        expect(panel.textContent).not.toContain("Monsoon hair");
+        expect(
+            panel.querySelector('[aria-label="Outline of this post"]'),
+        ).not.toBeNull();
+
+        act(() => named("Blog post: Bridal trial. Open another post")?.click());
+        const rows = Array.from(
+            document.querySelectorAll<HTMLAnchorElement>(
+                'nav[aria-label="Posts"] a',
+            ),
+        ).map((a) => a.textContent);
+        expect(rows).toEqual([
+            "Bridal trialLive",
+            "Monsoon hairLive",
+            "New post",
+            "All posts2",
+        ]);
+        expect(
+            el('nav[aria-label="Posts"] a[aria-current="page"]').textContent,
+        ).toContain("Bridal trial");
     });
 
     it("keeps the rail's tab across posts", () => {

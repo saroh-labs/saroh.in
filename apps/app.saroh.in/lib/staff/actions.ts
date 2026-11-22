@@ -78,8 +78,8 @@ export async function updateStaff(
     return staff.updateStaff(staffId, input);
 }
 
-export async function setStaffTeamPage(staffId: string, shown: boolean) {
-    return staff.setStaffTeamPage(staffId, shown);
+export async function setTeamPage(staffIds: string[]) {
+    return staff.setTeamPage(staffIds);
 }
 
 export async function setStaffServices(staffId: string, serviceIds: string[]) {

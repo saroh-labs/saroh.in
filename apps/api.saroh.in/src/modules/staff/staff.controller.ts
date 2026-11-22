@@ -91,15 +91,14 @@ export class StaffController {
         return this.staff.update(ctx, staffId, dto);
     }
 
-    /** "Show on Our team" (DEC-246): the person, or an owner for them. */
-    @Put(":staffId/team-page")
+    /** Who appears on Our team (round 3): an owner or admin, the whole list. */
+    @Put("team-page")
     @UseGuards(WebsiteAreaSwitchGuard)
     setTeamPage(
         @OrgContext() ctx: OrganizationContext,
-        @Param("staffId") staffId: string,
         @Body() dto: SetTeamPageDto,
-    ): Promise<StaffView> {
-        return this.staff.setTeamPage(ctx, staffId, dto.shown);
+    ): Promise<{ staffIds: string[] }> {
+        return this.staff.setTeamPage(ctx, dto.staffIds);
     }
 
     /** Off the diary for new bookings; their bookings and hours stay. */

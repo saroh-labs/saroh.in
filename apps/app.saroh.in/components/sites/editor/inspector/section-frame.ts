@@ -25,7 +25,9 @@ export function frameOf(section: Section): SectionFrameSettings {
 /** The section with its frame changed; an emptied frame is left out. */
 export function withFrame(
     section: Section,
-    patch: Partial<Record<keyof SectionFrameSettings, string | undefined>>,
+    patch: {
+        [K in keyof SectionFrameSettings]?: SectionFrameSettings[K] | undefined;
+    },
 ): Section {
     const frame: Content = { ...frameOf(section) };
     for (const key of Object.keys(patch) as (keyof SectionFrameSettings)[]) {
@@ -63,14 +65,22 @@ export function withTone(section: Section, tone: SectionTone): Section {
 export function styleChanges(section: Section): number {
     const c = section.content as Content;
     const frame = frameOf(section);
-    return [frame.tone ?? c.band, frame.spacing, c.padding].filter(
-        (v) => v !== undefined,
-    ).length;
+    return [
+        frame.tone ?? c.band,
+        frame.spacing,
+        c.padding,
+        // Each kind styled for the section as a whole (DEC-251).
+        ...Object.values(frame.styles ?? {}),
+    ].filter((v) => v !== undefined).length;
 }
 
 /** Back to the site look: no tone, band, spacing or own padding. */
 export function resetToLook(section: Section): Section {
-    const next = withFrame(section, { tone: undefined, spacing: undefined });
+    const next = withFrame(section, {
+        tone: undefined,
+        spacing: undefined,
+        styles: undefined,
+    });
     const content: Content = { ...(next.content as Content) };
     delete content.band;
     delete content.padding;

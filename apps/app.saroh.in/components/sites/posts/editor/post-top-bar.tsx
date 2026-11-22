@@ -299,7 +299,8 @@ function SavedLine({ model }: { model: PostEditorModel }) {
 
 /**
  * The post picker: the kind, the title over its link. Opens the kind's
- * newest posts, New post and the whole list.
+ * newest posts with Live / Not live yet, New post and All posts with its
+ * count. The one way to switch posts (`EBPostLeftPanel`).
  */
 function PostPicker({ model }: { model: PostEditorModel }) {
     const { siteId, posts, readOnly, postsPrefix } = model.data;
@@ -340,19 +341,30 @@ function PostPicker({ model }: { model: PostEditorModel }) {
                 className="max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[10px] p-1.5 shadow-lg"
             >
                 <nav aria-label="Posts" className="grid">
-                    {(posts ?? []).slice(0, 8).map((p) => (
-                        <Link
-                            key={p.id}
-                            href={`/sites/${siteId}/write/${p.id}`}
-                            aria-current={
-                                p.id === model.draft.postId ? "page" : undefined
-                            }
-                            onClick={() => setOpen(false)}
-                            className="flex h-9 min-w-0 items-center gap-2 rounded-[7px] px-2.5 text-sm hover:bg-secondary aria-[current=page]:font-semibold"
-                        >
-                            <span className="truncate">{p.title}</span>
-                        </Link>
-                    ))}
+                    {(posts ?? []).slice(0, 8).map((p) => {
+                        const current = p.id === model.draft.postId;
+                        return (
+                            <Link
+                                key={p.id}
+                                href={`/sites/${siteId}/write/${p.id}`}
+                                aria-current={current ? "page" : undefined}
+                                onClick={() => setOpen(false)}
+                                className="flex h-9 min-w-0 items-center gap-2 rounded-[7px] px-2.5 text-sm hover:bg-secondary aria-[current=page]:bg-secondary aria-[current=page]:font-semibold"
+                            >
+                                <span className="min-w-0 flex-1 truncate">
+                                    {p.title}
+                                </span>
+                                {/* The state the left panel's list used to show (`EBPostLeftPanel`). */}
+                                <span className="shrink-0 text-xs font-normal text-muted-foreground">
+                                    {current
+                                        ? model.status.split(" · ")[0]
+                                        : p.live
+                                          ? "Live"
+                                          : "Not live yet"}
+                                </span>
+                            </Link>
+                        );
+                    })}
                     <span aria-hidden className="mx-1.5 my-1 h-px bg-border" />
                     {readOnly ? null : (
                         <Link
@@ -369,7 +381,12 @@ function PostPicker({ model }: { model: PostEditorModel }) {
                         onClick={() => setOpen(false)}
                         className="flex h-9 items-center gap-2 rounded-[7px] px-2.5 text-sm hover:bg-secondary"
                     >
-                        All posts
+                        <span className="flex-1">All posts</span>
+                        {posts ? (
+                            <span className="text-xs text-muted-foreground">
+                                {posts.length}
+                            </span>
+                        ) : null}
                     </Link>
                 </nav>
             </PopoverContent>

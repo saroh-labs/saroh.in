@@ -41,16 +41,6 @@ export class PublicShareController {
         return png(res, await this.share.own(id, query, visitor(ip)));
     }
 
-    /** A live offer's words, for a post's Offer card (W2). */
-    @Get(":siteId/offer/:ref")
-    offer(
-        @Param("siteId") siteId: string,
-        @Param("ref") ref: string,
-        @ClientAddress() ip: string,
-    ) {
-        return this.share.offerWords(siteId, ref, visitor(ip));
-    }
-
     /** `?style=photo|price|offer|simple|colour&size=post|square|story&font=…&bg=&fg=&w=`, and `headline` (book) or `product` (offer). */
     @Get(":siteId/:kind/:ref/image")
     async item(

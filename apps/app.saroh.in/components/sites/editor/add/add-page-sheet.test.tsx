@@ -14,6 +14,15 @@ vi.mock("@/lib/sites/actions", () => ({
     duplicatePage: vi.fn(),
 }));
 
+const readTeam = vi.fn();
+const setTeamPage = vi.fn();
+vi.mock("@/lib/staff/actions", () => ({
+    setTeamPage: (...a: unknown[]) => setTeamPage(...a) as unknown,
+}));
+vi.mock("@/lib/staff/team-picker-read", () => ({
+    readTeamForPicker: () => readTeam() as unknown,
+}));
+
 let root: Root;
 let host: HTMLDivElement;
 beforeEach(() => {
@@ -24,6 +33,7 @@ beforeEach(() => {
     document.body.append(host);
     root = createRoot(host);
     createPage.mockResolvedValue({ ok: true, data: { id: "pg", title: "T" } });
+    readTeam.mockResolvedValue({ team: [], canChoose: false });
 });
 afterEach(() => {
     act(() => root.unmount());
@@ -115,6 +125,65 @@ describe("Add a page: new page types (A7)", () => {
             inMenu: true,
             starter: "TEAM",
         });
+    });
+});
+
+describe("Add a page: Our team's picker (round 3, EBTeamPicker)", () => {
+    const person = (
+        id: string,
+        name: string,
+        on: boolean,
+        role = "MEMBER",
+    ) => ({
+        id,
+        name,
+        title: null,
+        status: "ACTIVE",
+        showOnTeamPage: on,
+        membership: {
+            id: `m_${id}`,
+            userId: `u_${id}`,
+            name,
+            email: "x@example.com",
+            role,
+        },
+    });
+
+    it("an owner or admin picks who appears before the page is made", async () => {
+        readTeam.mockResolvedValue({
+            canChoose: true,
+            team: [
+                person("st_1", "Demo Owner", false, "OWNER"),
+                person("st_2", "Asha Rao", true, "ADMIN"),
+            ],
+        });
+        setTeamPage.mockResolvedValue({ ok: true, data: { staffIds: [] } });
+        await open("TEAM");
+        await type(
+            document.querySelector<HTMLInputElement>("input:not([aria-label])"),
+            "Our team",
+        );
+        await act(async () => {
+            document.querySelector("form")?.requestSubmit();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(createPage).not.toHaveBeenCalled();
+        expect(text()).toContain("Add people to Our team");
+        expect(text()).toContain("Asha RaoOn the page");
+        expect(text()).toContain("Demo OwnerNot on the page");
+        const owner = document.querySelectorAll<HTMLButtonElement>(
+            "[data-team-picker] [role=checkbox]",
+        )[0];
+        act(() => owner.click());
+        await act(async () => {
+            document.querySelector("form")?.requestSubmit();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(setTeamPage).toHaveBeenCalledWith(["st_2", "st_1"]);
+        expect(createPage).toHaveBeenCalledWith(
+            "site_1",
+            expect.objectContaining({ starter: "TEAM" }),
+        );
     });
 });
 

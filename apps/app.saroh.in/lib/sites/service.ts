@@ -50,7 +50,7 @@ import type { SiteChangeKind } from "./pending";
 export type { SectionType };
 
 /** Button style shared by hero CTA and the standalone cta section. */
-export type CtaStyle = "primary" | "secondary" | "link";
+export type CtaStyle = "primary" | "secondary" | "soft" | "link";
 
 /** What a button does (#207). Mirrors `ctaActionSchema` in the contract. */
 export type CtaAction =
@@ -416,6 +416,8 @@ export interface HoursContent {
 
 /** `person` — one practitioner, typed in (U2). */
 export interface PersonContent {
+    /** The team member, when picked for Our team (round 3). */
+    staffId?: string;
     image?: ImageValue;
     /** The photo a template says belongs here (KTD-5). */
     imageBrief?: string;
@@ -440,6 +442,8 @@ export type PersonCredential = string | { title: string; detail?: string };
 
 /** Another person in the team look. */
 export interface PersonMember {
+    /** The team member, when picked for Our team (round 3). */
+    staffId?: string;
     image?: ImageValue;
     imageBrief?: string;
     name: string;

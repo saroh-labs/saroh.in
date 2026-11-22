@@ -381,8 +381,11 @@ export class TurnDownRuleRequestDto {
     reason?: string;
 }
 
-/** "Show on Our team" (DEC-246). */
+/** Who appears on Our team: the whole chosen list (round 3). */
 export class SetTeamPageDto {
-    @IsBoolean({ message: "shown must be true or false" })
-    shown!: boolean;
+    @IsArray({ message: "staffIds must be a list" })
+    @ArrayMaxSize(200)
+    @IsString({ each: true })
+    @MaxLength(64, { each: true })
+    staffIds!: string[];
 }

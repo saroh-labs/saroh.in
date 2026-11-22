@@ -3295,3 +3295,40 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 - Not in this round: AI1–AI10, A3 ("Not here? Describe a section"), E2 (Ask AI on an empty site) and the Ask AI rows in D3's history. They wait for master plan batch 8 (U41–U43, Check this on the server).
 - Ask AI stays a right-column tab, not a dock (21 Nov decision).
+
+## DEC-250 An owner or admin picks who appears on Our team; the page reads them live
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round 3, EBTeamPicker) · replaces DEC-246's opt-in
+
+- Who appears is chosen by an owner or admin (`service:write`) in the Our team page's People list or picker, the whole list at once (`PUT staff/team-page`). Nobody adds themselves and nobody is told; the Hours screen shows a read-only line.
+- An Our team section's people are bound to staff (`staffId`). The public read shows a bound person only while still chosen and active, under their current name, so someone taken off leaves the live site at once (page-cache cause `team`). People typed in by hand show as typed.
+- One chosen list per business.
+- The post Offer card reads `public/sites/:siteId/offers/:id`, no longer behind SHARE_POSTS.
+
+## DEC-251 One button, photo or section can be styled on its own; the site stays the default
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, component styling, iteration C, canvas 4 pages `csi` and `cs`) · replaces DEC-237's "never per single instance"; keeps the rest of DEC-237
+
+- Context: the owner could not change a button's colour or corners on one page. DEC-237 set component styles per kind of component for the whole site only.
+- Decision:
+    - **Three scopes, closest wins:** this element › this section › the whole site › the look's own. The whole site stays the default and is still Brand › Buttons and shapes.
+    - A button or photo is selected on the canvas. Its Style tab starts with **Apply to** (This button, This section, Whole site), then Colour, Style, Corners and Size, with Changed marks and **one reset** at the chosen level.
+    - Where each lives: a button's style on its own CTA (`elementStyle`, and its `style` for Filled, Outline, Soft or Link); a photo's corners on its image; a section's in `frame.styles` (`button`, `card`, `image`), beside Background and Spacing. Section › Style lists "Styled in this section" with its own Reset.
+    - Nothing is written for a level nobody changed, so live sites draw exactly as before. Changes wait for Publish and are free on every plan, as in DEC-237.
+- Consequences: an element's style is drawn inline on the element; a section's as rules under its own mark, after the site's. The editor's canvas stamps each button and photo with its place (never saved or published) so a click can select it. A card can't yet be styled on its own (no card carries an identity in the content); its section and site scopes work.
+
+## DEC-252 A custom button colour, if its words read at 4.5:1; Soft buttons and Size S, M, L
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, iteration C) · relaxes DEC-090 and DEC-241 for buttons only · keeps DEC-177
+
+- **Colour** is one of the site's palette roles (Background, Panels, Text, Brand, Lines) or, for one button or one section, a custom `#RRGGBB`. A custom colour is kept only when white words read on it at 4.5:1, or else dark words do. Otherwise the API refuses it, and the editor's warning offers the two fixes (CS4): keep the colour with dark words, or the nearest darker shade where white reads. "Use this colour" waits for one. A palette role follows the palette when it changes; a custom colour stays.
+- **New contract options**, drawn by every look: a **Soft** button (a tint of its colour with the page's words) and **Size S / M / L** (Medium is the look's own). On a phone every button keeps its 44px.
+- The whole site gains Button colour (roles only), Button style and Button size in Buttons and shapes; each look's default is how it draws today.
+- Not decided yet (asked, 22 Nov): a sixth "Brand tint" role, shades of each role, and whether "Palettes to try" offers any palette or only the look's colourways. Until then the Site colours card offers the site's colourways only (DEC-090, paid ones gated by DEC-177), and there is no Tint role and no shades.
+
+## DEC-253 Blocks read the merchant's styles; a look only sets defaults
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, iteration C) · follows DEC-237
+
+- The hard-coded radii that a merchant's choice never reached now read the shared variables, with today's value as the fallback: Live's timetable day cards (20px) and phone service tiles (14px) the card corners; the price, timetable and next-free badges (9px, 4px) the tag corners; Quiet and Live team photos (round) and the phone hero photo (square) the image corners. Live's header button is drawn as a button, so it follows Buttons, not Slots and tags.
+- An untouched site draws exactly as before. No lock state is shown: nothing is locked any more.

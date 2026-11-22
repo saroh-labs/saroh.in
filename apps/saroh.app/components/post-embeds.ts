@@ -30,7 +30,7 @@ export const EMBED =
 /** `book` is a Book now button for a service, `offer` a live discount (W2). */
 export type EmbedKind = "service" | "product" | "book" | "offer";
 
-/** A live offer's words (API `public/share/:siteId/offer/:id`). */
+/** A live offer's words (API `public/sites/:siteId/offers/:id`). */
 export interface EmbedOffer {
     name: string;
     headline: string;

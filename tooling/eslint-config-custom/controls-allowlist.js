@@ -140,6 +140,8 @@ export const RAW_ALLOWED = {
     "components/commerce/product-sections/shop-switch.tsx": ["button"],
     // button: a row or card that is one button
     "components/commerce/product-settings/option-sheet.tsx": ["button"],
+    // Our team's People list: each row's drag handle, as option-sheet's.
+    "components/sites/editor/inspector/team-people.tsx": ["button"],
     // button: a chip that adds a token to the pattern
     "components/commerce/product-settings/sku-tab.tsx": ["button"],
     // button: a chip
@@ -227,6 +229,14 @@ export const RAW_ALLOWED = {
     "components/sites/editor/editor-rail.tsx": ["button"],
     // button: a Brand tab colour row, one line that opens its swatches (DEC-184)
     "components/sites/looks/colour-picker.tsx": ["button"],
+    // button: Custom's swatch and the contrast guard's two fixes; input: the
+    // native colour picker beside the hex field (DEC-252, CS4)
+    "components/sites/editor/inspector/element-style-tab.tsx": [
+        "button",
+        "input",
+    ],
+    // button: a palette row tried live on the page (CSI-C)
+    "components/sites/looks/site-colours-card.tsx": ["button"],
     // button: Brand's "Customise components" row, two lines that open the list (DEC-237)
     "components/sites/looks/component-styles.tsx": ["button"],
     // button, input: today's Brand panel, parked behind the Website area switch (owner, 20 Nov)

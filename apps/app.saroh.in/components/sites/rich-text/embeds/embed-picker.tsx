@@ -19,7 +19,7 @@ import { ServicesLoadNotice } from "@/components/sites/selling-sections/services
 import { useGridCatalogue } from "@/components/sites/selling-sections/use-grid-catalogue";
 import { formatDuration, POST_EMBED_CARD } from "@saroh/site-blocks";
 
-import { formatMoney } from "@/lib/format/money";
+import { servicePriceWords } from "@/lib/services/price-words";
 
 import type { EmbedKind } from "./insert-embed";
 import { useOffersForPicker } from "./use-offers";
@@ -141,11 +141,8 @@ function ServiceOptions({
         .map((s) => ({
             id: s.id,
             name: s.name,
-            // Every row says its price (W3.3), "No price" when none is set.
-            price:
-                s.priceCents == null
-                    ? "No price"
-                    : formatMoney(s.priceCents, s.currency ?? null),
+            // Every row says its price (W3.3), as Add a service does.
+            price: servicePriceWords(s.priceCents, s.currency),
             line: book
                 ? "Book now"
                 : [
@@ -154,7 +151,7 @@ function ServiceOptions({
                           : null,
                       s.priceCents == null
                           ? null
-                          : formatMoney(s.priceCents, s.currency ?? null),
+                          : servicePriceWords(s.priceCents, s.currency),
                       "Book now",
                   ]
                       .filter(Boolean)

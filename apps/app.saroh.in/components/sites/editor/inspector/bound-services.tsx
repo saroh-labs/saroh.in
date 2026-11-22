@@ -3,8 +3,8 @@
 import { Button } from "@saroh/ui/button";
 
 import type { ServicesLoad } from "@/components/sites/section-fields";
-import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { servicePriceWords } from "@/lib/services/price-words";
 import type { Section } from "@/lib/sites/service";
 
 /**
@@ -64,10 +64,7 @@ export function BoundServices({
             </h3>
             <ul className="grid gap-1.5">
                 {shown.map((s) => {
-                    const price =
-                        s.priceCents == null
-                            ? "Free"
-                            : formatMoney(s.priceCents, s.currency ?? null);
+                    const price = servicePriceWords(s.priceCents, s.currency);
                     return (
                         <li
                             key={s.id}

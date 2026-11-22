@@ -24,6 +24,8 @@ import { BlockThumbnail } from "@/components/sites/blocks/block-thumbnail";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import type { PickerReview } from "@/lib/product-reviews/picker-read";
+import { readReviewsForPicker } from "@/lib/product-reviews/picker-read";
 import { listServicesForPicker } from "@/lib/services/actions";
 import type { AddBusinessCounts } from "@/lib/sites/add-business-read";
 import { readAddBusiness } from "@/lib/sites/add-business-read";
@@ -52,6 +54,8 @@ import type { PageStart } from "./add-page-sheet";
 import { AddPageSheet } from "./add-page-sheet";
 import type { PickerService, ShowAs } from "./from-your-business";
 import { ServicesPicker } from "./from-your-business";
+import type { ReviewItem, ReviewTarget } from "./review-picker";
+import { ReviewPicker } from "./review-picker";
 import {
     formLine,
     readRecent,
@@ -89,6 +93,19 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
     // Storage throws on the server and in a private window: no Recent.
     const [recent] = useState<SectionType[]>(readRecent);
     const [counts, setCounts] = useState<AddBusinessCounts | null>(null);
+    // A review (round 3, EBReviewPicker): undefined while read, null unread.
+    const [reviews, setReviews] = useState<PickerReview[] | null>();
+    const [reviewing, setReviewing] = useState(false);
+
+    useEffect(() => {
+        let live = true;
+        readReviewsForPicker()
+            .then((r) => live && setReviews(r))
+            .catch(() => live && setReviews(null));
+        return () => {
+            live = false;
+        };
+    }, []);
 
     useEffect(() => {
         let live = true;
@@ -166,6 +183,79 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
         );
         setPicking(false);
     };
+
+    const testimonials: ReviewTarget[] = draft.sections.flatMap((s, i) =>
+        s.type === "testimonials"
+            ? [
+                  {
+                      index: i,
+                      heading: headingOr(
+                          (s.content as { heading?: string }).heading,
+                          SECTION_LABELS.testimonials,
+                      ),
+                      full:
+                          ((s.content as { items?: unknown[] }).items?.length ??
+                              0) >= TESTIMONIALS_MOST,
+                  },
+              ]
+            : [],
+    );
+
+    const addReview = (item: ReviewItem, into: number | null) => {
+        rememberRecent("testimonials");
+        if (into === null) {
+            add.addSection("testimonials", undefined, (at) =>
+                draft.restoreSections((prev) =>
+                    prev.map((s, i) =>
+                        i === at
+                            ? ({
+                                  ...s,
+                                  content: { ...s.content, items: [item] },
+                              } as typeof s)
+                            : s,
+                    ),
+                ),
+            );
+        } else {
+            draft.restoreSections((prev) =>
+                prev.map((s, i) =>
+                    i === into
+                        ? ({
+                              ...s,
+                              content: {
+                                  ...s.content,
+                                  items: [
+                                      ...((
+                                          s.content as { items?: ReviewItem[] }
+                                      ).items ?? []),
+                                      item,
+                                  ],
+                              },
+                          } as typeof s)
+                        : s,
+                ),
+            );
+            model.selection.setSelectedIndex(into);
+        }
+        setReviewing(false);
+    };
+
+    if (reviewing && reviews !== undefined) {
+        return (
+            <ReviewPicker
+                reviews={reviews}
+                targets={testimonials}
+                below={below}
+                onBack={() => setReviewing(false)}
+                onRetry={() => {
+                    readReviewsForPicker()
+                        .then(setReviews)
+                        .catch(() => setReviews(null));
+                }}
+                onAdd={addReview}
+            />
+        );
+    }
 
     if (picking && services?.ok) {
         return (
@@ -267,6 +357,17 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
             hint: formLine(counts.forms),
             onClick: () => pick("enquiry", looks("enquiry")),
             onDragStart: dragProps("enquiry"),
+        });
+    }
+    // A review (round 3, EBReviewPicker): the product reviews to show, or
+    // "Write one" when there are none.
+    if (addable.includes("testimonials") && reviews !== undefined) {
+        const n = reviews?.length ?? 0;
+        businessTiles.push({
+            id: "testimonials",
+            label: "A review",
+            hint: n > 0 ? `${n} · write one` : "Write one",
+            onClick: () => setReviewing(true),
         });
     }
     // The board's order: what is sold and booked first (A9, `WXBAdd`).
@@ -580,9 +681,20 @@ const TILE_ORDER: SectionType[] = [
     "productGrid",
     "timetable",
     "booking",
+    "testimonials",
     "enquiry",
     "journal",
 ];
+
+/** A section's heading, or its kind's name when it has none. */
+function headingOr(heading: string | undefined, label: string): string {
+    const h = heading?.trim();
+    if (h) return h;
+    return label;
+}
+
+/** The most quotes one Testimonials section takes (section contract). */
+const TESTIMONIALS_MOST = 12;
 
 /** Add a page's rows: one bordered list (A1). */
 const PAGE_LIST = "mx-2 divide-y overflow-hidden rounded-lg border bg-card";

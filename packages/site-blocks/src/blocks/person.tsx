@@ -1,6 +1,7 @@
 import type { LookId, RenderedPerson } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
+import { withElement } from "../element-theme";
 import { siteImage } from "../lib/site-image";
 import type { LookProps } from "../look-context";
 import { CtaButton } from "./cta";
@@ -113,13 +114,17 @@ export default function PersonSection({
                         alt={content.image?.alt ?? ""}
                         width={content.image?.width}
                         height={content.image?.height}
-                        {...siteImage("below", {
-                            src,
-                            width: content.image?.width,
-                            placeholder: content.image?.placeholder,
-                            widths: content.image?.widths,
-                            sizes: "(min-width: 640px) 384px, 100vw",
-                        })}
+                        {...withElement(
+                            "image",
+                            content.image,
+                            siteImage("below", {
+                                src,
+                                width: content.image?.width,
+                                placeholder: content.image?.placeholder,
+                                widths: content.image?.widths,
+                                sizes: "(min-width: 640px) 384px, 100vw",
+                            }),
+                        )}
                         className={
                             siteLook
                                 ? "rounded-site-photo aspect-[4/5] w-full max-w-sm object-cover"
@@ -270,13 +275,17 @@ function PortraitColumn({
                                 alt={content.image?.alt ?? ""}
                                 width={content.image?.width}
                                 height={content.image?.height}
-                                {...siteImage("below", {
-                                    src,
-                                    width: content.image?.width,
-                                    placeholder: content.image?.placeholder,
-                                    widths: content.image?.widths,
-                                    sizes: "300px",
-                                })}
+                                {...withElement(
+                                    "image",
+                                    content.image,
+                                    siteImage("below", {
+                                        src,
+                                        width: content.image?.width,
+                                        placeholder: content.image?.placeholder,
+                                        widths: content.image?.widths,
+                                        sizes: "300px",
+                                    }),
+                                )}
                                 className={
                                     siteLook
                                         ? "bg-site-surface rounded-site-photo aspect-[4/5] w-full object-cover"
@@ -362,14 +371,18 @@ function TeamGrid({ content }: { content: RenderedPerson }) {
                                         <img
                                             src={src}
                                             alt={m.image?.alt ?? ""}
-                                            {...siteImage("below", {
-                                                src,
-                                                width: m.image?.width,
-                                                placeholder:
-                                                    m.image?.placeholder,
-                                                widths: m.image?.widths,
-                                                sizes: "(min-width: 1024px) 25vw, 50vw",
-                                            })}
+                                            {...withElement(
+                                                "image",
+                                                m.image,
+                                                siteImage("below", {
+                                                    src,
+                                                    width: m.image?.width,
+                                                    placeholder:
+                                                        m.image?.placeholder,
+                                                    widths: m.image?.widths,
+                                                    sizes: "(min-width: 1024px) 25vw, 50vw",
+                                                }),
+                                            )}
                                             className="h-full w-full object-cover"
                                         />
                                     ) : null}

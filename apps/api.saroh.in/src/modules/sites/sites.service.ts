@@ -197,6 +197,7 @@ import {
     templateFooterLine,
     templateFormerFooterLines,
 } from "./site-template-record";
+import { liveTeamSnapshot } from "./team-live";
 import { websiteAreaOn } from "./website-area-switch";
 
 /** A site's live posts a public read lists, newest first (02 W6). */
@@ -3178,7 +3179,11 @@ export class SitesService {
             site.organizationId,
         );
         return {
-            snapshot,
+            // Our team's bound people, checked live (team-live.ts).
+            snapshot: (await liveTeamSnapshot(
+                snapshot,
+                site.organizationId,
+            )) as typeof snapshot,
             publishedAt,
             siteId: site.id,
             organizationId: site.organizationId,

@@ -1,5 +1,6 @@
 "use client";
 
+import { elementAt, textOf } from "@/lib/sites/element-style";
 import { Button } from "@saroh/ui/button";
 import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { IconButton } from "@saroh/ui/icon-button";
@@ -32,6 +33,7 @@ import { subjectOnCanvas } from "../editor-panels";
 import { EditorSheet } from "../editor-sheet";
 import { ChromePanel } from "../inspector/chrome-panel";
 import { ContentTab } from "../inspector/content-tab";
+import { ElementStyleTab } from "../inspector/element-style-tab";
 import { FeedbackTab } from "../inspector/feedback-tab";
 import { sectionActions } from "../inspector/section-actions";
 import { frameOf } from "../inspector/section-frame";
@@ -211,6 +213,62 @@ export function SectionSheet({
                     selection.setSelectedIndex(null);
                     selection.setInspector("feedback");
                 }}
+            />
+        );
+    } else if (active && selection.element) {
+        // One button or photo (DEC-251): its Style in the shared sheet,
+        // Reset and Done pinned (CSI-C phone).
+        const { index, section } = active;
+        const el = selection.element;
+        const word = el.kind === "button" ? "Button" : "Photo";
+        const own = elementAt(section.content, el.path);
+        title = textOf(own?.label) || word;
+        head = (
+            <SheetHead
+                title={title}
+                kicker={`${sectionTitle(section)} › ${word}`}
+                onClose={onClose}
+            />
+        );
+        footer = false;
+        body = (
+            <ElementStyleTab
+                element={el}
+                section={section}
+                sectionName={sectionTitle(section)}
+                scope={selection.elementScope}
+                onScope={selection.setElementScope}
+                style={model.siteStyle.style}
+                styleOptions={model.styleOptions}
+                onChange={(next) => draft.replaceAt(index, next)}
+                onSiteStyle={model.siteStyle.setStyle}
+                foot={(line, reset) => (
+                    <div
+                        data-element-foot=""
+                        className="sticky bottom-0 -mx-4 grid gap-2 border-t bg-background px-4 pb-3 pt-2.5"
+                    >
+                        <p className="text-xs text-muted-foreground">{line}</p>
+                        <div className="flex gap-2">
+                            {reset ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-12 min-w-0 flex-1"
+                                    onClick={reset.run}
+                                >
+                                    {reset.word}
+                                </Button>
+                            ) : null}
+                            <Button
+                                type="button"
+                                className="h-12 min-w-0 flex-1"
+                                onClick={onClose}
+                            >
+                                Done
+                            </Button>
+                        </div>
+                    </div>
+                )}
             />
         );
     } else if (active) {

@@ -720,7 +720,7 @@ function NowLine({ at, timeZone }: { at: number; timeZone: string }) {
             className="relative mb-2 flex h-[30px] items-center"
         >
             <span className="bg-site-accent absolute inset-x-0 top-1/2 h-0.5" />
-            <span className="bg-site-accent text-site-accent-fg relative rounded-[4px] px-2 py-1 text-[12px] font-bold tabular-nums">
+            <span className="bg-site-accent text-site-accent-fg relative rounded-[var(--site-tag-radius,4px)] px-2 py-1 text-[12px] font-bold tabular-nums">
                 {nowWords(at, timeZone)}
             </span>
         </span>

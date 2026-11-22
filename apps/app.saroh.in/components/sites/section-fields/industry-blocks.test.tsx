@@ -24,6 +24,11 @@ import {
     TimetableFields,
 } from "@/components/sites/selling-sections/timetable";
 
+// Our team's People list and picker read the team on the server.
+vi.mock("@/lib/staff/team-picker-read", () => ({
+    readTeamForPicker: () => Promise.resolve({ team: [], canChoose: false }),
+}));
+vi.mock("@/lib/staff/actions", () => ({ setTeamPage: vi.fn() }));
 vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: ({
         label,

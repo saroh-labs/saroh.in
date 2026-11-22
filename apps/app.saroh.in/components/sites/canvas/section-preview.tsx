@@ -36,6 +36,12 @@ import type { Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 // From the pure module, not the service: `lib/sites/service` reaches for
 // `next/headers` and cannot be pulled into a client component.
+import type { SelectedElement, StyleScope } from "@/lib/sites/element-style";
+import {
+    elementMark,
+    parseElementMark,
+    stampElements,
+} from "@/lib/sites/element-style";
 import { resolveStyleVariables } from "@/lib/sites/style";
 
 /**
@@ -83,10 +89,14 @@ export const FORM_NOT_SENT_DETAIL = "Forms send from your live site.";
 function toRenderedSection(
     section: Section,
     resolvePage: (pageId: string) => string | undefined,
+    stamp = false,
 ): RenderedSection {
+    const content = toRendered(section.type, section.content, { resolvePage });
     return {
         type: section.type,
-        content: toRendered(section.type, section.content, { resolvePage }),
+        // On the editing canvas each button and photo carries its place,
+        // so a click on it selects it (DEC-251).
+        content: stamp ? stampElements(content) : content,
     };
 }
 
@@ -112,7 +122,16 @@ export function DraftPreview({
     blockTools,
     headerTools,
     textEdit,
+    selectedElement = null,
+    elementScope = "element",
+    onSelectElement,
 }: {
+    /** The button or photo selected in the selected section (DEC-251). */
+    selectedElement?: SelectedElement | null;
+    /** Its Apply to: what the page outlines as moving with it (CSScope). */
+    elementScope?: StyleScope;
+    /** A click on a button or photo: select its section and it. */
+    onSelectElement?: (index: number, element: SelectedElement) => void;
     /** A phone's toolbar on the selected block (DEC-185). */
     blockTools?: (index: number) => ReactNode;
     /** On the header while it is selected: its menu edited in place (H1). */
@@ -263,7 +282,13 @@ export function DraftPreview({
             visible.map(({ section, index }, position) => {
                 const rendered = (
                     <PageSections
-                        sections={[toRenderedSection(section, resolvePage)]}
+                        sections={[
+                            toRenderedSection(
+                                section,
+                                resolvePage,
+                                onSelectElement !== undefined,
+                            ),
+                        ]}
                         siteId={siteId}
                         // The API this app talks to, so the canvas reads the
                         // same place as the site it is drawing; unset, the
@@ -319,6 +344,15 @@ export function DraftPreview({
                         name={`${label} section, ${position + 1} of ${count}`}
                         selected={selectedIndex === index}
                         onSelect={() => onSelect(index)}
+                        onSelectElement={
+                            onSelectElement
+                                ? (el) => onSelectElement(index, el)
+                                : undefined
+                        }
+                        element={
+                            selectedIndex === index ? selectedElement : null
+                        }
+                        elementScope={elementScope}
                         notes={
                             section.key === undefined
                                 ? 0
@@ -511,7 +545,13 @@ function CanvasBlock({
     onOpenNotes,
     tools,
     children,
+    onSelectElement,
+    element = null,
+    elementScope = "element",
 }: {
+    onSelectElement?: (element: SelectedElement) => void;
+    element?: SelectedElement | null;
+    elementScope?: StyleScope;
     /** "changed", "added", "moved" or "hidden" since live, for a reader. */
     changed?: string;
     /** Drawn on the block while it is selected: a phone's toolbar. */
@@ -535,7 +575,16 @@ function CanvasBlock({
     return (
         <div
             data-block-index={index}
-            onClick={onSelect}
+            onClick={(e) => {
+                // A button or photo on the block selects it (DEC-251).
+                const mark = parseElementMark(
+                    (e.target as HTMLElement)
+                        .closest("[data-site-el]")
+                        ?.getAttribute("data-site-el") ?? null,
+                );
+                if (mark && onSelectElement) onSelectElement(mark);
+                else onSelect();
+            }}
             /*
              * Joined by hand, not through `cn`: tailwind-merge reads
              * `outline` and `outline-2` as the same property and drops the
@@ -558,6 +607,9 @@ function CanvasBlock({
             }`}
         >
             {children}
+            {element ? (
+                <style>{elementOutline(index, element, elementScope)}</style>
+            ) : null}
             {tools}
             {changed ? (
                 /*
@@ -636,4 +688,35 @@ function CanvasBlock({
             ) : null}
         </div>
     );
+}
+
+/**
+ * The selected button or photo outlined in the canvas's amber, with its
+ * flag (CSI-C "Button · This button"); with Apply to on the section or the
+ * site, every one that will move is outlined too (CSScope).
+ */
+function elementOutline(
+    index: number | undefined,
+    element: SelectedElement,
+    scope: StyleScope,
+): string {
+    const block = `[data-block-index="${index}"]`;
+    const mark = `[data-site-el="${elementMark(element)}"]`;
+    const kind = `[data-site-el^="${element.kind}:"]`;
+    const moving =
+        scope === "site"
+            ? `[data-site-el]${kind}`
+            : scope === "section"
+              ? `${block} ${kind}`
+              : `${block} ${mark}`;
+    const word = element.kind === "button" ? "Button" : "Photo";
+    const where =
+        scope === "site"
+            ? "Whole site"
+            : scope === "section"
+              ? "This section"
+              : `This ${element.kind === "button" ? "button" : "photo"}`;
+    return `${moving}{outline:2px solid hsl(var(--highlight));outline-offset:4px}
+${block} ${mark}{position:relative}
+${block} ${mark}::before{content:"${word} · ${where}";position:absolute;left:-6px;top:-34px;white-space:nowrap;background:hsl(var(--brand-surface));color:hsl(var(--brand-surface-foreground));font:600 13px/1.5 system-ui,sans-serif;padding:2px 8px;border-radius:6px;z-index:20;pointer-events:none}`;
 }

@@ -116,8 +116,12 @@ export const ChangeMarks = Extension.create<{ live: string[] }>({
                                 Decoration.node(b.from, b.to, {
                                     "data-change": String(i + 1),
                                     tabindex: "-1",
-                                    // An ink 1.5px box, ink words (R3.1).
-                                    class: "scroll-mt-16 rounded-sm text-site-fg outline-none ring-[1.5px] ring-site-fg ring-offset-4 ring-offset-site-bg",
+                                    // An ink 1.5px box 4px off the words, ink
+                                    // words (R3.1). Drawn on a layer 4px out,
+                                    // not a ring with an offset: the offset's
+                                    // fill drew a second faint edge (and a
+                                    // border or outline rounds to 1px).
+                                    class: "relative scroll-mt-16 rounded-sm text-site-fg outline-none before:pointer-events-none before:absolute before:-inset-1 before:rounded-md before:shadow-[0_0_0_1.5px_hsl(var(--site-fg))] before:content-['']",
                                 }),
                             ]),
                         );

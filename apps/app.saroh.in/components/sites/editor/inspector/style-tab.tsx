@@ -21,6 +21,7 @@ import type { Section } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
 import { useEditorReadOnly } from "../read-only";
+import { withSectionStyles } from "./element-style-tab";
 import {
     frameOf,
     resetToLook,
@@ -169,6 +170,7 @@ export function StyleTab({
                         onChange={onChange}
                     />
                 </div>
+                <StyledHere section={section} onChange={onChange} />
             </fieldset>
 
             {changes > 0 ? (
@@ -195,4 +197,84 @@ export function StyleTab({
             ) : null}
         </div>
     );
+}
+
+const KIND_WORDS = {
+    button: "Buttons",
+    card: "Cards",
+    image: "Photos",
+} as const;
+
+/**
+ * "Styled in this section" (CSCards): each kind styled for the section as
+ * a whole, in words, with its own Reset, so a section-wide choice is found
+ * without hunting for the button. Nothing when none is.
+ */
+function StyledHere({
+    section,
+    onChange,
+}: {
+    section: Section;
+    onChange: (next: Section) => void;
+}) {
+    const styles = frameOf(section).styles;
+    const kinds = (
+        Object.keys(KIND_WORDS) as (keyof typeof KIND_WORDS)[]
+    ).filter((k) => styles?.[k] && Object.keys(styles[k] ?? {}).length > 0);
+    if (!styles || kinds.length === 0) return null;
+    const words = (v: Record<string, string | undefined>) =>
+        Object.entries(v)
+            .flatMap(([key, x]) => (x === undefined ? [] : [styleWord(key, x)]))
+            .join(", ");
+    return (
+        <div className="grid gap-2" data-styled-here="">
+            <p className="text-sm font-semibold">Styled in this section</p>
+            {kinds.map((k) => (
+                <div
+                    key={k}
+                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-[0.8125rem]"
+                >
+                    <span className="min-w-0 flex-1">
+                        {KIND_WORDS[k]}:{" "}
+                        {words(styles[k] as Record<string, string | undefined>)}
+                    </span>
+                    <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 font-semibold"
+                        onClick={() =>
+                            onChange(
+                                withSectionStyles(section, {
+                                    ...styles,
+                                    [k]: undefined,
+                                }),
+                            )
+                        }
+                    >
+                        Reset
+                    </Button>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/** One choice in words: "Pill", "Outline", "custom #A65E3F". */
+function styleWord(key: string, value: string): string {
+    if (value.startsWith("#")) return `custom ${value}`;
+    const table =
+        key === "colour"
+            ? COMPONENT_OPTION_LABELS.buttonColour
+            : key === "style"
+              ? COMPONENT_OPTION_LABELS.buttonStyle
+              : key === "size"
+                ? COMPONENT_OPTION_LABELS.buttonSize
+                : key === "card"
+                  ? COMPONENT_OPTION_LABELS.cards
+                  : {
+                        ...COMPONENT_OPTION_LABELS.buttons,
+                        ...COMPONENT_OPTION_LABELS.images,
+                    };
+    return (table as Record<string, string>)[value] ?? value;
 }

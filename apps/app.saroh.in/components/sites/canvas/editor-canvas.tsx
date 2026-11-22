@@ -1,5 +1,6 @@
 "use client";
 
+import type { SelectedElement, StyleScope } from "@/lib/sites/element-style";
 import { inPageNavigation, mergeInPageNavigation } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import type { ComponentProps, ReactNode, RefObject, UIEvent } from "react";
@@ -144,7 +145,15 @@ export function EditorCanvas({
     conflictYou = false,
     saveFailed = null,
     windowBar = true,
+    element = null,
+    elementScope = "element",
+    selectElement,
 }: {
+    /** The button or photo selected on the page (DEC-251). */
+    element?: SelectedElement | null;
+    elementScope?: StyleScope;
+    /** Selecting a button or photo; absent, a click selects its section. */
+    selectElement?: (index: number, element: SelectedElement) => void;
     /** The window bar round the page; off where the canvas bar names it. */
     windowBar?: boolean;
     /** Who saved the page since this editor opened it (C12), if known. */
@@ -253,6 +262,14 @@ export function EditorCanvas({
                       blockTools,
                       headerTools,
                       textEdit,
+                      selectedElement: element,
+                      elementScope,
+                      onSelectElement: selectElement
+                          ? (index: number, el: SelectedElement) => {
+                                setRail("sections");
+                                selectElement(index, el);
+                            }
+                          : undefined,
                       onSelect: (index: number) => {
                           setRail("sections");
                           setSelectedIndex(index);

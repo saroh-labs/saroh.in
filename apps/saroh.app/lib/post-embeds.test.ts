@@ -153,7 +153,7 @@ describe("a post's own blocks (W2)", () => {
     it("draws a live offer, escaped, and nothing for an ended one", async () => {
         const fetch = vi.fn((url: string) =>
             Promise.resolve(
-                url.endsWith("/offer/d1")
+                url.endsWith("/offers/d1")
                     ? new Response(
                           JSON.stringify({
                               name: "Buns <b>",
@@ -175,7 +175,7 @@ describe("a post's own blocks (W2)", () => {
         expect(out).toContain("until 30 Nov · Code BUN20");
         expect(out.match(/data-post-card/g)).toHaveLength(1);
         expect(fetch.mock.calls[0]?.[0]).toBe(
-            "https://api.test/public/share/s/offer/d1",
+            "https://api.test/public/sites/s/offers/d1",
         );
     });
 

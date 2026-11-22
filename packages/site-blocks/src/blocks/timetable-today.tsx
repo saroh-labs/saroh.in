@@ -203,7 +203,7 @@ export function TimetableToday({
                         <span
                             aria-hidden="true"
                             data-timetable-now=""
-                            className="bg-site-accent text-site-accent-fg rounded-[4px] px-2 py-0.5 text-[12px] font-bold tabular-nums"
+                            className="bg-site-accent text-site-accent-fg rounded-[var(--site-tag-radius,4px)] px-2 py-0.5 text-[12px] font-bold tabular-nums"
                         >
                             {nowWords(now, week.timezone)}
                         </span>

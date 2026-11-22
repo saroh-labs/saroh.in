@@ -3,6 +3,7 @@ export * from "@saroh/edition/address-rules";
 export * from "./coming-blocks";
 export * from "./component-styles";
 export * from "./delivery-place";
+export * from "./element-styles";
 export * from "./examples";
 export * from "./fixtures";
 export * from "./fonts";

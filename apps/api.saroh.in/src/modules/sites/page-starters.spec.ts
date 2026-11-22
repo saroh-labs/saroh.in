@@ -58,11 +58,11 @@ describe("page starters", () => {
         });
     });
 
-    it("Our team: only opted-in people, names and roles", async () => {
+    it("Our team: only the people an owner or admin picked, bound to them", async () => {
         const t = tx({
             people: [
-                { name: "Ritika", title: "Bridal artist" },
-                { name: "Pooja", title: null },
+                { id: "st_1", name: "Ritika", title: "Bridal artist" },
+                { id: "st_2", name: "Pooja", title: null },
             ],
         });
         const got = await starterSections(t as never, input("TEAM"));
@@ -72,9 +72,10 @@ describe("page starters", () => {
         expect(teamPageWhere("org_1")).toMatchObject({ showOnTeamPage: true });
         expect(got[1]?.content).toMatchObject({
             variant: "team",
+            staffId: "st_1",
             name: "Ritika",
             role: "Bridal artist",
-            people: [{ name: "Pooja" }],
+            people: [{ staffId: "st_2", name: "Pooja" }],
         });
     });
 
