@@ -130,11 +130,11 @@ describe("salon@1 (industry templates U11)", () => {
             bg: "#F7EFE9",
             fg: "#2B1D1A",
             // The gallery's #B4533A a step darker, to read 4.5:1 as a link.
-            accent: "#AF4F36",
+            accent: "#A44A33",
         });
         expect(mauve.style.palette).toMatchObject({
             bg: "#F6EEF4",
-            accent: "#9A5095",
+            accent: "#914B8C",
         });
         for (const s of [kesar, mauve]) {
             expect(parsePalette(s.style.palette)).toMatchObject({ ok: true });

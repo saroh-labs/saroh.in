@@ -135,11 +135,11 @@ describe("clinic@1 (industry templates U11)", () => {
         expect(tide.style.palette).toMatchObject({
             bg: "#F4F7F8",
             fg: "#16303A",
-            accent: "#2F7A8C",
+            accent: "#2C7384",
         });
         expect(heather.style.palette).toMatchObject({
             bg: "#F7F6F8",
-            accent: "#766496",
+            accent: "#736292",
         });
         for (const s of [tide, heather]) {
             expect(parsePalette(s.style.palette)).toMatchObject({ ok: true });

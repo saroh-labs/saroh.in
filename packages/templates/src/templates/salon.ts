@@ -209,8 +209,9 @@ export const salonTemplateV1: TemplateManifest = {
                 /*
                  * The gallery's paper, ink and kesar. The kesar #B4533A reads
                  * 4.36:1 as a link on the paper, so the accent role is its
-                 * sibling a step darker at the same hue and chroma
-                 * (#AF4F36, 4.63:1; white on it 5.26:1).
+                 * sibling darker at the same hue and saturation: #A44A33
+                 * reads 4.55:1 as a link on a card (#EFE1D6), 5.12:1 on the
+                 * paper; white on it 5.82:1 (22 Nov 2026).
                  */
                 palette: {
                     bg: "#F7EFE9",
@@ -219,11 +220,11 @@ export const salonTemplateV1: TemplateManifest = {
                     body: "#3E2D28",
                     muted: "#6A554F",
                     border: "#E5D4C8",
-                    accent: "#AF4F36",
+                    accent: "#A44A33",
                     accentFg: "#FFFFFF",
                     heroBg: "#F7EFE9",
                     heroFg: "#2B1D1A",
-                    ctaBg: "#AF4F36",
+                    ctaBg: "#A44A33",
                     ctaFg: "#FFFFFF",
                     footerBg: "#2B1D1A",
                     footerFg: "#F7EFE9",
@@ -255,11 +256,11 @@ export const salonTemplateV1: TemplateManifest = {
                     body: "#3A2D38",
                     muted: "#645563",
                     border: "#E2D2E0",
-                    accent: "#9A5095",
+                    accent: "#914B8C",
                     accentFg: "#FFFFFF",
                     heroBg: "#F6EEF4",
                     heroFg: "#271D26",
-                    ctaBg: "#9A5095",
+                    ctaBg: "#914B8C",
                     ctaFg: "#FFFFFF",
                     footerBg: "#271D26",
                     footerFg: "#F6EEF4",

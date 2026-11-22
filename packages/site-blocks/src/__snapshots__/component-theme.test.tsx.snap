@@ -6503,10 +6503,10 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-body: 259.09 16.42% 26.27%;
                 --site-muted: 257.14 10.14% 40.59%;
                 --site-border: 260 16.36% 89.22%;
-                --site-accent: 261.6 20% 49.02%;
+                --site-accent: 261.25 19.67% 47.84%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 270 12.5% 96.86%;
-                --site-cta-bg: 261.6 20% 49.02%;
+                --site-cta-bg: 261.25 19.67% 47.84%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 257.14 21.21% 93.53%;
                 --site-footer-fg: 261 20% 19.61%;
@@ -6523,7 +6523,7 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-measure: 68ch;
                 --site-content-width: 1120px;
                 --site-accent-text: 261.25 19.67% 47.84%;
-                --site-accent-soft: 270 17.39% 90.98%;
+                --site-accent-soft: 262.5 17.39% 90.98%;
                 --site-rule: 261.43 6.03% 54.51%;
                 --site-footer-muted: 262.5 7.14% 43.92%;
             }
@@ -6862,10 +6862,10 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-body: 259.09 16.42% 26.27%;
                 --site-muted: 257.14 10.14% 40.59%;
                 --site-border: 260 16.36% 89.22%;
-                --site-accent: 261.6 20% 49.02%;
+                --site-accent: 261.25 19.67% 47.84%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 270 12.5% 96.86%;
-                --site-cta-bg: 261.6 20% 49.02%;
+                --site-cta-bg: 261.25 19.67% 47.84%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 257.14 21.21% 93.53%;
                 --site-footer-fg: 261 20% 19.61%;
@@ -6882,7 +6882,7 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-measure: 68ch;
                 --site-content-width: 1120px;
                 --site-accent-text: 261.25 19.67% 47.84%;
-                --site-accent-soft: 270 17.39% 90.98%;
+                --site-accent-soft: 262.5 17.39% 90.98%;
                 --site-rule: 261.43 6.03% 54.51%;
                 --site-footer-muted: 262.5 7.14% 43.92%;
             }
@@ -7209,10 +7209,10 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-body: 259.09 16.42% 26.27%;
                 --site-muted: 257.14 10.14% 40.59%;
                 --site-border: 260 16.36% 89.22%;
-                --site-accent: 261.6 20% 49.02%;
+                --site-accent: 261.25 19.67% 47.84%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 270 12.5% 96.86%;
-                --site-cta-bg: 261.6 20% 49.02%;
+                --site-cta-bg: 261.25 19.67% 47.84%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 257.14 21.21% 93.53%;
                 --site-footer-fg: 261 20% 19.61%;
@@ -7229,7 +7229,7 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-measure: 68ch;
                 --site-content-width: 1120px;
                 --site-accent-text: 261.25 19.67% 47.84%;
-                --site-accent-soft: 270 17.39% 90.98%;
+                --site-accent-soft: 262.5 17.39% 90.98%;
                 --site-rule: 261.43 6.03% 54.51%;
                 --site-footer-muted: 262.5 7.14% 43.92%;
             }
@@ -7575,10 +7575,10 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-body: 195.38 35.14% 21.76%;
                 --site-muted: 198.33 19.15% 36.86%;
                 --site-border: 196 23.81% 87.65%;
-                --site-accent: 191.61 49.73% 36.67%;
+                --site-accent: 191.59 50% 34.51%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 195 22.22% 96.47%;
-                --site-cta-bg: 191.61 49.73% 36.67%;
+                --site-cta-bg: 191.59 50% 34.51%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 195 30% 92.16%;
                 --site-footer-fg: 196.67 45% 15.69%;
@@ -7594,8 +7594,8 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-body-size: 16px;
                 --site-measure: 68ch;
                 --site-content-width: 1120px;
-                --site-accent-text: 191.59 49.44% 34.9%;
-                --site-accent-soft: 192 27.27% 89.22%;
+                --site-accent-text: 191.59 50% 34.51%;
+                --site-accent-soft: 192.86 25% 89.02%;
                 --site-rule: 196.15 10.57% 51.76%;
                 --site-footer-muted: 194.48 14.15% 40.2%;
             }
@@ -7934,10 +7934,10 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-body: 195.38 35.14% 21.76%;
                 --site-muted: 198.33 19.15% 36.86%;
                 --site-border: 196 23.81% 87.65%;
-                --site-accent: 191.61 49.73% 36.67%;
+                --site-accent: 191.59 50% 34.51%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 195 22.22% 96.47%;
-                --site-cta-bg: 191.61 49.73% 36.67%;
+                --site-cta-bg: 191.59 50% 34.51%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 195 30% 92.16%;
                 --site-footer-fg: 196.67 45% 15.69%;
@@ -7953,8 +7953,8 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-body-size: 16px;
                 --site-measure: 68ch;
                 --site-content-width: 1120px;
-                --site-accent-text: 191.59 49.44% 34.9%;
-                --site-accent-soft: 192 27.27% 89.22%;
+                --site-accent-text: 191.59 50% 34.51%;
+                --site-accent-soft: 192.86 25% 89.02%;
                 --site-rule: 196.15 10.57% 51.76%;
                 --site-footer-muted: 194.48 14.15% 40.2%;
             }
@@ -8281,10 +8281,10 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-body: 195.38 35.14% 21.76%;
                 --site-muted: 198.33 19.15% 36.86%;
                 --site-border: 196 23.81% 87.65%;
-                --site-accent: 191.61 49.73% 36.67%;
+                --site-accent: 191.59 50% 34.51%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 195 22.22% 96.47%;
-                --site-cta-bg: 191.61 49.73% 36.67%;
+                --site-cta-bg: 191.59 50% 34.51%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 195 30% 92.16%;
                 --site-footer-fg: 196.67 45% 15.69%;
@@ -8300,8 +8300,8 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-body-size: 16px;
                 --site-measure: 68ch;
                 --site-content-width: 1120px;
-                --site-accent-text: 191.59 49.44% 34.9%;
-                --site-accent-soft: 192 27.27% 89.22%;
+                --site-accent-text: 191.59 50% 34.51%;
+                --site-accent-soft: 192.86 25% 89.02%;
                 --site-rule: 196.15 10.57% 51.76%;
                 --site-footer-muted: 194.48 14.15% 40.2%;
             }
@@ -21517,10 +21517,10 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-body: 13.64 21.57% 20%;
                 --site-muted: 13.33 14.59% 36.27%;
                 --site-border: 24.83 35.8% 84.12%;
-                --site-accent: 12.4 52.84% 44.9%;
+                --site-accent: 12.21 52.56% 42.16%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 25.71 46.67% 94.12%;
-                --site-cta-bg: 12.4 52.84% 44.9%;
+                --site-cta-bg: 12.21 52.56% 42.16%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 10.59 24.64% 13.53%;
                 --site-footer-fg: 25.71 46.67% 94.12%;
@@ -21536,8 +21536,8 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-body-size: 16px;
                 --site-measure: 60ch;
                 --site-content-width: 1200px;
-                --site-accent-text: 12.32 51.85% 42.35%;
-                --site-accent-soft: 18.46 43.33% 88.24%;
+                --site-accent-text: 12.21 52.56% 42.16%;
+                --site-accent-soft: 18.46 41.94% 87.84%;
                 --site-rule: 20 9.45% 50.2%;
                 --site-footer-muted: 20 8.67% 66.08%;
             }
@@ -21876,10 +21876,10 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-body: 13.64 21.57% 20%;
                 --site-muted: 13.33 14.59% 36.27%;
                 --site-border: 24.83 35.8% 84.12%;
-                --site-accent: 12.4 52.84% 44.9%;
+                --site-accent: 12.21 52.56% 42.16%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 25.71 46.67% 94.12%;
-                --site-cta-bg: 12.4 52.84% 44.9%;
+                --site-cta-bg: 12.21 52.56% 42.16%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 10.59 24.64% 13.53%;
                 --site-footer-fg: 25.71 46.67% 94.12%;
@@ -21895,8 +21895,8 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-body-size: 16px;
                 --site-measure: 60ch;
                 --site-content-width: 1200px;
-                --site-accent-text: 12.32 51.85% 42.35%;
-                --site-accent-soft: 18.46 43.33% 88.24%;
+                --site-accent-text: 12.21 52.56% 42.16%;
+                --site-accent-soft: 18.46 41.94% 87.84%;
                 --site-rule: 20 9.45% 50.2%;
                 --site-footer-muted: 20 8.67% 66.08%;
             }
@@ -22223,10 +22223,10 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-body: 13.64 21.57% 20%;
                 --site-muted: 13.33 14.59% 36.27%;
                 --site-border: 24.83 35.8% 84.12%;
-                --site-accent: 12.4 52.84% 44.9%;
+                --site-accent: 12.21 52.56% 42.16%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 25.71 46.67% 94.12%;
-                --site-cta-bg: 12.4 52.84% 44.9%;
+                --site-cta-bg: 12.21 52.56% 42.16%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 10.59 24.64% 13.53%;
                 --site-footer-fg: 25.71 46.67% 94.12%;
@@ -22242,8 +22242,8 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-body-size: 16px;
                 --site-measure: 60ch;
                 --site-content-width: 1200px;
-                --site-accent-text: 12.32 51.85% 42.35%;
-                --site-accent-soft: 18.46 43.33% 88.24%;
+                --site-accent-text: 12.21 52.56% 42.16%;
+                --site-accent-soft: 18.46 41.94% 87.84%;
                 --site-rule: 20 9.45% 50.2%;
                 --site-footer-muted: 20 8.67% 66.08%;
             }
@@ -22589,10 +22589,10 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-body: 309.23 12.62% 20.2%;
                 --site-muted: 304 8.11% 36.27%;
                 --site-border: 307.5 21.62% 85.49%;
-                --site-accent: 304.05 31.62% 45.88%;
+                --site-accent: 304.29 31.82% 43.14%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 315 30.77% 94.9%;
-                --site-cta-bg: 304.05 31.62% 45.88%;
+                --site-cta-bg: 304.29 31.82% 43.14%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 306 14.71% 13.33%;
                 --site-footer-fg: 315 30.77% 94.9%;
@@ -22608,8 +22608,8 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-body-size: 16px;
                 --site-measure: 60ch;
                 --site-content-width: 1200px;
-                --site-accent-text: 304.35 31.22% 43.33%;
-                --site-accent-soft: 307.5 28.57% 89.02%;
+                --site-accent-text: 304.29 31.82% 43.14%;
+                --site-accent-soft: 307.5 27.59% 88.63%;
                 --site-rule: 304.62 5.18% 50.78%;
                 --site-footer-muted: 313.33 5.26% 66.47%;
             }
@@ -22948,10 +22948,10 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-body: 309.23 12.62% 20.2%;
                 --site-muted: 304 8.11% 36.27%;
                 --site-border: 307.5 21.62% 85.49%;
-                --site-accent: 304.05 31.62% 45.88%;
+                --site-accent: 304.29 31.82% 43.14%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 315 30.77% 94.9%;
-                --site-cta-bg: 304.05 31.62% 45.88%;
+                --site-cta-bg: 304.29 31.82% 43.14%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 306 14.71% 13.33%;
                 --site-footer-fg: 315 30.77% 94.9%;
@@ -22967,8 +22967,8 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-body-size: 16px;
                 --site-measure: 60ch;
                 --site-content-width: 1200px;
-                --site-accent-text: 304.35 31.22% 43.33%;
-                --site-accent-soft: 307.5 28.57% 89.02%;
+                --site-accent-text: 304.29 31.82% 43.14%;
+                --site-accent-soft: 307.5 27.59% 88.63%;
                 --site-rule: 304.62 5.18% 50.78%;
                 --site-footer-muted: 313.33 5.26% 66.47%;
             }
@@ -23295,10 +23295,10 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-body: 309.23 12.62% 20.2%;
                 --site-muted: 304 8.11% 36.27%;
                 --site-border: 307.5 21.62% 85.49%;
-                --site-accent: 304.05 31.62% 45.88%;
+                --site-accent: 304.29 31.82% 43.14%;
                 --site-accent-fg: 0 0% 100%;
                 --site-hero-bg: 315 30.77% 94.9%;
-                --site-cta-bg: 304.05 31.62% 45.88%;
+                --site-cta-bg: 304.29 31.82% 43.14%;
                 --site-cta-fg: 0 0% 100%;
                 --site-footer-bg: 306 14.71% 13.33%;
                 --site-footer-fg: 315 30.77% 94.9%;
@@ -23314,8 +23314,8 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-body-size: 16px;
                 --site-measure: 60ch;
                 --site-content-width: 1200px;
-                --site-accent-text: 304.35 31.22% 43.33%;
-                --site-accent-soft: 307.5 28.57% 89.02%;
+                --site-accent-text: 304.29 31.82% 43.14%;
+                --site-accent-soft: 307.5 27.59% 88.63%;
                 --site-rule: 304.62 5.18% 50.78%;
                 --site-footer-muted: 313.33 5.26% 66.47%;
             }
