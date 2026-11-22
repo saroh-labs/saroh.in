@@ -34,11 +34,16 @@ interface SiteView {
     liveLook?: string | null;
 }
 
-/** Website › Style: the rail's Brand tab on a desk, its pill on a phone. */
-async function openBrand(page: Page, phone: boolean) {
+/**
+ * Website › Style: the rail's Brand tab on a desk, its pill on a phone,
+ * there on its Look tab unless `look` is false (no looks, no Look tab).
+ */
+async function openBrand(page: Page, phone: boolean, look = true) {
     if (phone) {
-        // The pill's Brand, in its sheet (DEC-185).
-        await openFromPill(page, "Brand");
+        // The pill's Brand, in its sheet (DEC-185): it opens on Colours
+        // (U24b), so the looks are its Look tab.
+        if (look) await brandTab(page, "Look");
+        else await openFromPill(page, "Brand");
         return;
     }
     await openDeskBrand(page);
@@ -249,7 +254,7 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             await useSession(page, "owner");
             await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
             await page.goto(`${urls.APP_URL}/sites/${look.siteId}`);
-            await openBrand(page, phone);
+            await openBrand(page, phone, false);
             // A phone's sheet opens on Colours (U24b): the faces are the
             // Fonts tab.
             if (phone) await brandTab(page, "Fonts");

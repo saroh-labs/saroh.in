@@ -120,6 +120,7 @@ export function PhoneShell({ model, topBar, children }: PhoneShellProps) {
                     waiting={model.status.waiting}
                     needsApproval={model.publish.needsApproval}
                     publishing={model.publish.publishing}
+                    saving={model.unsaved}
                     onSelect={onBar}
                 />
             </>

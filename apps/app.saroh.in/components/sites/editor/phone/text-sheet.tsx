@@ -111,6 +111,13 @@ export function TextSheet({
     links?: TextLinks;
     onClose: () => void;
 }) {
+    /*
+     * The field it was opened from, kept past closing: focus goes back to
+     * it (Save, Cancel or Escape), not to the page's body, and the section
+     * sheet does not open it again (`returned`).
+     */
+    const [last, setLast] = useState(field);
+    if (field !== null && field !== last) setLast(field);
     return (
         <EditorSheet
             open={field !== null}
@@ -119,6 +126,7 @@ export function TextSheet({
             side="bottom"
             title={field?.label ?? "Text"}
             closeLabel="Cancel"
+            returnFocus={() => (last?.el.isConnected === true ? last.el : null)}
             full
             head={null}
         >

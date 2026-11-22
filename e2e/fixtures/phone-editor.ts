@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import { pressUntil } from "./press";
+import { websiteAreaOn } from "./website-area";
 
 /**
  * The site editor on a phone (DEC-185): no bottom tabs, one floating pill
@@ -128,4 +129,32 @@ export async function typefaces(page: Page, phone: boolean): Promise<Locator> {
     }
     await page.locator("[data-typeface-change]").click();
     return page.getByRole("dialog", { name: "Fonts" });
+}
+
+/**
+ * Write into a block's field. With the Website area a phone's field whose
+ * words overflow it opens full screen when focused (`fix/WXNText`): written
+ * there, and Save puts it back in the field.
+ */
+export async function writeField(page: Page, field: Locator, text: string) {
+    const long = await field.evaluate(
+        (el) =>
+            el instanceof HTMLTextAreaElement ||
+            el.scrollWidth > el.clientWidth,
+    );
+    const phone = (page.viewportSize()?.width ?? 1440) < 760;
+    if (!long || !phone || !(await websiteAreaOn(page))) {
+        await field.fill(text);
+        return;
+    }
+    await field.focus();
+    const full = page.locator("#phone-text-sheet");
+    await full.fill(text);
+    await page
+        .getByRole("dialog")
+        .filter({ has: full })
+        .getByRole("button", { name: "Save", exact: true })
+        .click();
+    await expect(full).toHaveCount(0);
+    await expect(field).toHaveValue(text);
 }

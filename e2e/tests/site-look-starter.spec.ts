@@ -9,6 +9,7 @@ import {
 } from "../fixtures/phone-editor";
 import { useSession } from "../fixtures/sessions";
 import { setNorthwindLook } from "../fixtures/site-look";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
@@ -71,6 +72,18 @@ async function openBrand(page: Page, phone: boolean) {
 }
 
 /** A draft's sections as a save sends them back. */
+/**
+ * The looks in view again once the editor has started afresh. With the
+ * Website area a phone's Brand opens again on Colours (`WXBBrandPhone`),
+ * so its Look tab is chosen first.
+ */
+async function looksAgain(page: Page, phone: boolean) {
+    if (phone && (await websiteAreaOn(page))) await lookGallery(page, phone);
+    await expect(page.locator("[data-look-current]")).toBeVisible({
+        timeout: 30_000,
+    });
+}
+
 const asSaved = (sections: DraftSection[]) =>
     sections.map(({ type, contractVersion, content, hidden, key }) => ({
         type,
@@ -186,12 +199,14 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
                     ),
                 )
                 .toBe(true);
-            await expect(page.locator("[data-look-current]")).toBeVisible({
-                timeout: 30_000,
-            });
+            await looksAgain(page, phone);
 
             // Undo, within the toast's ten seconds.
-            await page.getByRole("button", { name: "Undo" }).click();
+            // The toast's: the editor's own Undo is in the bar too.
+            await page
+                .locator("[data-sonner-toaster]")
+                .getByRole("button", { name: "Undo" })
+                .click();
             await expect(page.getByText("Undone.")).toBeVisible();
             await expect
                 .poll(async () => (await nw.get<SiteView>(site)).style.look)
@@ -270,31 +285,50 @@ test.describe("a look's starter content", { tag: "@serial" }, () => {
                     name: "Use Live and its starter content",
                 })
                 .click();
+            await expect(preview).toHaveCount(0);
             await expect(
                 page.getByText("Starter content added to your draft."),
             ).toBeVisible();
-            await expect(page.locator("[data-look-current]")).toBeVisible({
-                timeout: 30_000,
-            });
+            await looksAgain(page, phone);
 
             // Bring in my details: what Northwind has replaces the samples,
-            // or it says there is nothing to bring.
+            // or it says there is nothing to bring. Under the looks today;
+            // with the Website area in Brand's Versions, with Previous
+            // versions (U24b).
+            const area = await websiteAreaOn(page);
+            if (area) {
+                await page
+                    .locator("[data-draft-versions-open]")
+                    .filter({ visible: true })
+                    .click();
+            }
             await page
                 .getByRole("button", { name: "Bring in my details" })
                 .click();
-            await expect(
-                page
-                    .getByText(/^Brought in your |^Nothing to bring in\.$/)
-                    .first(),
-            ).toBeVisible({ timeout: 15_000 });
-            await expect(page.locator("[data-look-current]")).toBeVisible({
-                timeout: 30_000,
-            });
+            const said = page
+                .getByText(/^Brought in your |^Nothing to bring in\.$/)
+                .first();
+            await expect(said).toBeVisible({ timeout: 15_000 });
+            if (area) {
+                // Details brought in start the editor afresh, which puts
+                // Versions away; with nothing to bring it stays open.
+                const sheet = page.locator("[data-draft-versions]");
+                if ((await said.innerText()).startsWith("Brought in")) {
+                    await expect(sheet).toHaveCount(0, { timeout: 30_000 });
+                } else {
+                    await page.keyboard.press("Escape");
+                    await expect(sheet).toHaveCount(0);
+                }
+            }
+            await looksAgain(page, phone);
 
             // Previous versions: the draft before the copy, rolled back to
-            // after its own confirm.
+            // after its own confirm. In Versions with the Website area.
             await page
-                .getByRole("button", { name: "Previous versions" })
+                .locator("[data-draft-versions-open]")
+                .filter({ visible: true })
+                .or(page.getByRole("button", { name: "Previous versions" }))
+                .first()
                 .click();
             const versions = page.locator("[data-draft-versions]");
             const first = versions

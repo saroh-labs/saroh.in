@@ -28,6 +28,7 @@ export function PhoneBar({
     waiting,
     needsApproval,
     publishing,
+    saving = false,
     onSelect,
 }: {
     /** The cell whose sheet is open, drawn current. */
@@ -36,6 +37,11 @@ export function PhoneBar({
     /** "Publishing needs approval" is on: Publish's sheet says what next. */
     needsApproval: boolean;
     publishing: boolean;
+    /**
+     * Work not saved yet: Publish waits for it, as the desk's does. Pressed
+     * mid-save it said "Save the draft first", with no Save to press.
+     */
+    saving?: boolean;
     onSelect: (key: PhoneBarKey) => void;
 }) {
     return (
@@ -63,7 +69,7 @@ export function PhoneBar({
                                       .join(", ")
                                 : undefined
                         }
-                        disabled={publish && publishing}
+                        disabled={publish && (publishing || saving)}
                         onClick={() => onSelect(key)}
                         className={cn(
                             "relative flex min-w-0 flex-col items-center justify-center gap-[3px] text-xs font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:text-disabled-foreground",

@@ -14,6 +14,7 @@ import {
     overrideNorthwindFlag,
     setNorthwindLook,
 } from "../fixtures/site-look";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
@@ -29,7 +30,7 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  *   is saved, and the API refuses the same save;
  * - a typeface the catalogue doesn't make free is refused the same way;
  * - with `themes` granted to Northwind (a module override, as staff give
- *   it on its admin page, ended after), Quiet is taken and saved;
+ *   it on its admin page, ended after), Quiet is unmarked, taken and saved;
  * - component styles (DEC-237) are free on every plan: Cards → Flat saves
  *   on a plan without `themes`, with no refusal.
  *
@@ -250,12 +251,17 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             await openEditor(page, look.siteId, phone);
             const looks = await gallery(page);
             const quiet = looks.locator('[data-look-choice="quiet"]');
-            // Still marked: a paid look is marked on every plan.
-            await expect(looks).toContainText(/Paid plans.*Quiet/);
+            // Not marked: "Paid plans" is said only where the plan leaves a
+            // style off (the 21 Nov editor audit, 057a986f3).
+            await expect(looks).toContainText("Quiet");
+            await expect(looks).not.toContainText(/paid plans/i);
             await quiet.click();
             // Taken: the card says Quiet. A desk's gallery closes; a phone's
-            // Look tab is the gallery, and stays (DEC-185).
-            if (!phone) await expect(looks).toHaveCount(0);
+            // Look tab is the gallery, and stays (DEC-185), as the Website
+            // area's desk cards in Brand do (U24b).
+            if (!phone && !(await websiteAreaOn(page))) {
+                await expect(looks).toHaveCount(0);
+            }
             await expect(lookCard(page)).toHaveAttribute(
                 "data-look-current",
                 "quiet",
@@ -295,7 +301,12 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
         try {
             await openEditor(page, look.siteId, phone);
             if (phone) {
-                await page.getByRole("tab", { name: "Components" }).click();
+                // "Buttons and shapes" with the Website area (U24b).
+                await page
+                    .getByRole("tab", {
+                        name: /^(Components|Buttons and shapes)$/,
+                    })
+                    .click();
             } else {
                 await page.locator("[data-components-open]").click();
             }

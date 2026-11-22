@@ -1,9 +1,12 @@
 // @covers accounts:/login app:/open app:/sites app:/sites/[siteId] api:sites pkg:site-blocks
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { askForChanges } from "../fixtures/reviewer-editor";
+import { openFromPill } from "../fixtures/phone-editor";
+import { pressUntil } from "../fixtures/press";
+import { askForChanges, openReviewedSite } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import {
     demoReviewer,
     demoUser,
@@ -54,18 +57,12 @@ async function asReviewer(browser: Browser): Promise<Page> {
 async function siteId(page: Page): Promise<string> {
     // The owner is in several businesses; Website is the OPEN one's.
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
-    await page.goto(`${urls.APP_URL}/sites`);
-    await page.waitForURL(/\/sites\/[^/]+\/pages/, { timeout: 30_000 });
-    await expect(page.getByRole("main")).toContainText(REVIEWED_SITE, {
+    // Website: the site's editor, through All sites and Open editor
+    // while the Website area is on, straight there while it is off.
+    const id = await openReviewedSite(page);
+    await expect(page.locator("body")).toContainText(REVIEWED_SITE, {
         timeout: 30_000,
     });
-    const href = page.url();
-    const id = /\/sites\/([^/]+)\//.exec(href)?.[1];
-    // Asserted rather than defaulted: an empty id would send every step below
-    // to a different, wrong URL and fail somewhere that says nothing.
-    if (id === undefined) {
-        throw new Error(`no site id in the address: ${href}`);
-    }
     return id;
 }
 
@@ -83,33 +80,82 @@ async function publishButton(page: Page) {
 }
 
 /**
- * The first block's Visible/Hidden toggle in the inspector. On a phone the
- * inspector is a sheet, opened here from the rail's block list: a hidden
- * block is left off the page, so choosing "1 of N" on the page after hiding
- * the first would pick the next one, and put back the wrong block.
+ * Show or hide the first block, from where its Visible/Hidden lives;
+ * returns whether it was hidden before. Chosen from the block list, not
+ * the page: a hidden block is left off the page, so "1 of N" there after
+ * hiding the first would pick the next one, and put back the wrong block.
+ *
+ * Today: the inspector's toggle (pressed is "Hidden"), a sheet on a phone
+ * opened from the Blocks list. The Website area (DEC-240): the inspector's
+ * Visibility tab, "Shown on the site" or "Hidden when published", from the
+ * Pages list's first section on a desk and the Sections sheet on a phone.
  */
-async function inspectorToggle(page: Page) {
-    const toggle = page
-        .getByRole("complementary", { name: "Inspector" })
-        .getByRole("button", { name: /^(Visible|Hidden)$/ })
-        .first();
-    if (onPhone(page) && !(await toggle.isVisible())) {
-        await page
-            .getByRole("toolbar", { name: "Edit page" })
-            .getByRole("button", { name: "Blocks" })
-            .click();
-        // The list has every block, hidden or not: the header, then the
-        // page's own blocks.
-        await page
-            .getByRole("dialog")
-            .getByRole("listitem")
+async function setFirstBlockHidden(
+    page: Page,
+    hidden: boolean,
+): Promise<boolean> {
+    if (!(await websiteAreaOn(page))) {
+        const toggle = page
+            .getByRole("complementary", { name: "Inspector" })
+            .getByRole("button", { name: /^(Visible|Hidden)$/ })
+            .first();
+        if (onPhone(page) && !(await toggle.isVisible())) {
+            const sheet = await openFromPill(page, "Blocks");
+            // The list has every block, hidden or not: the header, then the
+            // page's own blocks.
+            await sheet
+                .getByRole("listitem")
+                .nth(1)
+                .getByRole("button")
+                .first()
+                .click();
+        }
+        await expect(toggle).toBeVisible({ timeout: 30_000 });
+        const was = (await toggle.getAttribute("aria-pressed")) === "true";
+        if (was !== hidden) await toggle.click();
+        return was;
+    }
+    let tab: Locator;
+    if (onPhone(page)) {
+        const sheet = await openFromPill(page, "Blocks");
+        // The row's grip comes first, then the row itself.
+        await sheet
+            .locator('li[data-row-index="0"]')
+            .getByRole("button")
             .nth(1)
+            .click();
+        tab = page
+            .getByRole("tablist", { name: "Section" })
+            .getByRole("tab", { name: "Visibility" });
+    } else {
+        await page
+            .getByRole("list", { name: /^Sections on / })
             .getByRole("button")
             .first()
             .click();
+        tab = page
+            .getByRole("complementary", { name: "Inspector" })
+            .getByRole("tab", { name: "Visibility" });
     }
-    await expect(toggle).toBeVisible({ timeout: 30_000 });
-    return toggle;
+    await pressUntil(
+        tab,
+        async () => (await tab.getAttribute("aria-selected")) === "true",
+        { timeout: 30_000 },
+    );
+    const hide = page
+        .getByRole("radio", { name: /^Hidden when published/ })
+        .filter({ visible: true });
+    const show = page
+        .getByRole("radio", { name: /^Shown on the site/ })
+        .filter({ visible: true });
+    await expect(hide).toBeVisible();
+    const was = (await hide.getAttribute("aria-checked")) === "true";
+    if (was !== hidden) {
+        const want = hidden ? hide : show;
+        await want.click();
+        await expect(want).toHaveAttribute("aria-checked", "true");
+    }
+    return was;
 }
 
 /** Put the phone's sheet or menu away, so the page is reachable again. */
@@ -133,7 +179,7 @@ async function closeOverlays(page: Page) {
 async function publishFromEditor(page: Page): Promise<string> {
     const confirm = page
         .getByRole("button", {
-            name: /^Publish (changes|site|without approval)$/,
+            name: /^Publish (changes|site|without approval|\d+ (of \d+ )?changes? now)$/,
         })
         // The check's own button, drawn after the editor's "Publish".
         .last();
@@ -286,9 +332,18 @@ test.describe(
             const publishTitle = async () => {
                 const publish = await publishButton(page);
                 // Its hint is its description (`Tip`), not a `title`.
-                return publish.getAttribute("aria-description");
+                // The Website area's phone bar says it in its name instead:
+                // "Publish: 1 change waiting", or "Publish".
+                return (
+                    (await publish.getAttribute("aria-description")) ??
+                    (await publish.getAttribute("aria-label"))
+                );
             };
-            const NOTHING = "Nothing has changed since the last publish";
+            const NOTHING =
+                /^(Nothing has changed since the last publish|Publish)$/;
+            // "Put live: 1 block …" today; the Website area counts changes.
+            const WAITING =
+                /^(Put live: .*block|Publish: \d+ changes? waiting)/;
 
             /*
              * Start from a draft that matches what is live, with the first block
@@ -297,45 +352,41 @@ test.describe(
              * back — "Nothing has changed", correctly — and fail for the first
              * run's reason, not its own.
              */
-            const first = await inspectorToggle(page);
-            // Pressed is "Hidden" (the label carries an icon, so not its text).
-            if ((await first.getAttribute("aria-pressed")) === "true") {
-                await first.click();
-            }
+            await setFirstBlockHidden(page, false);
             await closeOverlays(page);
             await expect
                 .poll(publishTitle, { timeout: 30_000 })
                 .not.toMatch(/^Saving/);
-            if ((await publishTitle()) !== NOTHING) {
+            if (!NOTHING.test((await publishTitle()) ?? "")) {
                 await publishFromEditor(page);
                 await expect
                     .poll(publishTitle, { timeout: 30_000 })
-                    .toBe(NOTHING);
+                    .toMatch(NOTHING);
             }
 
             // One block's visibility flips; the autosave counts it.
-            const toggle = await inspectorToggle(page);
-            await expect(toggle).toHaveAccessibleName("Visible");
-            await toggle.click();
+            expect(await setFirstBlockHidden(page, true)).toBe(false);
             await closeOverlays(page);
             await expect
                 .poll(publishTitle, { timeout: 30_000 })
-                .toMatch(/^Put live: .*block/);
+                .toMatch(WAITING);
 
             // The count is the server's, so a reload says the same.
             await page.reload();
             await expect
                 .poll(publishTitle, { timeout: 30_000 })
-                .toMatch(/^Put live: .*block/);
+                .toMatch(WAITING);
 
             // Put it back, publish, and nothing is waiting.
-            await (await inspectorToggle(page)).click();
+            expect(await setFirstBlockHidden(page, false)).toBe(true);
             await closeOverlays(page);
             await expect(await publishButton(page)).toBeEnabled({
                 timeout: 30_000,
             });
             await publishFromEditor(page);
-            await expect.poll(publishTitle, { timeout: 30_000 }).toBe(NOTHING);
+            await expect
+                .poll(publishTitle, { timeout: 30_000 })
+                .toMatch(NOTHING);
         });
     },
 );

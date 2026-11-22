@@ -271,7 +271,7 @@ export function EditorPanels({
  * focus goes back to when the inspector closes, so a keyboard user carries on
  * from the thing they were changing.
  */
-function subjectOnCanvas(
+export function subjectOnCanvas(
     canvasRef: RefObject<HTMLDivElement | null>,
     { selectedIndex, selectedChrome }: EditorSelection,
 ): HTMLElement | null {

@@ -29,6 +29,7 @@ import type { Flag, Section } from "@/lib/sites/service";
 
 import { keyboardInsetNow, useKeyboardUp } from "../edit-pill";
 import { SECTION_LABELS, sectionTitle } from "../editor-constants";
+import { subjectOnCanvas } from "../editor-panels";
 import { EditorSheet } from "../editor-sheet";
 import { ContentTab } from "../inspector/content-tab";
 import { FeedbackTab } from "../inspector/feedback-tab";
@@ -362,6 +363,10 @@ export function SectionSheet({
                 title={title}
                 closeLabel="Close the section"
                 modal={false}
+                // Back to the section on the page, as the old sheet did.
+                returnFocus={() =>
+                    subjectOnCanvas(model.viewport.canvasRef, selection)
+                }
                 head={head}
                 // Tall enough that the fields scroll under the head, actions
                 // and tabs, even at 320 (`fix/WXNSection`).
