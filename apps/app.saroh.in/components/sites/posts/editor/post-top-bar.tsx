@@ -127,7 +127,14 @@ export function PostTopBar({
             ) : model ? (
                 <SavedLine model={model} />
             ) : (
-                <Skeleton aria-hidden className="ml-2 h-4 w-28" />
+                // `blogdesk/WXWStates` Loading: the frame, and these words (W7).
+                <span
+                    role="status"
+                    data-post-opening=""
+                    className="ml-2 shrink-0 text-[0.8125rem] text-muted-foreground"
+                >
+                    Opening the post…
+                </span>
             )}
 
             <span className="flex-1" />

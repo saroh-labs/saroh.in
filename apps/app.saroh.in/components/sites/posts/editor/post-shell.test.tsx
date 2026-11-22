@@ -19,19 +19,26 @@ vi.mock("next/navigation", () => ({
 
 // The rich text editor is browser-heavy; a textarea stands in for it. Like
 // Tiptap (setEditable emits an update), it re-reports its value on mount.
+// `dyn.arriving`: the editor's code is still on its way (its `loading`).
+const dyn = vi.hoisted(() => ({ arriving: false }));
 vi.mock("next/dynamic", async () => {
     const { useEffect } = await import("react");
     return {
-        default: () =>
+        default: (_load: unknown, opts?: { loading?: () => React.ReactNode }) =>
             function Stand({
                 value,
                 onChange,
+                readOnly,
             }: {
                 value: string;
                 onChange: (v: string) => void;
+                readOnly?: boolean;
             }) {
                 // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
                 useEffect(() => onChange(value), []);
+                if (dyn.arriving && opts?.loading) return opts.loading();
+                // A reader's styled post (R3): nothing to type in.
+                if (readOnly) return <div data-styled-post="" />;
                 return (
                     <textarea
                         aria-label="Post body"
@@ -61,6 +68,7 @@ vi.mock("@/components/shared/fields/media-picker", () => ({
 }));
 vi.mock("@/components/shared/share-item/share-item-sheet", () => ({
     ShareItemButton: () => <button type="button">Share</button>,
+    ShareItemSheet: () => null,
 }));
 vi.mock("@/lib/sites/actions", () => ({
     createComment: vi.fn(),
@@ -289,7 +297,7 @@ describe("the desk post editor (U15)", () => {
             "Undo",
             "Redo",
             "Preview",
-            "More: save now, more formatting, take off the site, delete",
+            "More: share, find, save now, more formatting, take off the site, delete",
         ]) {
             expect(named(name), name).toBeDefined();
         }
@@ -305,7 +313,11 @@ describe("the desk post editor (U15)", () => {
     it("a changed page link says the old one forwards on publish", () => {
         act(() => root.render(<PostShell data={data()} post={post} />));
         act(() => named("Search and sharing")?.click());
-        act(() => named("Change search and sharing")?.click());
+        // W8: changed in place, with the previews; no "Change" button first.
+        expect(named("Change search and sharing")).toBeUndefined();
+        expect(document.body.textContent).toContain(
+            "when someone shares the link",
+        );
         expect(document.body.textContent).toContain(
             "Changed from /blog/bridal-makeup-trial. When you publish the post, the old link forwards here.",
         );
@@ -414,11 +426,11 @@ describe("postTrailTabs", () => {
 describe("the post capability table, row by row (U51)", () => {
     const menuItems = () =>
         Array.from(document.querySelectorAll("[role=menuitem]")).map((m) =>
-            m.textContent.replace("⌘S", "").trim(),
+            m.textContent.replace(/⌘[SK]/, "").trim(),
         );
     function openMore() {
         const trigger = named(
-            "More: save now, more formatting, take off the site, delete",
+            "More: share, find, save now, more formatting, take off the site, delete",
         );
         if (!trigger) throw new Error("No More");
         act(() => {
@@ -450,10 +462,11 @@ describe("the post capability table, row by row (U51)", () => {
         expect(named("Publish post")).toBeDefined();
     });
 
-    it("More: Save now, More formatting, Take off the site and Delete", () => {
+    it("More: Find, Save now, More formatting, Take off the site and Delete", () => {
         act(() => root.render(<PostShell data={data()} post={post} />));
         openMore();
         expect(menuItems()).toEqual([
+            "Find",
             "Save now",
             "More formatting",
             "Take off the site…",
@@ -562,5 +575,28 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         draw(loader);
         draw(<PostShell key="p2" data={listed} post={other} />);
         expect(el("[data-left-panel]").dataset.leftPanel).toBe("add");
+    });
+});
+
+describe("opening a post (W7)", () => {
+    afterEach(() => {
+        dyn.arriving = false;
+    });
+
+    it("keeps the whole post a skeleton, and Publish grey, until the editor is here", () => {
+        dyn.arriving = true;
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        expect(document.querySelector("[data-post-opening]")?.textContent).toBe(
+            "Opening the post…",
+        );
+        const publish = Array.from(document.querySelectorAll("button")).find(
+            (b) => b.textContent === "Publish post",
+        );
+        expect(publish?.disabled).toBe(true);
+        expect(
+            document
+                .querySelector("[data-writing-surface]")
+                ?.closest("[aria-hidden]"),
+        ).not.toBeNull();
     });
 });

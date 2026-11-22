@@ -103,6 +103,7 @@ const ROW = {
     hours: [{ dayOfWeek: 1, startMinute: 360, endMinute: 720 }],
     extraHours: [],
     timeOff: [],
+    showOnTeamPage: false,
 };
 
 /** The refusal body a BadRequest/Conflict carries. */
@@ -800,5 +801,44 @@ describe("StaffService — booking rules", () => {
                 update: { freeCancelHours: 12, latestBookingMinutes: null },
             }),
         );
+    });
+});
+
+describe("StaffService — Show on Our team (A7, DEC-246)", () => {
+    it("is off until switched on", async () => {
+        const list = await service.list(member);
+        expect(list.staff[0]?.showOnTeamPage).toBe(false);
+    });
+
+    it("lets the person switch it for themselves, whatever their role", async () => {
+        db.staffMember!.findFirst!.mockResolvedValue({
+            ...ROW,
+            showOnTeamPage: true,
+            membership: {
+                id: "mem_1",
+                userId: "user_1",
+                user: { name: "Asha", email: "asha@example.com" },
+            },
+        });
+        await service.setTeamPage(member, "staff_1", true);
+        expect(db.staffMember!.update).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { showOnTeamPage: true } }),
+        );
+    });
+
+    it("lets an owner or admin switch it for someone else", async () => {
+        await service.setTeamPage(ctx(), "staff_1", true);
+        expect(db.staffMember!.update).toHaveBeenCalled();
+    });
+
+    it("refuses anyone else, and writes nothing", async () => {
+        db.staffMember!.findFirst!.mockResolvedValue({
+            ...ROW,
+            membership: { userId: "someone_else" },
+        });
+        await expect(
+            service.setTeamPage(member, "staff_1", true),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(db.staffMember!.update).not.toHaveBeenCalled();
     });
 });

@@ -14,10 +14,14 @@ import {
     ArrowDownToLine,
     MoreHorizontal,
     Save,
+    Search,
+    Share2,
     SlidersHorizontal,
     Trash2,
 } from "lucide-react";
 import { useState } from "react";
+
+import { ShareItemSheet } from "@/components/shared/share-item/share-item-sheet";
 
 import type { PostEditorModel } from "./post-model";
 
@@ -30,25 +34,43 @@ import type { PostEditorModel } from "./post-model";
 export function PostMoreMenu({
     model,
     onMoreFormatting,
+    onFind,
 }: {
     model: PostEditorModel;
     onMoreFormatting: () => void;
+    /** Find (⌘K, W6). */
+    onFind?: () => void;
 }) {
     const { draft, data } = model;
     const [ask, setAsk] = useState<"takeOff" | "delete" | null>(null);
+    const [sharing, setSharing] = useState(false);
+    const share = draft.live ? data.share : null;
     const writer = !data.readOnly;
     return (
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <IconButton
-                        label="More: save now, more formatting, take off the site, delete"
+                        label="More: share, find, save now, more formatting, take off the site, delete"
                         icon={<MoreHorizontal className="size-5" />}
                         tooltip={false}
                         className="size-11"
                     />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
+                    {share ? (
+                        <DropdownMenuItem onSelect={() => setSharing(true)}>
+                            <Share2 aria-hidden />
+                            Share as a post
+                        </DropdownMenuItem>
+                    ) : null}
+                    {onFind ? (
+                        <DropdownMenuItem onSelect={onFind}>
+                            <Search aria-hidden />
+                            Find
+                            <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
+                        </DropdownMenuItem>
+                    ) : null}
                     {writer && !data.paused ? (
                         <>
                             <DropdownMenuItem
@@ -68,7 +90,8 @@ export function PostMoreMenu({
                     ) : null}
                     {writer && draft.postId ? (
                         <>
-                            <DropdownMenuSeparator />
+                            {/* One gap, no rule, before the ways out (W6.3). */}
+                            <DropdownMenuSeparator className="my-1.5 bg-transparent" />
                             {/* Taking it off only ever lowers the count, so
                                 a paused post keeps it. */}
                             {draft.live ? (
@@ -96,6 +119,24 @@ export function PostMoreMenu({
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
+            {share ? (
+                <ShareItemSheet
+                    open={sharing}
+                    onClose={() => setSharing(false)}
+                    setup={share.setup}
+                    item={{
+                        kind: "post",
+                        // The saved address, which the live copy has.
+                        ref: model.liveCopy?.slug ?? draft.fields.slug,
+                        name: draft.fields.title,
+                        price: null,
+                        url: share.url,
+                        offerId: null,
+                        hasPhoto: Boolean(draft.fields.image.trim()),
+                        summary: draft.fields.excerpt,
+                    }}
+                />
+            ) : null}
             <ConfirmDialog
                 open={ask === "takeOff"}
                 onOpenChange={(open) => setAsk(open ? "takeOff" : null)}

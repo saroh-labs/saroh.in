@@ -19,6 +19,7 @@ import { useOpenPageId } from "../page-switch";
 
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
+import { count } from "@/lib/format/plural";
 import type { Flag, Section } from "@/lib/sites/service";
 
 import { sectionTitle } from "../editor-constants";
@@ -63,6 +64,11 @@ export function PagesTree({
     const openPageId = useOpenPageId(siteId);
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
+    const waiting = model.review.changes ?? [];
+    const changeCount = waiting.length;
+    const changedPages = new Set(
+        waiting.flatMap((u) => (u.pageId === null ? [] : [u.pageId])),
+    ).size;
 
     function openPage(id: string) {
         if (id === pageId) return;
@@ -299,6 +305,18 @@ export function PagesTree({
                                                                 className="size-1.5 shrink-0 rounded-full bg-foreground"
                                                             />
                                                         ) : null}
+                                                        {section.key !==
+                                                            undefined &&
+                                                        model.review.changedByKey.has(
+                                                            section.key,
+                                                        ) ? (
+                                                            // R1: changed since live.
+                                                            <span
+                                                                role="img"
+                                                                aria-label="Changed since live"
+                                                                className="size-2 shrink-0 rounded-full bg-info"
+                                                            />
+                                                        ) : null}
                                                         {mark ? (
                                                             <span className="flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
                                                                 <EyeOff
@@ -330,7 +348,16 @@ export function PagesTree({
             </div>
 
             <div className="shrink-0 border-t px-3 pb-3 pt-2.5">
-                {readOnly ? (
+                {readOnly && changeCount > 0 ? (
+                    // R1 (`WXMReviewer`): what waits, where the dots are.
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span
+                            aria-hidden
+                            className="size-2 shrink-0 rounded-full bg-info"
+                        />
+                        {`Changed since live · ${count(changeCount, "change")}${changedPages > 0 ? ` on ${count(changedPages, "page")}` : ""}`}
+                    </p>
+                ) : readOnly ? (
                     <p className="text-xs leading-relaxed text-muted-foreground">
                         You can read every page and leave notes. Nothing else
                         changes.

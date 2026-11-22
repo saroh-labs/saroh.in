@@ -7,8 +7,19 @@ import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import type { Section } from "@/lib/sites/service";
 
-/** The services a section shows, when it is bound to Services. */
-export function boundServiceIds(section: Section): string[] | null {
+/**
+ * The services a section shows, when it is bound to Services. A Booking
+ * section (D6) shows its one service, or, with none named, every service
+ * the booking page offers: `all`, the business's live ones.
+ */
+export function boundServiceIds(
+    section: Section,
+    all: readonly string[] = [],
+): string[] | null {
+    if (section.type === "booking") {
+        const one = (section.content as { serviceId?: string }).serviceId;
+        return one ? [one] : [...all];
+    }
     const ids = (section.content as { serviceIds?: unknown }).serviceIds;
     return Array.isArray(ids) ? (ids as string[]) : null;
 }
@@ -29,16 +40,18 @@ export function BoundServices({
     /** Open the price sheet for a service; absent, prices aren't tappable. */
     onPrice?: (serviceId: string) => void;
 }) {
-    const ids = boundServiceIds(section);
-    if (ids === null || ids.length === 0 || services.status !== "ready") {
-        return null;
-    }
+    if (services.status !== "ready") return null;
+    const active = services.services.filter((s) => s.status === "ACTIVE");
+    const ids = boundServiceIds(
+        section,
+        active.map((s) => s.id),
+    );
+    if (ids === null || ids.length === 0) return null;
     const byId = new Map(services.services.map((s) => [s.id, s]));
     const shown = ids.flatMap((id) => {
         const s = byId.get(id);
         return s?.status === "ACTIVE" ? [s] : [];
     });
-    const active = services.services.filter((s) => s.status === "ACTIVE");
 
     return (
         <section

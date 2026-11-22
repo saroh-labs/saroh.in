@@ -137,17 +137,11 @@ for (const size of [
                 await page
                     .getByRole("tab", { name: "Search and sharing" })
                     .click();
-                await page
-                    .getByRole("button", { name: "Change search and sharing" })
-                    .click();
-                const sheet = page.getByRole("dialog", {
-                    name: "Search and sharing",
-                });
-                await expect(sheet.getByLabel("Page link")).toBeVisible();
-                await expect(sheet).toContainText(
-                    "Saved · goes live when you publish",
-                );
-                await sheet.getByRole("button", { name: "Cancel" }).click();
+                // Changed in place, beside the post (W8), with the previews.
+                await expect(page.getByLabel("Page link")).toBeVisible();
+                await expect(
+                    page.getByText("when someone shares the link"),
+                ).toBeVisible();
                 await expect(
                     page.evaluate(
                         () =>

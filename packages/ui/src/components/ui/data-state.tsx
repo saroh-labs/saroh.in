@@ -793,6 +793,12 @@ export interface FailedStateProps extends Omit<
 > {
     icon?: React.ReactNode;
     /**
+     * Danger by default. Neutral where nothing broke on Saroh's side and
+     * red would alarm: a dropped connection the merchant can retry (the
+     * site editor's page switch, D5).
+     */
+    tone?: StateTone;
+    /**
      * Optional: a failure has a usable default. A caller that knows WHAT
      * failed says so with `couldntLoad("orders")`: "Couldn't load orders"
      * beats "Couldn't load this" on a screen showing three panels.
@@ -838,6 +844,7 @@ export function FailedState({
     action,
     reference,
     size = "page",
+    tone = "danger",
     ...props
 }: FailedStateProps) {
     const retry =
@@ -862,7 +869,7 @@ export function FailedState({
             title={title}
             description={description}
             outline="solid"
-            tone="danger"
+            tone={tone}
             action={
                 retry || action || showReference ? (
                     <div

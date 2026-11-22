@@ -257,6 +257,8 @@ export interface ServicesListContent {
     layout?: ListLayout;
     showDescriptions?: boolean;
     buttonLabel?: string;
+    /** "Show a Book button" (A5). Absent: shown. */
+    showBook?: boolean;
     /** The price card's lines around the service's price (template polish). */
     modeLine?: string;
     followUpLine?: string;
@@ -2478,8 +2480,17 @@ export async function getSiteFlags(siteId: string): Promise<SiteFlags> {
  * module page names its `kind` and may leave both to the kind's defaults
  * (a Book or Shop page's address is always its route's).
  */
+/** A new page type (A7, DEC-246): a free page filled from the business. */
+export type PageStarter = "SERVICE" | "OFFER" | "TEAM";
+
 export type CreatePageInput =
-    | { kind?: "FREE"; title: string; path: string; inMenu?: boolean }
+    | {
+          kind?: "FREE";
+          title: string;
+          path: string;
+          inMenu?: boolean;
+          starter?: PageStarter;
+      }
     | {
           kind: ModulePageKind;
           title?: string;

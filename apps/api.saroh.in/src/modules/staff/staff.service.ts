@@ -28,6 +28,7 @@ import { ownDiaryOf } from "../bookings/own-diary";
 import type { PersonRules } from "../bookings/person-rules";
 import { personRulesOf } from "../bookings/person-rules";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
+import { allows } from "../organizations/organization-policy";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
 import type {
@@ -66,6 +67,8 @@ export interface StaffView {
     name: string;
     title: string | null;
     status: string;
+    /** "Show on Our team" (DEC-246): their name and role on a team page. */
+    showOnTeamPage: boolean;
     /** The team member they are, when they have an account. */
     membership: {
         id: string;
@@ -169,6 +172,7 @@ function toView(
         name: row.name,
         title: row.title,
         status: row.status,
+        showOnTeamPage: row.showOnTeamPage,
         membership: row.membership
             ? {
                   id: row.membership.id,
@@ -440,6 +444,35 @@ export class StaffService {
      * Take someone off the diary for new bookings. Their bookings keep them
      * (the diary still says who); their hours stay, in case they come back.
      */
+    /**
+     * "Show on Our team" (A7, DEC-246): opt-in, off until switched on, by
+     * the person themselves or by whoever may change staff for them. Any
+     * other role is refused, even one that can read the team.
+     */
+    async setTeamPage(
+        ctx: OrganizationContext,
+        staffId: string,
+        shown: boolean,
+    ): Promise<StaffView> {
+        const person = await prisma.staffMember.findFirst({
+            where: { id: staffId, organizationId: ctx.organizationId },
+            select: { id: true, membership: { select: { userId: true } } },
+        });
+        if (!person) throw new NotFoundException("Staff member not found");
+        const self = person.membership?.userId === ctx.userId;
+        if (!self && !allows(ctx, "service:write")) {
+            throw new ForbiddenException(
+                "Only they, or someone who can change the team, can switch this.",
+            );
+        }
+        await prisma.staffMember.update({
+            where: { id: person.id },
+            data: { showOnTeamPage: shown },
+            select: { id: true },
+        });
+        return this.read(ctx, person.id);
+    }
+
     async archive(
         ctx: OrganizationContext,
         staffId: string,

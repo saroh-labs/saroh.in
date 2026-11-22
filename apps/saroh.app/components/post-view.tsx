@@ -1,4 +1,4 @@
-import { siteImage } from "@saroh/site-blocks";
+import { POST_BODY_BLOCKS, siteImage } from "@saroh/site-blocks";
 import Link from "next/link";
 
 /**
@@ -101,7 +101,7 @@ export function PostArticle({ post }: { post: PostViewModel }) {
                    so a post reads like the rest of the site rather than like
                    a second typography system: the merchant's own text colour
                    at 80%, never the plugin's greys. */
-                className="prose max-w-none text-[length:var(--site-body-size,1rem)] prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent-text prose-strong:text-site-fg prose-li:text-site-fg/80"
+                className={`prose max-w-none text-[length:var(--site-body-size,1rem)] ${POST_BODY_BLOCKS} prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent-text prose-strong:text-site-fg prose-li:text-site-fg/80`}
                 // Sanitized at publish — see the note above.
                 dangerouslySetInnerHTML={{ __html: post.content }}
             />

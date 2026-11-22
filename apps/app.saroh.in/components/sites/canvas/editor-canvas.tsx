@@ -138,6 +138,7 @@ export function EditorCanvas({
     onlyHeldBack,
     heldBack,
     blockTools,
+    headerTools,
     textEdit,
     conflictBy = null,
     conflictYou = false,
@@ -154,6 +155,8 @@ export function EditorCanvas({
     saveFailed?: ReactNode;
     /** A phone's toolbar on the selected block (DEC-185). */
     blockTools?: (index: number) => ReactNode;
+    /** On the selected header: its menu edited in place (H1). */
+    headerTools?: ReactNode;
     /** Typing on the page (U47d): the selected section's words' host. */
     textEdit?: ComponentProps<typeof DraftPreview>["textEdit"];
     canvasRef: RefObject<HTMLDivElement | null>;
@@ -248,6 +251,7 @@ export function EditorCanvas({
                 : {
                       selectedIndex,
                       blockTools,
+                      headerTools,
                       textEdit,
                       onSelect: (index: number) => {
                           setRail("sections");
@@ -279,7 +283,7 @@ export function EditorCanvas({
                     className="sticky top-3 z-20 flex h-0 justify-center"
                 >
                     <p className="h-fit whitespace-nowrap rounded-full border bg-card px-3 py-1.5 text-xs font-medium shadow-md">
-                        {`Trying ${trying}. Not saved until you press Enter.`}
+                        {trying}
                     </p>
                 </div>
             ) : null}

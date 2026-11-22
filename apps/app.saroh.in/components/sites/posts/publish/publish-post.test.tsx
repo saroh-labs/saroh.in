@@ -23,10 +23,25 @@ vi.mock("next/dynamic", () => ({
         function Stand({
             value,
             onChange,
+            readOnly,
         }: {
             value: string;
             onChange: (v: string) => void;
+            readOnly?: boolean;
         }) {
+            // A reader's styled post (R3): its paragraphs, nothing to type in.
+            if (readOnly)
+                return (
+                    <div>
+                        {value
+                            .split("</p>")
+                            .map((t) => t.replace(/<[^>]*>/g, " ").trim())
+                            .filter(Boolean)
+                            .map((t) => (
+                                <p key={t}>{t}</p>
+                            ))}
+                    </div>
+                );
             return (
                 <textarea
                     aria-label="Post body"
@@ -69,6 +84,7 @@ vi.mock("@/components/shared/fields/media-picker", () => ({
 }));
 vi.mock("@/components/shared/share-item/share-item-sheet", () => ({
     ShareItemButton: () => <button type="button">Share</button>,
+    ShareItemSheet: () => null,
 }));
 vi.mock("@/lib/sites/actions", () => ({
     createComment: (...a: unknown[]) => createComment(...a),
@@ -210,6 +226,39 @@ describe("Publish post (U18)", () => {
         expect(document.querySelector("[data-tell-people]")).not.toBeNull();
         expect(document.body.textContent).toContain("Live now");
         expect(document.body.textContent).toContain("WhatsApp status");
+    });
+
+    it("asks who to tell before it goes, and shows only those once live (Y2)", async () => {
+        publishPost.mockResolvedValue({
+            ok: true,
+            data: { path: "/blog/bridal-makeup-trial" },
+        });
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        await settle(() => named("Publish post")?.click());
+        const before = document.querySelector("[data-tell-once-live]");
+        expect(before?.textContent).toContain("Tell people once it is live");
+        expect(before?.textContent).toContain("WhatsApp status");
+        // Switches (`WXYPublish`), after When in the sheet.
+        const whatsapp = Array.from(
+            before?.querySelectorAll<HTMLElement>('[role="switch"]') ?? [],
+        ).at(-1);
+        const order = Array.from(
+            document.querySelectorAll('[role="dialog"] h3'),
+        ).map((h) => h.textContent);
+        expect(order.indexOf("When")).toBeLessThan(
+            order.indexOf("Tell people once it is live"),
+        );
+        expect(order.indexOf("Checked")).toBeLessThan(order.indexOf("When"));
+        await settle(() => whatsapp?.click());
+        const submit = Array.from(
+            document.querySelectorAll<HTMLButtonElement>(
+                '[role="dialog"] button[type="submit"]',
+            ),
+        ).find((b) => b.textContent.includes("Publish post"));
+        await settle(() => submit?.click());
+        const after = document.querySelector("[data-tell-people]");
+        expect(after).not.toBeNull();
+        expect(after?.textContent).not.toContain("WhatsApp status");
     });
 
     it("Later schedules it at the day and time picked, and says why it can't", async () => {
@@ -440,11 +489,14 @@ describe("the reviewer's view (U17, DEC-200)", () => {
     it("marks the changes against the live copy, read only", () => {
         act(() => root.render(<PostShell data={reader} post={post} />));
         const review = document.querySelector("[data-post-review]");
-        expect(review?.textContent).toContain("Since the live copy");
-        expect(review?.textContent).toContain("Change 1 of 1");
-        expect(review?.querySelector("del")?.textContent).toContain(
-            "and friends.",
-        );
+        // The legend sits in the canvas bar on the desk (R3.2).
+        expect(
+            document.querySelector("[data-canvas-bar] [data-review-legend]")
+                ?.textContent,
+        ).toContain("Since the live copy");
+        // Drawn as the post looks (R3); the marks themselves are
+        // change-marks.test.ts's, on a real editor.
+        expect(review?.getAttribute("data-post-review")).toBe("styled");
         expect(named("Next change")).toBeDefined();
         expect(named("Publish post")).toBeUndefined();
         expect(named("History")).toBeUndefined();

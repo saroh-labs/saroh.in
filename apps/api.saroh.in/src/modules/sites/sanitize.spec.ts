@@ -134,6 +134,39 @@ describe("post embeds (U15b)", () => {
     });
 });
 
+describe("a post's own blocks (W2)", () => {
+    it("keeps each block exactly as the editor writes it, and is idempotent", () => {
+        for (const html of [
+            '<div data-embed="book" data-id="svc1"></div>',
+            '<div data-embed="offer" data-id="disc_1"></div>',
+            '<div data-box="note"><p>Bring photos.</p></div>',
+            '<div data-gallery="photos"><img src="https://cdn.test/a.jpg" alt="A" /><img src="https://cdn.test/b.jpg" alt="B" /></div>',
+            '<div data-contents="headings"></div>',
+            '<p data-button="link"><a href="/book">Book a trial</a></p>',
+        ]) {
+            expect(sanitizeRichHtml(html)).toBe(html);
+            expect(sanitizeRichHtml(sanitizeRichHtml(html))).toBe(html);
+        }
+    });
+
+    it("drops any other value, and a button's script link", () => {
+        expect(
+            sanitizeRichHtml('<div data-box="x" onclick="y()">Hi</div>'),
+        ).toBe("<div>Hi</div>");
+        expect(sanitizeRichHtml('<div data-gallery="evil">a</div>')).toBe(
+            '<div data-gallery="photos">a</div>',
+        );
+        expect(
+            sanitizeRichHtml(
+                '<p data-button="1"><a href="javascript:alert(1)">Go</a></p>',
+            ),
+        ).toBe('<p data-button="link"><a>Go</a></p>');
+        expect(sanitizeRichHtml('<span data-button="link">x</span>')).toBe(
+            "<span>x</span>",
+        );
+    });
+});
+
 describe("sanitizeSectionContent", () => {
     it("cleans only the contract's flagged fields, and never mutates the input", () => {
         const input = {

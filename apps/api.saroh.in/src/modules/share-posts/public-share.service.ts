@@ -201,6 +201,35 @@ export class PublicShareService {
     }
 
     /**
+     * A live offer's words for a post's Offer card (W2), the same read
+     * the Offer picture draws (`offer`): what it is, how much off, until
+     * when, and its code. An ended or used-up offer is a 404 like any
+     * other miss, and the post then draws nothing in its place.
+     */
+    async offerWords(
+        siteId: string,
+        id: string,
+        visitor: string,
+    ): Promise<{
+        name: string;
+        headline: string;
+        until: string | null;
+        code: string;
+    }> {
+        // Not `take`: one row read, asked by the site's own server for every
+        // visitor at once, where a per-visitor picture limit would starve it.
+        const site = await this.liveSite(siteId);
+        const { name, offer } = await this.offer(site, id, visitor, null);
+        if (!offer) notFound();
+        return {
+            name,
+            headline: offer.headline,
+            until: offer.until ?? null,
+            code: offer.code ?? "",
+        };
+    }
+
+    /**
      * The booking page's card with the headline typed in the share sheet
      * (owner, 12 Nov 2026): for the business's own people only, through
      * `organizations/:id/share/book/image`, never the public route, so

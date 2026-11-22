@@ -6,17 +6,18 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { FixedBlockInspector } from "@/components/sites/blocks/fixed-block-inspector";
 import { useServicesForPicker } from "@/components/sites/blocks/use-services-for-picker";
 import { count } from "@/lib/format/plural";
 import type { Flag } from "@/lib/sites/service";
 
 import { SECTION_LABELS, sectionTitle } from "../editor-constants";
+import { linkPlaces, TextLinksContext } from "../link-picker";
 import type { PhotoTarget } from "../sheets/photo-sheet";
 import { PhotoSheet } from "../sheets/photo-sheet";
 import { PhotoSheetOpener } from "../sheets/photo-sheet-opener";
 import { PriceSheet } from "../sheets/price-sheet";
 import type { EditorModel } from "../shell/editor-model";
+import { ChromePanel } from "./chrome-panel";
 import { ContentTab } from "./content-tab";
 import { FeedbackTab } from "./feedback-tab";
 import { PageAtRest } from "./page-at-rest";
@@ -24,7 +25,36 @@ import { sectionActions } from "./section-actions";
 import { StyleTab } from "./style-tab";
 import { VisibilityTab } from "./visibility-tab";
 
-export type InspectorTab = "content" | "style" | "visibility" | "feedback";
+import type { InspectorTab } from "./inspector-tab";
+
+export type { InspectorTab };
+
+/** Content · Style · Visibility · Feedback, for a section or the header (H3). */
+function inspectorTabs(
+    tab: InspectorTab,
+    openTab: (next: InspectorTab) => void,
+    notes = 0,
+) {
+    return (
+        <TabStrip<InspectorTab>
+            label="Inspector"
+            idPrefix="inspector"
+            tabs={[
+                { value: "content", label: "Content" },
+                { value: "style", label: "Style" },
+                { value: "visibility", label: "Visibility" },
+                {
+                    value: "feedback",
+                    label: "Feedback",
+                    ...(notes > 0 ? { count: notes } : {}),
+                },
+            ]}
+            value={tab}
+            onValueChange={openTab}
+            listClassName="px-2"
+        />
+    );
+}
 
 /** The column's title row (`fix/WXKSelected`): a kicker over a title. */
 function InspectorHeader({
@@ -113,14 +143,8 @@ export function SiteInspector({
                 onClose={deselect}
             />
         );
-        body = (
-            <FixedBlockInspector
-                part={part}
-                siteId={siteId}
-                text={model.chrome}
-                bare
-            />
-        );
+        tabs = inspectorTabs(tab, openTab);
+        body = <ChromePanel part={part} tab={tab} model={model} />;
     } else if (active) {
         const { index, section } = active;
         const notes =
@@ -134,25 +158,7 @@ export function SiteInspector({
                 onClose={deselect}
             />
         );
-        tabs = (
-            <TabStrip<InspectorTab>
-                label="Inspector"
-                idPrefix="inspector"
-                tabs={[
-                    { value: "content", label: "Content" },
-                    { value: "style", label: "Style" },
-                    { value: "visibility", label: "Visibility" },
-                    {
-                        value: "feedback",
-                        label: "Feedback",
-                        ...(notes > 0 ? { count: notes } : {}),
-                    },
-                ]}
-                value={tab}
-                onValueChange={openTab}
-                listClassName="px-2"
-            />
-        );
+        tabs = inspectorTabs(tab, openTab, notes);
         const onChange = (next: typeof section) => draft.replaceAt(index, next);
         body =
             tab === "style" ? (
@@ -188,26 +194,38 @@ export function SiteInspector({
                             : (field) => setPhotoFor({ index, field })
                     }
                 >
-                    <ContentTab
-                        siteId={siteId}
-                        section={section}
-                        pages={pages}
-                        services={services}
-                        flags={activeFlags}
-                        unreadable={
-                            section.key !== undefined &&
-                            unreadableSections.includes(section.key)
-                        }
-                        error={
-                            draft.errorIndex === index
-                                ? draft.errorMessage
-                                : null
-                        }
-                        heldBack={draft.heldBackAt(index)}
-                        onChange={onChange}
-                        onPrice={setPriceFor}
-                        onAddNote={() => openTab("feedback")}
-                    />
+                    {/* A rich-text field's Link opens the picker (D2). */}
+                    <TextLinksContext.Provider
+                        value={{
+                            places: linkPlaces(pages, pageId, draft.sections),
+                            services:
+                                services.status === "ready"
+                                    ? services.services
+                                    : [],
+                            businessPhone: model.businessPhone,
+                        }}
+                    >
+                        <ContentTab
+                            siteId={siteId}
+                            section={section}
+                            pages={pages}
+                            services={services}
+                            flags={activeFlags}
+                            unreadable={
+                                section.key !== undefined &&
+                                unreadableSections.includes(section.key)
+                            }
+                            error={
+                                draft.errorIndex === index
+                                    ? draft.errorMessage
+                                    : null
+                            }
+                            heldBack={draft.heldBackAt(index)}
+                            onChange={onChange}
+                            onPrice={setPriceFor}
+                            onAddNote={() => openTab("feedback")}
+                        />
+                    </TextLinksContext.Provider>
                 </PhotoSheetOpener>
             );
     } else if (page) {

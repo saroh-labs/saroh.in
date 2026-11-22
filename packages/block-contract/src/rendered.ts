@@ -360,6 +360,7 @@ const renderedServicesList = z.object({
     layout: z.enum(["cards", "list"]).optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel: z.string().optional(),
+    showBook: z.boolean().optional(),
     modeLine: z.string().optional(),
     followUpLine: z.string().optional(),
     includesLabel: z.string().optional(),

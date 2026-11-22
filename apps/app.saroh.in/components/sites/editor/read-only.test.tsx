@@ -55,6 +55,7 @@ const writes = vi.hoisted(() => ({
     updateSiteStyle: vi.fn(),
     updateSiteSettings: vi.fn(),
     updateSiteFooter: vi.fn(),
+    updateSiteNavigation: vi.fn(),
     createPage: vi.fn(),
     deletePage: vi.fn(),
     updatePage: vi.fn(),
@@ -131,7 +132,11 @@ vi.mock("@saroh/ui/popover", async () => {
             ? React.createElement("div", { role: "dialog" }, children)
             : null;
     }
-    return { Popover, PopoverTrigger, PopoverContent };
+    // The brand colour's popover anchors on its own button (B3).
+    function PopoverAnchor({ children }: { children: React.ReactNode }) {
+        return children;
+    }
+    return { Popover, PopoverTrigger, PopoverContent, PopoverAnchor };
 });
 vi.mock("@/lib/api/http", () => ({
     apiFetch: vi.fn(),
@@ -391,7 +396,7 @@ const ALLOWED: RegExp[] = [
     // The one phone editor (U49): the page picker, the Sections sheet's
     // rows and pinned header and footer, and a reader's way to Brand.
     /^Page: .+\. Choose another page or change its settings$/,
-    /^(Welcome in|Our story)(Top of the page|Hidden when published)$/,
+    /^(Welcome in|Our story)(Heading and button|Hidden when published)$/,
     /^Open the (header|footer)$/,
     /^(Sections on this page|Done)$/,
     // Preview at three sizes (U46f): which sizes, and scrolling together.
@@ -1657,6 +1662,38 @@ describe("the inspector with the Website area on (U47)", () => {
         click(button("Back to this page's sections"));
         expect($("[data-everywhere-banner]")).toBeNull();
     });
+
+    it("the header's panel: its tabs, the menu edited here, no Move or Remove (H1, H3)", async () => {
+        writes.updateSiteNavigation.mockResolvedValue({ ok: true, data: {} });
+        render(owner);
+        click(button(/^Header/));
+        expect(inspector()?.textContent).toContain(
+            "Renaming here never renames the page",
+        );
+        expect(has("Content")).toBe(true);
+        expect(has("Move up")).toBe(false);
+        expect(inspector()?.textContent).not.toContain("Open Website settings");
+        // A page not in the menu yet goes in, and saves on its own.
+        const add = Array.from(
+            inspector()?.querySelectorAll<HTMLElement>("button") ?? [],
+        ).find((b) => b.textContent === "About");
+        if (!add) throw new Error("No About to add to the menu");
+        click(add);
+        await act(async () => {
+            vi.advanceTimersByTime(800);
+            await Promise.resolve();
+        });
+        expect(writes.updateSiteNavigation).toHaveBeenCalledWith(
+            expect.any(String),
+            { items: [{ pageId: "p-about" }] },
+        );
+        click(button("Visibility"));
+        expect(inspector()?.textContent).toContain(
+            "can't be hidden, moved or removed",
+        );
+        // The one write this scene means to make (the file's rule is none).
+        writes.updateSiteNavigation.mockClear();
+    });
 });
 
 describe("the one phone editor (U49)", () => {
@@ -1783,6 +1820,18 @@ describe("the one phone editor (U49)", () => {
         expect(has("Hide here")).toBe(true);
     });
 
+    it("the header's sheet has the desk's tabs and the menu (H4)", () => {
+        render(owner);
+        tapSection(0);
+        click(button("Move"));
+        click(button("Change the header"));
+        expect(document.body.textContent).toContain(
+            "Renaming here never renames the page",
+        );
+        expect(has("Visibility")).toBe(true);
+        expect(has("Move up")).toBe(false);
+    });
+
     it("Move opens Sections: pinned header and footer, Up and Down with Undo", () => {
         render(owner);
         tapSection(0);
@@ -1794,6 +1843,8 @@ describe("the one phone editor (U49)", () => {
         expect(list()?.textContent).toContain(
             "FooterOn every page · stays at the bottom",
         );
+        // Every row says what it shows (P1).
+        expect(list()?.textContent).toContain("Welcome inHeading and button");
         expect(
             (button("Move Welcome in up") as HTMLButtonElement).disabled,
         ).toBe(true);

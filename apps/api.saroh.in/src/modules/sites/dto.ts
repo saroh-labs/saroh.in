@@ -20,6 +20,8 @@ import {
 import type { PageKind } from "@saroh/database";
 
 import { PAGE_KINDS } from "./page-kinds";
+import type { PageStarter } from "./page-starters";
+import { PAGE_STARTERS } from "./page-starters";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -218,6 +220,17 @@ export class CreatePageDto {
     @IsOptional()
     @IsBoolean({ message: "inMenu must be a boolean" })
     inMenu?: boolean;
+
+    /**
+     * A new page type (A7, DEC-246) for a free-form page: it starts with
+     * that type's sections, filled from the business. ABSENT: empty, as
+     * ever. Only with the Website area on (DEC-240).
+     */
+    @IsOptional()
+    @IsIn(PAGE_STARTERS, {
+        message: `starter must be one of ${PAGE_STARTERS.join(", ")}`,
+    })
+    starter?: PageStarter;
 }
 
 function isFreeKind(dto: CreatePageDto): boolean {

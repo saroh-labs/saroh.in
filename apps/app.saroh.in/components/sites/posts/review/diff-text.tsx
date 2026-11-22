@@ -1,4 +1,5 @@
 import { cn } from "@saroh/ui/lib/utils";
+import type { ReactNode } from "react";
 
 import type { DiffRun, ParagraphDiff } from "@/lib/sites/post-diff";
 
@@ -28,20 +29,43 @@ export function DiffRuns({ runs }: { runs: DiffRun[] }) {
  * A compared post as paragraphs (`paragraphDiff`): each changed one carries
  * `data-change` (its number among the changes), for Next change.
  */
+/** A paragraph's words as they read now: what was put in or kept. */
+export function wordsNow(p: ParagraphDiff): string {
+    if (p.kind === "changed")
+        return p.runs
+            .filter((r) => r.kind !== "removed")
+            .map((r) => r.text)
+            .join("");
+    return p.kind === "removed" ? "" : p.text;
+}
+
 export function DiffParagraphs({
     paragraphs,
     label,
+    after,
 }: {
     paragraphs: ParagraphDiff[];
     /** The words over a changed paragraph, or none. */
     label?: (n: number, of: number) => string;
+    /** Drawn under a paragraph that is still there (R2's feedback). */
+    after?: (words: string) => ReactNode;
 }) {
     const of = paragraphs.filter((p) => p.kind !== "same").length;
     let n = 0;
+    const below = (p: ParagraphDiff) => {
+        const words = wordsNow(p).trim();
+        return after && words ? after(words) : null;
+    };
     return (
         <div className="space-y-4 text-[15px] leading-relaxed">
             {paragraphs.map((p, i) => {
-                if (p.kind === "same") return <p key={i}>{p.text}</p>;
+                if (p.kind === "same")
+                    return (
+                        <div key={i}>
+                            <p>{p.text}</p>
+                            {below(p)}
+                        </div>
+                    );
                 n++;
                 return (
                     <div
@@ -66,6 +90,7 @@ export function DiffParagraphs({
                                 <DiffRuns runs={[p]} />
                             )}
                         </p>
+                        {below(p)}
                     </div>
                 );
             })}

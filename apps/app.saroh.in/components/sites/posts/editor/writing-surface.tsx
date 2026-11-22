@@ -7,7 +7,14 @@ import { Textarea } from "@saroh/ui/textarea";
 import type { Editor } from "@tiptap/react";
 import { ImagePlus, Sparkles, X } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+} from "react";
 
 import { openAskAi } from "@/components/ask-ai/open";
 import { useSiteFaces } from "@/components/sites/looks/site-faces";
@@ -16,7 +23,7 @@ import { postParagraphs } from "@/lib/content/plain-text";
 import { formatNumber } from "@/lib/format/money";
 import { resolveStyleVariables } from "@/lib/sites/style";
 
-import { PostReviewBody } from "../review/review-body";
+import { ReviewLegend, StyledReviewBody } from "../review/styled-review-body";
 import type { PostEditorModel } from "./post-model";
 
 /* On demand and browser-only: the editor is heavy and made in the browser. */
@@ -25,7 +32,7 @@ const RichTextEditor = dynamic(
         import("@/components/sites/rich-text/rich-text-editor").then(
             (m) => m.RichTextEditor,
         ),
-    { ssr: false, loading: () => <EditorLoading className="min-h-64" /> },
+    { ssr: false, loading: () => <ArrivingEditor /> },
 );
 
 /** About how fast a customer reads, for "n min read". */
@@ -38,6 +45,24 @@ export function readingOf(html: string): { words: number; minutes: number } {
         .split(/\s+/)
         .filter(Boolean).length;
     return { words, minutes: Math.max(1, Math.ceil(words / WORDS_PER_MINUTE)) };
+}
+
+/**
+ * Told while the editor's code is still on its way (W7): the post shell
+ * keeps the whole post a skeleton, and the bar "Opening the post…", until
+ * it is here.
+ */
+export const EditorArriving = createContext<((on: boolean) => void) | null>(
+    null,
+);
+
+function ArrivingEditor() {
+    const say = useContext(EditorArriving);
+    useLayoutEffect(() => {
+        say?.(true);
+        return () => say?.(false);
+    }, [say]);
+    return <EditorLoading className="min-h-64" />;
 }
 
 export const EMPTY_POST_HINT =
@@ -99,7 +124,7 @@ export function WritingSurface({
     }, [titleError]);
 
     return (
-        <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)]">
             <div
                 data-canvas-bar=""
                 className="flex h-7 shrink-0 items-center gap-2.5 bg-muted px-4 font-mono text-xs text-muted-foreground"
@@ -108,9 +133,11 @@ export function WritingSurface({
                     aria-hidden
                     className="size-[7px] shrink-0 rounded-full bg-muted-foreground/60"
                 />
-                <b className="min-w-0 truncate font-medium text-foreground">
+                <b className="min-w-0 shrink-[3] truncate font-medium text-foreground">
                     {link}
                 </b>
+                {/* R3.2: the reader's legend and Next change, in the bar. */}
+                {!writer ? <ReviewLegend model={model} /> : null}
                 <span className="flex-1" />
                 {writer && !previewing ? (
                     <Button
@@ -165,7 +192,7 @@ export function WritingSurface({
                             aria-describedby={
                                 titleError ? "post-title-error" : undefined
                             }
-                            className="mt-2 block min-h-0 w-full resize-none overflow-hidden rounded-md border-0 bg-transparent p-0 font-site-heading text-4xl font-normal leading-tight text-site-fg outline-none [field-sizing:content] placeholder:text-site-muted focus-visible:ring-0 focus-visible:ring-offset-0 aria-[invalid]:ring-2 aria-[invalid]:ring-destructive [&[readonly]]:text-site-fg"
+                            className="mt-2 block min-h-0 w-full resize-none overflow-hidden rounded-md border-0 bg-transparent p-0 font-site-heading text-[calc(2.25rem*var(--site-heading-scale,1))] font-bold leading-tight tracking-tight text-site-fg outline-none [field-sizing:content] placeholder:text-site-muted focus-visible:ring-0 focus-visible:ring-offset-0 aria-[invalid]:ring-2 aria-[invalid]:ring-destructive coarse:text-[calc(2.25rem*var(--site-heading-scale,1))] sm:text-[calc(2.75rem*var(--site-heading-scale,1))] coarse:sm:text-[calc(2.75rem*var(--site-heading-scale,1))] [&[readonly]]:text-site-fg"
                         />
                         {titleError ? (
                             <p
@@ -225,7 +252,7 @@ export function WritingSurface({
                         ) : null}
 
                         {!writer ? (
-                            <PostReviewBody model={model} />
+                            <StyledReviewBody model={model} legend={false} />
                         ) : (
                             <div className="mt-6">
                                 <RichTextEditor

@@ -42,7 +42,9 @@ export async function readPostEditorData(
         readWebAddressLinks(),
     ]);
     const prefix = site.postsPrefix ?? "blog";
-    const setup = post?.live && web ? await readShareSetup(web) : null;
+    // Read for a saved post, live or not: Publish post offers "Tell people
+    // once it is live" before it goes (Y2). Every Share stays live-only.
+    const setup = post && web ? await readShareSetup(web) : null;
     return {
         siteId,
         author: post?.author ?? null,

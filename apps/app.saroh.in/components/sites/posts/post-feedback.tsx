@@ -55,6 +55,7 @@ export function PostFeedback({
     canComment,
     canSettle,
     onChanged,
+    pin = null,
 }: {
     siteId: string;
     postId: string;
@@ -67,6 +68,8 @@ export function PostFeedback({
     /** `section:write`: settle and reopen. */
     canSettle: boolean;
     onChanged: () => void;
+    /** The words the next note starts pinned to (a paragraph, R2). */
+    pin?: string | null;
 }) {
     const zone = useBusinessZone();
     const [draft, setDraft] = useState("");
@@ -74,7 +77,7 @@ export function PostFeedback({
     const [busy, setBusy] = useState<string | null>(null);
     const [editing, setEditing] = useState<{ id: string; body: string }>();
     const [showSettled, setShowSettled] = useState(false);
-    const [quote, setQuote] = useState<string | null>(null);
+    const [quote, setQuote] = useState<string | null>(pin);
 
     // Selecting words in the post pins the note being written to them;
     // a click elsewhere (the note's own box) keeps the pin.

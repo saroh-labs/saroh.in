@@ -35,6 +35,8 @@ export interface StaffView {
     name: string;
     title: string | null;
     status: "ACTIVE" | "ARCHIVED";
+    /** "Show on Our team" (DEC-246); absent from an older API. */
+    showOnTeamPage?: boolean;
     membership: {
         id: string;
         userId: string;

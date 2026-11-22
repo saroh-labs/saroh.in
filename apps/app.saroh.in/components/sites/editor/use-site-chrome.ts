@@ -1,12 +1,21 @@
 import { showError } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
-import { updateSiteFooter, updateSiteSettings } from "@/lib/sites/actions";
+import {
+    updateSiteFooter,
+    updateSiteNavigation,
+    updateSiteSettings,
+} from "@/lib/sites/actions";
 import { footerFromLine, footerLineField } from "@/lib/sites/footer-line";
-import type { SiteFooter, SitesResult } from "@/lib/sites/service";
+import type {
+    SiteFooter,
+    SiteNavigation,
+    SiteNavigationItem,
+    SitesResult,
+} from "@/lib/sites/service";
 
 /** Which site setting a save changed, in the API's pending-change words. */
-export type ChromeKind = "name" | "footer";
+export type ChromeKind = "name" | "footer" | "menu";
 
 const AUTOSAVE_MS = 700;
 
@@ -115,12 +124,15 @@ function useAutosavedText({
 export function useSiteChrome({
     siteId,
     siteName,
+    navigation = null,
     footerPreview,
     canUpdate,
     onSaved,
 }: {
     siteId: string;
     siteName: string;
+    /** The menu as saved (H1): edited in the Header's panel. */
+    navigation?: SiteNavigation | null;
     /** The footer as the API sanitized it (#336). */
     footerPreview: SiteFooter | null;
     /** Whether this person holds `site:update`. */
@@ -157,8 +169,32 @@ export function useSiteChrome({
             "Couldn't reach Saroh. The footer is still here, and saving will try again shortly.",
     });
 
-    const saving = nameSave.saving || footerSave.saving;
-    const dirty = nameSave.dirty || footerSave.dirty;
+    /*
+     * The menu (H1, `fix/WXMGlobal`), saved as Website settings saves it.
+     * Kept as its JSON on the same clock: an empty menu removes it, and
+     * the live site then lists its pages on its own.
+     */
+    const [menu, setMenu] = useState<SiteNavigationItem[]>(
+        navigation?.items ?? [],
+    );
+    const menuSave = useAutosavedText({
+        value: JSON.stringify(menu),
+        initial: JSON.stringify(navigation?.items ?? []),
+        enabled: canUpdate,
+        save: (value) => {
+            const items = JSON.parse(value) as SiteNavigationItem[];
+            return updateSiteNavigation(
+                siteId,
+                items.length ? { items } : null,
+            );
+        },
+        onSaved: () => onSaved("menu"),
+        unreachable:
+            "Couldn't reach Saroh. The menu is still here, and saving will try again shortly.",
+    });
+
+    const saving = nameSave.saving || footerSave.saving || menuSave.saving;
+    const dirty = nameSave.dirty || footerSave.dirty || menuSave.dirty;
     // A name or footer still going out is work leaving would lose: it
     // reaches the leave guard as `chromeDirty` (`use-editor-leave.ts`).
 
@@ -174,6 +210,10 @@ export function useSiteChrome({
         footerRich: field.kind === "rich",
         footerText,
         setFooterText,
+        menu,
+        setMenu,
+        /** The menu the canvas draws: as edited, null when there is none. */
+        navigation: menu.length ? { items: menu } : null,
         /*
          * The footer the canvas draws. A line is escaped as it is built
          * (`footerFromLine`), so it is safe to draw as markup; a richer
@@ -189,7 +229,7 @@ export function useSiteChrome({
         chromeSaving: saving,
         chromeDirty: dirty,
         /** A name or footer that did not save: the bar says "Not saved". */
-        chromeFailed: nameSave.failed || footerSave.failed,
+        chromeFailed: nameSave.failed || footerSave.failed || menuSave.failed,
     };
 }
 

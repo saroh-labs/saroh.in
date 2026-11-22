@@ -18,7 +18,7 @@ import { EMBED_NODE } from "./insert-embed";
  * so pasting one there drops it on the way in.
  */
 
-const KINDS: readonly string[] = ["service", "product"];
+const KINDS: readonly string[] = ["service", "product", "book", "offer"];
 /** The sanitizer's id rule: what it would strip is never parsed in. */
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 

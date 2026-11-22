@@ -1,24 +1,32 @@
 "use client";
 
 import { BLOCK_META } from "@saroh/block-contract";
+import { BlockFixturePreview } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { ListSearch } from "@saroh/ui/list-search";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { ConciergeBell, Copy, FilePlus, LayoutGrid } from "lucide-react";
+import { Copy, FilePlus, LayoutGrid, LayoutTemplate } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useOpenPageId } from "../page-switch";
 
+import type { BusinessTileProps } from "@/components/sites/blocks/add-block-panel";
 import {
     AddBlockPanel,
+    BusinessTile,
     Entry,
-    FamilyEntry,
     Group,
+    PreviewEntry,
 } from "@/components/sites/blocks/add-block-panel";
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import { addBlockGroups } from "@/components/sites/blocks/block-kinds";
+import { BlockThumbnail } from "@/components/sites/blocks/block-thumbnail";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
+import { formatMoney } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { listServicesForPicker } from "@/lib/services/actions";
+import type { AddBusinessCounts } from "@/lib/sites/add-business-read";
+import { readAddBusiness } from "@/lib/sites/add-business-read";
 import {
     MODULE_PAGE_OFFERS,
     addPageOffers,
@@ -29,6 +37,7 @@ import type {
     SectionType,
     SitePage,
 } from "@/lib/sites/service";
+import { resolveStyleVariables } from "@/lib/sites/style";
 
 import {
     SECTION_HINTS,
@@ -43,7 +52,13 @@ import type { PageStart } from "./add-page-sheet";
 import { AddPageSheet } from "./add-page-sheet";
 import type { PickerService, ShowAs } from "./from-your-business";
 import { ServicesPicker } from "./from-your-business";
-import { readRecent, rememberRecent, suggestedSections } from "./suggestions";
+import {
+    formLine,
+    readRecent,
+    rememberRecent,
+    suggestedSections,
+} from "./suggestions";
+import { useCanvasDrop } from "./use-canvas-drop";
 
 export interface AddPanelProps {
     model: EditorModel;
@@ -73,6 +88,17 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
     const [services, setServices] = useState<ServicesRead | null>(null);
     // Storage throws on the server and in a private window: no Recent.
     const [recent] = useState<SectionType[]>(readRecent);
+    const [counts, setCounts] = useState<AddBusinessCounts | null>(null);
+
+    useEffect(() => {
+        let live = true;
+        readAddBusiness()
+            .then((c) => live && setCounts(c))
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, []);
 
     useEffect(() => {
         let live = true;
@@ -96,6 +122,21 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
         };
     }, []);
 
+    const pick = (type: SectionType, looks: number) => {
+        rememberRecent(type);
+        if (looks > 1) add.setLookFor(type);
+        else add.addSection(type);
+    };
+
+    // Drag a card onto the canvas (A4): it goes in where it drops.
+    const { dragProps, line } = useCanvasDrop({
+        canvasRef: model.viewport.canvasRef,
+        sections: draft.sections,
+        setSelectedIndex: model.selection.setSelectedIndex,
+        desk: model.layout !== "phone" && !model.readOnly,
+        onDrop: (type) => pick(type, BLOCK_META[type].variants.length),
+    });
+
     if (model.readOnly) return null;
 
     const addable = addableSections(model.shopOpen, model.packsOpen);
@@ -104,13 +145,7 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
     const below = active ? sectionTitle(active.section) : null;
     const q = query.trim().toLowerCase();
 
-    const pick = (type: SectionType, looks: number) => {
-        rememberRecent(type);
-        if (looks > 1) add.setLookFor(type);
-        else add.addSection(type);
-    };
-
-    const addServices = (ids: string[], showAs: ShowAs) => {
+    const addServices = (ids: string[], showAs: ShowAs, showBook: boolean) => {
         rememberRecent("servicesList");
         add.addSection("servicesList", showAs, (at) =>
             draft.restoreSections((prev) =>
@@ -118,7 +153,12 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
                     i === at
                         ? ({
                               ...s,
-                              content: { ...s.content, serviceIds: ids },
+                              content: {
+                                  ...s.content,
+                                  serviceIds: ids,
+                                  // Absent is shown (A5).
+                                  ...(showBook ? {} : { showBook: false }),
+                              },
                           } as typeof s)
                         : s,
                 ),
@@ -145,21 +185,119 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
         ),
     );
     const serviceCount = services?.ok ? services.services.length : null;
+    const firstService = services?.ok ? services.services[0] : undefined;
+    /**
+     * A suggested card in the business's own words (A1): its first
+     * service with time and price, its products, its form. Null keeps
+     * the block's own line.
+     */
+    const businessLine = (t: SectionType): string | null => {
+        if ((t === "booking" || t === "servicesList") && firstService) {
+            const price =
+                firstService.priceCents == null
+                    ? null
+                    : formatMoney(
+                          firstService.priceCents,
+                          firstService.currency ?? null,
+                      );
+            return [
+                firstService.name,
+                firstService.durationMinutes
+                    ? count(firstService.durationMinutes, "min", "min")
+                    : null,
+                price,
+            ]
+                .filter(Boolean)
+                .join(" · ");
+        }
+        if (t === "productGrid" && counts?.products) {
+            return count(counts.products, "product");
+        }
+        if (t === "enquiry" && counts?.forms) return formLine(counts.forms);
+        return null;
+    };
     const { types: suggested, matched } = suggestedSections(
         page ? pageKind(page) : "FREE",
         draft.sections,
         addable,
     );
     const recentShown = recent.filter((t) => addable.includes(t));
+    // The site's colours, so the small pictures wear them (A1).
+    const variables = resolveStyleVariables(
+        model.siteStyle.style,
+        model.styleOptions,
+    );
     const looks = (t: SectionType) => BLOCK_META[t].variants.length;
 
+    // From your business (A9): a tile per layout of each bound family, and
+    // A form (an enquiry section) when the business has a form.
+    const businessTiles: BusinessTileProps[] = [];
+    for (const f of business) {
+        if (f.head === "servicesList") {
+            if (serviceCount === 0) continue;
+            businessTiles.push({
+                id: f.head,
+                label: "A service",
+                hint:
+                    serviceCount === null
+                        ? SECTION_HINTS.servicesList
+                        : count(serviceCount, "service"),
+                onClick: services?.ok
+                    ? () => setPicking(true)
+                    : () => pick("servicesList", 1),
+            });
+            continue;
+        }
+        for (const l of f.layouts) {
+            businessTiles.push({
+                id: l.type,
+                label:
+                    TILE_NAMES[l.type] ??
+                    (f.layouts.length > 1 ? l.label : SECTION_LABELS[l.type]),
+                hint: businessLine(l.type) ?? SECTION_HINTS[l.type],
+                onClick: () => pick(l.type, looks(l.type)),
+                onDragStart: dragProps(l.type),
+            });
+        }
+    }
+    if (counts?.forms && addable.includes("enquiry")) {
+        businessTiles.push({
+            id: "enquiry",
+            label: "A form",
+            hint: formLine(counts.forms),
+            onClick: () => pick("enquiry", looks("enquiry")),
+            onDragStart: dragProps("enquiry"),
+        });
+    }
+    // The board's order: what is sold and booked first (A9, `WXBAdd`).
+    const rank = (id: string) => {
+        const at = TILE_ORDER.indexOf(id as SectionType);
+        return at === -1 ? TILE_ORDER.length : at;
+    };
+    businessTiles.sort((a, b) => rank(a.id) - rank(b.id));
+
     const pageRows = canAddPage ? (
-        <Group label={phone ? "A page" : "Add a page"}>
+        // A bordered list, left aligned (A1, `WXBAdd`).
+        <Group
+            titled
+            label={phone ? "A page" : "Add a page"}
+            listClassName={PAGE_LIST}
+        >
             <PageRow
                 icon={FilePlus}
                 label="Blank page"
                 onClick={() => setPageSheet("blank")}
             />
+            {phone ? null : (
+                // A template's pages are added where the template is
+                // chosen: Brand's Template row (A1, `WXBAdd`).
+                <PageRow
+                    icon={LayoutTemplate}
+                    label="From a template"
+                    note="its pages, in Brand"
+                    onClick={() => model.openRail("brand")}
+                />
+            )}
             {page ? (
                 <PageRow
                     icon={Copy}
@@ -169,9 +307,11 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
                 />
             ) : null}
             {offers.length > 0 ? (
-                <li>
-                    <p className="label px-2 pb-1 pt-1.5">Ready pages</p>
-                    <ul className="flex flex-wrap gap-1.5 px-2">
+                <li className="pb-2.5">
+                    <p className="px-3 pb-1 pt-2 text-sm font-semibold">
+                        Ready pages
+                    </p>
+                    <ul className="flex flex-wrap gap-1.5 px-3">
                         {offers.map((o) => (
                             <li key={o.kind}>
                                 <Button
@@ -214,9 +354,16 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
             </div>
 
             {suggested.length > 0 ? (
-                <Group label="Suggested for this page">
+                <Group
+                    titled
+                    label="Suggested for this page"
+                    count={suggested.length}
+                    listClassName={
+                        phone ? undefined : "grid grid-cols-3 gap-2 px-2"
+                    }
+                >
                     {matched && page ? (
-                        <li className="px-2 text-xs text-muted-foreground">
+                        <li className="col-span-3 text-xs text-muted-foreground">
                             {
                                 // `matched` is only ever a module page.
                                 MODULE_PAGE_OFFERS[
@@ -226,21 +373,48 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
                             pages often have these. Yours doesn&apos;t yet.
                         </li>
                     ) : null}
-                    {suggested.map((t) => (
-                        <Entry
-                            key={t}
-                            icon={SECTION_ICONS[t]}
-                            label={SECTION_LABELS[t]}
-                            hint={SECTION_HINTS[t]}
-                            looks={looks(t)}
-                            onClick={() => pick(t, looks(t))}
-                        />
-                    ))}
+                    {suggested.map((t) =>
+                        phone ? (
+                            <Entry
+                                key={t}
+                                icon={SECTION_ICONS[t]}
+                                label={SECTION_LABELS[t]}
+                                hint={businessLine(t) ?? SECTION_HINTS[t]}
+                                looks={looks(t)}
+                                onClick={() => pick(t, looks(t))}
+                                onDragStart={dragProps(t)}
+                            />
+                        ) : (
+                            // Three small pictures in a row on a desk (A1).
+                            <PreviewEntry
+                                key={t}
+                                label={SECTION_LABELS[t]}
+                                hint={businessLine(t) ?? SECTION_HINTS[t]}
+                                onClick={() => pick(t, looks(t))}
+                                onDragStart={dragProps(t)}
+                                preview={
+                                    <BlockThumbnail
+                                        variables={variables}
+                                        look={model.siteStyle.style.look}
+                                        height={56}
+                                    >
+                                        <BlockFixturePreview
+                                            type={t}
+                                            variant={
+                                                BLOCK_META[t].variants[0].id
+                                            }
+                                            look={model.siteStyle.style.look}
+                                        />
+                                    </BlockThumbnail>
+                                }
+                            />
+                        ),
+                    )}
                 </Group>
             ) : null}
 
             {recentShown.length > 0 && !phone ? (
-                <Group label="Recent">
+                <Group titled label="Recent" count={recentShown.length}>
                     <li>
                         <ul className="flex flex-wrap gap-1.5 px-2">
                             {recentShown.map((t) => (
@@ -263,38 +437,21 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
 
             {phone ? null : <BrowseAll model={model} count={addable.length} />}
 
-            {business.length > 0 ? (
-                <Group label="From your business">
-                    <li className="px-2 text-xs text-muted-foreground">
+            {businessTiles.length > 0 ? (
+                // Small tiles two to a row (A9, `WXBAdd`): one per layout,
+                // so every way the old list added a section stays.
+                <Group
+                    titled
+                    label="From your business"
+                    count={businessTiles.length}
+                    listClassName="grid grid-cols-2 gap-2 px-2"
+                >
+                    <li className="col-span-2 text-xs text-muted-foreground">
                         Filled in, kept up to date
                     </li>
-                    {business.map((f) =>
-                        f.head === "servicesList" ? (
-                            serviceCount === 0 ? null : (
-                                <Entry
-                                    key={f.head}
-                                    icon={ConciergeBell}
-                                    label="A service"
-                                    hint={
-                                        serviceCount === null
-                                            ? SECTION_HINTS.servicesList
-                                            : `${serviceCount} ${serviceCount === 1 ? "service" : "services"}`
-                                    }
-                                    onClick={
-                                        services?.ok
-                                            ? () => setPicking(true)
-                                            : () => pick("servicesList", 1)
-                                    }
-                                />
-                            )
-                        ) : (
-                            <FamilyEntry
-                                key={f.head}
-                                family={f}
-                                onPick={pick}
-                            />
-                        ),
-                    )}
+                    {businessTiles.map((t) => (
+                        <BusinessTile key={t.id} {...t} />
+                    ))}
                 </Group>
             ) : null}
         </>
@@ -310,7 +467,8 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
                 {phone ? null : <h2 className="text-sm font-semibold">Add</h2>}
                 <ListSearch
                     // ListSearch's rule: "Search {things}", the rest said
-                    // as its description, so nothing is clipped at 320px.
+                    // as its description. The board's "…and your business"
+                    // is cut at the panel's width (A1 · 5, 22 Nov 2026).
                     placeholder="Search pages and sections"
                     describe="Pages, sections and things from your business"
                     onSearch={setQuery}
@@ -348,6 +506,7 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
                     </>
                 )}
             </div>
+            {line}
             {pageSheet !== null ? (
                 <AddPageFor
                     key={pageSheet}
@@ -399,12 +558,34 @@ export function AddPageFor({
             address={model.address}
             offers={addPageOffers(model.addablePageKinds)}
             page={model.page}
+            takenPaths={model.pages.map((p) => p.path)}
             start={start}
             onClose={onClose}
             onAdded={opened}
         />
     );
 }
+
+/** A business tile's name, in the board's words (A9); the rest keep theirs. */
+const TILE_NAMES: Partial<Record<SectionType, string>> = {
+    productGrid: "A product",
+    timetable: "A class",
+    booking: "A booking",
+    journal: "A list of posts",
+};
+
+/** Tiles first in From your business, in this order; the rest after. */
+const TILE_ORDER: SectionType[] = [
+    "servicesList",
+    "productGrid",
+    "timetable",
+    "booking",
+    "enquiry",
+    "journal",
+];
+
+/** Add a page's rows: one bordered list (A1). */
+const PAGE_LIST = "mx-2 divide-y overflow-hidden rounded-lg border bg-card";
 
 function BrowseAll({ model, count }: { model: EditorModel; count: number }) {
     return (
@@ -442,7 +623,7 @@ function PageRow({
                 variant="ghost"
                 size="sm"
                 onClick={onClick}
-                className="w-full justify-start gap-2.5 px-2"
+                className="h-11 w-full justify-start gap-2.5 rounded-none px-3 text-left"
             >
                 <Icon
                     aria-hidden
@@ -481,7 +662,7 @@ function PageMatches({
     ].filter((r) => r.label.toLowerCase().includes(q));
     if (rows.length === 0) return null;
     return (
-        <Group label="Add a page">
+        <Group titled label="Add a page" listClassName={PAGE_LIST}>
             {rows.map((r) => (
                 <PageRow
                     key={r.start}

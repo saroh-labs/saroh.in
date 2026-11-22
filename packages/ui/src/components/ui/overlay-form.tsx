@@ -71,10 +71,15 @@ function firstControl(body: Element | null | undefined): HTMLElement | null {
     for (const el of Array.from(
         body?.querySelectorAll<HTMLElement>(CONTROLS) ?? [],
     )) {
+        // A radio group's chosen option is its keyboard stop, even while the
+        // group's roving tabindex marks every option -1 (Publish's When, 22 Nov 2026).
+        const chosenRadio =
+            el.getAttribute("role") === "radio" &&
+            el.getAttribute("aria-checked") === "true";
         if (
             el.matches(":disabled") ||
             el.getAttribute("type") === "hidden" ||
-            el.getAttribute("tabindex") === "-1" ||
+            (el.getAttribute("tabindex") === "-1" && !chosenRadio) ||
             el.getAttribute("aria-hidden") === "true"
         ) {
             continue;

@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EditorModel } from "../shell/editor-model";
-import { PhotoSheet, sizeLine } from "./photo-sheet";
+import { PhotoSheet, sizeLine, tooBig } from "./photo-sheet";
 
 const TOO_BIG =
     "That photo is over 10 MB. Export it smaller and upload it again.";
@@ -199,12 +199,30 @@ describe("the photo sheet", () => {
             await Promise.resolve();
         });
         expect(sheet()?.textContent).toContain(`wedding-big.jpg: ${TOO_BIG}`);
+        expect(sheet()?.querySelector("b")?.textContent).toBe(
+            "wedding-big.jpg",
+        );
+        // The easy way round it, and another pick (D7).
+        expect(sheet()?.textContent).toContain("Share it from your phone");
+        const click = vi.spyOn(input, "click");
+        act(() => button("Choose another photo")?.click());
+        expect(click).toHaveBeenCalled();
+        // Cancel puts the refusal away (D7).
+        act(() => button("Cancel")?.click());
+        expect(sheet()?.textContent).not.toContain(TOO_BIG);
     });
 
     it("a reader never opens it", async () => {
         await open(model(true));
         expect(sheet()).toBeNull();
         expect(button("Use this photo")).toBeUndefined();
+    });
+});
+
+describe("a refusal about size (D7)", () => {
+    it("is told by the limit it names", () => {
+        expect(tooBig(TOO_BIG)).toBe(true);
+        expect(tooBig("That is not an image. Choose a JPG.")).toBe(false);
     });
 });
 

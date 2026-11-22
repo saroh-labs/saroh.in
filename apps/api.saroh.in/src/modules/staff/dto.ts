@@ -380,3 +380,9 @@ export class TurnDownRuleRequestDto {
     @MaxLength(300)
     reason?: string;
 }
+
+/** "Show on Our team" (DEC-246). */
+export class SetTeamPageDto {
+    @IsBoolean({ message: "shown must be true or false" })
+    shown!: boolean;
+}

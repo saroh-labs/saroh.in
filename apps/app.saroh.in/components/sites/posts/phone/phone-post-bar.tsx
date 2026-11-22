@@ -68,8 +68,9 @@ export function PhonePostBar({
                     data-status-chip=""
                     className={cn(
                         "inline-flex h-[22px] max-w-full items-center gap-[5px] rounded-full px-2 text-xs font-semibold",
+                        // Blue, as the desk's chip for the same state (R2.3).
                         live && model.waiting > 0
-                            ? "bg-warning-subtle text-warning-subtle-foreground"
+                            ? "bg-info-subtle text-info-subtle-foreground"
                             : live
                               ? "bg-success-subtle text-success-subtle-foreground"
                               : "bg-secondary text-foreground/80",

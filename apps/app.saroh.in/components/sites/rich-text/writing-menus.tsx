@@ -9,16 +9,22 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import type { LucideIcon } from "lucide-react";
 import {
     Bold,
+    CalendarCheck,
+    Heading,
     Heading2,
-    ImagePlus,
+    ImageIcon,
     Italic,
+    LayoutGrid,
     Link2,
     List,
     ListOrdered,
+    ListTree,
     Minus,
     Quote,
+    RectangleHorizontal,
     ShoppingBag,
     SlidersHorizontal,
+    SquareStack,
     Tag,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -40,8 +46,11 @@ const EmbedPicker = dynamic(
  * bar over a selection, and the add menu that "/" opens on an empty line.
  * Both run the editor's existing nodes; every rarer control stays in the
  * full toolbar, which More formatting shows (C10). From your business
- * (U15b): a service card and a product, which store only which one.
- * Offer, Book now button, Gallery, Video and Button are not built yet.
+ * (U15b): a service card and a product, which store only which one;
+ * an Offer and a Book now button the same way (W2). A highlight box,
+ * contents, a gallery and a button are the post's own blocks
+ * (`embeds/post-blocks.ts`). Video and Instagram posts are left out
+ * (owner, 22 Nov).
  */
 
 /** One thing the add menu puts in the post. */
@@ -57,7 +66,7 @@ export interface AddItem {
 }
 
 /** What an item without `run` asks for before it adds. */
-type Picking = "image" | EmbedKind;
+type Picking = "image" | "gallery" | EmbedKind;
 
 export const ADD_ITEMS: AddItem[] = [
     {
@@ -73,10 +82,22 @@ export const ADD_ITEMS: AddItem[] = [
         icon: ShoppingBag,
     },
     {
+        key: "offer",
+        label: "Offer",
+        group: "From your business",
+        icon: Tag,
+    },
+    {
+        key: "book",
+        label: "Book now button",
+        group: "From your business",
+        icon: CalendarCheck,
+    },
+    {
         key: "heading",
         label: "Heading",
         group: "Write",
-        icon: Heading2,
+        icon: Heading,
         keys: "##",
         run: (e) => e.chain().focus().setHeading({ level: 2 }).run(),
     },
@@ -105,6 +126,20 @@ export const ADD_ITEMS: AddItem[] = [
         run: (e) => e.chain().focus().toggleBlockquote().run(),
     },
     {
+        key: "highlight",
+        label: "Highlight box",
+        group: "Write",
+        icon: SquareStack,
+        run: (e) => e.chain().focus().wrapIn("highlightBox").run(),
+    },
+    {
+        key: "contents",
+        label: "Contents",
+        group: "Write",
+        icon: ListTree,
+        run: (e) => e.chain().focus().insertContent({ type: "contents" }).run(),
+    },
+    {
         key: "divider",
         label: "Divider",
         group: "Write",
@@ -112,8 +147,51 @@ export const ADD_ITEMS: AddItem[] = [
         keys: "---",
         run: (e) => e.chain().focus().setHorizontalRule().run(),
     },
-    { key: "image", label: "Image", group: "Media", icon: ImagePlus },
+    { key: "image", label: "Image", group: "Media", icon: ImageIcon },
+    { key: "gallery", label: "Gallery", group: "Media", icon: LayoutGrid },
+    {
+        key: "button",
+        label: "Button",
+        group: "Media",
+        icon: RectangleHorizontal,
+        // Asks its words and link in place (`PostButtonView`).
+        run: (e) =>
+            e
+                .chain()
+                .focus()
+                .insertContent({
+                    type: "postButton",
+                    attrs: { href: "", label: "" },
+                })
+                .run(),
+    },
 ];
+
+/** Put a gallery at the cursor, starting with one photo (W2). */
+export function insertGallery(
+    editor: Editor,
+    img: { src: string; width?: number | null; height?: number | null },
+) {
+    editor
+        .chain()
+        .focus()
+        .insertContent({
+            type: "gallery",
+            content: [
+                {
+                    type: "image",
+                    attrs: {
+                        src: img.src,
+                        alt: "",
+                        ...(img.width && img.height
+                            ? { width: img.width, height: img.height }
+                            : {}),
+                    },
+                },
+            ],
+        })
+        .run();
+}
 
 /** Put a picked photo at the cursor, with the size the page needs. */
 export function insertImage(
@@ -136,9 +214,11 @@ export function insertImage(
 /** The items whose words start with, or contain, what was typed. */
 export function filterAddItems(query: string): AddItem[] {
     const q = query.trim().toLowerCase();
-    return q
-        ? ADD_ITEMS.filter((i) => i.label.toLowerCase().includes(q))
-        : ADD_ITEMS;
+    if (!q) return ADD_ITEMS;
+    const hits = ADD_ITEMS.filter((i) => i.label.toLowerCase().includes(q));
+    // "button" is Button before Book now button: a name that starts with it.
+    const starts = (i: AddItem) => i.label.toLowerCase().startsWith(q);
+    return [...hits.filter(starts), ...hits.filter((i) => !starts(i))];
 }
 
 /**
@@ -161,7 +241,7 @@ export function AddList({
     onDone?: () => void;
 }) {
     const [picking, setPicking] = useState<Picking | null>(startPicking);
-    if ((picking === "service" || picking === "product") && editor) {
+    if (picking && picking !== "image" && picking !== "gallery" && editor) {
         return (
             <EmbedPicker
                 kind={picking}
@@ -178,9 +258,14 @@ export function AddList({
         return (
             <div className="grid gap-2 p-2">
                 <MediaPicker
-                    label="Choose a photo"
+                    label={
+                        picking === "gallery"
+                            ? "Choose the gallery's first photo"
+                            : "Choose a photo"
+                    }
                     onPick={(img) => {
-                        insertImage(editor, img);
+                        if (picking === "gallery") insertGallery(editor, img);
+                        else insertImage(editor, img);
                         setPicking(null);
                         onDone?.();
                     }}
@@ -220,7 +305,8 @@ export function AddList({
                                     onDone?.();
                                 }}
                                 className={cn(
-                                    "flex h-8 items-center gap-2.5 rounded-[7px] px-2.5 text-left text-[0.8125rem] hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                    // 43px rows at 15px (W1.2); h-11 is the nearest.
+                                    "flex h-11 items-center gap-3 rounded-[7px] px-2.5 text-left text-[0.9375rem] hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                     active === item.key &&
                                         "bg-secondary font-semibold",
                                 )}
@@ -264,16 +350,36 @@ export function SlashMenu({ editor }: { editor: Editor }) {
     const [index, setIndex] = useState(0);
     const [picking, setPicking] = useState<Picking | null>(null);
     const box = useRef<HTMLInputElement>(null);
+    const open = useRef(false);
+    useEffect(() => {
+        open.current = at !== null;
+    }, [at]);
 
     useEffect(() => {
         // The view mounts after the first render (immediatelyRender off), and
         // reading editor.view before then throws: listen once it exists.
         let dom: HTMLElement | null = null;
         const onKey = (e: KeyboardEvent) => {
-            if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
-            if (!onEmptyLine(editor)) return;
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            /*
+             * Typed straight after "/", before the filter has focus: the
+             * letters went into the post and the filter read "ervice", so
+             * the list showed nothing (bug, 22 Nov). They are the filter's.
+             */
+            if (open.current) {
+                if (e.key.length !== 1 && e.key !== "Backspace") return;
+                e.preventDefault();
+                setQuery((q) =>
+                    e.key === "Backspace" ? q.slice(0, -1) : q + e.key,
+                );
+                setIndex(0);
+                box.current?.focus();
+                return;
+            }
+            if (e.key !== "/" || !onEmptyLine(editor)) return;
             e.preventDefault();
             const c = editor.view.coordsAtPos(editor.state.selection.from);
+            open.current = true;
             setQuery("");
             setIndex(0);
             setPicking(null);
@@ -329,9 +435,10 @@ export function SlashMenu({ editor }: { editor: Editor }) {
                     box.current?.focus();
                 }}
                 onCloseAutoFocus={(e) => e.preventDefault()}
-                className="w-72 overflow-hidden rounded-xl p-0"
+                className="w-80 overflow-hidden rounded-xl p-0"
             >
-                <div className="flex h-9 items-center gap-2 border-b px-2.5 text-[0.8125rem]">
+                {/* A plain "/" and the words to its right (W1.3): no box. */}
+                <div className="flex h-12 items-center gap-2 border-b px-4 text-[0.9375rem]">
                     <b className="font-mono font-semibold">/</b>
                     <Input
                         ref={box}
@@ -357,20 +464,26 @@ export function SlashMenu({ editor }: { editor: Editor }) {
                         }}
                         placeholder="Type to filter"
                         aria-label="Type to filter"
-                        className="h-7 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                        className="h-8 border-0 bg-transparent px-0 text-[0.9375rem] shadow-none placeholder:text-right focus-visible:border-0 focus-visible:shadow-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                 </div>
-                <AddList
-                    key={picking ?? "list"}
-                    editor={editor}
-                    startPicking={picking}
-                    items={items}
-                    active={items[index]?.key}
-                    onDone={() => setAt(null)}
-                />
-                <p className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-                    Enter to add · Esc to close
-                </p>
+                {/* The whole list shows (W1.1); only a short window scrolls it. */}
+                <div className="max-h-[min(calc(var(--radix-popover-content-available-height,80vh)-5.5rem),44rem)] overflow-y-auto">
+                    <AddList
+                        key={picking ?? "list"}
+                        editor={editor}
+                        startPicking={picking}
+                        items={items}
+                        active={items[index]?.key}
+                        onDone={() => setAt(null)}
+                    />
+                </div>
+                {/* A picker says it itself, under its preview (W3). */}
+                {picking ? null : (
+                    <p className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                        Enter to add · Esc to close
+                    </p>
+                )}
             </PopoverContent>
         </Popover>
     );

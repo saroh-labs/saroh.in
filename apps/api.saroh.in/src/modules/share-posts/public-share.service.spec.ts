@@ -381,6 +381,24 @@ describe("an offer's picture", () => {
         });
     });
 
+    it("says a live offer's words for a post's Offer card, and 404s an ended one (W2)", async () => {
+        const { service } = setup();
+        db.discount.findFirst.mockResolvedValue(discount());
+        await expect(service.offerWords("site_1", "d_1", "v")).resolves.toEqual(
+            {
+                name: "Cardamom bun box",
+                headline: "20% off",
+                until: null,
+                code: "BUN20",
+            },
+        );
+        expect(drawn).not.toHaveBeenCalled();
+        db.discount.findFirst.mockResolvedValueOnce(
+            discount({ endsAt: new Date("2020-01-01") }),
+        );
+        await missing(service.offerWords("site_1", "d_1", "v"));
+    });
+
     it("draws the product being shared, and only one the discount is on", async () => {
         const { service, catalogue } = setup();
         db.discount.findFirst.mockResolvedValue(discount());

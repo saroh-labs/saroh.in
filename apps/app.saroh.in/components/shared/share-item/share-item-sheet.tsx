@@ -82,6 +82,38 @@ export function ShareItemButton({
 }
 
 /**
+ * The same sheet opened from elsewhere, a menu item for one (the post's
+ * More › Share as a post, W6): no trigger of its own.
+ */
+export function ShareItemSheet({
+    item,
+    setup,
+    open,
+    onClose,
+}: {
+    item: ShareItem;
+    setup: ShareSetup;
+    open: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <FormSheet
+            open={open}
+            onClose={onClose}
+            title={`Share ${item.name}`}
+            description={SHARE_WORDS.subtitle(item)}
+            dirty={false}
+            bottomOnPhone
+            className="sm:max-w-[740px]"
+        >
+            {open ? (
+                <ShareBody item={item} setup={setup} onClose={onClose} />
+            ) : null}
+        </FormSheet>
+    );
+}
+
+/**
  * The sheet's inside, mounted only while it is open, so the picture is
  * fetched then. Its parts (`InstaFrame`, `ReadyActions`, `LookPicker`,
  * `CaptionBox`, `SharePayoff`) are what Create post reuses.

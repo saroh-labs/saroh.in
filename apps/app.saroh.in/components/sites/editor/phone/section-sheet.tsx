@@ -21,7 +21,6 @@ import type { FocusEvent, MouseEvent, ReactNode } from "react";
 import { useRef, useState } from "react";
 
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
-import { FixedBlockInspector } from "@/components/sites/blocks/fixed-block-inspector";
 import { useServicesForPicker } from "@/components/sites/blocks/use-services-for-picker";
 import { SaveFooter } from "@/components/sites/shell/save-footer";
 import { count } from "@/lib/format/plural";
@@ -31,6 +30,7 @@ import { keyboardInsetNow, useKeyboardUp } from "../edit-pill";
 import { SECTION_LABELS, sectionTitle } from "../editor-constants";
 import { subjectOnCanvas } from "../editor-panels";
 import { EditorSheet } from "../editor-sheet";
+import { ChromePanel } from "../inspector/chrome-panel";
 import { ContentTab } from "../inspector/content-tab";
 import { FeedbackTab } from "../inspector/feedback-tab";
 import { sectionActions } from "../inspector/section-actions";
@@ -185,12 +185,32 @@ export function SectionSheet({
                 onClose={onClose}
             />
         );
+        // The same fields and tabs as the desk's (H4).
+        tabs = (
+            <TabStrip<InspectorTab>
+                label={title}
+                idPrefix="phone-section"
+                tabs={[
+                    { value: "content", label: "Content" },
+                    { value: "style", label: "Style" },
+                    { value: "visibility", label: "Visibility" },
+                    { value: "feedback", label: "Feedback" },
+                ]}
+                value={tab}
+                onValueChange={openTab}
+                listClassName="px-1 [&>button]:px-3"
+            />
+        );
         body = (
-            <FixedBlockInspector
+            <ChromePanel
                 part={part}
-                siteId={siteId}
-                text={model.chrome}
-                bare
+                tab={tab}
+                model={model}
+                onBrand={onBrand}
+                onWholeSite={() => {
+                    selection.setSelectedIndex(null);
+                    selection.setInspector("feedback");
+                }}
             />
         );
     } else if (active) {
@@ -369,9 +389,14 @@ export function SectionSheet({
                 }
                 head={head}
                 // Tall enough that the fields scroll under the head, actions
-                // and tabs, even at 320 (`fix/WXNSection`).
+                // and tabs, even at 320 (`fix/WXNSection`). The header's
+                // menu chips opened half hidden under Save: it opens tall (H4).
                 className={
-                    keyboard ? "h-auto max-h-[70%]" : "min-h-[min(92%,30rem)]"
+                    keyboard
+                        ? "h-auto max-h-[70%]"
+                        : selection.selectedChrome === "header"
+                          ? "min-h-[92%]"
+                          : "min-h-[min(92%,30rem)]"
                 }
             >
                 <div
@@ -396,7 +421,7 @@ export function SectionSheet({
                         <div
                             className={
                                 active || selection.selectedChrome
-                                    ? "px-4 py-3.5"
+                                    ? "px-4 pb-6 pt-3.5"
                                     : undefined
                             }
                         >

@@ -276,6 +276,7 @@ function CompactHeading({
                 >
                     <PhoneText
                         text={content.subheading}
+                        field="subheading"
                         phone={content.phoneLine}
                     />
                 </p>

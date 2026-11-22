@@ -19,6 +19,7 @@ import type { BookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { WebsiteAreaSwitchGuard } from "../sites/website-area-switch";
 import {
     AddExtraHoursDto,
     AddSelfDto,
@@ -27,6 +28,7 @@ import {
     RemoveOffDto,
     ReplaceStaffHoursDto,
     SetStaffServicesDto,
+    SetTeamPageDto,
     UpdateBookingRulesDto,
     UpdateStaffDto,
 } from "./dto";
@@ -87,6 +89,17 @@ export class StaffController {
         @Body() dto: UpdateStaffDto,
     ): Promise<StaffView> {
         return this.staff.update(ctx, staffId, dto);
+    }
+
+    /** "Show on Our team" (DEC-246): the person, or an owner for them. */
+    @Put(":staffId/team-page")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    setTeamPage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("staffId") staffId: string,
+        @Body() dto: SetTeamPageDto,
+    ): Promise<StaffView> {
+        return this.staff.setTeamPage(ctx, staffId, dto.shown);
     }
 
     /** Off the diary for new bookings; their bookings and hours stay. */

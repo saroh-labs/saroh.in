@@ -232,6 +232,16 @@ export function updateStaff(
     );
 }
 
+/** "Show on Our team" (DEC-246): the person, or an owner for them. */
+export function setStaffTeamPage(staffId: string, shown: boolean) {
+    return send<StaffView>(
+        `/staff/${staffId}/team-page`,
+        "PUT",
+        { shown },
+        "Couldn't save that.",
+    );
+}
+
 export function setStaffServices(staffId: string, serviceIds: string[]) {
     return send<StaffView>(
         `/staff/${staffId}/services`,

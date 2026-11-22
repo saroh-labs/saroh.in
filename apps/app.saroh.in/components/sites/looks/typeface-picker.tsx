@@ -25,6 +25,19 @@ import { useSiteFaces } from "./site-faces";
 /** The default pair needs nothing fetched: said beside its name. */
 const SYSTEM_NOTE = "Loads instantly";
 
+/** A Hindi word to show each pair's Devanagari in (`WXBBrand`). */
+const HINDI_SAMPLE = "दुल्हन";
+
+/**
+ * The Devanagari face a pair's Hindi is set in (DEC-046): every stack's
+ * fallback names one, serif for a serif heading, sans otherwise.
+ */
+export function hindiPairing(stack: string | undefined): string {
+    return stack?.includes("Noto Serif Devanagari")
+        ? "Noto Serif Devanagari"
+        : "Noto Sans Devanagari";
+}
+
 /**
  * The Brand tab's Typeface (KTD-2; redesigned 22 Oct 2026): the pair in
  * force, set in its own face, and Change. Change opens the pairs as a
@@ -73,13 +86,14 @@ export function TypefacePicker({
     const current = pairs.find((p) => p.key === active) ?? pairs[0];
     const free = pairs.filter((p) => !rules.isPaid("fontPair", p.key));
     const paid = pairs.filter((p) => rules.isPaid("fontPair", p.key));
+    const hindi = (key: string) => `Hindi in ${hindiPairing(face(key))}`;
     const note = (key: string) =>
-        key === pairs[0].key ? SYSTEM_NOTE : undefined;
+        key === pairs[0].key ? `${SYSTEM_NOTE} · ${hindi(key)}` : hindi(key);
 
     // The row's quiet line: the pair being tried, else what the pair is.
     const tried = highlight !== current.key && open;
     const rowNote = tried
-        ? `Trying ${pairs.find((p) => p.key === highlight)?.name ?? ""} on the page`
+        ? `Trying ${pairs.find((p) => p.key === highlight)?.name ?? ""} on the page · ${hindi(highlight)}`
         : note(current.key);
 
     function setOpenAndTry(next: boolean) {
@@ -114,14 +128,20 @@ export function TypefacePicker({
                         pair.key === current.key ? "opacity-100" : "opacity-0",
                     )}
                 />
-                <span className="min-w-0 flex-1 truncate">{pair.name}</span>
-                {trying || note(pair.key) ? (
-                    <small className="ml-auto shrink-0 font-sans text-xs text-muted-foreground">
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate">{pair.name}</span>
+                    <small
+                        className="block truncate font-sans text-xs text-muted-foreground"
+                        data-hindi-pairing=""
+                    >
                         {trying && !inSheet
-                            ? "Trying on the page"
+                            ? `Trying on the page · ${hindi(pair.key)}`
                             : note(pair.key)}
                     </small>
-                ) : null}
+                </span>
+                <span aria-hidden lang="hi" className="shrink-0 text-sm">
+                    {HINDI_SAMPLE}
+                </span>
             </CommandItem>
         );
     }
@@ -156,7 +176,7 @@ export function TypefacePicker({
                 >
                     <span className="min-w-0 flex-1">
                         <span
-                            className="block truncate text-base leading-tight"
+                            className="block truncate text-[17px] leading-tight"
                             style={{ fontFamily: face(current.key) }}
                         >
                             {current.name}

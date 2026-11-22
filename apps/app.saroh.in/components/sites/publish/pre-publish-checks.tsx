@@ -34,76 +34,84 @@ export function PrePublishChecks({
     const [describing, setDescribing] = useState<Flag | null>(null);
     const pageTitle = (flag: Flag) =>
         pages.find((p) => p.id === flag.pageId)?.title ?? "This site";
+    const rows = checkRows(flags);
 
+    const lower = (t: string) => t[0].toLowerCase() + t.slice(1);
+    const ok = rows.filter((r) => r.ok);
+    const problems = rows.filter((r) => !r.ok);
+
+    // One summary line, each check named in it, a problem in bold (P2,
+    // `fix/WXNPublish`); each problem's fixes under it.
     return (
         <section
             aria-label="Checked before you publish"
             data-pre-publish-checks=""
-            className="grid gap-1.5 rounded-lg border px-3 py-2.5 text-sm"
+            data-all-ok={problems.length === 0 ? "" : undefined}
+            className="grid gap-1.5 text-sm"
         >
-            <h3 className="font-semibold">Checked before you publish</h3>
-            <ul className="grid gap-1.5">
-                {checkRows(flags).map((row) => (
-                    <li
-                        key={row.key}
-                        data-check={row.key}
-                        data-ok={row.ok ? "" : undefined}
-                        className="grid gap-1"
-                    >
-                        <span
-                            className={cn(
-                                "flex items-start gap-1.5",
-                                row.ok
-                                    ? "text-success-subtle-foreground"
-                                    : "text-warning-subtle-foreground",
-                            )}
-                        >
-                            {row.ok ? (
-                                <Check
-                                    aria-hidden
-                                    className="mt-0.5 size-4 shrink-0"
-                                />
-                            ) : (
-                                <CircleAlert
-                                    aria-hidden
-                                    className="mt-0.5 size-4 shrink-0"
-                                />
-                            )}
-                            <span className="min-w-0">{row.title}</span>
-                        </span>
-                        {row.flags.length > 0 ? (
-                            <ul className="grid gap-1 pl-6">
-                                {row.flags.map((flag, i) => (
-                                    <li
-                                        key={i}
-                                        className="flex flex-wrap items-start gap-x-3 gap-y-0.5"
-                                    >
-                                        <span className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">
-                                            {flag.type === "photoNoDescription"
-                                                ? pageTitle(flag)
-                                                : `${pageTitle(flag)} · ${flag.message}`}
-                                        </span>
-                                        <Button
-                                            type="button"
-                                            variant="link"
-                                            size="sm"
-                                            className="h-auto shrink-0 p-0 font-semibold coarse:min-h-11"
-                                            onClick={() =>
-                                                flag.type ===
-                                                "photoNoDescription"
-                                                    ? setDescribing(flag)
-                                                    : onShow(flag)
-                                            }
-                                        >
-                                            {FIX_WORD[flag.type]}
-                                        </Button>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : null}
-                    </li>
-                ))}
-            </ul>
+            <p
+                className={cn(
+                    "flex items-start gap-1.5",
+                    problems.length === 0
+                        ? "text-success-subtle-foreground"
+                        : "text-warning-subtle-foreground",
+                )}
+            >
+                {problems.length === 0 ? (
+                    <Check aria-hidden className="mt-0.5 size-4 shrink-0" />
+                ) : (
+                    <CircleAlert
+                        aria-hidden
+                        className="mt-0.5 size-4 shrink-0"
+                    />
+                )}
+                <span className="min-w-0">
+                    {ok.length > 0 ? (
+                        <>
+                            <b className="font-semibold">Checked:</b>{" "}
+                            {ok.map((r) => lower(r.title)).join(", ")}
+                            {problems.length > 0 ? ". " : ""}
+                        </>
+                    ) : null}
+                    {problems.length > 0 ? (
+                        <b className="font-semibold">
+                            {problems.map((r) => `${r.title}.`).join(" ")}
+                        </b>
+                    ) : null}
+                </span>
+            </p>
+            {problems.length > 0 ? (
+                <ul className="grid gap-1 pl-6">
+                    {problems.flatMap((row) =>
+                        row.flags.map((flag, i) => (
+                            <li
+                                key={`${row.key}-${i}`}
+                                data-check={row.key}
+                                className="flex flex-wrap items-start gap-x-3 gap-y-0.5"
+                            >
+                                <span className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">
+                                    {flag.type === "photoNoDescription"
+                                        ? pageTitle(flag)
+                                        : `${pageTitle(flag)} · ${flag.message}`}
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto shrink-0 p-0 font-semibold coarse:min-h-11"
+                                    onClick={() =>
+                                        flag.type === "photoNoDescription"
+                                            ? setDescribing(flag)
+                                            : onShow(flag)
+                                    }
+                                >
+                                    {FIX_WORD[flag.type]}
+                                </Button>
+                            </li>
+                        )),
+                    )}
+                </ul>
+            ) : null}
             <DescribePhotoDialog
                 siteId={siteId}
                 flag={describing}

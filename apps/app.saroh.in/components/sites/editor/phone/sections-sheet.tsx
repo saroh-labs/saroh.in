@@ -20,7 +20,7 @@ import { useRef, useState } from "react";
 
 import type { FixedPart } from "@/components/sites/editor/use-editor-selection";
 
-import { SECTION_LABELS, sectionTitle } from "../editor-constants";
+import { SECTION_SHOWS, sectionTitle } from "../editor-constants";
 import { EditorSheet } from "../editor-sheet";
 import { sectionActions } from "../inspector/section-actions";
 import { frameOf } from "../inspector/section-frame";
@@ -28,7 +28,10 @@ import { nearestRow } from "../phone-blocks";
 import type { EditorModel } from "../shell/editor-model";
 
 /** The board's 44px icon buttons, glyph at 18. */
-const ICON = "size-11 rounded-[9px] text-muted-foreground [&_svg]:size-[18px]";
+const ICON =
+    "size-11 rounded-[9px] text-muted-foreground disabled:text-disabled-foreground [&_svg]:size-[18px]";
+/** An arrow that cannot move further is greyed: the disabled edge's ink (P1). */
+const ARROW = cn(ICON, "disabled:text-[hsl(var(--disabled-border))]");
 
 /**
  * "Sections on this page" (U49, `fix/WXNReorder`), full screen from the
@@ -148,26 +151,33 @@ export function SectionsSheet({
                 >
                     <PinnedRow
                         part="header"
+                        selected={selection.selectedChrome === "header"}
                         readOnly={readOnly}
                         onOpen={chooseChrome}
                     />
                     {sections.map((section, index) => {
                         const name = sectionTitle(section);
-                        const kind = SECTION_LABELS[section.type];
                         const offPhone = frameOf(section).hideOn === "phone";
+                        // Every row says what it shows (P1, `fix/WXNReorder`).
                         const line = section.hidden
                             ? "Hidden when published"
                             : offPhone
                               ? "Hidden on phone"
-                              : name === kind
-                                ? null
-                                : kind;
+                              : SECTION_SHOWS[section.type];
                         return (
                             <li
                                 key={section.key ?? index}
                                 data-row-index={index}
+                                aria-current={
+                                    selection.selectedIndex === index
+                                        ? "true"
+                                        : undefined
+                                }
                                 className={cn(
                                     "flex min-h-[60px] items-center gap-0.5 pr-1",
+                                    // The open section, in the selected fill (P1).
+                                    selection.selectedIndex === index &&
+                                        "bg-muted",
                                     readOnly && "pl-1",
                                     drag?.from === index && "opacity-40",
                                     drag?.to === index &&
@@ -198,7 +208,8 @@ export function SectionsSheet({
                                     <span
                                         data-ph-mask=""
                                         className={cn(
-                                            "truncate text-[0.9375rem] font-semibold",
+                                            // Two lines before a long name is cut (P1).
+                                            "line-clamp-2 break-words text-[0.9375rem] font-semibold",
                                             (section.hidden === true ||
                                                 offPhone) &&
                                                 "text-muted-foreground",
@@ -206,11 +217,9 @@ export function SectionsSheet({
                                     >
                                         {name}
                                     </span>
-                                    {line ? (
-                                        <span className="truncate text-[0.8125rem] text-muted-foreground">
-                                            {line}
-                                        </span>
-                                    ) : null}
+                                    <span className="truncate text-[0.8125rem] text-muted-foreground">
+                                        {line}
+                                    </span>
                                 </button>
                                 {readOnly ? null : (
                                     <>
@@ -222,7 +231,7 @@ export function SectionsSheet({
                                             onClick={() =>
                                                 edits.move(index, -1)
                                             }
-                                            className={ICON}
+                                            className={ARROW}
                                         />
                                         <IconButton
                                             label={`Move ${name} down`}
@@ -232,7 +241,7 @@ export function SectionsSheet({
                                                 index === sections.length - 1
                                             }
                                             onClick={() => edits.move(index, 1)}
-                                            className={ICON}
+                                            className={ARROW}
                                         />
                                         <IconButton
                                             label={`Hide ${name} on phone`}
@@ -264,6 +273,7 @@ export function SectionsSheet({
                     })}
                     <PinnedRow
                         part="footer"
+                        selected={selection.selectedChrome === "footer"}
                         readOnly={readOnly}
                         onOpen={chooseChrome}
                     />
@@ -296,16 +306,26 @@ export function SectionsSheet({
 /** The header or the footer: on every page, so it is never moved here. */
 function PinnedRow({
     part,
+    selected,
     readOnly,
     onOpen,
 }: {
     part: FixedPart;
+    /** Open in its sheet: the selected fill over the tint (P1). */
+    selected: boolean;
     readOnly: boolean;
     onOpen: (part: FixedPart) => void;
 }) {
     const name = part === "header" ? "Header" : "Footer";
     return (
-        <li className="flex min-h-[60px] items-center gap-0.5 pr-1">
+        // Tinted: it never moves (P1, `fix/WXNReorder`).
+        <li
+            aria-current={selected ? "true" : undefined}
+            className={cn(
+                "flex min-h-[60px] items-center gap-0.5 pr-1",
+                selected ? "bg-muted" : "bg-background",
+            )}
+        >
             <span
                 aria-hidden
                 className="grid size-11 shrink-0 place-items-center text-muted-foreground"

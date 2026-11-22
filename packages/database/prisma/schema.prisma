@@ -6278,6 +6278,10 @@ model StaffMember {
   status     String    @default("ACTIVE") // ACTIVE | ARCHIVED — archived take no new bookings
   archivedAt DateTime?
 
+  // "Show on Our team" (DEC-246): the person's name and role on a website's
+  // Our team page. Off until they, or an owner for them, switch it on.
+  showOnTeamPage Boolean @default(false)
+
   services          StaffService[]
   hours             StaffHours[]
   timeOff           StaffTimeOff[]

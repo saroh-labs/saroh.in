@@ -25,9 +25,18 @@ import {
  */
 
 export const EMBED =
-    /<div data-embed="(service|product)" data-id="([A-Za-z0-9_-]{1,64})"><\/div>/g;
+    /<div data-embed="(service|product|book|offer)" data-id="([A-Za-z0-9_-]{1,64})"><\/div>/g;
 
-export type EmbedKind = "service" | "product";
+/** `book` is a Book now button for a service, `offer` a live discount (W2). */
+export type EmbedKind = "service" | "product" | "book" | "offer";
+
+/** A live offer's words (API `public/share/:siteId/offer/:id`). */
+export interface EmbedOffer {
+    name: string;
+    headline: string;
+    until: string | null;
+    code: string;
+}
 
 /** What a service card needs: what the booking page offers now. */
 export interface EmbedService {
@@ -41,7 +50,12 @@ export interface EmbedService {
 
 /** The ids of each kind a post's body names, each once. */
 export function embedsIn(html: string): Record<EmbedKind, string[]> {
-    const out: Record<EmbedKind, string[]> = { service: [], product: [] };
+    const out: Record<EmbedKind, string[]> = {
+        service: [],
+        product: [],
+        book: [],
+        offer: [],
+    };
     html.replace(EMBED, (match, kind: EmbedKind, id: string) => {
         if (!out[kind].includes(id)) out[kind].push(id);
         return match;
@@ -107,6 +121,75 @@ export function productCard(product: ShopListingCard): string {
     );
 }
 
+/** A Book now button for one service (W2), as a post's button draws. */
+export function bookButton(service: EmbedService): string {
+    return `<p data-button="link"><a href="/book?service=${encodeURIComponent(service.id)}" aria-label="${escape(`Book now: ${service.name}`)}">Book now</a></p>`;
+}
+
+/** A live offer (W2): how much off, until when, the code, and the shop. */
+export function offerCard(offer: EmbedOffer): string {
+    const line = [offer.until, offer.code ? `Code ${offer.code}` : null]
+        .filter(Boolean)
+        .join(" · ");
+    return card(
+        { name: `${offer.headline} · ${offer.name}`, line },
+        "/shop",
+        "Shop now",
+    );
+}
+
+/** Lower-case words joined by hyphens: a heading's anchor. */
+function anchorOf(text: string): string {
+    return (
+        text
+            .toLowerCase()
+            // Spaces and ASCII punctuation go; letters of any script stay.
+            .replace(/[\s!-/:-@[-`{-~]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 60) || "part"
+    );
+}
+
+const CONTENTS = /<div data-contents="headings"><\/div>/g;
+/** An `<h2>` the sanitizer wrote: only a `style` may sit on it. */
+const H2 = /<h2((?: style="[^"]*")?)>([\s\S]*?)<\/h2>/g;
+
+/**
+ * The contents list (W2): each `<h2>` gets an anchor, and the post's
+ * `data-contents` block lists them. Words are the heading's text, tags
+ * dropped and escaped again. A post with no contents block is unchanged.
+ */
+export function fillContents(html: string): string {
+    if (!html.includes('data-contents="headings"')) return html;
+    const seen = new Map<string, number>();
+    const parts: { id: string; text: string }[] = [];
+    const out = html.replace(H2, (_, style: string, inner: string) => {
+        // Until nothing changes: `<sc<b>ript>` is a tag again after one pass.
+        let words = inner;
+        for (let before = ""; before !== words;) {
+            before = words;
+            words = words.replace(/<[^>]*>/g, "");
+        }
+        const text = words.replace(/&nbsp;/g, " ").trim();
+        let id = anchorOf(text.replace(/&[a-z#0-9]+;/gi, ""));
+        const n = seen.get(id) ?? 0;
+        seen.set(id, n + 1);
+        if (n > 0) id = `${id}-${n + 1}`;
+        parts.push({ id, text });
+        return `<h2 id="${id}"${style}>${inner}</h2>`;
+    });
+    // The text is already escaped HTML from the sanitizer, tags dropped.
+    const list = parts.length
+        ? `<div data-contents="headings"><p class="m-0 text-sm font-semibold text-site-fg">In this post</p><ol class="m-0 mt-2 grid list-decimal gap-1 pl-5 text-sm">${parts
+              .map(
+                  (p) =>
+                      `<li><a href="#${p.id}" class="text-site-accent-text">${p.text}</a></li>`,
+              )
+              .join("")}</ol></div>`
+        : "";
+    return out.replace(CONTENTS, list);
+}
+
 /**
  * The body with each card filled in. A card whose thing isn't found draws
  * nothing; `null` for a kind means its read failed, and its cards draw
@@ -117,12 +200,18 @@ export function fillPostEmbeds(
     found: {
         services: ReadonlyMap<string, EmbedService> | null;
         products: ReadonlyMap<string, ShopListingCard> | null;
+        offers?: ReadonlyMap<string, EmbedOffer> | null;
     },
 ): string {
     return html.replace(EMBED, (_, kind: EmbedKind, id: string) => {
-        if (kind === "service") {
+        if (kind === "service" || kind === "book") {
             const s = found.services?.get(id);
-            return s ? serviceCard(s) : "";
+            if (!s) return "";
+            return kind === "book" ? bookButton(s) : serviceCard(s);
+        }
+        if (kind === "offer") {
+            const o = found.offers?.get(id);
+            return o ? offerCard(o) : "";
         }
         const p = found.products?.get(id);
         return p ? productCard(p) : "";

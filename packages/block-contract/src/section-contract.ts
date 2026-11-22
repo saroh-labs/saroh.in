@@ -910,6 +910,11 @@ const servicesListV1 = z.object({
     showDescriptions: z.boolean().optional(),
     buttonLabel,
     /**
+     * "Show a Book button" (A5, `fix/WXBAdd`): each service's own Book,
+     * opening a time to book it. ABSENT means shown, as it always was.
+     */
+    showBook: z.boolean().optional(),
+    /**
      * The `priceCard` look's own words (template polish), around a price and
      * a duration that are ALWAYS the service's: `modeLine` under the price
      * ("In person in Pune, or by video"), `followUpLine` under the button

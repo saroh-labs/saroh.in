@@ -13,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
+import { Sparkles } from "lucide-react";
 
 import {
     SECTION_HINTS,
@@ -20,6 +21,62 @@ import {
     addableFamilies,
 } from "@/components/sites/editor/editor-constants";
 import { BlockThumbnail } from "./block-thumbnail";
+
+/** The library's categories (A2, `fix/WXKLibrary`), in the board's order. */
+const CATEGORY_OF: Record<SectionType, string> = {
+    hero: "Top and about",
+    richText: "Top and about",
+    cta: "Top and about",
+    gallery: "Top and about",
+    features: "Top and about",
+    person: "Top and about",
+    projects: "Top and about",
+    servicesList: "Services and shop",
+    productGrid: "Services and shop",
+    plans: "Services and shop",
+    packs: "Services and shop",
+    booking: "Bookings",
+    timetable: "Bookings",
+    testimonials: "Reviews",
+    faq: "Reviews",
+    enquiry: "Contact and posts",
+    contact: "Contact and posts",
+    visitUs: "Contact and posts",
+    hours: "Contact and posts",
+    journal: "Contact and posts",
+};
+const CATEGORY_ORDER = [
+    "Top and about",
+    "Services and shop",
+    "Bookings",
+    "Reviews",
+    "Contact and posts",
+];
+
+/** Families under their categories, each category with what it holds. */
+/** Where a business-filled block's words come from (A2, `WXKLibrary`). */
+const SOURCE_OF: Partial<Record<SectionType, string>> = {
+    servicesList: "From Services",
+    productGrid: "From Products",
+    plans: "From Plans",
+    packs: "From Class packs",
+    booking: "From Bookings",
+    timetable: "From Classes",
+    enquiry: "From Forms",
+    journal: "From your posts",
+    visitUs: "From your business details",
+    hours: "From your opening hours",
+    contact: "From your business details",
+};
+
+export function libraryCategories<F extends { head: SectionType }>(
+    families: readonly F[],
+): { name: string; families: F[] }[] {
+    return CATEGORY_ORDER.map((name) => ({
+        name,
+        families: families.filter((f) => CATEGORY_OF[f.head] === name),
+    })).filter((c) => c.families.length > 0);
+}
 
 /**
  * "Add section", showing what you are about to get (#267).
@@ -35,6 +92,10 @@ import { BlockThumbnail } from "./block-thumbnail";
  * the section editor's Look field changes it afterwards (#254), so the two can
  * never disagree about what the block is.
  */
+/** A group's id in the library, for its rail link. */
+const categoryId = (name: string) =>
+    `library-${name.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+
 export function AddSectionDialog({
     open,
     onOpenChange,
@@ -44,7 +105,13 @@ export function AddSectionDialog({
     startType = null,
     shopOpen = false,
     packsOpen = false,
+    onDescribe,
 }: {
+    /**
+     * "Not here? Describe a section": Ask AI on the page (A2). Absent where
+     * Ask AI is not on for this person.
+     */
+    onDescribe?: () => void;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     /** This merchant's `--site-*` variables, so previews wear their palette. */
@@ -76,6 +143,8 @@ export function AddSectionDialog({
         onAdd(t, variant);
         close(false);
     };
+
+    const categories = libraryCategories(addableFamilies(shopOpen, packsOpen));
 
     const title =
         types && types.length > 1
@@ -160,53 +229,152 @@ export function AddSectionDialog({
                                 site&apos;s colours.
                             </DialogDescription>
                         </DialogHeader>
-                        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {addableFamilies(shopOpen, packsOpen).map((f) => {
-                                const t = f.layouts[0].type;
-                                const m = BLOCK_META[t];
-                                const looks = m.variants.length;
-                                const layouts = f.layouts.length;
-                                return (
-                                    <li key={f.head}>
-                                        <PickerCard
-                                            label={
-                                                layouts > 1
-                                                    ? f.name
-                                                    : SECTION_LABELS[t]
-                                            }
-                                            description={SECTION_HINTS[t]}
-                                            detail={
-                                                layouts > 1
-                                                    ? `${layouts} layouts`
-                                                    : looks > 1
-                                                      ? `${looks} looks`
-                                                      : undefined
-                                            }
-                                            onPick={() =>
-                                                layouts > 1 || looks > 1
-                                                    ? setType(
-                                                          f.layouts.map(
-                                                              (l) => l.type,
-                                                          ),
-                                                      )
-                                                    : add(t)
-                                            }
-                                        >
-                                            <BlockThumbnail
-                                                variables={variables}
-                                                look={look}
+                        {/* A rail of the groups with their counts beside
+                            the cards (A2, `WXKLibrary`). */}
+                        <div className="grid gap-6 md:grid-cols-[11rem_minmax(0,1fr)]">
+                            <nav
+                                aria-label="Kinds of section"
+                                className="sticky top-0 hidden self-start md:block"
+                            >
+                                <ul className="grid gap-0.5">
+                                    {categories.map(({ name, families }) => (
+                                        <li key={name}>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full justify-between gap-2 font-normal"
+                                                onClick={() =>
+                                                    document
+                                                        .getElementById(
+                                                            categoryId(name),
+                                                        )
+                                                        ?.scrollIntoView({
+                                                            block: "start",
+                                                            behavior: "smooth",
+                                                        })
+                                                }
                                             >
-                                                <BlockFixturePreview
-                                                    type={t}
-                                                    variant={m.variants[0].id}
-                                                    look={look}
-                                                />
-                                            </BlockThumbnail>
-                                        </PickerCard>
-                                    </li>
-                                );
-                            })}
-                        </ul>
+                                                <span className="truncate">
+                                                    {name}
+                                                </span>
+                                                <span className="tabular-nums text-muted-foreground">
+                                                    {families.length}
+                                                </span>
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </nav>
+                            <div className="grid min-w-0 gap-6">
+                                {categories.map(({ name, families }) => (
+                                    <section
+                                        key={name}
+                                        id={categoryId(name)}
+                                        aria-label={name}
+                                        className="grid scroll-mt-2 gap-2"
+                                        data-library-category={name}
+                                    >
+                                        <h3 className="flex items-baseline gap-1.5 text-sm font-medium">
+                                            {name}
+                                            <span className="font-normal tabular-nums text-muted-foreground">
+                                                {families.length}
+                                            </span>
+                                        </h3>
+                                        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                            {families.map((f) => {
+                                                const t = f.layouts[0].type;
+                                                const m = BLOCK_META[t];
+                                                const looks = m.variants.length;
+                                                const layouts =
+                                                    f.layouts.length;
+                                                return (
+                                                    <li key={f.head}>
+                                                        <PickerCard
+                                                            label={
+                                                                layouts > 1
+                                                                    ? f.name
+                                                                    : SECTION_LABELS[
+                                                                          t
+                                                                      ]
+                                                            }
+                                                            // Where its words come
+                                                            // from, else what it is (A2).
+                                                            description={
+                                                                SOURCE_OF[t] ??
+                                                                SECTION_HINTS[t]
+                                                            }
+                                                            // Name and source only; a
+                                                            // look is chosen after (A2 · 3).
+                                                            detail={
+                                                                layouts > 1
+                                                                    ? `${layouts} layouts`
+                                                                    : undefined
+                                                            }
+                                                            onPick={() =>
+                                                                layouts > 1 ||
+                                                                looks > 1
+                                                                    ? setType(
+                                                                          f.layouts.map(
+                                                                              (
+                                                                                  l,
+                                                                              ) =>
+                                                                                  l.type,
+                                                                          ),
+                                                                      )
+                                                                    : add(t)
+                                                            }
+                                                        >
+                                                            <BlockThumbnail
+                                                                variables={
+                                                                    variables
+                                                                }
+                                                                look={look}
+                                                            >
+                                                                <BlockFixturePreview
+                                                                    type={t}
+                                                                    variant={
+                                                                        m
+                                                                            .variants[0]
+                                                                            .id
+                                                                    }
+                                                                    look={look}
+                                                                />
+                                                            </BlockThumbnail>
+                                                        </PickerCard>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </section>
+                                ))}
+                                {onDescribe ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        data-describe-section=""
+                                        className="h-auto justify-start gap-3 whitespace-normal border-dashed p-4 text-left"
+                                        onClick={() => {
+                                            close(false);
+                                            onDescribe();
+                                        }}
+                                    >
+                                        <Sparkles
+                                            aria-hidden
+                                            className="size-5 shrink-0"
+                                        />
+                                        <span className="grid gap-0.5">
+                                            <span className="font-semibold">
+                                                Not here? Describe a section
+                                            </span>
+                                            <span className="text-sm font-normal text-muted-foreground">
+                                                Ask AI makes it from your words
+                                            </span>
+                                        </span>
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </div>
                     </>
                 )}
             </DialogContent>

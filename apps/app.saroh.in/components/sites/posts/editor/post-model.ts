@@ -37,7 +37,10 @@ export interface PostEditorData {
         canComment: boolean;
         canSettle: boolean;
     };
-    /** Share as a post (#1375): only while the post is live. */
+    /**
+     * Share as a post (#1375), for any saved post; each Share shows only
+     * while it is live, and Publish post names it beforehand (Y2).
+     */
     share: { setup: ShareSetup; url: string } | null;
     /** Started from an Ask AI blog draft; null when it couldn't be read. */
     fromAskAi?: AskAiStart | null;

@@ -150,6 +150,7 @@ export default function LookHero({
                         <p className={LINE[look]}>
                             <PhoneText
                                 text={content.subheading}
+                                field="subheading"
                                 phone={content.phoneLine}
                             />
                         </p>

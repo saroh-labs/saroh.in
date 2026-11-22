@@ -109,6 +109,7 @@ export default function PlainHero({
                             <p className="mt-5 max-w-[54ch] text-pretty text-[length:calc(var(--site-body-size,1rem)*1.125)] leading-relaxed sm:text-[length:calc(var(--site-body-size,1rem)*1.25)]">
                                 <PhoneText
                                     text={content.subheading}
+                                    field="subheading"
                                     phone={content.phoneLine}
                                 />
                             </p>

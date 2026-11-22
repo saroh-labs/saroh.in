@@ -85,6 +85,7 @@ import {
 } from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
+import { starterSections } from "./page-starters";
 import { pageUpdatedAt, pageUpdatedSelect } from "./page-updated";
 import type { SiteChangeKind } from "./pending-changes";
 import {
@@ -4482,23 +4483,67 @@ export class SitesService {
                 "A page needs a title and an address.",
             );
         }
+        // A new page type (A7) is the Website area's (DEC-240).
+        if (dto.starter !== undefined && !websiteAreaOn()) {
+            throw new BadRequestException(
+                "This page type isn't available yet.",
+            );
+        }
         await assertPathIsFree(siteId, dto.path, { title: dto.title });
 
         const path = dto.path;
         const title = dto.title;
+        const starter = dto.starter;
         return prisma.$transaction(async (tx) => {
             // A page now has this link: it wins over an old link's forward.
             await dropRedirectsAt(tx, siteId, path);
+            const sections = starter
+                ? await starterSections(tx, {
+                      organizationId: ctx.organizationId,
+                      siteId,
+                      title,
+                      starter,
+                  })
+                : null;
+            // A site with no pages yet: its first page is its home (owner, 22 Nov 2026).
+            const firstPage =
+                (await tx.page.count({ where: { siteId } })) === 0;
             return tx.page.create({
                 data: {
                     siteId,
                     organizationId: ctx.organizationId,
                     path,
                     title,
-                    isHome: false,
+                    isHome: firstPage,
                     ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
                     settingsEditedByUserId: ctx.userId,
                     settingsEditedAt: new Date(),
+                    // Its draft, filled from the business (A7), as a
+                    // module page's is.
+                    ...(sections
+                        ? {
+                              versions: {
+                                  create: {
+                                      organizationId: ctx.organizationId,
+                                      status: "DRAFT",
+                                      createdByUserId: ctx.userId,
+                                      sections: {
+                                          create: sections.map((s, order) => ({
+                                              organizationId:
+                                                  ctx.organizationId,
+                                              key: randomUUID(),
+                                              type: s.type,
+                                              contractVersion:
+                                                  s.contractVersion,
+                                              order,
+                                              content:
+                                                  s.content as Prisma.InputJsonValue,
+                                          })),
+                                      },
+                                  },
+                              },
+                          }
+                        : {}),
                 },
                 select: PAGE_VIEW_SELECT,
             });

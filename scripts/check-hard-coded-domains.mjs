@@ -5,7 +5,7 @@
 // site and the docs, help, templates and UI sites aren't shared, so they aren't
 // scanned.
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dirname, "..");
@@ -43,7 +43,13 @@ function scan(pattern) {
         { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 },
     )
         .split("\n")
-        .filter((f) => /\.(ts|tsx|js|mjs|cjs)$/.test(f) && !SKIP_FILE.test(f));
+        .filter(
+            (f) =>
+                /\.(ts|tsx|js|mjs|cjs)$/.test(f) &&
+                !SKIP_FILE.test(f) &&
+                // A file deleted in the work tree but not yet committed.
+                existsSync(join(root, f)),
+        );
     const counts = {};
     for (const file of files) {
         const n = codeLines(readFileSync(join(root, file), "utf8"), pattern);

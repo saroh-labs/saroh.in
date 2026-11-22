@@ -2,12 +2,14 @@
 
 import type { Editor } from "@tiptap/react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import {
     useCallback,
     useEffect,
     useLayoutEffect,
     useMemo,
     useState,
+    useSyncExternalStore,
 } from "react";
 
 import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
@@ -21,10 +23,10 @@ import { postChanges, postStatusLabel } from "@/lib/sites/post-diff";
 import { PhonePostEditor } from "../phone/phone-post-editor";
 import { usePublishPost } from "../publish/publish-post";
 import { approvalStatus } from "../review/approval-words";
-import { PostFrame, usePostFrame } from "./post-frame";
+import { PostFrame, PostLoading, usePostFrame } from "./post-frame";
 import type { PostEditorData, PostEditorModel } from "./post-model";
 import { usePostDraft } from "./use-post-draft";
-import { WritingSurface } from "./writing-surface";
+import { EditorArriving, WritingSurface } from "./writing-surface";
 
 export { postTrailTabs } from "./post-trail";
 export type { PostTrailKey } from "./post-trail";
@@ -145,8 +147,24 @@ function PostBody({ data, post }: { data: PostEditorData; post?: PostDetail }) {
     // The frame's bar, list and inspector read this post after each render;
     // gone, they show their skeletons until the next post is here.
     const key = post?.id ?? "new";
+    // W7: until a writer's editor is made the post is still opening: the
+    // bar says so (Publish greyed) and the whole post is a skeleton.
+    const [arriving, setArriving] = useState(false);
+    // Before hydration nothing has said so yet: the server's paint drew the
+    // title alone over the body's skeleton (W7.1). A writer's post opens.
+    const hydrated = useSyncExternalStore(
+        noSubscribe,
+        () => true,
+        () => false,
+    );
+    const opening =
+        !phone && (arriving || (!hydrated && !data.readOnly && !data.paused));
     useLayoutEffect(() => {
-        show({ key, model, editor, onPublish: publish.open, onDiscard });
+        show(
+            opening
+                ? null
+                : { key, model, editor, onPublish: publish.open, onDiscard },
+        );
     });
     useLayoutEffect(() => () => show(null), [show]);
 
@@ -173,18 +191,55 @@ function PostBody({ data, post }: { data: PostEditorData; post?: PostDetail }) {
                     onDiscard={onDiscard}
                 />
             ) : (
-                <WritingSurface
-                    model={model}
-                    previewing={previewing}
-                    titleError={showTitleError}
-                    toolbar={toolbar}
-                    onToolbar={setToolbar}
-                    onEditor={setEditor}
-                    onCover={openCover}
-                />
+                <EditorArriving.Provider value={setArriving}>
+                    <OpeningCover opening={opening}>
+                        <WritingSurface
+                            model={model}
+                            previewing={previewing}
+                            titleError={showTitleError}
+                            toolbar={toolbar}
+                            onToolbar={setToolbar}
+                            onEditor={setEditor}
+                            onCover={openCover}
+                        />
+                    </OpeningCover>
+                </EditorArriving.Provider>
             )}
             {publish.node}
             {draft.guard.dialog}
         </>
+    );
+}
+
+const noSubscribe = () => () => undefined;
+
+/**
+ * The writing surface under its skeleton while the editor's code arrives
+ * (W7, `WXWStates`): drawn, so the editor is made, but not seen.
+ */
+function OpeningCover({
+    opening,
+    children,
+}: {
+    opening: boolean;
+    children: ReactNode;
+}) {
+    // One tree either way: the surface (and its editor) never remounts.
+    return (
+        <div
+            className={
+                opening
+                    ? "grid min-h-0 [&>*]:col-start-1 [&>*]:row-start-1"
+                    : "contents"
+            }
+        >
+            <div
+                aria-hidden={opening || undefined}
+                className={opening ? "invisible grid min-h-0" : "contents"}
+            >
+                {children}
+            </div>
+            {opening ? <PostLoading /> : null}
+        </div>
     );
 }

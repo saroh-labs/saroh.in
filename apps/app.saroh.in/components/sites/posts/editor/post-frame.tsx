@@ -29,6 +29,7 @@ import {
 import { useEditorLayout } from "@/components/sites/editor/use-editor-layout";
 import { AddList } from "@/components/sites/rich-text/writing-menus";
 import {
+    answers,
     armFullLoadCatch,
     resetRouterAfterCatch,
 } from "@/lib/navigation/caught-full-load";
@@ -39,6 +40,7 @@ import {
 } from "../history/post-history-panel";
 import { ApprovalBand } from "../review/approval-band";
 import type { DetailsRow } from "./details-tab";
+import { PostFind } from "./post-find";
 import type { InspectorTab } from "./post-inspector";
 import { PostInspector, PostInspectorHeader } from "./post-inspector";
 import type { PostEditorData, PostEditorModel } from "./post-model";
@@ -110,6 +112,7 @@ export function PostFrame({ children }: { children: ReactNode }) {
     const [toolbar, setToolbar] = useState(false);
     const [previewing, setPreviewing] = useState(false);
     const [mode, away] = useState<FrameMode>("post");
+    const [finding, setFinding] = useState(false);
     const right = useRightWidth();
 
     // Another post: what was open on the last one closes.
@@ -141,18 +144,29 @@ export function PostFrame({ children }: { children: ReactNode }) {
             (url) =>
                 !letThrough.current &&
                 url.pathname.startsWith(`/sites/${siteId}/write/`),
-            () => {
-                if (onScreen.current) {
-                    showError(
-                        `${couldntLoadLine("that post")} Check your connection.`,
-                    );
-                    resetRouterAfterCatch();
-                    nextRound((n) => n + 1);
-                    return;
-                }
-                setCaught(true);
+            (url) => {
+                void answers(url).then((ok) => {
+                    // Nothing failed (a new deploy, a scripted load): go.
+                    if (ok) {
+                        letThrough.current = true;
+                        window.location.assign(url.href);
+                        return;
+                    }
+                    failedLoad();
+                });
             },
         );
+        function failedLoad() {
+            if (onScreen.current) {
+                showError(
+                    `${couldntLoadLine("that post")} Check your connection.`,
+                );
+                resetRouterAfterCatch();
+                nextRound((n) => n + 1);
+                return;
+            }
+            setCaught(true);
+        }
     }, [siteId, caught, round]);
     useEffect(() => {
         onScreen.current = live !== null;
@@ -206,6 +220,19 @@ export function PostFrame({ children }: { children: ReactNode }) {
               ),
           })
         : [];
+
+    // ⌘K opens Find (W6), as in the site editor.
+    useEffect(() => {
+        if (phone || mode === "off") return;
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+                e.preventDefault();
+                setFinding(true);
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [phone, mode]);
 
     function onTrail(next: PostTrailKey) {
         if (next === "feedback") setTab("feedback");
@@ -268,10 +295,33 @@ export function PostFrame({ children }: { children: ReactNode }) {
                                 <PostMoreMenu
                                     model={model}
                                     onMoreFormatting={() => setToolbar(true)}
+                                    onFind={() => setFinding(true)}
                                 />
                             ) : null
                         }
                         onDiscard={live?.onDiscard}
+                    />
+                ) : null}
+                {chrome && model ? (
+                    <PostFind
+                        model={model}
+                        editor={live?.editor ?? null}
+                        open={finding}
+                        onOpenChange={setFinding}
+                        go={{
+                            details: () => setTab("details"),
+                            search: () => setTab("search"),
+                            feedback:
+                                feedback && model.draft.postId
+                                    ? () => onTrail("feedback")
+                                    : null,
+                            history:
+                                POST_HISTORY_READY && model.draft.postId
+                                    ? () => setTrail("history")
+                                    : null,
+                            add: () => setTrail("add"),
+                            publish: live?.onPublish ?? noop,
+                        }}
                     />
                 ) : null}
                 {chrome && model ? <PostBanner model={model} /> : null}

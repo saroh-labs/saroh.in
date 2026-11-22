@@ -73,13 +73,16 @@ function isPublicService(value: unknown): value is PublicService {
     );
 }
 
+/** How long the first failed read waits before its one quiet retry. */
+const RETRY_AFTER_MS = 800;
+
 export default function ServicesListSection({
     content,
     apiUrl = DEFAULT_API_URL,
     siteId,
     services,
     feed,
-    bookHref,
+    bookHref: siteBookHref,
     look,
 }: LookProps & {
     content: RenderedServicesList;
@@ -98,6 +101,8 @@ export default function ServicesListSection({
     bookHref?: string;
 }) {
     const source = useQrSource();
+    // "Show a Book button" off (A5): no service carries its own Book.
+    const bookHref = content.showBook === false ? undefined : siteBookHref;
     const given = feed?.services ?? services;
     const moreHref = feed?.moreHref ?? null;
     const askHref = feed?.askHref ?? null;
@@ -136,11 +141,25 @@ export default function ServicesListSection({
     useEffect(() => {
         if (given) return;
         let active = true;
+        let again: ReturnType<typeof setTimeout> | undefined;
         void load().then((next) => {
-            if (active) setState(next);
+            if (!active) return;
+            if (next.kind !== "error") {
+                setState(next);
+                return;
+            }
+            // One quiet second try before the error: a blip (a cold API, a
+            // busy editor drawing the block several times) flashed "couldn't
+            // load our services" before the next draw showed them (22 Nov).
+            again = setTimeout(() => {
+                void load().then((retried) => {
+                    if (active) setState(retried);
+                });
+            }, RETRY_AFTER_MS);
         });
         return () => {
             active = false;
+            clearTimeout(again);
         };
     }, [given, load]);
 

@@ -1,13 +1,15 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { RadioCards } from "@saroh/ui/choice-group";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Field } from "@saroh/ui/field";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { Switch } from "@saroh/ui/switch";
+import { Check } from "lucide-react";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -17,11 +19,110 @@ import type { ModulePageOffer } from "@/lib/sites/page-menu";
 import type {
     CreatePageInput,
     ModulePageKind,
+    PageStarter,
     SitePage,
 } from "@/lib/sites/service";
 
-/** What a new page starts from: blank, one ready page, or a copy. */
-export type PageStart = "blank" | "copy" | ModulePageKind;
+/** What a new page starts from: blank, one ready page, a type, or a copy. */
+export type PageStart = "blank" | "copy" | ModulePageKind | PageStarter;
+
+/**
+ * The new page types (A7, `fix/WXBAddPage`), each with what it starts
+ * with, filled from the business, as the API makes it (`page-starters.ts`).
+ */
+export const PAGE_TYPES: Record<
+    PageStarter,
+    { label: string; note: string; name: string; starts: string[] }
+> = {
+    SERVICE: {
+        label: "Service detail",
+        note: "Top of the page, what’s included, price, book",
+        name: "Service",
+        starts: [
+            "Top of the page",
+            "What’s included",
+            "Price, from Services",
+            "Book, from Services",
+            "Questions",
+        ],
+    },
+    OFFER: {
+        label: "Offer",
+        note: "Offer, services in it, book",
+        name: "Offer",
+        starts: ["Top of the page, with Book", "Services in it, from Services"],
+    },
+    TEAM: {
+        label: "Our team",
+        note: "People, their work, book with",
+        name: "Our team",
+        starts: [
+            "Top of the page, with Book",
+            "Your team, from those who switched on Show on Our team",
+        ],
+    },
+};
+
+const isType = (s: PageStart): s is PageStarter => s in PAGE_TYPES;
+
+/** The four ways to start a page (A7). */
+type StartGroup = "blank" | "template" | "ready" | "copy";
+
+/** A start tile, chosen or not. */
+const tile = (on: boolean) =>
+    cn(
+        "grid min-w-0 content-start gap-1 rounded-[10px] border p-2.5 text-left text-sm",
+        on ? "border-foreground ring-1 ring-foreground" : "hover:bg-muted",
+    );
+
+/**
+ * A template page drawn as grey blocks in its order (A7): a picture of its
+ * shape, not of any business.
+ */
+function PageSketch({ type }: { type: PageStarter }) {
+    const bar = "block h-1.5 rounded-full bg-muted-foreground/30";
+    return (
+        <span
+            aria-hidden
+            className="grid h-16 content-start gap-1 overflow-hidden rounded-md border bg-background p-1.5"
+        >
+            <span
+                className={cn(
+                    "block rounded-sm bg-muted",
+                    type === "TEAM" ? "h-4" : "h-6",
+                )}
+            />
+            <span className={cn(bar, "w-3/4")} />
+            {type === "TEAM" ? (
+                <span className="grid grid-cols-3 gap-1">
+                    {[0, 1, 2].map((i) => (
+                        <span
+                            key={i}
+                            className="block size-4 rounded-full bg-muted"
+                        />
+                    ))}
+                </span>
+            ) : (
+                <>
+                    <span className={cn(bar, "w-full")} />
+                    <span className={cn(bar, "w-1/2")} />
+                </>
+            )}
+        </span>
+    );
+}
+/** A page that takes a name and a link of its own: blank or a type. */
+const ownLink = (s: PageStart) => s === "blank" || isType(s);
+
+/**
+ * A shorter link for a page (A8): the last word of its own, so "/bridal-
+ * trials" becomes "/trials". Null when there is nothing shorter.
+ */
+export function shorterLink(link: string): string | null {
+    const words = link.replace(/^\//, "").split("-").filter(Boolean);
+    if (words.length < 2) return null;
+    return `/${words[words.length - 1]}`;
+}
 
 /** A refusal in the API's words, and the link it offers instead. */
 interface Refusal {
@@ -47,7 +148,10 @@ export function AddPageSheet({
     start: initialStart,
     onClose,
     onAdded,
+    takenPaths = [],
 }: {
+    /** The site's pages' links, said as taken while one is typed (A8). */
+    takenPaths?: readonly string[];
     open: boolean;
     siteId: string;
     /** "gulmohar.saroh.app", or null before the site has one. */
@@ -74,13 +178,38 @@ export function AddPageSheet({
     // The link follows the name until it is typed in.
     const link = path ?? (title.trim() ? `/${slugify(title)}` : "");
 
-    const options = [
-        { value: "blank" as const, label: "Blank", note: "An empty page" },
-        ...offers.map((o) => ({
-            value: o.kind,
-            label: `A ready page: ${o.label}`,
-            note: o.what,
-        })),
+    // Said as it is typed (A8); the API still decides on Add page.
+    const typedLink = link.trim();
+    const taken = typedLink !== "" && takenPaths.includes(typedLink);
+    const shorter = typedLink ? shorterLink(typedLink) : null;
+    const shorten = shorter && !takenPaths.includes(shorter) ? shorter : null;
+
+    // The four ways to start (A7, `fix/WXBAddPage`), then, for a template
+    // or ready page, which one.
+    const group: StartGroup =
+        start === "blank" || start === "copy"
+            ? start
+            : isType(start)
+              ? "template"
+              : "ready";
+    const groups: { value: StartGroup; label: string; note: string }[] = [
+        { value: "blank", label: "Blank", note: "An empty page" },
+        {
+            value: "template",
+            label: "A template page",
+            note: (Object.keys(PAGE_TYPES) as PageStarter[])
+                .map((t) => PAGE_TYPES[t].label)
+                .join(", "),
+        },
+        ...(offers.length > 0
+            ? [
+                  {
+                      value: "ready" as const,
+                      label: "A ready page",
+                      note: offers.map((o) => o.label).join(", "),
+                  },
+              ]
+            : []),
         ...(page
             ? [
                   {
@@ -91,6 +220,19 @@ export function AddPageSheet({
               ]
             : []),
     ];
+    const choose = (next: PageStart) => {
+        setStart(next);
+        setPath(null);
+        setRefusal(null);
+    };
+    const chooseGroup = (g: StartGroup) =>
+        choose(
+            g === "template"
+                ? "SERVICE"
+                : g === "ready"
+                  ? (offers[0]?.kind ?? "blank")
+                  : g,
+        );
 
     async function add() {
         setRefusal(null);
@@ -102,13 +244,18 @@ export function AddPageSheet({
             });
         } else {
             let input: CreatePageInput;
-            if (start === "blank") {
+            if (ownLink(start)) {
                 const t = title.trim();
                 if (t === "" || link.trim() === "") {
                     setMissing(true);
                     return;
                 }
-                input = { title: t, path: link.trim(), inMenu };
+                input = {
+                    title: t,
+                    path: link.trim(),
+                    inMenu,
+                    ...(isType(start) ? { starter: start } : {}),
+                };
             } else {
                 input = {
                     kind: start,
@@ -151,9 +298,9 @@ export function AddPageSheet({
                     <>
                         <Field
                             label="Page name"
-                            optional={start !== "blank"}
+                            optional={!ownLink(start)}
                             error={
-                                missing && start === "blank" && !title.trim()
+                                missing && ownLink(start) && !title.trim()
                                     ? "Give the page a name."
                                     : undefined
                             }
@@ -161,51 +308,176 @@ export function AddPageSheet({
                             <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                placeholder={offer?.label ?? "Our team"}
+                                placeholder={
+                                    isType(start)
+                                        ? PAGE_TYPES[start].name
+                                        : (offer?.label ?? "Our team")
+                                }
                             />
                         </Field>
                         <Field
                             holdsData
                             label="Page link"
                             hint={
-                                start === "blank"
-                                    ? "Made from the name. Change it if you like."
-                                    : `${offer?.path ?? ""} · this page's own link`
+                                !ownLink(start) ? (
+                                    `${offer?.path ?? ""} · this page's own link`
+                                ) : typedLink === "" ? (
+                                    "Made from the name. Change it if you like."
+                                ) : (
+                                    // Free: green with a tick (A7, `WXBAddPage`).
+                                    <span
+                                        data-link-free={!taken}
+                                        className={
+                                            taken
+                                                ? undefined
+                                                : "inline-flex items-center gap-1 text-success-subtle-foreground"
+                                        }
+                                    >
+                                        {taken ? null : (
+                                            <Check
+                                                aria-hidden
+                                                className="size-3.5 shrink-0"
+                                            />
+                                        )}
+                                        {taken
+                                            ? `Another page uses ${typedLink}. Change it, or Shorten.`
+                                            : `Nobody else uses it.${shorten ? ` Shorten makes it ${shorten}.` : ""}`}
+                                    </span>
+                                )
                             }
                         >
-                            <div className="flex min-w-0 items-center gap-1">
+                            {/* The address and the whole link in one field
+                                (A7): the address gives way, never the link. */}
+                            <div className="flex min-w-0 items-center gap-1 rounded-md border bg-background pl-3 pr-1 focus-within:ring-2 focus-within:ring-ring">
                                 {address ? (
-                                    <span className="shrink-0 truncate text-sm text-muted-foreground">
+                                    <span className="min-w-0 shrink truncate font-mono text-sm text-muted-foreground">
                                         {address}
                                     </span>
                                 ) : null}
                                 <Input
-                                    className="min-w-0 font-mono"
+                                    // As wide as the link, so the address
+                                    // truncates first (A7 · 2).
+                                    className="w-auto min-w-[9rem] max-w-full shrink-0 grow border-0 bg-transparent px-0 font-mono shadow-none [field-sizing:content] focus-visible:ring-0"
                                     value={
-                                        start === "blank"
+                                        ownLink(start)
                                             ? link
                                             : (path ?? offer?.path ?? "")
                                     }
-                                    disabled={start !== "blank"}
+                                    disabled={!ownLink(start)}
                                     onChange={(e) => setPath(e.target.value)}
                                     aria-label="Page link"
                                     placeholder="/our-team"
                                 />
+                                {ownLink(start) && shorten ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="xs"
+                                        className="shrink-0"
+                                        onClick={() => setPath(shorten)}
+                                    >
+                                        Shorten
+                                    </Button>
+                                ) : null}
                             </div>
                         </Field>
                     </>
                 )}
 
-                <RadioCards
+                <ChoiceGroup
                     label="Start from"
-                    options={options}
-                    value={start}
-                    onChange={(v) => {
-                        setStart(v);
-                        setPath(null);
-                        setRefusal(null);
-                    }}
+                    className="grid grid-cols-2 gap-2"
+                    choices={groups.map((g) => ({
+                        value: g.value,
+                        label: (
+                            <>
+                                <span className="font-semibold">{g.label}</span>
+                                <span className="line-clamp-2 text-xs text-muted-foreground">
+                                    {g.note}
+                                </span>
+                            </>
+                        ),
+                    }))}
+                    value={group}
+                    onChange={chooseGroup}
+                    itemClassName={tile}
                 />
+
+                {group === "template" ? (
+                    // Each with a small picture of its page (A7).
+                    <ChoiceGroup
+                        label="Template pages"
+                        className="grid grid-cols-3 gap-2"
+                        choices={(Object.keys(PAGE_TYPES) as PageStarter[]).map(
+                            (t) => ({
+                                value: t,
+                                label: (
+                                    <>
+                                        <PageSketch type={t} />
+                                        <span className="text-[0.8125rem] font-semibold">
+                                            {PAGE_TYPES[t].label}
+                                        </span>
+                                        <span className="line-clamp-2 text-xs text-muted-foreground">
+                                            {PAGE_TYPES[t].note}
+                                        </span>
+                                    </>
+                                ),
+                            }),
+                        )}
+                        value={isType(start) ? start : null}
+                        onChange={choose}
+                        itemClassName={tile}
+                    />
+                ) : group === "ready" ? (
+                    <ChoiceGroup
+                        label="Ready pages"
+                        className="flex flex-wrap gap-1.5"
+                        choices={offers.map((o) => ({
+                            value: o.kind,
+                            label: o.label,
+                        }))}
+                        value={start}
+                        onChange={choose}
+                        itemClassName={(on) =>
+                            cn(
+                                "min-h-9 rounded-full border px-3 text-[0.8125rem] coarse:min-h-11",
+                                on
+                                    ? "border-foreground ring-1 ring-foreground"
+                                    : "hover:bg-muted",
+                            )
+                        }
+                    />
+                ) : null}
+
+                {isType(start) ? (
+                    <section
+                        aria-labelledby={`${menuId}-starts`}
+                        className="grid gap-1.5 rounded-[10px] border bg-card p-3"
+                        data-page-type-starts={start}
+                    >
+                        <h3
+                            id={`${menuId}-starts`}
+                            className="text-xs font-semibold text-muted-foreground"
+                        >
+                            Starts with, filled from your business
+                        </h3>
+                        {/* As chips, in the page's order (A7). */}
+                        <ol className="flex flex-wrap gap-1.5 text-[0.8125rem]">
+                            {PAGE_TYPES[start].starts.map((line) => (
+                                <li
+                                    key={line}
+                                    className="rounded-full border bg-background px-2.5 py-0.5"
+                                >
+                                    {line}
+                                </li>
+                            ))}
+                        </ol>
+                        <p className="text-xs text-muted-foreground">
+                            Sample words are swapped for your details. Change
+                            anything once it opens.
+                        </p>
+                    </section>
+                ) : null}
 
                 {start === "copy" ? null : (
                     <div className="flex items-center justify-between gap-3">

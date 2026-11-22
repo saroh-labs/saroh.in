@@ -12,6 +12,7 @@ import {
 import { useEditorViewport } from "@/components/sites/canvas/use-editor-viewport";
 import { BrandSheetActions as LegacyBrandSheetActions } from "@/components/sites/looks/legacy/brand-sheet-parts";
 import { lookChoices } from "@/components/sites/looks/look-picker";
+import { lookWords } from "@/components/sites/looks/look-thumbnail";
 import { starterContentActions } from "@/components/sites/looks/starter-content-actions";
 import {
     BrandAside,
@@ -37,15 +38,14 @@ import {
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
 import { useTestReleases } from "@/components/sites/test-releases/use-test-releases";
 import { useWebsiteArea } from "@/components/sites/website-area";
+import { colourName } from "@/lib/share-item/share";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
-import type { Section } from "@/lib/sites/service";
 import { siteStatus } from "@/lib/sites/site-status";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
 import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 import type { LookId } from "@saroh/block-contract";
-import type { EditableTextHost } from "@saroh/site-blocks";
 import type { ReactElement } from "react";
 import { useEffect, useRef, useState } from "react";
 import { BlockToolbar } from "./block-toolbar";
@@ -55,8 +55,10 @@ import type { EditorPanelsProps } from "./editor-panels";
 import { EditorPanels } from "./editor-panels";
 import { EditorRail, railTabFor, selectRailTab } from "./editor-rail";
 import { EditorTopBar } from "./editor-top-bar";
+import { inPlaceText } from "./in-place-text";
 import { InspectorHost } from "./inspector-host";
 import { EverywhereBanner } from "./inspector/everywhere-banner";
+import { HeaderMenuInPlace } from "./inspector/header-menu-in-place";
 import { sectionActions } from "./inspector/section-actions";
 import { frameOf } from "./inspector/section-frame";
 import { SectionToolbar } from "./inspector/section-toolbar";
@@ -199,7 +201,7 @@ export function SiteEditor({
     };
     // The header's name and footer's line (G6), saved like the look.
     const chrome = useSiteChrome({
-        ...{ siteId, siteName, footerPreview },
+        ...{ siteId, siteName, footerPreview, navigation },
         canUpdate: canUpdateSite,
         onSaved: publish.markSitePending,
     });
@@ -390,7 +392,7 @@ export function SiteEditor({
         active === null ? [] : (flagsBySection.get(active.index) ?? []);
     const canvasChrome = canvasChromeFor({
         siteName: chrome.displayName,
-        navigation,
+        navigation: chrome.navigation,
         pages,
         footer: chrome.footer,
         homeSections: pages.find((p) => p.id === pageId)?.isHome
@@ -621,6 +623,8 @@ export function SiteEditor({
                 templateId,
                 error: siteStyle.lookError,
                 onChoose: siteStyle.chooseLook,
+                // Each look card in the business's own words (B5).
+                words: lookWords(chrome.displayName, sections),
                 // Each look's Preview draws its showcase
                 // template, and offers its starter content to
                 // whoever may change the site (DEC-182).
@@ -682,10 +686,19 @@ export function SiteEditor({
                 styleOptions,
             }}
             blockTools={deskTools ?? blockTools}
+            headerTools={
+                desk && chrome.canUpdate && !readOnly ? (
+                    <HeaderMenuInPlace
+                        menu={chrome.menu}
+                        setMenu={chrome.setMenu}
+                        pages={pages}
+                    />
+                ) : undefined
+            }
             textEdit={textEdit}
             // A typeface being tried draws on the page unsaved.
             style={siteStyle.trying ?? style}
-            trying={triedFace(siteStyle.trying, styleOptions)}
+            trying={triedLine(siteStyle.trying, style, styleOptions)}
             // Holds a page switch back (G-3).
             dirty={unsaved}
             neverPublished={publish.neverPublished}
@@ -922,6 +935,8 @@ export function SiteEditor({
                         onAdd={(type, variant) => addSection(type, variant)}
                         shopOpen={shopOpen}
                         packsOpen={packsOpen}
+                        // "Not here? Describe a section" (A3) waits for the Ask AI
+                        // round (owner, 22 Nov 2026): the dialog keeps it, unwired.
                     />
 
                     <PublishSheet
@@ -930,7 +945,30 @@ export function SiteEditor({
                         changes={publishChanges}
                         onFlagsChanged={() => void publish.refreshFlags()}
                         onAsk={() => void review.askForReview()}
-                        more={publishMore(siteId, releases, publish.closeCheck)}
+                        more={{
+                            ...publishMore(
+                                siteId,
+                                releases,
+                                publish.closeCheck,
+                            ),
+                            // A phone's More holds the ask too (P2).
+                            ...(readOnly
+                                ? {}
+                                : {
+                                      review: {
+                                          inReview: review.review.pending,
+                                          asking: review.asking,
+                                          onAsk: () => {
+                                              publish.closeCheck();
+                                              void review.askForReview();
+                                          },
+                                          onWithdraw: () => {
+                                              publish.closeCheck();
+                                              void review.withdrawReview();
+                                          },
+                                      },
+                                  }),
+                        }}
                         // Tell people about the page open here, once live;
                         // the home page when this one was left out.
                         share={
@@ -1026,49 +1064,31 @@ function publishMore(
     };
 }
 
-/**
- * The fields a section's words may be typed into on the canvas (U47d): only
- * those whose block draws the field as written, through an `EditableText`
- * marker in `@saroh/site-blocks`. Anything else a marker sends is ignored.
- */
-export const IN_PLACE_FIELDS: Partial<
-    Record<Section["type"], readonly string[]>
-> = {
-    hero: ["heading"],
-    faq: ["heading", "intro"],
-    features: ["heading", "intro"],
-    servicesList: ["heading", "intro"],
-    contact: ["heading", "intro"],
-    testimonials: ["heading"],
-};
-
-/** The host the canvas hands a section's markers, or none for its kind. */
-export function inPlaceText(
-    section: Section | undefined,
-    replace: (next: Section) => void,
-): EditableTextHost | undefined {
-    const fields = section ? IN_PLACE_FIELDS[section.type] : undefined;
-    if (!section || !fields) return undefined;
-    return {
-        onText: (field, text) => {
-            if (!fields.includes(field)) return;
-            replace({
-                ...section,
-                content: { ...section.content, [field]: text },
-            } as Section);
-        },
-    };
-}
-
 /** An editor's default: a reader's abilities are passed in by the page. */
 const EVERY_REVIEW_ABILITY = { comment: true, approve: true };
 
 /** The tried typeface's name, for the line over the page; null for none. */
-function triedFace(
+/**
+ * The canvas's line while a style is tried unsaved: a brand colour from
+ * its sheet (B4), else a font pair from the Fonts picker.
+ */
+function triedLine(
     trying: SiteStyle | null,
+    style: SiteStyle,
     options: SiteStyleOptions,
 ): string | null {
     if (!trying) return null;
+    if (trying.brandColour && trying.brandColour !== style.brandColour) {
+        return `Trying your ${colourName(trying.brandColour).toLowerCase()}. Not saved until you press Use these colours.`;
+    }
+    const face = triedFace(trying, options);
+    return face ? `Trying ${face}. Not saved until you press Enter.` : null;
+}
+
+function triedFace(
+    trying: SiteStyle,
+    options: SiteStyleOptions,
+): string | null {
     const pairs = options.fontPairs ?? [];
     const key = trying.fontPair ?? pairs[0]?.key;
     return pairs.find((p) => p.key === key)?.name ?? null;

@@ -3264,3 +3264,34 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A Global-edition business's uploads go to their own R2 bucket, `saroh-global-media` (location Automatic), served at `https://media.saroh.tech`. India keeps `saroh-media` at `media.saroh.in`; development keeps `saroh-media-dev` at `media.saroh.io` for both editions.
 - The API picks the bucket by the business's edition from its organization row, never from the request (`R2_GLOBAL_*`, all four or none; unset, Global uses the main bucket as before). Every stored file keeps the bucket it was written to (`Media.bucket`, `DataExport.bucket`; a social post's picture by its address), and every later read, check, delete, sweep and erasure goes there. Nothing already in `saroh-media` moves.
 - `media.saroh.tech` carries the same sandbox CSP and `nosniff` as the other media domains, and is in the apps' `img-src`.
+## DEC-246 Add a page offers Service detail, Offer and Our team; a person is on Our team only once opted in
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, editor missing features A7 and Q5)
+
+- Add a page offers three new page types beside Blank, the ready pages and A copy: **Service detail**, **Offer** and **Our team**. Each is an ordinary free-form page (`CreatePageDto.starter`), not a page kind: a site may have many, at any link. Each starts with sections filled from the business, and sample words that claim nothing.
+- Offer does not read `Discount`: a discount code is for the shop's checkout and never applies to a booking.
+- **Our team shows a person only after an opt-in, default off** (`StaffMember.showOnTeamPage`). The person switches it for themselves, or an owner or admin (`service:write`) for them; no other role can. Names and roles only; staff carry no photo.
+- The names are copied into the page when it is made. Someone who switches it off later is taken off that page by hand.
+- Behind the Website area switch (DEC-240): the page types and `PUT staff/:id/team-page` are refused with it off.
+
+## DEC-247 "From your logo" reads the logo's colours in the merchant's browser
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, B3 and Q7) · keeps DEC-241
+
+- Colours from my brand colour offers **From your logo**: the logo's two or three main colours, read in the merchant's browser from the logo the site shows. There is no server decode.
+- A logo whose host won't let it be read is picked from the device instead. It is read there and never uploaded.
+- The colour picked is a brand colour like a typed one: the palette is still made on the server and held to 4.5:1 (DEC-241).
+
+## DEC-248 Video and Instagram embeds in posts are left out
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, W2, Y1 and Q6)
+
+- The post editor's inserts (W2 desk, Y1 phone) are built without **Video** and **Instagram post**. The other inserts are in.
+- No host allow-list is chosen, so nothing embeds a third party's player or post.
+
+## DEC-249 The Ask AI items of the editor's missing features wait
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, Q1 and Q2)
+
+- Not in this round: AI1–AI10, A3 ("Not here? Describe a section"), E2 (Ask AI on an empty site) and the Ask AI rows in D3's history. They wait for master plan batch 8 (U41–U43, Check this on the server).
+- Ask AI stays a right-column tab, not a dock (21 Nov decision).

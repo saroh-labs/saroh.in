@@ -4,7 +4,7 @@
 // the identity files below and tests. A third edition then means a profile,
 // not a hunt through every branch.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -60,6 +60,8 @@ export function filesIn(root, scope = SCOPE) {
             (f) =>
                 SOURCE.test(f) &&
                 !TEST.test(f) &&
+                // A file deleted in the work tree but not yet committed.
+                existsSync(join(root, f)) &&
                 !IDENTITY.some((i) => f === i || f.startsWith(i)),
         );
 }

@@ -18,7 +18,11 @@ import { GROUP_ICONS } from "./group-icons";
 import type { SiteGroup, SiteGroupId } from "./group-map";
 import { currentSection, overviewHref } from "./group-map";
 
-/** A row's look: Settings' side list's (`@saroh/ui/section-list`). */
+/**
+ * A row's look, and the column's rule on its right: Settings' side list's
+ * (`@saroh/ui/section-list` as `settings-tabs.tsx` draws it). Not that
+ * component itself: its rows cannot open a group in place.
+ */
 const ROW =
     "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11";
 const OFF =
@@ -47,7 +51,7 @@ export function SiteSectionList({
     return (
         <nav
             aria-label="Website"
-            className="hidden min-w-0 flex-col gap-0.5 min-[760px]:flex"
+            className="hidden min-w-0 flex-col gap-0.5 border-r border-border px-2.5 py-3.5 min-[760px]:flex"
         >
             <Link
                 href={overviewHref(siteId)}
