@@ -275,6 +275,59 @@ export class SocialMetaClient implements SocialMetaPort {
             // Only Meta's own Graph address is followed.
             next = more?.startsWith(`${graph}/`) ? more : undefined;
         }
+        const direct = data.length;
+        const fields =
+            kind === "INSTAGRAM"
+                ? "id,name,access_token,instagram_business_account{id,username,profile_picture_url}"
+                : "id,name,access_token,picture{url}";
+        // What was granted: a quiet "no Page" is explained in the log.
+        let granted: string[] | null = null;
+        let declined: string[] | null = null;
+        try {
+            const perms = await metaCall<{
+                data?: { permission?: string; status?: string }[];
+            }>(this.fetchFn, `${graph}/me/permissions`, { token: userToken });
+            const rows = perms.data ?? [];
+            granted = rows.flatMap((r) =>
+                r.status === "granted" && r.permission ? [r.permission] : [],
+            );
+            declined = rows.flatMap((r) =>
+                r.status !== "granted" && r.permission ? [r.permission] : [],
+            );
+        } catch {
+            // Unknown: the lookup goes on with what /me/accounts gave.
+        }
+        // A Page a business portfolio owns isn't in /me/accounts: with
+        // business_management, each portfolio's own Pages too.
+        // shortcut: 20 portfolios and their first 100 Pages each, and not
+        // client Pages (agencies); upgrade when a merchant has more.
+        let viaBusiness = 0;
+        if (granted?.includes("business_management")) {
+            try {
+                const businesses = await metaCall<{ data?: { id?: string }[] }>(
+                    this.fetchFn,
+                    `${graph}/me/businesses${query({ fields: "id", limit: "20" })}`,
+                    { token: userToken },
+                );
+                for (const b of (businesses.data ?? []).slice(0, 20)) {
+                    const id = str(b.id);
+                    if (!id || !/^\d+$/.test(id)) continue;
+                    const owned: Accounts = await metaCall<Accounts>(
+                        this.fetchFn,
+                        `${graph}/${id}/owned_pages${query({ fields, limit: "100" })}`,
+                        { token: userToken },
+                    );
+                    for (const p of owned.data ?? []) {
+                        if (data.some((d) => d.id === p.id)) continue;
+                        data.push(p);
+                        viaBusiness++;
+                    }
+                }
+            } catch {
+                // The person's own Pages still count.
+            }
+        }
+        const seen = { direct, viaBusiness, granted, declined };
         const platformUserId = need(str(me.id), "user id");
         const pages = data.flatMap((p) =>
             p.id && p.access_token
@@ -285,6 +338,7 @@ export class SocialMetaClient implements SocialMetaPort {
         if (kind === "FACEBOOK") {
             return {
                 platformUserId,
+                seen,
                 pages: pages.map((p) => ({
                     accountId: p.id,
                     platformUserId,
@@ -298,6 +352,7 @@ export class SocialMetaClient implements SocialMetaPort {
         // Instagram: only Pages with a linked professional account.
         return {
             platformUserId,
+            seen,
             pages: pages.flatMap((p) => {
                 const ig = p.instagram_business_account;
                 const igId = str(ig?.id);

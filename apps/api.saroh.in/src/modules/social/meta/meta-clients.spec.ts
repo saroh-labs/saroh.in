@@ -109,6 +109,8 @@ describe("tokens", () => {
         const got = await meta.pageAccounts("INSTAGRAM", "code", "https://cb");
         expect(got).toEqual({
             platformUserId: "fbu-9",
+            // No /me/permissions answer here: unknown, and no portfolio lookup.
+            seen: { direct: 2, viaBusiness: 0, granted: null, declined: null },
             pages: [
                 {
                     accountId: "1784",
@@ -156,6 +158,80 @@ describe("tokens", () => {
             ["p1", "pt1", null],
             ["p2", "pt2", null],
         ]);
+    });
+
+    it("finds a Page a business portfolio owns, once, with business_management (22 Nov 2026)", async () => {
+        const { meta, seen } = client([
+            [/fb_exchange_token/, { access_token: "long-user" }],
+            [/oauth\/access_token/, { access_token: "short-user" }],
+            // The person manages no Page directly: their portfolio owns it.
+            [
+                /\/me\/accounts/,
+                { data: [{ id: "p1", name: "Own", access_token: "pt1" }] },
+            ],
+            [
+                /\/me\/permissions/,
+                {
+                    data: [
+                        { permission: "pages_show_list", status: "granted" },
+                        {
+                            permission: "business_management",
+                            status: "granted",
+                        },
+                        {
+                            permission: "pages_manage_posts",
+                            status: "declined",
+                        },
+                    ],
+                },
+            ],
+            [/\/me\/businesses/, { data: [{ id: "77" }, { id: "../x" }] }],
+            [
+                /\/77\/owned_pages/,
+                {
+                    data: [
+                        { id: "p1", name: "Own", access_token: "pt1" },
+                        {
+                            id: "p9",
+                            name: "Portfolio Page",
+                            access_token: "pt9",
+                        },
+                    ],
+                },
+            ],
+            [/\/me\?/, { id: "fbu-9" }],
+        ]);
+        const got = await meta.pageAccounts("FACEBOOK", "code", "https://cb");
+        expect(got.pages.map((p) => p.accountId)).toEqual(["p1", "p9"]);
+        expect(got.seen).toEqual({
+            direct: 1,
+            viaBusiness: 1,
+            granted: ["pages_show_list", "business_management"],
+            declined: ["pages_manage_posts"],
+        });
+        // A business id that isn't Meta's digits is never put in a path.
+        expect(seen.some((c) => c.url.includes("../x"))).toBe(false);
+    });
+
+    it("skips the portfolios without business_management", async () => {
+        const { meta, seen } = client([
+            [/fb_exchange_token/, { access_token: "long-user" }],
+            [/oauth\/access_token/, { access_token: "short-user" }],
+            [/\/me\/accounts/, { data: [] }],
+            [
+                /\/me\/permissions/,
+                {
+                    data: [
+                        { permission: "pages_show_list", status: "granted" },
+                    ],
+                },
+            ],
+            [/\/me\?/, { id: "fbu-9" }],
+        ]);
+        const got = await meta.pageAccounts("FACEBOOK", "code", "https://cb");
+        expect(got.pages).toEqual([]);
+        expect(got.seen?.granted).toEqual(["pages_show_list"]);
+        expect(seen.some((c) => c.url.includes("/me/businesses"))).toBe(false);
     });
 
     it("follows Meta's pages of Pages, only on Graph's own address (S-13)", async () => {

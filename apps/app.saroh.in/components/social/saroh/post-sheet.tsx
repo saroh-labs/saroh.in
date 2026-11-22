@@ -212,6 +212,21 @@ export function PostSheet({
             footer={actions}
         >
             <div data-post-sheet={post.id} className="grid gap-4 p-[18px]">
+                {post.status === "SCHEDULED" && post.publishAt ? (
+                    <p
+                        data-held-by-saroh=""
+                        className="text-[0.8125rem] leading-snug text-muted-foreground"
+                    >
+                        {SOCIAL_WORDS.heldBySaroh(
+                            new Intl.ListFormat("en", {
+                                type: "conjunction",
+                            }).format(
+                                post.channels.map((c) => CHANNEL_NAMES[c.kind]),
+                            ),
+                            whenWords(post.publishAt, zone),
+                        )}
+                    </p>
+                ) : null}
                 {post.status === "PARTLY_DONE" && failed.length > 0 ? (
                     <Notice tone="warning" data-post-partly="">
                         {SOCIAL_WORDS.partly(
