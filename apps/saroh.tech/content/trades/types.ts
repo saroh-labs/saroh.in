@@ -19,8 +19,9 @@ export interface TradeProblemWords {
 
 /**
  * A trade page beyond the four lead ones (owner, 16 Nov 2026): each in its
- * own words, problems and questions, for a business outside India, held
- * `unreviewed` (noindex) until the owner has read it.
+ * own words, problems and questions, for a business outside India. Held
+ * `unreviewed` (noindex) at first; released to search with every page on
+ * 22 Nov 2026.
  */
 export interface TradePage {
     /** Plural, as the lead ones: `plumbers`, `dental-clinics`. */

@@ -49,7 +49,8 @@ const HOW_TITLE = `${howTitle.before}${howTitle.mark}${howTitle.after}`;
 /**
  * Every page, as the site map and page-spec boards list them. Title,
  * description and H1 are the specs' own words. An `unreviewed` page is noindex
- * and out of the sitemap. The pricing line
+ * and out of the sitemap; every hand-listed page was released on 22 Nov 2026,
+ * so only document templates whose data isn't `reviewed` use it today. The pricing line
  * names no price until the USD catalogue reads them in (stage 9).
  */
 export type PageType =
@@ -158,7 +159,7 @@ const GUIDES = [
     ],
 ] as const;
 
-const CONTENT_BUILT = { unreviewed: true, updated: "2026-11-02" };
+const CONTENT_BUILT = { updated: "2026-11-02" };
 
 const legal = (slug: string, name: string, description: string): SitePage => ({
     path: `/legal/${slug}`,
@@ -167,7 +168,6 @@ const legal = (slug: string, name: string, description: string): SitePage => ({
     description,
     h1: name,
     crumb: [{ name: "Home", path: "/" }, { name }],
-    unreviewed: true,
     updated: LEGAL_UPDATED,
 });
 
@@ -215,7 +215,6 @@ export const PAGES: SitePage[] = [
         description: f.seoDescription,
         h1: f.headline,
         crumb: [{ name: "Features", path: "/features" }, { name: f.name }],
-        unreviewed: true,
         updated: FEATURES_UPDATED,
     })),
     // The Solutions hub (DEC-221): saroh.in's /for hub over saroh.tech's trades.
@@ -228,7 +227,6 @@ export const PAGES: SitePage[] = [
             `${HUB_WORDS.h1Before} ${HUB_WORDS.h1Mark}`,
             HUB_WORDS.crumb,
         ),
-        unreviewed: true,
         updated: SOLUTIONS_UPDATED,
     },
     ...solutionList.map((s): SitePage => ({
@@ -238,10 +236,9 @@ export const PAGES: SitePage[] = [
         description: s.seoDescription,
         h1: s.headline,
         crumb: [{ name: "Solutions", path: HUB_PATH }, { name: s.name }],
-        unreviewed: true,
         updated: SOLUTIONS_UPDATED,
     })),
-    // The other trades (owner, 16 Nov 2026), held until the owner reads them.
+    // The other trades (owner, 16 Nov 2026); released with every page on 22 Nov 2026.
     ...TRADE_PAGES.map((t): SitePage => ({
         path: `/solutions/${t.slug}`,
         type: "solution",
@@ -249,7 +246,6 @@ export const PAGES: SitePage[] = [
         description: t.seoDescription,
         h1: t.headline,
         crumb: [{ name: "Solutions", path: HUB_PATH }, { name: t.name }],
-        unreviewed: true,
         updated: TRADES_UPDATED,
     })),
     {
@@ -262,7 +258,6 @@ export const PAGES: SitePage[] = [
             "Start free.",
             "Pricing",
         ),
-        unreviewed: true,
         updated: "2026-11-04",
     },
     {
@@ -294,7 +289,6 @@ export const PAGES: SitePage[] = [
             ABOUT.title,
             "About",
         ),
-        unreviewed: true,
         updated: "2026-11-04",
     },
     {
@@ -306,7 +300,6 @@ export const PAGES: SitePage[] = [
             CONTACT.title,
             "Contact",
         ),
-        unreviewed: true,
         updated: "2026-11-04",
     },
     // The website templates gallery, only while templates are on (DEC-135),
@@ -323,7 +316,6 @@ export const PAGES: SitePage[] = [
                       websiteTemplatesPage.title,
                       websiteTemplatesPage.name,
                   ),
-                  unreviewed: true,
                   updated: "2026-11-16",
               },
               ...galleryTemplates().map((t): SitePage => ({
@@ -337,7 +329,6 @@ export const PAGES: SitePage[] = [
                       WEBSITE_TEMPLATES_PATH,
                       t.name,
                   ),
-                  unreviewed: true,
                   updated: "2026-11-16",
               })),
           ]),
@@ -354,7 +345,6 @@ export const PAGES: SitePage[] = [
                       DEVELOPERS.headline,
                       DEVELOPERS.name,
                   ),
-                  unreviewed: true,
                   updated: "2026-11-16",
               },
           ]),
@@ -367,7 +357,6 @@ export const PAGES: SitePage[] = [
             INTEGRATIONS.title,
             "Integrations",
         ),
-        unreviewed: true,
         updated: "2026-11-04",
     },
     {
@@ -379,7 +368,6 @@ export const PAGES: SitePage[] = [
             "Refer a friend",
             "Referral",
         ),
-        unreviewed: true,
         updated: "2026-11-04",
     },
     {
@@ -391,7 +379,6 @@ export const PAGES: SitePage[] = [
             "How can we help?",
             "Help",
         ),
-        unreviewed: true,
         updated: "2026-11-04",
     },
     ...HELP.map(({ slug, task, minutes }): SitePage => ({
@@ -401,7 +388,6 @@ export const PAGES: SitePage[] = [
         description: `Step by step: ${task[0].toLowerCase()}${task.slice(1)}. Takes about ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
         h1: task,
         crumb: under("Help", "/help", task),
-        unreviewed: true,
         updated: "2026-11-04",
     })),
     legal(
@@ -433,7 +419,6 @@ export const PAGES: SitePage[] = [
             "Bought from a business that uses Saroh?",
             "For customers",
         ),
-        unreviewed: true,
         updated: "2026-11-04",
     },
     {
@@ -512,7 +497,6 @@ export const PAGES: SitePage[] = [
             "Free document templates for every trade",
             "Document templates",
         ),
-        unreviewed: true,
         updated: "2026-11-02",
     },
     ...templateEntries(),

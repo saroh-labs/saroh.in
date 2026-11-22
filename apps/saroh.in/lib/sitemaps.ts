@@ -1,3 +1,9 @@
+import type { SitemapEntry } from "@saroh/marketing/sitemap-xml";
+import {
+    sitemapIndexXml as indexXml,
+    urlsetXml,
+    xmlResponse,
+} from "@saroh/marketing/sitemap-xml";
 import { DOC_KINDS } from "@saroh/search-pages/kinds";
 
 import type { PublishContext } from "@/content/resources";
@@ -21,12 +27,9 @@ import { indexedPaths, lastModified } from "@/lib/site-pages";
  * these by hand, static at build.
  *
  * Every page says the day its words last changed (`lastModified`), never the
- * build's; no `changefreq` or `priority`: search engines ignore both.
+ * build's. The XML is `@saroh/marketing/sitemap-xml`, shared with saroh.tech.
  */
-export interface SitemapEntry {
-    url: string;
-    lastModified?: string;
-}
+export type { SitemapEntry };
 
 const inGroup = (path: string, hub: string) =>
     path === hub || path.startsWith(`${hub}/`);
@@ -79,39 +82,9 @@ export async function builtSitemapGroups(): Promise<
     return sitemapGroups(LAUNCH_MODE, resourcesContext(), pricing?.goLiveAt);
 }
 
-const esc = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-const HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n';
-const NS = 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"';
-
-const item = (tag: string, loc: string, lastmod?: string) =>
-    `<${tag}>\n<loc>${esc(loc)}</loc>\n${lastmod ? `<lastmod>${esc(lastmod)}</lastmod>\n` : ""}</${tag}>\n`;
-
-/** One group's `<urlset>`. */
-export function urlsetXml(entries: readonly SitemapEntry[]): string {
-    return `${HEAD}<urlset ${NS}>\n${entries.map((e) => item("url", e.url, e.lastModified)).join("")}</urlset>\n`;
-}
-
-/** The index: each group's sitemap, dated by its newest page. */
-export function sitemapIndexXml(
+/** The index, with saroh.in's address (`@saroh/marketing/sitemap-xml`). */
+export const sitemapIndexXml = (
     groups: ReadonlyMap<string, readonly SitemapEntry[]>,
-): string {
-    const children = [...groups].map(([g, entries]) =>
-        item(
-            "sitemap",
-            `${SITE_URL}/sitemap/${g}.xml`,
-            entries
-                .map((e) => e.lastModified)
-                .filter((d): d is string => d !== undefined)
-                .sort()
-                .at(-1),
-        ),
-    );
-    return `${HEAD}<sitemapindex ${NS}>\n${children.join("")}</sitemapindex>\n`;
-}
+) => indexXml(SITE_URL, groups);
 
-export const xmlResponse = (body: string) =>
-    new Response(body, {
-        headers: { "Content-Type": "application/xml; charset=utf-8" },
-    });
+export { urlsetXml, xmlResponse };

@@ -397,10 +397,10 @@ describe("the other trades' pages (owner, 16 Nov 2026)", () => {
         );
     });
 
-    it("are held back until the owner reads them", () => {
+    it("are released to search (22 Nov 2026)", () => {
         for (const t of TRADE_PAGES) {
             const page = pageAt(`/solutions/${t.slug}`);
-            expect(page?.unreviewed, t.slug).toBe(true);
+            expect(page?.unreviewed, t.slug).toBeUndefined();
             expect(page?.h1, t.slug).toBe(t.headline);
         }
     });
@@ -482,18 +482,18 @@ describe("the changelog", () => {
         expect(dates).toEqual([...dates].sort().reverse());
         for (const e of CHANGELOG) {
             expect(e.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-            expect(pageAt(changelogPath(e))?.unreviewed).toBe(true);
+            expect(pageAt(changelogPath(e))?.unreviewed).toBeUndefined();
             if (e.try) expect(pageAt(e.try.href), e.try.href).toBeTruthy();
         }
     });
 });
 
-describe("content pages are held back until someone reads them", () => {
-    it("guides and the changelog are all unreviewed", () => {
+describe("content pages are released to search (22 Nov 2026)", () => {
+    it("guides and the changelog are all indexed", () => {
         for (const p of PAGES.filter((p) =>
             ["guide", "guides", "changelog"].includes(p.type),
         )) {
-            expect(p.unreviewed, p.path).toBe(true);
+            expect(p.unreviewed, p.path).toBeUndefined();
             expect(p.title.length, p.path).toBeLessThanOrEqual(60);
         }
     });

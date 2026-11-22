@@ -1,4 +1,6 @@
-import { builtSitemapGroups, urlsetXml, xmlResponse } from "@/lib/sitemaps";
+import { groupSitemapResponse } from "@saroh/marketing/sitemap-xml";
+
+import { builtSitemapGroups } from "@/lib/sitemaps";
 
 /**
  * `/sitemap/<group>.xml`: one group's pages (`lib/sitemaps.ts`), static at
@@ -18,9 +20,5 @@ export async function GET(
     { params }: { params: Promise<{ group: string }> },
 ): Promise<Response> {
     const { group } = await params;
-    const entries = group.endsWith(".xml")
-        ? (await builtSitemapGroups()).get(group.slice(0, -4))
-        : undefined;
-    if (!entries) return new Response("Not found", { status: 404 });
-    return xmlResponse(urlsetXml(entries));
+    return groupSitemapResponse(await builtSitemapGroups(), group);
 }

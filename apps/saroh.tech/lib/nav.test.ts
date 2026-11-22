@@ -89,11 +89,11 @@ describe("the nav", () => {
         expect(PAGES.filter((p) => p.path.startsWith(gone))).toEqual([]);
     });
 
-    it("builds /referral noindex, out of every menu, as saroh.in has none", () => {
+    it("builds /referral indexed but out of every menu, as saroh.in has none", () => {
         expect(allLinks.filter((l) => l.href === "/referral")).toEqual([]);
-        expect(PAGES.find((p) => p.path === "/referral")?.unreviewed).toBe(
-            true,
-        );
+        expect(
+            PAGES.find((p) => p.path === "/referral")?.unreviewed,
+        ).toBeUndefined();
     });
 
     it("groups Templates as documents, countries and six trades", () => {
