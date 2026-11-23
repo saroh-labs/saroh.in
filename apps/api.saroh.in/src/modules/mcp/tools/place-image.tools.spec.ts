@@ -6,7 +6,7 @@
  * `site.tools.db.spec.ts`.
  */
 jest.mock("@saroh/database", () => ({
-    prisma: { post: { updateMany: jest.fn() } },
+    prisma: { post: { findFirst: jest.fn() } },
 }));
 
 import { NotFoundException } from "@nestjs/common";
@@ -16,7 +16,15 @@ import type { McpCall } from "../tool-registry";
 import type { SiteToolDeps } from "./site.tools";
 import { siteTools } from "./site.tools";
 
-const updateMany = prisma.post.updateMany as jest.Mock;
+const findFirst = prisma.post.findFirst as jest.Mock;
+const POST = {
+    title: "T",
+    slug: "t",
+    excerpt: null,
+    content: "body",
+    categoryId: null,
+    featured: false,
+};
 
 function setup(opts: { owned?: boolean } = {}) {
     const media = {
@@ -43,7 +51,9 @@ function setup(opts: { owned?: boolean } = {}) {
     const productAccess = {
         edit: jest.fn().mockResolvedValue({ organizationId: "org_1" }),
     };
+    const posts = { update: jest.fn().mockResolvedValue({ id: "po1" }) };
     const tools = siteTools({
+        posts,
         media,
         productImages,
         productAccess,
@@ -53,8 +63,14 @@ function setup(opts: { owned?: boolean } = {}) {
         if (!t) throw new Error(name);
         return t;
     };
-    const call = { ctx: { organizationId: "org_1", userId: "u1" } } as McpCall;
-    return { get, call, media, productImages, productAccess };
+    const ctx = { organizationId: "org_1", userId: "u1" };
+    // Undo is Ask AI's own: the in-process "app" connection.
+    const call = { ctx, connection: { kind: "app" } } as unknown as McpCall;
+    const external = {
+        ctx,
+        connection: { kind: "key" },
+    } as unknown as McpCall;
+    return { get, call, external, media, productImages, productAccess, posts };
 }
 
 describe("each target has its own gate", () => {
@@ -122,27 +138,38 @@ describe("place_product_photo", () => {
 describe("place_image on a post", () => {
     beforeEach(() => jest.clearAllMocks());
 
-    it("sets a cover only on the business's own post", async () => {
+    it("sets the cover through the post's own save, with its alt text, and only on the business's own post", async () => {
         const t = setup();
-        updateMany.mockResolvedValue({ count: 1 });
+        findFirst.mockResolvedValue(POST);
         await t.get("place_image").run(
             {
                 target: "post_cover",
                 site_id: "s1",
                 post_id: "po1",
                 media_id: "m1",
+                alt: "An aisle",
             },
             t.call,
         );
-        expect(updateMany).toHaveBeenCalledWith({
-            where: {
-                id: "po1",
-                siteId: "s1",
-                site: { organizationId: "org_1" },
-            },
-            data: { image: "https://m.test/aisle.webp" },
+        expect(findFirst.mock.calls[0][0].where).toEqual({
+            id: "po1",
+            siteId: "s1",
+            site: { organizationId: "org_1" },
         });
-        updateMany.mockResolvedValue({ count: 0 });
+        expect(t.posts.update).toHaveBeenCalledWith(
+            t.call.ctx,
+            "s1",
+            "po1",
+            expect.objectContaining({
+                title: "T",
+                slug: "t",
+                content: "body",
+                image: "https://m.test/aisle.webp",
+                imageAlt: "An aisle",
+                event: "ask_ai",
+            }),
+        );
+        findFirst.mockResolvedValue(null);
         await expect(
             t.get("place_image").run(
                 {
@@ -156,9 +183,27 @@ describe("place_image on a post", () => {
         ).rejects.toThrow("no such post");
     });
 
+    it("a post the plan paused is refused by its save, and nothing is adopted", async () => {
+        const t = setup();
+        findFirst.mockResolvedValue(POST);
+        t.posts.update.mockRejectedValue(new Error("paused"));
+        await expect(
+            t.get("place_image").run(
+                {
+                    target: "post_cover",
+                    site_id: "s1",
+                    post_id: "po1",
+                    media_id: "m1",
+                },
+                t.call,
+            ),
+        ).rejects.toThrow("paused");
+        expect(t.media.adoptAskAiImage).not.toHaveBeenCalled();
+    });
+
     it("Undo puts the earlier cover back, or takes it off when there was none", async () => {
         const t = setup();
-        updateMany.mockResolvedValue({ count: 1 });
+        findFirst.mockResolvedValue(POST);
         await t.get("place_image").run(
             {
                 target: "post_cover",
@@ -168,7 +213,7 @@ describe("place_image on a post", () => {
             },
             t.call,
         );
-        expect(updateMany.mock.calls[0][0].data).toEqual({
+        expect(t.posts.update.mock.calls[0][3]).toMatchObject({
             image: "https://m.test/old.webp",
         });
         await t.get("place_image").run(
@@ -180,7 +225,42 @@ describe("place_image on a post", () => {
             },
             t.call,
         );
-        expect(updateMany.mock.calls[1][0].data).toEqual({ image: null });
+        expect(t.posts.update.mock.calls[1][3]).toMatchObject({
+            image: undefined,
+            imageAlt: null,
+        });
         expect(t.media.adoptAskAiImage).not.toHaveBeenCalled();
+    });
+});
+
+describe("restore and clear are Ask AI's Undo only (L2)", () => {
+    it("an external connection can't set them", async () => {
+        const t = setup();
+        await expect(
+            t.get("place_image").run(
+                {
+                    target: "post_cover",
+                    site_id: "s1",
+                    post_id: "po1",
+                    restore: { src: "https://evil.test/pixel.gif" },
+                },
+                t.external,
+            ),
+        ).rejects.toThrow("isn't available");
+        await expect(
+            t
+                .get("place_image")
+                .run(
+                    { target: "section", site_id: "s1", clear: true },
+                    t.external,
+                ),
+        ).rejects.toThrow("isn't available");
+        await expect(
+            t
+                .get("place_product_photo")
+                .run({ product_id: "pr1", clear: true }, t.external),
+        ).rejects.toThrow("isn't available");
+        expect(t.productImages.replaceIn).not.toHaveBeenCalled();
+        expect(t.posts.update).not.toHaveBeenCalled();
     });
 });

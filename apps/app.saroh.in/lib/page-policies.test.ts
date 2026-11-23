@@ -41,6 +41,8 @@ describe("app.saroh.in page policies", () => {
                 // Global businesses' own bucket (owner, 22 Nov 2026).
                 "https://media.saroh.tech",
                 "https://images.unsplash.com",
+                // Ask AI's signed GET links to private chat images (M2).
+                "https://*.r2.cloudflarestorage.com",
             ]),
         );
         expect(sources("script-src").join(" ")).not.toMatch(

@@ -954,6 +954,27 @@ describe("who may ask (plan U7)", () => {
         expect(t.provider.requests).toHaveLength(0);
     });
 
+    it("a refused turn reads no image bytes (L4)", async () => {
+        const images = [
+            { id: "m1", filename: "a.jpg", contentType: "image/jpeg" },
+        ];
+        const out = setup({ rounds: [[text("never"), done()]], images });
+        out.switches.atStart = {
+            reason: "allowance",
+            limit: 3,
+            resetsAt: new Date("2026-12-01T00:00:00Z"),
+            requestMore: true,
+            askName: null,
+        };
+        await collect(out.turn({ question: "q", images: ["m1"] }));
+        expect(out.media.readAskAiImage).not.toHaveBeenCalled();
+
+        const locked = setup({ rounds: [[text("never"), done()]], images });
+        locked.switches.plan = "locked";
+        await collect(locked.turn({ question: "q", images: ["m1"] }));
+        expect(locked.media.readAskAiImage).not.toHaveBeenCalled();
+    });
+
     it("the start's checks refusing: nothing sent, not counted; a full day is DAILY_LIMIT", async () => {
         const resetsAt = new Date("2026-12-01T00:00:00Z");
         const t = setup({ rounds: [[text("never"), done()]] });

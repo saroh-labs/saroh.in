@@ -201,6 +201,13 @@ export function useImageUpload(
         const prepared = await preparePhoto(file).finally(() => {
             if (mounted.current) setPreparing(false);
         });
+        // A picture for Ask AI is sent on only once re-drawn without its
+        // metadata (where it was taken); a GIF has none to drop.
+        if (purpose === "ask-ai" && !prepared && file.type !== "image/gif") {
+            throw new Error(
+                "This photo couldn't be got ready on this device. Try a JPG or PNG.",
+            );
+        }
         const photo = prepared?.file ?? file;
         // Dimensions from the bytes already on the device, so the upload
         // never has to be followed by a second round trip to ask storage.

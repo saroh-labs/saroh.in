@@ -1,5 +1,5 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
-import type { Job } from "@saroh/database";
+import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { MediaService } from "../../media/media.service";
@@ -113,11 +113,14 @@ export class AiRetentionJob {
                         })
                     ).map((c) => c.id),
                 );
+                const gone = carried.filter((c) => !kept.has(c.id));
+                // An image a later question of a kept conversation reused stays (L3).
+                const shown = await this.shownImages(gone.map((c) => c.org));
                 deleted +=
                     (await this.media?.deleteAskAiImages(
-                        carried.flatMap((c) =>
-                            kept.has(c.id) ? [] : c.images,
-                        ),
+                        gone
+                            .flatMap((c) => c.images)
+                            .filter((id) => !shown.has(id)),
                     )) ?? 0;
             }
             deleted += done.count;
@@ -135,12 +138,25 @@ export class AiRetentionJob {
         return deleted + reports.count + images;
     }
 
+    /** Every image the questions still kept in these businesses show (sealed, so read here). */
+    private async shownImages(orgs: string[]): Promise<Set<string>> {
+        if (!orgs.length) return new Set();
+        const kept = await this.imagesWhere({
+            organizationId: { in: [...new Set(orgs)] },
+        });
+        return new Set(kept.flatMap((c) => c.images));
+    }
+
     /** The media ids each conversation's questions carried (sealed in their messages). */
-    private async imagesOf(
-        ids: string[],
-    ): Promise<{ id: string; images: string[] }[]> {
+    private imagesOf(ids: string[]) {
+        return this.imagesWhere({ conversationId: { in: ids } });
+    }
+
+    private async imagesWhere(
+        where: Prisma.AiMessageWhereInput,
+    ): Promise<{ id: string; org: string; images: string[] }[]> {
         const rows = await prisma.aiMessage.findMany({
-            where: { conversationId: { in: ids }, role: "USER" },
+            where: { ...where, role: "USER" },
             select: {
                 id: true,
                 organizationId: true,
@@ -151,6 +167,7 @@ export class AiRetentionJob {
             },
         });
         const by = new Map<string, string[]>();
+        const orgOf = new Map<string, string>();
         for (const m of rows) {
             try {
                 const body = openMessageBody(
@@ -166,6 +183,7 @@ export class AiRetentionJob {
                     },
                 );
                 if (body.images?.length) {
+                    orgOf.set(m.conversationId, m.organizationId);
                     by.set(m.conversationId, [
                         ...(by.get(m.conversationId) ?? []),
                         ...body.images,
@@ -175,7 +193,11 @@ export class AiRetentionJob {
                 // A message that can't be opened has no images to find.
             }
         }
-        return [...by].map(([id, images]) => ({ id, images }));
+        return [...by].map(([id, images]) => ({
+            id,
+            org: orgOf.get(id) ?? "",
+            images,
+        }));
     }
 
     /** Leave one run waiting at `runAt`, unless one is. Never throws. */

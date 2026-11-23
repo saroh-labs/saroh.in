@@ -2,11 +2,17 @@
  * Images on a question (owner, 22 Nov): checked before the stream opens, so
  * a bad one is an HTTP error and nothing is asked or counted.
  */
-jest.mock("@saroh/database", () => ({ prisma: {} }));
+jest.mock("@saroh/database", () => ({
+    prisma: { media: { findMany: jest.fn() } },
+}));
 
 import { NotFoundException } from "@nestjs/common";
+import { prisma } from "@saroh/database";
+import type { ObjectStorage } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import { AskAiService } from "./ask-ai.service";
 
 const ctx: OrganizationContext = {
@@ -61,5 +67,45 @@ describe("AskAiService.begin with images", () => {
         });
         expect(t.askAiImages).not.toHaveBeenCalled();
         expect(begun.images).toBeUndefined();
+    });
+});
+
+describe("AskAiService.get with images (M2)", () => {
+    it("never returns a public media address for a chat image, only a signed link", async () => {
+        const getPublicUrl = jest.fn(() => "https://media.test/public");
+        const storage = {
+            getPublicUrl,
+            createSignedDownloadUrl: jest.fn().mockResolvedValue({
+                url: "https://acct.r2.cloudflarestorage.com/k?X-Amz-Signature=s",
+            }),
+        } as unknown as ObjectStorage;
+        (prisma.media.findMany as jest.Mock).mockResolvedValue([
+            {
+                id: "m1",
+                key: "org/org_1/ask-ai/m1.png",
+                bucket: "MAIN",
+                purpose: "ask-ai-sent",
+                filename: "a.png",
+            },
+        ]);
+        const service = new AskAiService(
+            {} as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            {
+                get: jest.fn().mockResolvedValue({
+                    id: "c1",
+                    messages: [{ id: "x", role: "USER", images: ["m1"] }],
+                }),
+            } as never,
+            new MediaService(mediaStorages(storage, null)),
+        );
+        const got = await service.get(ctx, "c1");
+        const url = (got.messages[0] as { images: { url: string }[] }).images[0]
+            .url;
+        expect(url).toContain("X-Amz-Signature");
+        expect(JSON.stringify(got)).not.toContain("media.test");
+        expect(getPublicUrl).not.toHaveBeenCalled();
     });
 });

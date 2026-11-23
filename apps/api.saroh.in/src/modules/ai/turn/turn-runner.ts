@@ -19,7 +19,6 @@ import {
     withLanguageTail,
 } from "../agents/agent-definition";
 import type {
-    AiImage,
     AiMessage,
     AiProvider,
     AiStreamRequest,
@@ -99,6 +98,8 @@ interface Prepared {
     system: AiSystemPart[];
     tools: AiToolDefinition[];
     messages: AiMessage[];
+    /** The question's images, named but not yet read: bytes wait for admission (L4). */
+    imageFiles: { id: string; filename: string; contentType: string }[];
     /** Messages before this turn's: a starter is free only with none (04-F5). */
     earlierTurns: number;
 }
@@ -271,6 +272,7 @@ export class TurnRunner {
             ),
         };
         try {
+            await this.attachImages(ctx.organizationId, prepared);
             yield* this.rounds(input, prepared, state);
         } catch (error) {
             end(state, state.text ? "CUT_OFF" : "FAILED", "provider");
@@ -332,9 +334,12 @@ export class TurnRunner {
             this.store.language(ctx),
         ]);
         const block = await agent.businessBlock(ctx, language, now);
-        const sent = await this.imagesOf(ctx.organizationId, input.images);
+        const imageFiles = await this.imageFilesOf(
+            ctx.organizationId,
+            input.images,
+        );
         const question =
-            input.question || (sent.length ? IMAGES_ONLY_QUESTION : "");
+            input.question || (imageFiles.length ? IMAGES_ONLY_QUESTION : "");
         return {
             conversation,
             agent,
@@ -354,46 +359,51 @@ export class TurnRunner {
                     role: "user",
                     text:
                         withLanguageTail(question, language) +
-                        imagesTail(sent.map((i) => i.file)) +
+                        imagesTail(imageFiles) +
                         aboutTail(input.about),
-                    ...(sent.length
-                        ? { images: sent.map((i) => i.image) }
-                        : {}),
                 },
             ],
+            imageFiles,
             earlierTurns: history.length,
         };
     }
 
-    /** The images as the provider reads them: bytes, read from the business's own storage. */
-    private async imagesOf(
+    /** The images' names and types, from the business's own rows: no bytes read yet. */
+    private async imageFilesOf(
         organizationId: string,
         ids: readonly string[] | undefined,
-    ): Promise<{ file: { id: string; filename: string }; image: AiImage }[]> {
+    ): Promise<{ id: string; filename: string; contentType: string }[]> {
         if (!ids?.length) return [];
         if (!this.media) throw new Unavailable();
-        const files = await this.media.askAiImages(organizationId, ids);
-        return Promise.all(
-            files.map(async (file) => {
+        return this.media.askAiImages(organizationId, ids);
+    }
+
+    /** Once the turn is admitted: the bytes, read from the business's own storage, onto the question. */
+    private async attachImages(
+        organizationId: string,
+        p: Prepared,
+    ): Promise<void> {
+        if (!p.imageFiles.length) return;
+        const images = await Promise.all(
+            p.imageFiles.map(async (file) => {
                 const got = await this.media?.readAskAiImage(
                     organizationId,
                     file.id,
                 );
                 if (!got) throw new Unavailable();
+                // A plain view: a Buffer would be read as JSON by the prompt estimate.
                 return {
-                    file: { id: file.id, filename: file.filename },
-                    // A plain view: a Buffer would be read as JSON by the prompt estimate.
-                    image: {
-                        bytes: new Uint8Array(
-                            got.bytes.buffer,
-                            got.bytes.byteOffset,
-                            got.bytes.byteLength,
-                        ),
-                        mediaType: file.contentType,
-                    },
+                    bytes: new Uint8Array(
+                        got.bytes.buffer,
+                        got.bytes.byteOffset,
+                        got.bytes.byteLength,
+                    ),
+                    mediaType: file.contentType,
                 };
             }),
         );
+        const question = p.messages[p.messages.length - 1];
+        if (question.role === "user") question.images = images;
     }
 
     private async limits(org: string, model: string): Promise<TurnLimits> {

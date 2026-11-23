@@ -12,6 +12,7 @@ jest.mock("@saroh/database", () => {
                 updateMany: jest.fn(),
                 deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
                 delete: jest.fn(),
+                count: jest.fn().mockResolvedValue(0),
             },
             // Products showing an object; default "none" as for publications.
             productImage: { count: jest.fn().mockResolvedValue(0) },
@@ -992,9 +993,18 @@ describe("MediaService — images for Ask AI (owner, 22 Nov)", () => {
     const storage = () =>
         fakeStorage({
             getPublicUrl: jest.fn((key: string) => `https://m.test/${key}`),
+            createSignedDownloadUrl: jest.fn((key: string) =>
+                Promise.resolve({
+                    url: `https://r2.test/${key}?X-Amz-Signature=s`,
+                    method: "GET" as const,
+                    key,
+                    expiresAt: "2026-01-01T00:00:00.000Z",
+                }),
+            ),
         });
     const row = (over: Record<string, unknown> = {}) => ({
         id: "m1",
+        purpose: "ask-ai",
         key: "org/org_1/ask-ai/m1.png",
         bucket: "MAIN",
         filename: "aisle.png",
@@ -1097,12 +1107,103 @@ describe("MediaService — images for Ask AI (owner, 22 Nov)", () => {
         ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it("lists links only for images still there", async () => {
+    it("lists links only for images still there, and never a public address for a chat image (M2)", async () => {
+        const store = storage();
+        const service = new MediaService(mediaStorages(store, null));
+        findMany.mockResolvedValue([
+            row(),
+            row({ id: "m3", purpose: "ask-ai-sent" }),
+        ]);
+        const views = await service.askAiImageViews("org_1", [
+            "m1",
+            "m3",
+            "gone",
+        ]);
+        expect([...views.keys()]).toEqual(["m1", "m3"]);
+        for (const v of views.values()) {
+            expect(v.url).toContain("X-Amz-Signature");
+            expect(v.url).not.toContain("https://m.test/");
+        }
+        expect(store.getPublicUrl).not.toHaveBeenCalled();
+        expect(store.createSignedDownloadUrl).toHaveBeenCalledWith(
+            "org/org_1/ask-ai/m1.png",
+            { expiresInSeconds: 900 },
+        );
+        // Applied (now the library's): the normal public address.
+        findMany.mockResolvedValue([row({ purpose: "site-image" })]);
+        const applied = await service.askAiImageViews("org_1", ["m1"]);
+        expect(applied.get("m1")?.url).toContain("https://m.test/");
+    });
+
+    it("the composer's link after an upload is signed too, not the public host (M2)", async () => {
+        const store = fakeStorage({
+            getPublicUrl: jest.fn(() => "https://m.test/x"),
+            createSignedDownloadUrl: jest.fn().mockResolvedValue({
+                url: "https://r2.test/x?X-Amz-Signature=s",
+            }),
+            headObject: jest.fn().mockResolvedValue(null),
+        });
+        const service = new MediaService(mediaStorages(store, null));
+        findUnique.mockResolvedValue(
+            row({ organizationId: "org_1", status: "PENDING", variants: null }),
+        );
+        update.mockResolvedValue(row({ status: "READY" }));
+        const asker = ctx({
+            role: "MEMBER",
+            actions: new Set(["ai:use"] as const),
+        });
+        const done = await service.completeUpload(asker, "m1");
+        expect(done.url).toContain("X-Amz-Signature");
+        expect(store.getPublicUrl).not.toHaveBeenCalled();
+    });
+
+    it("refuses variants for an Ask AI upload (M1)", async () => {
         const service = new MediaService(mediaStorages(storage(), null));
-        findMany.mockResolvedValue([row()]);
-        const views = await service.askAiImageViews("org_1", ["m1", "gone"]);
-        expect([...views.keys()]).toEqual(["m1"]);
-        expect(views.get("m1")?.url).toContain("https://m.test/");
+        await expect(
+            service.createUpload(ctx(), {
+                contentType: "image/png",
+                contentLength: 1000,
+                filename: "a.png",
+                purpose: "ask-ai",
+                variants: [{ width: 640, contentLength: 100 }],
+            } as never),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it("caps one person's unsent Ask AI pictures, and limits how fast they mint (M1)", async () => {
+        const createSignedUploadUrl = jest.fn().mockResolvedValue(SIGNED);
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ createSignedUploadUrl }), null),
+        );
+        const input = {
+            contentType: "image/png",
+            contentLength: 1000,
+            filename: "a.png",
+            purpose: "ask-ai",
+        };
+        create.mockResolvedValue({ id: "media_1", key: SIGNED.key });
+        const count = prisma.media.count as jest.Mock;
+        count.mockResolvedValueOnce(30);
+        await expect(service.createUpload(ctx(), input)).rejects.toMatchObject({
+            status: 429,
+        });
+        expect(count.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            uploadedByUserId: "user_1",
+            purpose: "ask-ai",
+        });
+        expect(createSignedUploadUrl).not.toHaveBeenCalled();
+        // The rate: past it, refused before anything is read or signed.
+        service.askAiUploadLimiter = {
+            take: () => false,
+            retryAfterSeconds: () => 1,
+        };
+        count.mockClear();
+        await expect(service.createUpload(ctx(), input)).rejects.toMatchObject({
+            status: 429,
+        });
+        expect(count).not.toHaveBeenCalled();
     });
 
     it("applying one makes it the library's: only an Ask AI image changes purpose", async () => {

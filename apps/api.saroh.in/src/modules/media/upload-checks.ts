@@ -168,6 +168,10 @@ export function assertUploadType(input: CreateUploadInput): void {
     }
     // An image for Ask AI: what the provider reads, at its per-image size.
     if (input.purpose === ASK_AI_IMAGE_PURPOSE) {
+        // Smaller copies are for the library's pages; a chat image has none.
+        if (input.variants?.length) {
+            throw new BadRequestException(NOT_AN_IMAGE_MESSAGE);
+        }
         if (
             !(ASK_AI_IMAGE_TYPES as readonly string[]).includes(
                 input.contentType,

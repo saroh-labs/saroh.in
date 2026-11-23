@@ -2,6 +2,8 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    HttpException,
+    HttpStatus,
     Inject,
     Injectable,
     Logger,
@@ -33,6 +35,8 @@ import {
     logDeletionProviderCall,
 } from "../organizations/deletion-provider-log";
 import { authorize } from "../organizations/organization-policy";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import type { MediaStorages } from "./object-storage.provider";
 import { OBJECT_STORAGE } from "./object-storage.provider";
 import type { CreateUploadInput } from "./upload-checks";
@@ -54,6 +58,13 @@ const STAND_IN_PNG = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
     "base64",
 );
+
+/** How long a chat image's signed link lives: a screen's worth, then it is asked for again. */
+const ASK_AI_UPLOADS_PER_HOUR = 60;
+/** Pictures picked for Ask AI and not yet sent, per person; they are swept after a day. */
+const ASK_AI_UNSENT_PER_PERSON = 30;
+
+const ASK_AI_VIEW_LINK_SECONDS = 15 * 60;
 
 /** A deleted business's stored files, on its deletion trail (#921). */
 const deletionLog = new Logger("OrganizationDeletion");
@@ -100,6 +111,13 @@ function goneAsNothing(error: unknown, onlyGone = false): void {
 
 @Injectable()
 export class MediaService {
+    /** One person's Ask AI upload links an hour (M1): the library's gate is not on them. */
+    askAiUploadLimiter: WindowLimiter = new SharedRateLimiter(
+        "ask-ai-image-uploads",
+        ASK_AI_UPLOADS_PER_HOUR,
+        60 * 60 * 1000,
+    );
+
     constructor(
         @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
     ) {}
@@ -126,6 +144,9 @@ export class MediaService {
         assertUploadType(input);
         const sizesProblem = uploadSizesProblem(input);
         if (sizesProblem) throw new BadRequestException(sizesProblem);
+        if (input.purpose === ASK_AI_IMAGE_PURPOSE) {
+            await this.admitAskAiUpload(ctx);
+        }
 
         // The business's edition's bucket; the row remembers which (owner,
         // 22 Nov 2026).
@@ -217,6 +238,30 @@ export class MediaService {
                 key: c.key,
             })),
         };
+    }
+
+    /** `ai:use` mints no more than a person's share: an hourly rate and a cap of unsent pictures (M1). */
+    private async admitAskAiUpload(ctx: OrganizationContext): Promise<void> {
+        const key = `${ctx.organizationId}:${ctx.userId}`;
+        if (!(await this.askAiUploadLimiter.take(key))) {
+            throw new HttpException(
+                "Too many pictures just now. Try again in a little while.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
+        const unsent = await prisma.media.count({
+            where: {
+                organizationId: ctx.organizationId,
+                uploadedByUserId: ctx.userId,
+                purpose: ASK_AI_IMAGE_PURPOSE,
+            },
+        });
+        if (unsent >= ASK_AI_UNSENT_PER_PERSON) {
+            throw new HttpException(
+                "Send a question with your pictures, or wait a day, before adding more.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
     }
 
     /**
@@ -313,7 +358,7 @@ export class MediaService {
              * left them holding a key with no way to turn it into an <img src>
              * — an upload that completed and could not be used.
              */
-            url: this.publicUrlFor(updated),
+            url: await this.viewUrlFor(updated),
         };
     }
 
@@ -360,6 +405,35 @@ export class MediaService {
     }): string | null {
         try {
             return this.storages.of(media.bucket).getPublicUrl(media.key);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Where a person's browser reads an object. A chat image (Ask AI's, before
+     * it is applied) is private: a short-lived signed link from its own
+     * edition's bucket, never the public media host (M2). Everything else is
+     * served from the public address.
+     */
+    private async viewUrlFor(media: {
+        key: string;
+        bucket: MediaBucket;
+        purpose: string | null;
+    }): Promise<string | null> {
+        if (
+            media.purpose !== ASK_AI_IMAGE_PURPOSE &&
+            media.purpose !== ASK_AI_SENT_PURPOSE
+        ) {
+            return this.publicUrlFor(media);
+        }
+        try {
+            const signed = await this.storages
+                .of(media.bucket)
+                .createSignedDownloadUrl(media.key, {
+                    expiresInSeconds: ASK_AI_VIEW_LINK_SECONDS,
+                });
+            return signed.url;
         } catch {
             return null;
         }
@@ -604,7 +678,6 @@ export class MediaService {
         {
             id: string;
             filename: string;
-            url: string | null;
             contentType: string;
             sizeBytes: number;
         }[]
@@ -613,8 +686,6 @@ export class MediaService {
             where: { id: { in: [...ids] }, organizationId, status: "READY" },
             select: {
                 id: true,
-                key: true,
-                bucket: true,
                 filename: true,
                 contentType: true,
                 sizeBytes: true,
@@ -637,14 +708,13 @@ export class MediaService {
             return {
                 id: r.id,
                 filename: r.filename,
-                url: this.publicUrlFor(r),
                 contentType: r.contentType,
                 sizeBytes: r.sizeBytes,
             };
         });
     }
 
-    /** Links for images already sent: only those still there and servable. */
+    /** Links for images already sent: signed and short-lived while private, public once applied; only those still there. */
     async askAiImageViews(
         organizationId: string,
         ids: readonly string[],
@@ -654,15 +724,23 @@ export class MediaService {
         if (!ids.length) return new Map();
         const rows = await prisma.media.findMany({
             where: { id: { in: [...ids] }, organizationId, status: "READY" },
-            select: { id: true, key: true, bucket: true, filename: true },
+            select: {
+                id: true,
+                key: true,
+                bucket: true,
+                purpose: true,
+                filename: true,
+            },
         });
+        const views = await Promise.all(
+            rows.map(async (r) => ({ r, url: await this.viewUrlFor(r) })),
+        );
         return new Map(
-            rows.flatMap((r) => {
-                const url = this.publicUrlFor(r);
-                return url
+            views.flatMap(({ r, url }) =>
+                url
                     ? [[r.id, { mediaId: r.id, url, filename: r.filename }]]
-                    : [];
-            }),
+                    : [],
+            ),
         );
     }
 

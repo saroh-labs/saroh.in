@@ -46,6 +46,7 @@ import { appBaseOf } from "../../../common/app-url";
 import { strictFetch } from "../../../common/net/ssrf";
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { isModuleKey, MODULE_BY_KEY } from "../../capabilities/module-registry";
+import { PostsService } from "../../content/posts.service";
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { FlagKey } from "../../feature-flags/flags";
 import { JobHandlerRegistry } from "../../jobs/job-handler.registry";
@@ -152,6 +153,8 @@ export interface SiteToolDeps {
     /** place_image's product photo (optional: tests that don't place one leave them out). */
     productImages?: ProductImagesService;
     productAccess?: ProductAccess;
+    /** place_image's post cover goes through the post's own save (revision, paused check). */
+    posts?: Pick<PostsService, "update">;
     /** The SSRF-guarded fetch; tests stand in a server. */
     fetchImage?: typeof strictFetch;
     /** The clock publish requests expire by; tests move it. */
@@ -926,6 +929,16 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         return { ...file, url: file.url };
     }
 
+    /** `clear` and `restore` are Ask AI's Undo; a key or an AI app never sets them (L2). */
+    function onlyForUndo(call: McpCall, used: unknown): void {
+        if (used && call.connection.kind !== "app") {
+            throw new ToolError(
+                "That option isn't available here.",
+                "Call it again with media_id and no other change.",
+            );
+        }
+    }
+
     const placeImage = defineTool({
         name: "place_image",
         title: "Set an image on a section or a post",
@@ -939,6 +952,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
             const { ctx } = call;
             const orgId = ctx.organizationId;
             const { site_id, media_id, restore } = input;
+            onlyForUndo(call, input.clear === true || restore !== undefined);
             if (!input.clear && !restore && !media_id) {
                 throw new ToolError(
                     "media_id is needed.",
@@ -1013,20 +1027,43 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
             } else {
                 const { post_id } = input;
                 if (!post_id) throw missing("post_id");
-                const post = await prisma.post.updateMany({
+                if (!d.posts) {
+                    throw new ToolError("Post covers aren't available here.");
+                }
+                const post = await prisma.post.findFirst({
                     where: {
                         id: post_id,
                         siteId: site_id,
                         site: { organizationId: orgId },
                     },
-                    data: { image: image?.src ?? null },
+                    select: {
+                        title: true,
+                        slug: true,
+                        excerpt: true,
+                        content: true,
+                        categoryId: true,
+                        featured: true,
+                    },
                 });
-                if (post.count !== 1) {
+                if (!post) {
                     throw new ToolError(
                         "There is no such post in this business.",
                         "Take post_id from the post the person has open.",
                     );
                 }
+                // The post's own save: a paused live post is read-only, the
+                // revision row is written, and the alt text is kept (L1).
+                await d.posts.update(ctx, site_id, post_id, {
+                    title: post.title,
+                    slug: post.slug,
+                    excerpt: post.excerpt ?? undefined,
+                    content: post.content,
+                    categoryId: post.categoryId,
+                    featured: post.featured,
+                    image: image?.src,
+                    imageAlt: image && image.alt !== "" ? image.alt : null,
+                    event: "ask_ai",
+                });
                 where = image ? "set the cover" : "took the cover off";
                 activity = {
                     target: `post:${post_id}`,
@@ -1059,6 +1096,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         async run({ product_id, media_id, alt, clear }, call: McpCall) {
             const { ctx } = call;
             const orgId = ctx.organizationId;
+            onlyForUndo(call, clear);
             if (!clear && !media_id) {
                 throw new ToolError(
                     "media_id is needed.",
@@ -1882,6 +1920,8 @@ export class SiteTools implements OnModuleInit {
         const deps: SiteToolDeps = {
             productImages: this.productImages,
             productAccess: this.productAccess,
+            // Stateless, as blog.tools builds it.
+            posts: new PostsService(),
             sites: this.sites,
             previews: this.previews,
             media: this.media,
