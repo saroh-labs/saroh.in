@@ -80,7 +80,12 @@ export async function createUpload(
         contentLength: number;
         filename: string;
         /** The library bucket; site images unless said. */
-        purpose?: "site-image" | "business-logo" | "product-video" | "ask-ai";
+        purpose?:
+            | "site-image"
+            | "business-logo"
+            | "product-video"
+            | "staff-photo"
+            | "ask-ai";
     } & UploadSizes,
 ): Promise<MediaResult<UploadTicket>> {
     const base = await mediaBase();

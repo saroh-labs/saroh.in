@@ -8,7 +8,7 @@ import type { Editor } from "@tiptap/react";
 import type { LucideIcon } from "lucide-react";
 import {
     ArrowDownToLine,
-    ChevronDown,
+    ArrowUp,
     Eye,
     History,
     ImageIcon,
@@ -25,6 +25,7 @@ import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet
 import { insertEmbed } from "@/components/sites/rich-text/embeds/insert-embed";
 import {
     ADD_ITEMS,
+    insertGallery,
     insertImage,
 } from "@/components/sites/rich-text/writing-menus";
 import { runAction } from "@/lib/api/run-action";
@@ -57,9 +58,9 @@ const TILE_NAMES: Record<string, string> = {
 /**
  * Add to the post (`blogphone/WXYAdd`): "Goes where your cursor is".
  * Photo, Heading and Quote as tiles, then More: everything else the "/"
- * menu adds (Product, List, Numbered list, Divider). Your services and
- * Product add a card that reads its price live (U15b); offers, Book now,
- * gallery and video are not built yet.
+ * menu adds (Product, Offer, Book now button, List, Highlight box,
+ * Contents, Gallery, Button…, Y1). Your services, Product, Offer and Book
+ * now read live (U15b, W2). Video is left out (owner, 22 Nov).
  */
 export function AddMenu({
     editor,
@@ -84,7 +85,13 @@ export function AddMenu({
         item.run(editor);
         onDone();
     }
-    if ((picking === "service" || picking === "product") && editor) {
+    if (
+        (picking === "service" ||
+            picking === "product" ||
+            picking === "book" ||
+            picking === "offer") &&
+        editor
+    ) {
         const kind = picking;
         return (
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -104,9 +111,14 @@ export function AddMenu({
         return (
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 <MediaPicker
-                    label="Choose a photo"
+                    label={
+                        picking === "gallery"
+                            ? "Choose the gallery's first photo"
+                            : "Choose a photo"
+                    }
                     onPick={(img) => {
-                        insertImage(editor, img);
+                        if (picking === "gallery") insertGallery(editor, img);
+                        else insertImage(editor, img);
                         setPicking(null);
                         onDone();
                     }}
@@ -126,21 +138,29 @@ export function AddMenu({
                         type="button"
                         disabled={!editor}
                         onClick={() => add(t.key)}
-                        className="flex h-[84px] min-w-0 flex-col items-start justify-center gap-1.5 rounded-xl border bg-card px-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex min-h-[100px] min-w-0 flex-col items-start justify-center gap-1.5 rounded-xl border bg-card px-3.5 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <t.icon
                             aria-hidden
                             className="size-[22px] text-foreground/80"
                         />
-                        <b className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
-                            {TILE_NAMES[t.key] ?? t.label}
+                        {/* One line: the name gives way, never the badge (it wrapped and clipped on phone, 22 Nov). */}
+                        <b className="flex min-w-0 max-w-full items-center gap-1.5 text-[0.9375rem] font-semibold">
+                            <span className="truncate">
+                                {TILE_NAMES[t.key] ?? t.label}
+                            </span>
                             {t.key === "service" ? (
-                                <Badge variant="info" size="sm">
+                                <Badge
+                                    variant="info"
+                                    size="sm"
+                                    className="shrink-0"
+                                >
                                     New
                                 </Badge>
                             ) : null}
                         </b>
-                        <span className="max-w-full truncate text-xs text-muted-foreground">
+                        {/* Two lines, as the board, never cut to "…" (Y1). */}
+                        <span className="line-clamp-2 max-w-full text-xs text-muted-foreground">
                             {TILE_WORDS[t.key]}
                         </span>
                     </button>
@@ -153,11 +173,11 @@ export function AddMenu({
                 className="flex h-12 w-full items-center gap-2 px-1 text-left text-[0.9375rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <span className="flex-1">More</span>
-                <ChevronDown
+                <ArrowUp
                     aria-hidden
                     className={cn(
                         "size-[18px] transition-transform duration-fast",
-                        more && "rotate-180",
+                        !more && "rotate-180",
                     )}
                 />
             </button>

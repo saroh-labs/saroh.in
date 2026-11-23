@@ -1,7 +1,10 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { Globe } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -27,6 +30,8 @@ interface PageSwitch {
     /** It couldn't be fetched: the canvas says so, with Try again. */
     failed: boolean;
     retry: () => void;
+    /** The site, for "Back to Website" beside Try again (D5). */
+    siteId: string;
 }
 
 const PageSwitchContext = createContext<PageSwitch | null>(null);
@@ -92,6 +97,7 @@ export function PageSwitchProvider({
                 open,
                 pending,
                 failed: failedFor !== null,
+                siteId,
                 retry: () => {
                     if (failedFor) open(failedFor);
                 },
@@ -127,11 +133,30 @@ export function PageRegion({
     const ctx = useContext(PageSwitchContext);
     if (ctx?.failed && shape === "canvas") {
         return (
-            <div className="grid min-h-0 place-items-center p-6">
+            // The whole editor body, the bar above still there; a globe for
+            // a dropped connection and the way back to Website (D5,
+            // `fix/WXKStates`).
+            <div className="grid min-h-0">
+                {/* No card: the message fills the canvas, a rule over its
+                    two buttons, at the large size (D5 · 3-5). */}
                 <FailedState
+                    tone="neutral"
+                    icon={<Globe />}
                     title={couldntLoad("this page")}
-                    description="Check your connection. Nothing you wrote is lost."
-                    onRetry={ctx.retry}
+                    description="Your connection dropped while it opened. Nothing you made is lost."
+                    className="h-full rounded-none border-0"
+                    action={
+                        <div className="flex w-full max-w-sm flex-wrap items-center justify-center gap-2 border-t pt-4">
+                            <Button size="lg" onClick={ctx.retry}>
+                                Try again
+                            </Button>
+                            <Button asChild size="lg" variant="outline">
+                                <Link href={`/sites/${ctx.siteId}/overview`}>
+                                    Back to Website
+                                </Link>
+                            </Button>
+                        </div>
+                    }
                 />
             </div>
         );

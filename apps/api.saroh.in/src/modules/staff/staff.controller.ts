@@ -19,6 +19,7 @@ import type { BookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { WebsiteAreaSwitchGuard } from "../sites/website-area-switch";
 import {
     AddExtraHoursDto,
     AddSelfDto,
@@ -27,8 +28,10 @@ import {
     RemoveOffDto,
     ReplaceStaffHoursDto,
     SetStaffServicesDto,
+    SetTeamPageDto,
     UpdateBookingRulesDto,
     UpdateStaffDto,
+    UpdateStaffProfileDto,
 } from "./dto";
 import type { BookingBrief, StaffList, StaffView } from "./staff.service";
 import { StaffService } from "./staff.service";
@@ -72,6 +75,12 @@ export class StaffController {
         return this.staff.addSelf(ctx, dto);
     }
 
+    /** The caller's own place on the diary, or null (Your profile). */
+    @Get("mine")
+    mine(@OrgContext() ctx: OrganizationContext): Promise<StaffView | null> {
+        return this.staff.mine(ctx);
+    }
+
     @Get(":staffId")
     get(
         @OrgContext() ctx: OrganizationContext,
@@ -87,6 +96,29 @@ export class StaffController {
         @Body() dto: UpdateStaffDto,
     ): Promise<StaffView> {
         return this.staff.update(ctx, staffId, dto);
+    }
+
+    /**
+     * A team member's photo and "About them": the person themselves, or an
+     * owner or admin for them (decided in the service).
+     */
+    @Patch(":staffId/profile")
+    updateProfile(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("staffId") staffId: string,
+        @Body() dto: UpdateStaffProfileDto,
+    ): Promise<StaffView> {
+        return this.staff.updateProfile(ctx, staffId, dto);
+    }
+
+    /** Who appears on Our team (round 3): an owner or admin, the whole list. */
+    @Put("team-page")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    setTeamPage(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SetTeamPageDto,
+    ): Promise<{ staffIds: string[] }> {
+        return this.staff.setTeamPage(ctx, dto.staffIds);
     }
 
     /** Off the diary for new bookings; their bookings and hours stay. */

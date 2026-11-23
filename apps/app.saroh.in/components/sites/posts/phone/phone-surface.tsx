@@ -16,7 +16,7 @@ import { resolveStyleVariables } from "@/lib/sites/style";
 
 import type { PostEditorModel } from "../editor/post-model";
 import { EMPTY_POST_HINT, TITLE_NEEDED } from "../editor/writing-surface";
-import { PostReviewBody } from "../review/review-body";
+import { StyledReviewBody } from "../review/styled-review-body";
 
 /* On demand and browser-only: the editor is heavy and made in the browser. */
 const RichTextEditor = dynamic(
@@ -41,7 +41,10 @@ export function PhoneSurface({
     onToolbar,
     onEditor,
     onCover,
+    onParagraphFeedback,
 }: {
+    /** A reader's feedback on one paragraph (R2). */
+    onParagraphFeedback?: (words: string) => void;
     model: PostEditorModel;
     previewing: boolean;
     titleError: boolean;
@@ -129,7 +132,7 @@ export function PhoneSurface({
                     aria-describedby={
                         titleError ? "post-title-error" : undefined
                     }
-                    className="mt-[18px] block min-h-0 w-full resize-none overflow-hidden rounded-md border-0 bg-transparent p-0 font-site-heading text-[1.75rem] font-normal leading-[1.18] text-site-fg outline-none [field-sizing:content] placeholder:text-site-muted focus-visible:ring-0 focus-visible:ring-offset-0 aria-[invalid]:ring-2 aria-[invalid]:ring-destructive [&[readonly]]:text-site-fg"
+                    className="mt-[18px] block min-h-0 w-full resize-none overflow-hidden rounded-md border-0 bg-transparent p-0 font-site-heading text-[calc(1.75rem*var(--site-heading-scale,1))] font-bold leading-[1.18] tracking-tight text-site-fg outline-none [field-sizing:content] placeholder:text-site-muted focus-visible:ring-0 focus-visible:ring-offset-0 aria-[invalid]:ring-2 aria-[invalid]:ring-destructive coarse:text-[calc(1.75rem*var(--site-heading-scale,1))] [&[readonly]]:text-site-fg"
                 />
                 {titleError ? (
                     <p
@@ -158,8 +161,18 @@ export function PhoneSurface({
                         />
                     </div>
                 ) : (
-                    // A reviewer gets the desk's change marks and Next change.
-                    <PostReviewBody model={model} />
+                    // In the site's look, as on the desk (R2): change marks,
+                    // Next change, and a tap on a paragraph for feedback.
+                    <StyledReviewBody
+                        model={model}
+                        onParagraphFeedback={
+                            data.readOnly &&
+                            data.feedback?.canComment &&
+                            draft.postId
+                                ? onParagraphFeedback
+                                : undefined
+                        }
+                    />
                 )}
                 {fresh && editing ? (
                     <div className="mt-[18px] grid gap-2 font-sans">

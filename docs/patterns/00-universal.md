@@ -414,6 +414,13 @@ ships. The site editor redesign (#334) dropped Tablet and zoom, the whole-site
 review panel, status details, block previews and settled notes, and #347 had to
 put every one back.
 
+**Current** — This holds for any build, not only a redesign: never remove or
+merge a feature without the owner's explicit yes, even when an approved design
+or decision seems to imply it. Keep the feature, ask the one question, and wait.
+An agent that finds its work would remove something keeps it and says so in its
+report. On 23 Nov 2026 "colourways only" would have retired the free palette
+builder; asked first, the owner kept it.
+
 ## 16. Check the plan against what was already decided
 
 **Current** — Before building anything the user asked for, and again before

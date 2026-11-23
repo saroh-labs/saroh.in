@@ -10,6 +10,7 @@ import {
     LookEyebrow,
     said,
 } from "./look-front";
+import { ReviewStars } from "./review-stars";
 
 /**
  * What customers said, under a look (DEC-172, plan U6, #1094), as each
@@ -88,6 +89,10 @@ export default function LookTestimonials({
                                     className="min-[700px]:basis-[calc((100%-6rem)/3)]"
                                 >
                                     <figure className="border-site-border m-0 grid gap-2.5 border-t py-5 min-[700px]:border-t-0 min-[700px]:py-0 min-[700px]:text-center">
+                                        <ReviewStars
+                                            rating={item.rating}
+                                            className="min-[700px]:justify-self-center"
+                                        />
                                         <blockquote className="font-site-heading text-site-fg m-0 whitespace-pre-line text-[22px] italic leading-[1.3] [text-wrap:balance] min-[700px]:text-[26px]">
                                             “{item.quote}”
                                         </blockquote>
@@ -113,6 +118,10 @@ export default function LookTestimonials({
                                     )}
                                 >
                                     <figure className="bg-site-surface rounded-site-s m-0 grid h-full content-between gap-3 p-6">
+                                        <ReviewStars
+                                            rating={item.rating}
+                                            className="justify-self-start"
+                                        />
                                         <blockquote className="text-site-fg m-0 whitespace-pre-line text-[18px] leading-[1.6] [text-wrap:pretty]">
                                             “{item.quote}”
                                         </blockquote>
@@ -164,6 +173,10 @@ function FolioQuotes({ items, title }: { items: Item[]; title: ReactNode }) {
             {rest.map((item, i) => (
                 <li key={i}>
                     <figure className="border-site-fg m-0 grid gap-3.5 border-t pt-5">
+                        <ReviewStars
+                            rating={item.rating}
+                            className="justify-self-start"
+                        />
                         <blockquote className="font-site-heading text-site-fg m-0 whitespace-pre-line text-[20px] font-light leading-[1.35] tracking-[-0.01em] min-[700px]:text-[24px]">
                             “{item.quote}”
                         </blockquote>
@@ -191,6 +204,10 @@ function FolioQuotes({ items, title }: { items: Item[]; title: ReactNode }) {
                     </p>
                 )}
                 <figure className="m-0 grid gap-4">
+                    <ReviewStars
+                        rating={lead.rating}
+                        className="justify-self-start"
+                    />
                     <blockquote className="font-site-heading text-site-fg border-t-site-fg border-b-site-border m-0 whitespace-pre-line border-b border-t py-7 text-[40px] font-light italic leading-[1.25] tracking-[-0.02em] min-[700px]:py-10">
                         “{lead.quote}”
                     </blockquote>

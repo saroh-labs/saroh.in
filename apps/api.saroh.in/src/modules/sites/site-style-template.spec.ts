@@ -190,6 +190,7 @@ describe("siteStyleVariables with a palette and type scale", () => {
               "--site-radius": "2px",
               "--site-section-padding": "52px",
               "--site-surface": "0 0% 100%",
+              "--site-tint": "20 35.29% 93.33%",
             }
         `);
         expect(defaultSiteStyle()).not.toHaveProperty("palette");

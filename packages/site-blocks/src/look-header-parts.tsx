@@ -45,7 +45,7 @@ const ACTION: Record<LookId, string> = {
     quiet: "rounded-site border border-site-fg bg-transparent px-5 text-[14.5px] font-medium tracking-[0.02em] text-site-fg max-[699px]:px-[18px] max-[699px]:[html[data-site-bar=book]_&]:hidden",
     // VB01: a white pill with a control edge; the dock carries Book on a
     // phone.
-    live: "rounded-full border-[1.5px] border-site-rule bg-site-surface px-4 text-[14.5px] font-bold text-site-fg max-[699px]:hidden",
+    live: "rounded-site border-[1.5px] border-site-rule bg-site-surface px-4 text-[14.5px] font-bold text-site-fg max-[699px]:hidden",
 };
 
 /**

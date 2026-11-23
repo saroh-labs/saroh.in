@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { EditableText } from "../editable-text";
 
 /**
  * Different words on a phone (KD9, DEC-237): a button's label, the hero's
@@ -31,15 +32,26 @@ export function phoneVersion(
 export function PhoneText({
     text,
     phone,
+    field,
 }: {
     text: string;
     phone?: string | null;
+    /**
+     * The contract field the desk words are (U47d), so the editor's canvas
+     * can type into them. The phone words are the inspector's.
+     */
+    field?: string;
 }): ReactNode {
     const short = phoneVersion(phone, text);
-    if (short === null) return text;
+    const desk = field ? (
+        <EditableText field={field}>{text}</EditableText>
+    ) : (
+        text
+    );
+    if (short === null) return desk;
     return (
         <>
-            <span className={DESK_ONLY}>{text}</span>
+            <span className={DESK_ONLY}>{desk}</span>
             <span className={PHONE_ONLY}>{short}</span>
         </>
     );

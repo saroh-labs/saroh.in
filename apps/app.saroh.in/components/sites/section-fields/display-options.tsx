@@ -31,6 +31,7 @@ export function DisplayOptions({
     descriptions,
     prices,
     highlight,
+    book,
     button,
 }: {
     /** Absent: no Show as, where the block's look says it instead. */
@@ -39,6 +40,8 @@ export function DisplayOptions({
     photos?: Shown;
     descriptions?: Shown;
     prices?: Shown;
+    /** Each item's own Book button (A5). */
+    book?: Shown;
     highlight?: {
         value: "first" | "none";
         onChange: (next: "first" | "none") => void;
@@ -86,6 +89,15 @@ export function DisplayOptions({
                     value={prices.value}
                     onChange={prices.onChange}
                     note={prices.note}
+                />
+            ) : null}
+            {book ? (
+                <ChoiceField
+                    label="Book button"
+                    options={SHOW_HIDE}
+                    value={book.value}
+                    onChange={book.onChange}
+                    note={book.note}
                 />
             ) : null}
             {highlight ? (

@@ -78,6 +78,7 @@ export function FormSheet({
     bottomOnPhone = false,
     flow = false,
     ownHeader = false,
+    undimmed = false,
     ...foot
 }: {
     /** The form's id. */
@@ -124,6 +125,8 @@ export function FormSheet({
      * kept for a screen reader, not seen.
      */
     ownHeader?: boolean;
+    /** The page stays undimmed behind it: what the sheet tries shows there. */
+    undimmed?: boolean;
     children: ReactNode;
 } & Omit<OverlayFootProps, "note" | "onSubmit" | "pending" | "className">) {
     const composed = !onSubmit && !doneOnly;
@@ -169,6 +172,7 @@ export function FormSheet({
                             : "sm:max-w-md",
                     className,
                 )}
+                overlayClassName={undimmed ? "bg-transparent" : undefined}
                 {...frame.contentProps}
             >
                 {bottom ? <SheetHandle className="mb-3" /> : null}

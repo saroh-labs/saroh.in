@@ -1,5 +1,5 @@
 import { showError } from "@saroh/ui/toast";
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { useOpenPageId } from "./page-switch";
 
 import { carryPreview } from "@/components/sites/canvas/use-editor-viewport";
@@ -9,6 +9,7 @@ import {
     setPlace,
     subscribe,
 } from "@/lib/sites/editor-prefs";
+import type { SelectedElement, StyleScope } from "@/lib/sites/element-style";
 import type { Section, SitePage } from "@/lib/sites/service";
 
 export type EditorRailTab = "sections" | "style";
@@ -57,9 +58,32 @@ export function useEditorSelection({
     const selectedChrome = place.chrome;
     // Writing through the store is what makes the choice survive a reload;
     // the re-render is the store's notification, not a second source of truth.
-    const setSelectedIndex = (next: number | null) =>
+    /*
+     * The button or photo chosen inside the selected section (DEC-253),
+     * with its Apply to. Not remembered: a reload comes back to the
+     * section, and choosing another section lets the element go.
+     */
+    const [element, setElement] = useState<SelectedElement | null>(null);
+    const [elementScope, setElementScope] = useState<StyleScope>("element");
+    /*
+     * A section drawn on the canvas but not saved: a custom colour being
+     * picked for one button (CSI-C states 2 and 3). The picker clears it.
+     */
+    const [trial, setTrial] = useState<{
+        index: number;
+        section: Section;
+    } | null>(null);
+    const setSelectedIndex = (next: number | null) => {
+        setElement(null);
         setPlace(siteId, sectionCount, { selectedIndex: next, chrome: null });
+    };
+    const selectElement = (index: number, next: SelectedElement) => {
+        setPlace(siteId, sectionCount, { selectedIndex: index, chrome: null });
+        setElement(next);
+        setElementScope("element");
+    };
     const selectChrome = (part: FixedPart) => {
+        setElement(null);
         setPlace(siteId, sectionCount, { selectedIndex: null, chrome: part });
         setInspector("block");
     };
@@ -77,6 +101,13 @@ export function useEditorSelection({
         rail,
         inspector,
         setSelectedIndex,
+        element: selectedIndex === null ? null : element,
+        selectElement,
+        clearElement: () => setElement(null),
+        elementScope,
+        setElementScope,
+        trial,
+        setTrial,
         selectChrome,
         setRail,
         setInspector,

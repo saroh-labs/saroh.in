@@ -143,6 +143,7 @@ export default function AnswerHero(props: AnswerHeroProps) {
                         <p className="max-w-[52ch] text-pretty text-[17px] leading-[1.55] min-[700px]:text-[18px]">
                             <PhoneText
                                 text={content.subheading}
+                                field="subheading"
                                 phone={content.phoneLine}
                             />
                         </p>

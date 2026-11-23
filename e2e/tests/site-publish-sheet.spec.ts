@@ -47,6 +47,9 @@ test.describe("Publish sheet", () => {
         await expect(
             sheet.getByRole("region", { name: "Checked before you publish" }),
         ).toBeVisible();
+        // On a phone the links wait behind More.
+        const more = sheet.getByRole("button", { name: "More", exact: true });
+        if ((await more.count()) > 0) await more.click();
         await expect(
             sheet.getByRole("link", { name: "See versions" }),
         ).toBeVisible();

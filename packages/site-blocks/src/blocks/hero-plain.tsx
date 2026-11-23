@@ -4,6 +4,7 @@ import type { RenderedHero } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { EditableText } from "../editable-text";
+import { withElement } from "../element-theme";
 import { siteImage } from "../lib/site-image";
 import { CtaButton } from "./cta";
 import { HeroHeading } from "./hero-heading";
@@ -109,6 +110,7 @@ export default function PlainHero({
                             <p className="mt-5 max-w-[54ch] text-pretty text-[length:calc(var(--site-body-size,1rem)*1.125)] leading-relaxed sm:text-[length:calc(var(--site-body-size,1rem)*1.25)]">
                                 <PhoneText
                                     text={content.subheading}
+                                    field="subheading"
                                     phone={content.phoneLine}
                                 />
                             </p>
@@ -133,16 +135,20 @@ export default function PlainHero({
                             alt={photo.alt ?? ""}
                             width={photo.width}
                             height={photo.height}
-                            {...siteImage(priority ? "first-hero" : "below", {
-                                src: photo.src,
-                                width: photo.width,
-                                placeholder: photo.placeholder,
-                                widths: photo.widths,
-                                focus: photo.focus,
-                                sizes: hasImage
-                                    ? "(min-width: 1024px) 50vw, 100vw"
-                                    : "(min-width: 832px) 832px, 100vw",
-                            })}
+                            {...withElement(
+                                "image",
+                                photo,
+                                siteImage(priority ? "first-hero" : "below", {
+                                    src: photo.src,
+                                    width: photo.width,
+                                    placeholder: photo.placeholder,
+                                    widths: photo.widths,
+                                    focus: photo.focus,
+                                    sizes: hasImage
+                                        ? "(min-width: 1024px) 50vw, 100vw"
+                                        : "(min-width: 832px) 832px, 100vw",
+                                }),
+                            )}
                             className={
                                 hasImage
                                     ? "h-auto w-full rounded-[var(--site-radius)] object-cover"

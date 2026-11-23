@@ -4,7 +4,7 @@ import { EmptyState } from "@saroh/ui/empty-state";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
-import { Columns2, X } from "lucide-react";
+import { Columns2, History, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -23,7 +23,24 @@ import type {
 } from "@/lib/sites/service";
 
 import type { EditorModel } from "../shell/editor-model";
-import { FRAME_WIDTH, ScaledPage } from "./preview-frames";
+import { unitSectionKey } from "../use-editor-review";
+import { ScaledPage } from "./preview-frames";
+
+/**
+ * The widest both pages are laid out at: desktop breakpoints (lg is 1024).
+ * The Live version view lays its page out at this width.
+ */
+export const COMPARE_WIDTH = 1024;
+
+/**
+ * The width Compare lays both pages out at, for a column `column` px wide:
+ * as wide as draws them at about three quarters (`fix/WXEHistory`), so the
+ * words read beside each other at 1440 (D3), never narrower than sm (640)
+ * nor wider than `COMPARE_WIDTH`. Both pages share it, so they line up.
+ */
+export function compareLayoutWidth(column: number): number {
+    return Math.min(COMPARE_WIDTH, Math.max(640, Math.round(column / 0.75)));
+}
 
 /** Page or whole site: what History compares. */
 export type HistoryScope = "page" | "site";
@@ -33,13 +50,38 @@ type Loaded =
     | { state: "failed" }
     | { state: "ready"; detail: SitePublicationDetail; changes: SiteChanges };
 
-/** The differences Compare numbers: this page's, or the whole site's. */
+/**
+ * The differences Compare numbers: this page's, or the whole site's. A
+ * site-wide one (look, menu, footer: `pageId` null) is on this page too;
+ * leaving it out said "0 differences" beside a draft in another look.
+ */
 export function compareUnits(
     changes: SiteChanges,
     scope: HistoryScope,
     pageId: string,
 ): ChangeUnit[] {
-    return changes.units.filter((u) => scope === "site" || u.pageId === pageId);
+    return changes.units.filter(
+        (u) => scope === "site" || u.pageId === pageId || u.pageId === null,
+    );
+}
+
+/**
+ * The draft's sections marked with their difference's number (D3,
+ * `fix/WXEHistory`): "2 · Changed", drawn as a numbered outline. A
+ * removed section is not on the draft to mark; the line above names it.
+ */
+export function compareMarks(
+    units: readonly ChangeUnit[],
+    pageId: string,
+): Map<string, string> {
+    const marks = new Map<string, string>();
+    units.forEach((unit, i) => {
+        const key = unit.pageId === pageId ? unitSectionKey(unit) : null;
+        if (key === null || unit.change === "removed") return;
+        const change = `${unit.change[0].toUpperCase()}${unit.change.slice(1)}`;
+        marks.set(key, `${i + 1} · ${change}`);
+    });
+    return marks;
 }
 
 /**
@@ -104,9 +146,19 @@ export function HistoryCompare({
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") onClose();
         };
+        // The body narrows once `place` moves the overlay right of History;
+        // measured only on mount, the draft ran off the right (22 Nov 2026).
+        const watch =
+            typeof ResizeObserver === "undefined" || !body.current
+                ? null
+                : new ResizeObserver(() => {
+                      if (body.current) setWidth(body.current.clientWidth);
+                  });
+        if (watch && body.current) watch.observe(body.current);
         window.addEventListener("resize", measure);
         window.addEventListener("keydown", onKey);
         return () => {
+            watch?.disconnect();
             window.removeEventListener("resize", measure);
             window.removeEventListener("keydown", onKey);
         };
@@ -120,7 +172,8 @@ export function HistoryCompare({
             : [];
     // Two columns with a 24px gap inside 24px of padding each side.
     const column = Math.max(160, (width - 48 - 24) / 2);
-    const scale = column / FRAME_WIDTH.desktop;
+    const layoutWidth = compareLayoutWidth(column);
+    const scale = column / layoutWidth;
 
     const overlay = (
         <div
@@ -151,6 +204,7 @@ export function HistoryCompare({
                             loaded.detail.renderability.renderable
                         }
                         onRestored={onRestored}
+                        icon={<History aria-hidden className="size-4" />}
                     />
                 ) : null}
                 <IconButton
@@ -178,7 +232,7 @@ export function HistoryCompare({
                     />
                 ) : (
                     <>
-                        <Differences units={units} />
+                        <Differences units={units} pageId={pageId} />
                         <div className="grid grid-cols-2 gap-6">
                             <div className="min-w-0">
                                 <h3 className="mb-2 text-[0.8125rem] font-semibold text-muted-foreground">
@@ -189,6 +243,7 @@ export function HistoryCompare({
                                     siteId={siteId}
                                     path={model.page?.path ?? "/"}
                                     scale={scale}
+                                    width={layoutWidth}
                                 />
                             </div>
                             <div className="min-w-0">
@@ -196,7 +251,7 @@ export function HistoryCompare({
                                     Your draft now
                                 </h3>
                                 <ScaledPage
-                                    width={FRAME_WIDTH.desktop}
+                                    width={layoutWidth}
                                     scale={scale}
                                     title="Your draft now"
                                 >
@@ -210,6 +265,10 @@ export function HistoryCompare({
                                             style={model.siteStyle.style}
                                             styleOptions={model.styleOptions}
                                             chrome={model.canvasChrome}
+                                            markByKey={compareMarks(
+                                                units,
+                                                pageId,
+                                            )}
                                         />
                                     </div>
                                 </ScaledPage>
@@ -225,8 +284,18 @@ export function HistoryCompare({
         : createPortal(overlay, document.body);
 }
 
-/** The differences, numbered, each said as the Publish sheet says it. */
-function Differences({ units }: { units: ChangeUnit[] }) {
+/**
+ * The differences the draft page cannot show (D3): removed or hidden
+ * sections, other pages, site-wide settings, each with the number the
+ * header counts. Those on the draft are marked there, not repeated here.
+ */
+function Differences({
+    units,
+    pageId,
+}: {
+    units: ChangeUnit[];
+    pageId: string;
+}) {
     if (units.length === 0) {
         return (
             <EmptyState
@@ -237,9 +306,22 @@ function Differences({ units }: { units: ChangeUnit[] }) {
             />
         );
     }
+    // Exactly the units `compareMarks` draws on the draft.
+    const marked = new Set(
+        units
+            .filter(
+                (u) =>
+                    u.pageId === pageId &&
+                    unitSectionKey(u) !== null &&
+                    u.change !== "removed",
+            )
+            .map((u) => u.key),
+    );
+    if (marked.size === units.length) return <div className="h-4" />;
     return (
         <ol data-compare-differences="" className="flex flex-wrap gap-2 py-4">
             {units.map((unit, i) => {
+                if (marked.has(unit.key)) return null;
                 const gone =
                     unit.change === "removed" || unit.change === "hidden";
                 return (
@@ -272,16 +354,19 @@ function Differences({ units }: { units: ChangeUnit[] }) {
 }
 
 /** The open page as it was in that version, matched by its link. */
-function VersionPage({
+export function VersionPage({
     detail,
     siteId,
     path,
     scale,
+    width = COMPARE_WIDTH,
 }: {
     detail: SitePublicationDetail;
     siteId: string;
     path: string;
     scale: number;
+    /** The width the page is laid out at (`compareLayoutWidth`). */
+    width?: number;
 }) {
     const page = (detail.snapshot.pages ?? []).find((p) => p.path === path);
     if (!page) {
@@ -300,11 +385,7 @@ function VersionPage({
     );
     const sections = page.sections.filter((_, i) => !skipped.has(i));
     return (
-        <ScaledPage
-            width={FRAME_WIDTH.desktop}
-            scale={scale}
-            title="That version"
-        >
+        <ScaledPage width={width} scale={scale} title="That version">
             <PastVersionPreview
                 sections={sections}
                 siteId={siteId}

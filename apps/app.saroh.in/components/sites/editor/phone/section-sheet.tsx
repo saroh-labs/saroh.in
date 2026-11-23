@@ -1,5 +1,6 @@
 "use client";
 
+import { elementAt, textOf } from "@/lib/sites/element-style";
 import { Button } from "@saroh/ui/button";
 import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { IconButton } from "@saroh/ui/icon-button";
@@ -21,7 +22,6 @@ import type { FocusEvent, MouseEvent, ReactNode } from "react";
 import { useRef, useState } from "react";
 
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
-import { FixedBlockInspector } from "@/components/sites/blocks/fixed-block-inspector";
 import { useServicesForPicker } from "@/components/sites/blocks/use-services-for-picker";
 import { SaveFooter } from "@/components/sites/shell/save-footer";
 import { count } from "@/lib/format/plural";
@@ -31,7 +31,9 @@ import { keyboardInsetNow, useKeyboardUp } from "../edit-pill";
 import { SECTION_LABELS, sectionTitle } from "../editor-constants";
 import { subjectOnCanvas } from "../editor-panels";
 import { EditorSheet } from "../editor-sheet";
+import { ChromePanel } from "../inspector/chrome-panel";
 import { ContentTab } from "../inspector/content-tab";
+import { ElementStyleTab } from "../inspector/element-style-tab";
 import { FeedbackTab } from "../inspector/feedback-tab";
 import { sectionActions } from "../inspector/section-actions";
 import { frameOf } from "../inspector/section-frame";
@@ -94,6 +96,8 @@ export function SectionSheet({
     const [own, setOwn] =
         useState<Exclude<InspectorTab, "feedback">>("content");
     const [priceFor, setPriceFor] = useState<string | null>(null);
+    // A tapped button opens on its Style (CSI-C phone).
+    const [elTab, setElTab] = useState<"content" | "style">("style");
     const [text, setText] = useState<TextField | null>(null);
     // The field the text sheet just gave back focus to: not reopened.
     const returned = useRef<HTMLElement | null>(null);
@@ -185,14 +189,137 @@ export function SectionSheet({
                 onClose={onClose}
             />
         );
-        body = (
-            <FixedBlockInspector
-                part={part}
-                siteId={siteId}
-                text={model.chrome}
-                bare
+        // The same fields and tabs as the desk's (H4).
+        tabs = (
+            <TabStrip<InspectorTab>
+                label={title}
+                idPrefix="phone-section"
+                tabs={[
+                    { value: "content", label: "Content" },
+                    { value: "style", label: "Style" },
+                    { value: "visibility", label: "Visibility" },
+                    { value: "feedback", label: "Feedback" },
+                ]}
+                value={tab}
+                onValueChange={openTab}
+                listClassName="px-1 [&>button]:px-3"
             />
         );
+        body = (
+            <ChromePanel
+                part={part}
+                tab={tab}
+                model={model}
+                onBrand={onBrand}
+                onWholeSite={() => {
+                    selection.setSelectedIndex(null);
+                    selection.setInspector("feedback");
+                }}
+            />
+        );
+    } else if (active && selection.element) {
+        // One button or photo (DEC-253): its Style in the shared sheet,
+        // Reset and Done pinned (CSI-C phone).
+        const { index, section } = active;
+        const el = selection.element;
+        const word = el.kind === "button" ? "Button" : "Photo";
+        const own = elementAt(section.content, el.path);
+        title = textOf(own?.label) || word;
+        head = (
+            <SheetHead
+                title={title}
+                kicker={`${sectionTitle(section)} › ${word}`}
+                onClose={onClose}
+            />
+        );
+        // Content · Style, as on a desk (CSI-C phone).
+        tabs = (
+            <TabStrip<"content" | "style">
+                label={word}
+                idPrefix="phone-element"
+                tabs={[
+                    { value: "content", label: "Content" },
+                    { value: "style", label: "Style" },
+                ]}
+                value={elTab}
+                onValueChange={setElTab}
+                listClassName="px-1 [&>button]:px-3"
+            />
+        );
+        footer = elTab === "content" && !readOnly;
+        body =
+            elTab === "content" ? (
+                <div
+                    className="grid gap-4"
+                    onFocusCapture={(e) => openText(e, title)}
+                    onClickCapture={(e) => openText(e, title)}
+                >
+                    <SaveFailedNotice draft={draft} />
+                    <ContentTab
+                        siteId={siteId}
+                        section={section}
+                        pages={pages}
+                        services={services}
+                        flags={activeFlags}
+                        unreadable={false}
+                        error={
+                            draft.errorIndex === index
+                                ? draft.errorMessage
+                                : null
+                        }
+                        heldBack={draft.heldBackAt(index)}
+                        onChange={(next) => draft.replaceAt(index, next)}
+                        onPrice={setPriceFor}
+                        onAddNote={() => openTab("feedback")}
+                    />
+                </div>
+            ) : (
+                <ElementStyleTab
+                    element={el}
+                    section={section}
+                    sectionName={sectionTitle(section)}
+                    scope={selection.elementScope}
+                    onScope={selection.setElementScope}
+                    style={model.siteStyle.style}
+                    styleOptions={model.styleOptions}
+                    onChange={(next) => draft.replaceAt(index, next)}
+                    onSiteStyle={model.siteStyle.setStyle}
+                    onTry={(next) =>
+                        selection.setTrial(
+                            next ? { index, section: next } : null,
+                        )
+                    }
+                    foot={(line, reset) => (
+                        <div
+                            data-element-foot=""
+                            className="sticky bottom-0 -mx-4 grid gap-2 border-t bg-background px-4 pb-3 pt-2.5"
+                        >
+                            <p className="text-xs text-muted-foreground">
+                                {line}
+                            </p>
+                            <div className="flex gap-2">
+                                {reset ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-12 min-w-0 flex-1"
+                                        onClick={reset.run}
+                                    >
+                                        {reset.word}
+                                    </Button>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    className="h-12 min-w-0 flex-1"
+                                    onClick={onClose}
+                                >
+                                    Done
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                />
+            );
     } else if (active) {
         const { index, section } = active;
         const Icon = SECTION_ICONS[section.type];
@@ -369,9 +496,14 @@ export function SectionSheet({
                 }
                 head={head}
                 // Tall enough that the fields scroll under the head, actions
-                // and tabs, even at 320 (`fix/WXNSection`).
+                // and tabs, even at 320 (`fix/WXNSection`). The header's
+                // menu chips opened half hidden under Save: it opens tall (H4).
                 className={
-                    keyboard ? "h-auto max-h-[70%]" : "min-h-[min(92%,30rem)]"
+                    keyboard
+                        ? "h-auto max-h-[70%]"
+                        : selection.selectedChrome === "header"
+                          ? "min-h-[92%]"
+                          : "min-h-[min(92%,30rem)]"
                 }
             >
                 <div
@@ -396,7 +528,7 @@ export function SectionSheet({
                         <div
                             className={
                                 active || selection.selectedChrome
-                                    ? "px-4 py-3.5"
+                                    ? "px-4 pb-6 pt-3.5"
                                     : undefined
                             }
                         >

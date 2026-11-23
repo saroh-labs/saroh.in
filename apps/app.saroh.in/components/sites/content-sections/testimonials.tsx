@@ -4,6 +4,7 @@ import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
+import { StarRating } from "@/components/shared/fields/star-rating";
 import type { TestimonialsContent } from "@/lib/sites/service";
 
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
@@ -64,6 +65,12 @@ export function TestimonialsFields({
                                 placeholder="Customer since 2019."
                             />
                         </Field>
+                        <StarRating
+                            value={item.rating ?? null}
+                            onChange={(next) =>
+                                set({ rating: next ?? undefined })
+                            }
+                        />
                     </>
                 )}
             </RepeatedItems>

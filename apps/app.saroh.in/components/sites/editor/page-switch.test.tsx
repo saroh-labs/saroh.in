@@ -68,7 +68,16 @@ describe("PageSwitchProvider", () => {
         act(() => open());
         expect(push).not.toHaveBeenCalled();
         expect(container.textContent).toContain("Couldn't load this page");
+        expect(container.textContent).toContain("Nothing you made is lost.");
         expect(container.textContent).not.toContain("the canvas");
+        // Neutral, not red: a dropped connection (D5).
+        expect(container.innerHTML).not.toContain("border-destructive");
+        // The way back beside Try again (D5).
+        expect(
+            Array.from(container.querySelectorAll("a"))
+                .find((a) => a.textContent === "Back to Website")
+                ?.getAttribute("href"),
+        ).toBe("/sites/s1/overview");
 
         online.mockReturnValue(true);
         act(() => button("Try again")?.click());

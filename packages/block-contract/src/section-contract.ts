@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import { COMPONENT_STYLE_OPTIONS } from "./component-styles";
+import {
+    buttonElementStyleSchema,
+    imageStyleSchema,
+    sectionStylesSchema,
+} from "./element-styles";
 import { imagePlaceholderSchema, imageWidthsSchema } from "./image-variants";
 import { parseSectionFrame } from "./section-frame";
 
@@ -93,6 +98,8 @@ export const sectionFrameSettingsSchema = z
         hideOn: z.literal("phone").optional(),
         tone: z.enum(SECTION_TONES).optional(),
         spacing: z.enum(COMPONENT_STYLE_OPTIONS.spacing).optional(),
+        /** Its buttons', cards' and photos' styles (DEC-253). */
+        styles: sectionStylesSchema.optional(),
     })
     .strict();
 export type SectionFrameSettings = z.infer<typeof sectionFrameSettingsSchema>;
@@ -183,11 +190,20 @@ const linkHref = z
  */
 const phoneLabel = z.string().trim().max(40).optional();
 
+/**
+ * Filled, Outline, Soft or Link (DEC-254): Soft is new, a tint of the
+ * button's colour with the page's words.
+ */
+const ctaStyle = z
+    .enum(["primary", "secondary", "soft", "link"])
+    .default("primary");
+
 const ctaSchema = z.object({
     label: z.string().min(1),
     href: linkHref,
-    style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    style: ctaStyle,
     phoneLabel,
+    elementStyle: buttonElementStyleSchema.optional(),
 });
 
 /**
@@ -234,8 +250,9 @@ export type CtaAction = z.infer<typeof ctaActionSchema>;
 const ctaSchemaV2 = z.object({
     label: z.string().min(1),
     action: ctaActionSchema,
-    style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    style: ctaStyle,
     phoneLabel,
+    elementStyle: buttonElementStyleSchema.optional(),
 });
 
 /** Digits and a leading +, nothing else — what tel: and wa.me both want. */
@@ -362,6 +379,8 @@ const imageSchema = z.object({
     placeholder: imagePlaceholderSchema.optional(),
     /** The widths of its stored smaller copies (DEC-246). */
     widths: imageWidthsSchema.optional(),
+    /** This photo's own corners (DEC-253). */
+    elementStyle: imageStyleSchema.optional(),
 });
 
 /** How long an image brief may run (KTD-5). */
@@ -590,8 +609,9 @@ const ctaV1 = z.object({
     padding: paddingOverride,
     label: z.string().min(1),
     href: linkHref,
-    style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    style: ctaStyle,
     phoneLabel,
+    elementStyle: buttonElementStyleSchema.optional(),
 });
 
 /**
@@ -789,6 +809,10 @@ const testimonialItemSchema = z.object({
     quote: z.string().trim().min(1).max(600),
     name: z.string().trim().min(1).max(120),
     role: z.string().max(120).optional(),
+    /** Stars out of five, only when set (23 Nov 2026): none is drawn otherwise. */
+    rating: z.number().int().min(1).max(5).optional(),
+    /** The product review it was copied from: the live site drops it once that review is hidden or deleted. */
+    reviewId: z.string().max(64).optional(),
 });
 
 const testimonialsV1 = z.object({
@@ -909,6 +933,11 @@ const servicesListV1 = z.object({
     layout: listLayout,
     showDescriptions: z.boolean().optional(),
     buttonLabel,
+    /**
+     * "Show a Book button" (A5, `fix/WXBAdd`): each service's own Book,
+     * opening a time to book it. ABSENT means shown, as it always was.
+     */
+    showBook: z.boolean().optional(),
     /**
      * The `priceCard` look's own words (template polish), around a price and
      * a duration that are ALWAYS the service's: `modeLine` under the price
@@ -1432,7 +1461,17 @@ export const PERSON_TEAM_MAX = 11;
  * what they do and a line about them. Plain text and a photo, as the
  * block's own person is.
  */
+/**
+ * The team member a person is, when an owner or admin picked them for Our
+ * team (round 3, EBTeamPicker). A bound person shows only while they are
+ * still chosen and active, under their name as Team has it now; the name
+ * here is the fallback the editor draws. Absent: the merchant's own words,
+ * shown as typed.
+ */
+const staffIdSchema = z.string().trim().min(1).max(64).optional();
+
 const teamMemberSchema = z.object({
+    staffId: staffIdSchema,
     image: imageSchema.optional(),
     imageBrief,
     name: z.string().trim().min(1).max(120),
@@ -1440,44 +1479,65 @@ const teamMemberSchema = z.object({
     bio: z.string().trim().max(600).optional(),
 });
 
-const personV1 = z.object({
-    variant,
-    padding: paddingOverride,
-    image: imageSchema.optional(),
-    /** The photo this person wants, until it has one (KTD-5). */
-    imageBrief,
-    name: z.string().trim().min(1).max(120),
-    role: z.string().trim().max(160).optional(),
-    credentials: z
-        .array(credentialSchema)
-        .max(PERSON_CREDENTIALS_MAX)
-        .optional(),
-    /**
-     * A visible label over the qualifications ("Qualifications", "Training").
-     * ABSENT: the portrait look says "Qualifications"; the default look keeps
-     * its list unlabelled on screen, as before.
-     */
-    credentialsLabel: z.string().trim().max(40).optional(),
-    bio: z.string().trim().max(PERSON_BIO_MAX).optional(),
-    cta: ctaSchemaV2.optional(),
-    /**
-     * The name as the page's `h1` (template polish), for a person who opens
-     * the page — the practitioner's site whose first section is them. ABSENT
-     * is the `h2` every section heading is. Set it only on a section that
-     * opens its page, so the page keeps one `h1`.
-     */
-    asTitle: z.boolean().optional(),
-    /**
-     * The `team` look's heading over the grid ("Who is coaching"). The other
-     * looks have the person's name as their heading and ignore it.
-     */
-    title: z.string().trim().max(160).optional(),
-    /**
-     * The `team` look's other people, after the block's own person, who is
-     * always first. The other looks draw one person and ignore them.
-     */
-    people: z.array(teamMemberSchema).max(PERSON_TEAM_MAX).optional(),
-});
+const personV1 = z
+    .object({
+        variant,
+        padding: paddingOverride,
+        /** The block's own person's team member, as a member's (above). */
+        staffId: staffIdSchema,
+        image: imageSchema.optional(),
+        /** The photo this person wants, until it has one (KTD-5). */
+        imageBrief,
+        /** Required, except on an Our team section everyone was taken off (below). */
+        name: z.string().trim().max(120),
+        role: z.string().trim().max(160).optional(),
+        credentials: z
+            .array(credentialSchema)
+            .max(PERSON_CREDENTIALS_MAX)
+            .optional(),
+        /**
+         * A visible label over the qualifications ("Qualifications", "Training").
+         * ABSENT: the portrait look says "Qualifications"; the default look keeps
+         * its list unlabelled on screen, as before.
+         */
+        credentialsLabel: z.string().trim().max(40).optional(),
+        bio: z.string().trim().max(PERSON_BIO_MAX).optional(),
+        cta: ctaSchemaV2.optional(),
+        /**
+         * The name as the page's `h1` (template polish), for a person who opens
+         * the page — the practitioner's site whose first section is them. ABSENT
+         * is the `h2` every section heading is. Set it only on a section that
+         * opens its page, so the page keeps one `h1`.
+         */
+        asTitle: z.boolean().optional(),
+        /**
+         * The `team` look's heading over the grid ("Who is coaching"). The other
+         * looks have the person's name as their heading and ignore it.
+         */
+        title: z.string().trim().max(160).optional(),
+        /**
+         * The `team` look's other people, after the block's own person, who is
+         * always first. The other looks draw one person and ignore them.
+         */
+        people: z.array(teamMemberSchema).max(PERSON_TEAM_MAX).optional(),
+    })
+    .superRefine((c, ctx) => {
+        // The team look may be empty (ER3, 22 Nov 2026): the last person taken
+        // off Our team leaves the section, drawn as nothing, with nobody in it.
+        if (
+            c.name === "" &&
+            (c.variant !== "team" || (c.people?.length ?? 0) > 0)
+        ) {
+            ctx.addIssue({
+                code: "too_small",
+                origin: "string",
+                minimum: 1,
+                inclusive: true,
+                path: ["name"],
+                message: "Too small: expected string to have >=1 characters",
+            });
+        }
+    });
 
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;

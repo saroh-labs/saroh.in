@@ -12,6 +12,7 @@ export * from "./copy-button";
 export * from "./count-badge";
 export * from "./data-state";
 export * from "./dialog";
+export * from "./drawer";
 export * from "./dropdown-menu";
 export * from "./field";
 export * from "./form";

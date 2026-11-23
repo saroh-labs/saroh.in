@@ -451,3 +451,53 @@ describe("readDraft", () => {
         expect(readDraft(a)).toBe(readDraft(b));
     });
 });
+
+describe("a sheet that opens on a choice", () => {
+    function When() {
+        const [open, setOpen] = useState(false);
+        return (
+            <>
+                <button type="button" onClick={() => setOpen(true)}>
+                    Edit
+                </button>
+                <FormSheet
+                    title="Publish"
+                    description="When it goes live."
+                    open={open}
+                    onClose={() => setOpen(false)}
+                    onSubmit={() => undefined}
+                >
+                    {/* A roving radio group marks every option -1 until one is focused. */}
+                    <div role="radiogroup" aria-label="When">
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked="true"
+                            tabIndex={-1}
+                        >
+                            Now
+                        </button>
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked="false"
+                            tabIndex={-1}
+                        >
+                            Later
+                        </button>
+                    </div>
+                    <button type="button" role="switch" aria-checked="false">
+                        Tell people
+                    </button>
+                </FormSheet>
+            </>
+        );
+    }
+
+    it("starts on the chosen option, not the switch after it (22 Nov 2026)", async () => {
+        await open(<When />);
+        await vi.waitFor(() =>
+            expect(document.activeElement?.textContent).toBe("Now"),
+        );
+    });
+});

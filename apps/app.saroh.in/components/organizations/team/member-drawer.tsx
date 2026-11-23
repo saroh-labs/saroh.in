@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffProfileFields } from "@/components/staff/profile-photo";
 import { runAction } from "@/lib/api/run-action";
 import {
     setMemberExtraActions,
@@ -20,8 +21,16 @@ import { ExtraPermissions, useMemberExtras } from "./member-extras";
 import type { RoleBook } from "./role-book";
 import { nameOf } from "./role-book";
 
+/** A member's place on the diary, for their photo and words. */
+export interface StaffProfile {
+    staffId: string;
+    photo: string | null;
+    about: string | null;
+}
+
 export function MemberDrawer({
     member,
+    profile = null,
     members,
     organizationName,
     book,
@@ -31,6 +40,8 @@ export function MemberDrawer({
     onRemove,
 }: {
     member: OrganizationMember | null;
+    /** Set when this viewer may set their photo (an owner or admin). */
+    profile?: StaffProfile | null;
     members: OrganizationMember[];
     organizationName: string;
     book: RoleBook;
@@ -167,6 +178,19 @@ export function MemberDrawer({
         >
             {member ? (
                 <>
+                    {profile ? (
+                        <div className="mb-4 border-b pb-4">
+                            <StaffProfileFields
+                                key={profile.staffId}
+                                staffId={profile.staffId}
+                                name={nameOf(member)}
+                                photo={profile.photo}
+                                about={profile.about}
+                                byOther={!member.isSelf}
+                                onSaved={() => router.refresh()}
+                            />
+                        </div>
+                    ) : null}
                     <div>
                         <p className="label mb-2.5">
                             Role in {organizationName}

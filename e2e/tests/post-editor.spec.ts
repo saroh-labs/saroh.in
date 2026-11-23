@@ -133,21 +133,36 @@ for (const size of [
                     "Not live yet",
                 );
 
+                // The left panel is this post only (`EBPostLeftPanel`);
+                // posts switch from the top picker, each with its state.
+                const panel = page.getByRole("complementary", {
+                    name: "In this post",
+                });
+                await expect(
+                    panel.getByRole("list", { name: "Outline of this post" }),
+                ).toBeVisible();
+                await expect(panel.locator('a[href*="/write/"]')).toHaveCount(
+                    0,
+                );
+                await bar
+                    .getByRole("button", { name: /Open another post$/ })
+                    .click();
+                const picked = page
+                    .getByRole("navigation", { name: "Posts" })
+                    .locator('a[aria-current="page"]');
+                await expect(picked).toContainText(title);
+                await expect(picked).toContainText("Not live yet");
+                await page.keyboard.press("Escape");
+
                 // The page link is in Search and sharing (RULES §1).
                 await page
                     .getByRole("tab", { name: "Search and sharing" })
                     .click();
-                await page
-                    .getByRole("button", { name: "Change search and sharing" })
-                    .click();
-                const sheet = page.getByRole("dialog", {
-                    name: "Search and sharing",
-                });
-                await expect(sheet.getByLabel("Page link")).toBeVisible();
-                await expect(sheet).toContainText(
-                    "Saved · goes live when you publish",
-                );
-                await sheet.getByRole("button", { name: "Cancel" }).click();
+                // Changed in place, beside the post (W8), with the previews.
+                await expect(page.getByLabel("Page link")).toBeVisible();
+                await expect(
+                    page.getByText("when someone shares the link"),
+                ).toBeVisible();
                 await expect(
                     page.evaluate(
                         () =>

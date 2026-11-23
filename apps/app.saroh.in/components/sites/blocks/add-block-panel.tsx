@@ -100,14 +100,14 @@ export function AddBlockPanel({
                 </p>
             ) : null}
             {structure.length === 0 ? null : (
-                <Group label="Structure">
+                <Group label="Structure" count={structure.length}>
                     {structure.map((f) => (
                         <FamilyEntry key={f.head} family={f} onPick={onPick} />
                     ))}
                 </Group>
             )}
             {business.length === 0 ? null : (
-                <Group label="From your business">
+                <Group label="From your business" count={business.length}>
                     {business.map((f) => (
                         <FamilyEntry key={f.head} family={f} onPick={onPick} />
                     ))}
@@ -131,17 +131,44 @@ export function AddBlockPanel({
     );
 }
 
+/** A card's drag start (A4). */
+type DragHandler = (e: React.DragEvent<HTMLElement>) => void;
+
 export function Group({
     label,
+    count,
+    titled = false,
+    listClassName = "space-y-1.5",
     children,
 }: {
+    /** The list's layout: rows by default; a grid or a bordered list (A1). */
+    listClassName?: string;
     label: string;
+    /** How many it holds, said beside its name (A2). */
+    count?: number;
+    /** A 15px sentence-case heading (the Add panel, A1) for the small label. */
+    titled?: boolean;
     children: React.ReactNode;
 }) {
     return (
         <section aria-label={label} className="space-y-1.5">
-            <h3 className="label px-2">{label}</h3>
-            <ul className="space-y-1.5">{children}</ul>
+            <h3
+                className={cn(
+                    "flex items-baseline gap-1.5 px-2",
+                    titled ? "text-[0.9375rem] font-semibold" : "label",
+                )}
+            >
+                {label}
+                {count !== undefined ? (
+                    <span
+                        className="font-normal tabular-nums text-muted-foreground"
+                        data-group-count={count}
+                    >
+                        {count}
+                    </span>
+                ) : null}
+            </h3>
+            <ul className={listClassName}>{children}</ul>
         </section>
     );
 }
@@ -154,9 +181,15 @@ export function Group({
 export function FamilyEntry({
     family,
     onPick,
+    hint,
+    onDragStart,
 }: {
+    /** Makes a lone layout draggable onto the canvas (A4). */
+    onDragStart?: (type: SectionType) => DragHandler | undefined;
     family: BlockFamily;
     onPick: (type: SectionType, looks: number) => void;
+    /** The business's own line ("32 products", A9) over the block's. */
+    hint?: string;
 }) {
     const looks = (t: SectionType) => BLOCK_META[t].variants.length;
     if (family.layouts.length === 1) {
@@ -165,9 +198,10 @@ export function FamilyEntry({
             <Entry
                 icon={SECTION_ICONS[t]}
                 label={SECTION_LABELS[t]}
-                hint={SECTION_HINTS[t]}
+                hint={hint ?? SECTION_HINTS[t]}
                 looks={looks(t)}
                 onClick={() => onPick(t, looks(t))}
+                onDragStart={onDragStart?.(t)}
             />
         );
     }
@@ -188,7 +222,7 @@ export function FamilyEntry({
                             {family.name}
                         </span>
                         <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                            {SECTION_HINTS[family.head]}
+                            {hint ?? SECTION_HINTS[family.head]}
                         </span>
                     </span>
                 </span>
@@ -213,13 +247,65 @@ export function FamilyEntry({
 }
 
 /** One block to add. Without `onClick` it is shown disabled, with its hint as the reason. */
+/**
+ * A suggested section as a small card (A1, `WXBAdd`): a picture of the
+ * section, its name, and what it would show from the business. Three sit
+ * in a row; clicked or dragged as `Entry` is.
+ */
+export function PreviewEntry({
+    label,
+    hint,
+    preview,
+    onClick,
+    onDragStart,
+}: {
+    label: string;
+    hint: string;
+    /** The section drawn small (`BlockThumbnail`). */
+    preview: React.ReactNode;
+    onClick: () => void;
+    onDragStart?: DragHandler;
+}) {
+    return (
+        <li className="min-w-0">
+            <button
+                type="button"
+                onClick={onClick}
+                draggable={onDragStart !== undefined}
+                onDragStart={onDragStart}
+                aria-label={`Add ${label}`}
+                title={hint}
+                className="grid w-full gap-1 rounded-lg border p-1 text-left transition-colors duration-fast hover:border-foreground/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <span className="block overflow-hidden rounded-md">
+                    {preview}
+                </span>
+                <span className="grid min-w-0 px-1 pb-0.5">
+                    <span className="truncate text-xs font-medium">
+                        {label}
+                    </span>
+                    <span
+                        data-ph-mask=""
+                        className="truncate text-xs text-muted-foreground"
+                    >
+                        {hint}
+                    </span>
+                </span>
+            </button>
+        </li>
+    );
+}
+
 export function Entry({
     icon: Icon,
     label,
     hint,
     looks = 1,
     onClick,
+    onDragStart,
 }: {
+    /** Draggable onto the canvas (A4); absent, a click only. */
+    onDragStart?: DragHandler;
     icon: LucideIcon;
     label: string;
     hint: string;
@@ -234,6 +320,8 @@ export function Entry({
                 type="button"
                 onClick={onClick}
                 disabled={disabled}
+                draggable={onDragStart !== undefined && !disabled}
+                onDragStart={onDragStart}
                 aria-label={disabled ? `${label}. ${hint}` : `Add ${label}`}
                 className={cn(
                     "flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -258,6 +346,46 @@ export function Entry({
                     <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                         {hint}
                     </span>
+                </span>
+            </button>
+        </li>
+    );
+}
+
+export interface BusinessTileProps {
+    id: string;
+    label: string;
+    hint: string;
+    onClick: () => void;
+    onDragStart?: (e: React.DragEvent<HTMLElement>) => void;
+}
+
+/** One From your business tile (A9, `WXBAdd` `.ob`): name over one line. */
+export function BusinessTile({
+    label,
+    hint,
+    onClick,
+    onDragStart,
+}: BusinessTileProps) {
+    return (
+        <li className="min-w-0">
+            <button
+                type="button"
+                onClick={onClick}
+                draggable={onDragStart !== undefined}
+                onDragStart={onDragStart}
+                aria-label={`Add ${label}`}
+                title={hint}
+                className="flex min-h-11 w-full flex-col justify-center rounded-lg border bg-card px-2.5 py-1.5 text-left transition-colors duration-fast hover:border-foreground/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <span className="truncate text-[0.8125rem] font-semibold">
+                    {label}
+                </span>
+                <span
+                    data-ph-mask=""
+                    className="truncate text-xs text-muted-foreground"
+                >
+                    {hint}
                 </span>
             </button>
         </li>

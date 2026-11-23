@@ -21,6 +21,7 @@
  * Run from the repo root.
  */
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
 // redact.ts names those headers only to strip them from log lines, so a
@@ -50,6 +51,8 @@ const files = execFileSync(
     .filter(
         (f) =>
             f &&
+            // A file deleted in the work tree but not yet committed.
+            existsSync(f) &&
             !ALLOWED.has(f) &&
             !/\.(test|spec)\.[cm]?[jt]sx?$/u.test(f) &&
             !f.includes("/e2e/"),

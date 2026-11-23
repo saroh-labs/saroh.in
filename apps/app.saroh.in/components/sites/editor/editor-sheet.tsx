@@ -152,6 +152,8 @@ export function EditorSheet({
                               )
                             : // 300px, never more than 88% of a small window.
                               "inset-y-0 right-0 w-[300px] max-w-[88%] border-l shadow-[-8px_0_24px_hsl(var(--shadow-color)/0.12)] data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+                        // The phone's colour sheet replaces this one while open.
+                        "data-[colour-open]:invisible",
                         className,
                     )}
                 >

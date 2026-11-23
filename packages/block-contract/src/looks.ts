@@ -138,6 +138,9 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
         components: {
             buttons: "square",
             secondButton: "text",
+            buttonStyle: "filled",
+            buttonSize: "m",
+            buttonColour: "accent",
             cards: "flat",
             cardCorners: "soft",
             images: "square",
@@ -181,6 +184,9 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
         components: {
             buttons: "pill",
             secondButton: "text",
+            buttonStyle: "filled",
+            buttonSize: "m",
+            buttonColour: "accent",
             cards: "flat",
             cardCorners: "soft",
             images: "arch",
@@ -221,6 +227,9 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
         components: {
             buttons: "pill",
             secondButton: "outline",
+            buttonStyle: "filled",
+            buttonSize: "m",
+            buttonColour: "accent",
             cards: "raised",
             cardCorners: "soft",
             images: "soft",

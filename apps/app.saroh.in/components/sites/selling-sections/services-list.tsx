@@ -268,6 +268,11 @@ export function ServicesListFields({
                     value: c.showPrices !== false,
                     onChange: (on) => patch({ showPrices: hiddenFlag(on) }),
                 }}
+                book={{
+                    value: c.showBook !== false,
+                    onChange: (on) => patch({ showBook: hiddenFlag(on) }),
+                    note: "Opens a time to book each one.",
+                }}
                 button={{
                     value: c.buttonLabel ?? "",
                     onChange: (v) => patch({ buttonLabel: wordsOrAbsent(v) }),

@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -37,6 +38,7 @@ export function RestoreVersion({
     pageId,
     revision,
     onRestored,
+    icon,
 }: {
     siteId: string;
     publicationId: string;
@@ -48,6 +50,8 @@ export function RestoreVersion({
     revision?: number;
     /** After the draft changed (the editor's History reloads); else refresh. */
     onRestored?: () => void;
+    /** Drawn before the label (History's Compare: the history icon, D3). */
+    icon?: ReactNode;
 }) {
     const router = useRouter();
     const zone = useBusinessZone();
@@ -89,6 +93,7 @@ export function RestoreVersion({
                 variant="outline"
                 onClick={() => setConfirming(true)}
             >
+                {icon}
                 {label}
             </Button>
         );

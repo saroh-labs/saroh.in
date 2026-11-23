@@ -34,6 +34,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { useState } from "react";
 import type { ReviewableSite } from "./invite-sheet";
 import { InviteSheet } from "./invite-sheet";
+import type { StaffProfile } from "./member-drawer";
 import { MemberDrawer } from "./member-drawer";
 import { PausedDiary } from "./paused-diary";
 import { PeopleTab } from "./people-tab";
@@ -86,6 +87,7 @@ export function TeamScreen({
     limitNotice = null,
     bookableNoLogin = 0,
     diaryPeople = [],
+    staffProfiles = {},
     paused = NONE_PAUSED,
     calendar = null,
 }: {
@@ -131,6 +133,12 @@ export function TeamScreen({
      * Calendar only unless another role is picked.
      */
     diaryPeople?: DiaryPerson[];
+    /**
+     * Each team member's place on the diary by user id, for the photo an
+     * owner or admin may set in the member's sheet. Empty for anyone who
+     * may not set one.
+     */
+    staffProfiles?: Record<string, StaffProfile>;
     /**
      * Past the plan's team limit (#800): who can't open the business, and
      * which invitations can't be accepted, from `GET …/billing/paused`.
@@ -296,6 +304,9 @@ export function TeamScreen({
 
             <MemberDrawer
                 member={editing}
+                profile={
+                    editing ? (staffProfiles[editing.userId] ?? null) : null
+                }
                 members={members}
                 organizationName={organizationName}
                 book={book}

@@ -43,7 +43,7 @@ export function canCatchFullLoad(): boolean {
  */
 export function armFullLoadCatch(
     match: (url: URL) => boolean,
-    onCaught: () => void,
+    onCaught: (url: URL) => void,
 ): () => void {
     const nav = navigation();
     if (!nav) return () => undefined;
@@ -60,7 +60,7 @@ export function armFullLoadCatch(
         // Next asks for the load from inside its router's render: what the
         // region does about it (a state, the router's reset) waits for that
         // render to end, or React drops it and the screen stays stuck.
-        setTimeout(onCaught, 0);
+        setTimeout(() => onCaught(url), 0);
     };
     nav.addEventListener("navigate", onNavigate);
     return () => nav.removeEventListener("navigate", onNavigate);
@@ -77,4 +77,24 @@ export function resetRouterAfterCatch(): void {
     window.dispatchEvent(
         new PageTransitionEvent("pageshow", { persisted: true }),
     );
+}
+
+/**
+ * Whether a caught full load was a real failure: the address answers (a
+ * page, or a redirect such as sign-in) or it doesn't (offline, a gateway
+ * error). Next also loads in full on purpose (a new deploy), and a script
+ * can ask for one: those must go through, not say "Couldn't load".
+ */
+export async function answers(url: URL): Promise<boolean> {
+    try {
+        const res = await fetch(url, {
+            method: "HEAD",
+            redirect: "manual",
+            cache: "no-store",
+            credentials: "same-origin",
+        });
+        return res.ok || res.type === "opaqueredirect";
+    } catch {
+        return false;
+    }
 }

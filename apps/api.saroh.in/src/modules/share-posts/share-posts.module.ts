@@ -9,6 +9,7 @@ import { ProductsModule } from "../products/products.module";
 import { SitesModule } from "../sites/sites.module";
 import { PublicShareController } from "./public-share.controller";
 import { PublicShareService } from "./public-share.service";
+import { PublicSiteOfferController } from "./public-site-offer.controller";
 import { ShareCardsController } from "./share-cards.controller";
 import { SharePostsController } from "./share-posts.controller";
 import { SharePostsService } from "./share-posts.service";
@@ -31,6 +32,8 @@ import { SharePostsService } from "./share-posts.service";
         SharePostsController,
         ShareCardsController,
         PublicShareController,
+        // A post's Offer card: public/sites, not behind SHARE_POSTS.
+        PublicSiteOfferController,
     ],
     providers: [SharePostsService, PublicShareService, OrganizationGuard],
     // Saroh Social draws its pictures with the same cards.

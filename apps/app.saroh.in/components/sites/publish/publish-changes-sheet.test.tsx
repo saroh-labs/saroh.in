@@ -227,7 +227,8 @@ describe("the Publish sheet's changes (U11)", () => {
             ],
         });
         const text = host.textContent;
-        const checks = text.indexOf("Checked before you publish");
+        // All checks pass here: the one summary line (P2).
+        const checks = text.indexOf("Checked:");
         const people = text.indexOf("Ritika Sharma");
         const advice = text.indexOf("1 more thing worth a look");
         expect(checks).toBeGreaterThan(-1);

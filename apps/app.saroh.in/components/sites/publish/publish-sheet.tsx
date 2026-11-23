@@ -208,7 +208,15 @@ export function PublishSheet({
                 )}
             >
                 <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2.5">
-                    <SheetTitle className="flex-1 font-sans text-base">
+                    {/* The phone board's big title (P2, `fix/WXNPublish`). */}
+                    <SheetTitle
+                        className={cn(
+                            "flex-1 font-sans",
+                            phone
+                                ? "text-[1.75rem] font-bold leading-tight"
+                                : "text-base",
+                        )}
+                    >
                         {title}
                     </SheetTitle>
                     <SheetClose asChild>
@@ -364,7 +372,9 @@ export function PublishSheet({
                         />
                     ) : (
                         <div className="grid gap-2">
-                            {more ? <MoreRow more={more} /> : null}
+                            {more ? (
+                                <MoreRow more={more} phone={phone} />
+                            ) : null}
                             <div
                                 className={cn(
                                     "flex gap-2",

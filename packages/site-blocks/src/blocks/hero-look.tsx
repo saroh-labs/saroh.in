@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { EditableText } from "../editable-text";
+import { withElement } from "../element-theme";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { LiveToday } from "../live/next-free";
@@ -150,6 +151,7 @@ export default function LookHero({
                         <p className={LINE[look]}>
                             <PhoneText
                                 text={content.subheading}
+                                field="subheading"
                                 phone={content.phoneLine}
                             />
                         </p>
@@ -209,14 +211,18 @@ export default function LookHero({
                     width={src.width}
                     height={src.height}
                     data-hero-photo=""
-                    {...siteImage(priority ? "first-hero" : "below", {
-                        src: src.src,
-                        width: src.width,
-                        placeholder: src.placeholder,
-                        widths: src.widths,
-                        sizes,
-                        focus: src.focus,
-                    })}
+                    {...withElement(
+                        "image",
+                        src,
+                        siteImage(priority ? "first-hero" : "below", {
+                            src: src.src,
+                            width: src.width,
+                            placeholder: src.placeholder,
+                            widths: src.widths,
+                            sizes,
+                            focus: src.focus,
+                        }),
+                    )}
                     className={cn(
                         "rounded-site-photo bg-site-surface block w-full object-cover",
                         aspect,
@@ -451,7 +457,7 @@ function QuietHero({
                 )}
             >
                 {photo(
-                    "aspect-[3/2] min-[700px]:aspect-video max-[699px]:rounded-none",
+                    "aspect-[3/2] min-[700px]:aspect-video max-[699px]:rounded-[var(--site-image-radius,0px)]",
                     "(min-width: 1280px) 1184px, 100vw",
                 )}
             </div>

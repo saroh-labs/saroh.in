@@ -54,11 +54,13 @@ export function hrefsOf(html: string): string[] {
     });
 }
 
-/** The ids of the service cards in the writing. */
+/** The ids of the service cards and Book now buttons in the writing. */
 function serviceCardsOf(html: string): string[] {
     return tagsOf(html, "div").flatMap((d) => {
         const id = d.get("data-id");
-        return d.get("data-embed") === "service" && id ? [id] : [];
+        const kind = d.get("data-embed");
+        // A Book now button (W2) names a service as a card does.
+        return (kind === "service" || kind === "book") && id ? [id] : [];
     });
 }
 

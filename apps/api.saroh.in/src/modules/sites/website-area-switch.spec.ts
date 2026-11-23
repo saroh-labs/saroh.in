@@ -18,6 +18,7 @@ import { GUARDS_METADATA } from "@nestjs/common/constants";
 
 import { env } from "../../env";
 import { PostsController } from "../content/posts.controller";
+import { StaffController } from "../staff/staff.controller";
 import { ChangeRevertController } from "./change-revert.controller";
 import { PageResultsController } from "./page-results.controller";
 import { ServiceUsesController } from "./service-uses.controller";
@@ -60,6 +61,8 @@ describe("the Website area switch (DEC-240)", () => {
                 SitesController.prototype,
                 ["changes", "approveChanges", "askForChanges", "duplicatePage"],
             ],
+            // "Show on Our team" (DEC-248).
+            [StaffController.prototype, ["setTeamPage"]],
             [
                 PostsController.prototype,
                 [

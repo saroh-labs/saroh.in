@@ -12,6 +12,7 @@ import { selectRailTab } from "../editor-rail";
 import { EditorSheet } from "../editor-sheet";
 import type { InspectorHost } from "../inspector-host";
 import type { EditorModel } from "../shell/editor-model";
+import { PreviewLabel } from "../shell/preview-label";
 import { ReviewerStrip } from "../shell/reviewer-strip";
 import { FirstHint } from "./first-hint";
 import { PageMenuSheet, PhonePageBar } from "./page-menu-sheet";
@@ -139,9 +140,18 @@ export function PhoneShell({ model, topBar, children }: PhoneShellProps) {
                 ref={setBody}
                 data-layout="phone"
                 data-phone-editor=""
-                className="relative grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]"
+                className="relative flex min-h-0 flex-1 flex-col"
             >
-                {canvas}
+                {/* Its own row above the page, so it never covers the
+                    "Button · This button" tag the canvas draws. */}
+                {selection.trial ? (
+                    <div className="pointer-events-none flex shrink-0 justify-center py-1.5">
+                        <PreviewLabel />
+                    </div>
+                ) : null}
+                <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]">
+                    {canvas}
+                </div>
             </div>
             {foot}
 
@@ -177,6 +187,7 @@ export function PhoneShell({ model, topBar, children }: PhoneShellProps) {
                 side="bottom"
                 title="Add"
                 closeLabel="Close Add"
+                className="h-[78%]"
             >
                 <AddPanel model={model} phone />
             </EditorSheet>

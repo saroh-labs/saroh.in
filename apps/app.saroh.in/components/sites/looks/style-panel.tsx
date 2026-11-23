@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
 import { SAVE_LINES } from "@/components/sites/shell/save-footer";
+import { mediaSrc } from "@/lib/media/media-src";
 import { colourName } from "@/lib/share-item/share";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
@@ -304,7 +305,18 @@ export function StylePanel({
             }}
         />
     );
-    const brandColour = <BrandColourButton style={style} onChange={onChange} />;
+    const logoUrl =
+        mediaSrc(siteIcon?.saved.businessLogoUrl) ??
+        mediaSrc(siteIcon?.saved.own?.url) ??
+        null;
+    const brandColour = (
+        <BrandColourButton
+            style={style}
+            onChange={onChange}
+            onTry={onTry}
+            logoUrl={logoUrl}
+        />
+    );
     const coloursNote = style.brandColour
         ? `from your ${colourName(style.brandColour).toLowerCase()}`
         : undefined;
@@ -447,6 +459,9 @@ export function StylePanel({
                             aria-expanded={editing}
                             aria-controls={rowsId}
                             data-edit-colours=""
+                            // A quiet underlined link (B5): 12px, the
+                            // smallest text the editor draws.
+                            className="text-xs font-normal underline underline-offset-2"
                             onClick={() => setEditing((on) => !on)}
                         >
                             {editing ? "Done" : "Edit each colour"}

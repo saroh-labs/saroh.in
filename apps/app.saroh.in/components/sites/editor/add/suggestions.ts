@@ -58,3 +58,10 @@ export function rememberRecent(type: SectionType): void {
         // A browser that keeps nothing simply has no Recent.
     }
 }
+
+/** "Bridal enquiry", or "Bridal enquiry, 1 more". */
+export function formLine(forms: { count: number; first: string }): string {
+    return forms.count > 1
+        ? `${forms.first}, ${forms.count - 1} more`
+        : forms.first;
+}

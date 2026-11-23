@@ -13,3 +13,17 @@ export const POST_EMBED_CARD = {
     /** The editor's stand-in where the live card has its picture. */
     tile: "grid size-12 shrink-0 place-items-center rounded-[var(--site-radius)] bg-site-fg/5 text-site-muted",
 } as const;
+
+/**
+ * The post body's own blocks (W2): a highlight box (`div[data-box=note]`),
+ * a gallery (`div[data-gallery]` of photos), a button (`p[data-button] > a`)
+ * and the contents list (`[data-contents]`). Classes on the body, not on the
+ * stored HTML, so the post stores only the shape the sanitizer keeps; the
+ * live page and the editor wear the same set.
+ */
+export const POST_BODY_BLOCKS = [
+    "[&_[data-box=note]]:my-6 [&_[data-box=note]]:rounded-[calc(var(--site-radius)*1.4)] [&_[data-box=note]]:border-l-4 [&_[data-box=note]]:border-site-accent [&_[data-box=note]]:bg-site-surface [&_[data-box=note]]:px-5 [&_[data-box=note]]:py-1",
+    "[&_[data-gallery]]:my-6 [&_[data-gallery]]:grid [&_[data-gallery]]:grid-cols-2 [&_[data-gallery]]:gap-2 sm:[&_[data-gallery]]:grid-cols-3 [&_[data-gallery]_img]:m-0 [&_[data-gallery]_img]:aspect-square [&_[data-gallery]_img]:w-full [&_[data-gallery]_img]:rounded-[var(--site-radius)] [&_[data-gallery]_img]:object-cover",
+    "[&_[data-button]]:my-6 [&_[data-button]>a]:inline-flex [&_[data-button]>a]:min-h-11 [&_[data-button]>a]:items-center [&_[data-button]>a]:rounded-[var(--site-radius)] [&_[data-button]>a]:bg-site-accent [&_[data-button]>a]:px-5 [&_[data-button]>a]:font-bold [&_[data-button]>a]:text-site-accent-fg [&_[data-button]>a]:no-underline [&_[data-button]>a:hover]:opacity-90",
+    "[&_[data-contents]]:my-6 [&_[data-contents]]:rounded-[calc(var(--site-radius)*1.4)] [&_[data-contents]]:border [&_[data-contents]]:border-site-border [&_[data-contents]]:p-4",
+].join(" ");

@@ -437,7 +437,10 @@ export async function copyStarterContent(
                     organizationId: ctx.organizationId,
                     path: create.path,
                     title: create.title,
-                    isHome: false,
+                    // A site with no pages yet (E1, `fix/WXKStates`): the
+                    // template's home page becomes its home.
+                    isHome:
+                        page?.isHome === true && !pages.some((p) => p.isHome),
                     settingsEditedByUserId: ctx.userId,
                     settingsEditedAt: stamp.lastEditedAt,
                     versions: {

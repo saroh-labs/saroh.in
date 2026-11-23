@@ -23,6 +23,16 @@ describe("checkPost", () => {
         ).toEqual([]);
     });
 
+    it("reads a Book now button and a post button like a card and a link (W2)", () => {
+        const flags = checkPost({
+            content:
+                '<div data-embed="book" data-id="s_old"></div><p data-button="link"><a href="/nowhere">Go</a></p>',
+            services: SERVICES,
+            paths: PATHS,
+        });
+        expect(flags.map((f) => f.type)).toEqual(["brokenLink", "serviceGone"]);
+    });
+
     it("flags a typed price, a dead link and a card for a gone service", () => {
         const flags = checkPost({
             content:

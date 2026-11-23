@@ -75,7 +75,7 @@ const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime"]);
 export function useImageUpload(
     options: {
         /** The library bucket; site images unless said. */
-        purpose?: "site-image" | "business-logo" | "ask-ai";
+        purpose?: "site-image" | "business-logo" | "staff-photo" | "ask-ai";
         /** What to say when storage cannot serve the upload. */
         unserved?: string;
         /**
@@ -186,7 +186,7 @@ export function useImageUpload(
      */
     async function sendPhoto(
         file: File,
-        purpose: "site-image" | "business-logo" | "ask-ai",
+        purpose: "site-image" | "business-logo" | "staff-photo" | "ask-ai",
         onProgress: (pct: number) => void,
     ): Promise<{
         mediaId: string;

@@ -116,6 +116,13 @@ const WRITTEN: {
         href: "/settings/integrations",
     },
     { type: "team.joined", kind: "team", id: null, href: "/settings/people" },
+    // Someone set your photo: Your profile, where you change it.
+    {
+        type: "staff.photo",
+        kind: "profile",
+        id: null,
+        href: "/settings/profile",
+    },
     // A booking rules request and its answer open Hours and time off on
     // the person (#1038); a row written before it named them, the page.
     {

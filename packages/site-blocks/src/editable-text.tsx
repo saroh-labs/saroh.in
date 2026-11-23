@@ -1,7 +1,13 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
-import { createContext, useContext, useLayoutEffect, useRef } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
+import {
+    createContext,
+    useContext,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from "react";
 
 /**
  * Typing on the page in the editor (U47d, `fix/WXKText`): what the editor
@@ -10,6 +16,16 @@ import { createContext, useContext, useLayoutEffect, useRef } from "react";
  */
 export interface EditableTextHost {
     onText: (field: string, text: string) => void;
+    /**
+     * The editor's floating bar over the words being typed in
+     * (`fix/WXKText`: "Paragraph · Done", the length). Drawn only while
+     * the words have the caret; `done` ends the typing.
+     */
+    bar?: (state: {
+        field: string;
+        text: string;
+        done: () => void;
+    }) => ReactNode;
 }
 
 /**
@@ -48,6 +64,8 @@ function EditableSpan({
     const ref = useRef<HTMLSpanElement>(null);
     // The words as they were when typing started, for Esc.
     const before = useRef<string | null>(null);
+    // The words while they have the caret, for the editor's bar; else null.
+    const [typing, setTyping] = useState<string | null>(null);
     /*
      * The words are set by hand, never as React children: React rewriting
      * a text node the owner is typing in would move the caret. Only while
@@ -76,17 +94,18 @@ function EditableSpan({
         }
     };
 
-    return (
+    const span = (
         <span
             ref={ref}
             data-edit-field={field}
             contentEditable="plaintext-only"
             suppressContentEditableWarning
             role="textbox"
-            aria-label={`${field === "intro" ? "Intro" : "Heading"}, type to change it`}
+            aria-label={`${FIELD_NAMES[field] ?? "Heading"}, type to change it`}
             spellCheck
             onFocus={(e) => {
                 before.current = e.currentTarget.textContent;
+                setTyping(e.currentTarget.textContent);
             }}
             onBlur={(e) => {
                 // Emptied here, the words come back: a block draws no
@@ -98,9 +117,11 @@ function EditableSpan({
                     host.onText(field, before.current);
                 }
                 before.current = null;
+                setTyping(null);
             }}
             onInput={(e) => {
                 const words = e.currentTarget.textContent;
+                setTyping(words);
                 if (words.trim()) host.onText(field, words);
             }}
             onKeyDown={onKeyDown}
@@ -115,9 +136,73 @@ function EditableSpan({
                 range.insertNode(doc.createTextNode(words));
                 range.collapse(false);
                 const now = e.currentTarget.textContent;
+                setTyping(now);
                 if (now.trim()) host.onText(field, now);
             }}
-            className="cursor-text rounded-[2px] outline-none focus:bg-[hsl(var(--site-fg)/0.06)] focus:shadow-[0_0_0_2px_hsl(var(--site-fg)/0.35)]"
+            // With the editor's bar the wrapper draws the outline below.
+            className={
+                host.bar
+                    ? "cursor-text outline-none"
+                    : "cursor-text rounded-[2px] outline-none focus:bg-[hsl(var(--site-fg)/0.06)] focus:shadow-[0_0_0_2px_hsl(var(--site-fg)/0.35)]"
+            }
         />
     );
+    if (!host.bar) return span;
+    // Done in the editor's bar: the typing ends as Enter ends it.
+    function finish() {
+        ref.current?.blur();
+    }
+    return (
+        <span
+            // While typing, one 1.5px outline round the whole field, not a
+            // box per line (D1, `fix/WXKText`).
+            className={
+                typing !== null
+                    ? // Room under the words for the bar while typing, so it
+                      // never lies over what follows, such as a button
+                      // (EBSite D1 · 1, round 3).
+                      "relative mb-11 inline-block rounded-[6px] outline outline-[1.5px] outline-offset-4 outline-[hsl(var(--site-fg))]"
+                    : "relative"
+            }
+        >
+            {span}
+            {typing !== null ? (
+                <span
+                    contentEditable={false}
+                    // A press on the bar keeps the caret in the words.
+                    onMouseDown={(e) => e.preventDefault()}
+                    // Under the words' last line, never over the heading
+                    // above them (D1, `fix/WXKText`).
+                    className="absolute left-0 top-full z-30 mt-2 block whitespace-nowrap text-left"
+                >
+                    <BarSlot
+                        bar={host.bar}
+                        field={field}
+                        text={typing}
+                        done={finish}
+                    />
+                </span>
+            ) : null}
+        </span>
+    );
 }
+
+/** The editor's bar, drawn as a component so `done` is a handler. */
+function BarSlot({
+    bar,
+    ...state
+}: {
+    bar: NonNullable<EditableTextHost["bar"]>;
+    field: string;
+    text: string;
+    done: () => void;
+}) {
+    return bar(state);
+}
+
+/** What each marked field is called, for its typing box's name. */
+const FIELD_NAMES: Record<string, string> = {
+    heading: "Heading",
+    intro: "Intro",
+    subheading: "Line under the heading",
+};
