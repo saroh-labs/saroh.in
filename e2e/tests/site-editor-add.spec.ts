@@ -89,4 +89,71 @@ test.describe("Rail › Add at 1920", () => {
             await page.getByRole("button", { name: "Back to Add" }).click();
         }
     });
+
+    test("round 2: page types, the link said as typed, categories and the Book switch", async ({
+        page,
+    }) => {
+        test.skip(
+            !(await openEditor(page)),
+            "The Website area is off: today's chrome",
+        );
+        await page
+            .locator("[data-editor-trail]")
+            .getByRole("button", { name: /^Add/ })
+            .click();
+        const panel = page.locator("[data-add-panel=desk]");
+        await expect(panel).toBeVisible();
+
+        // Each group says how many it holds (A2).
+        await expect(
+            panel.locator(
+                'section[aria-label="From your business"] [data-group-count]',
+            ),
+        ).toBeVisible();
+
+        // Add a page offers the new page types, each with what it starts with (A7).
+        await panel.getByRole("button", { name: "Blank page" }).click();
+        const sheet = page.getByRole("dialog", { name: "Add a page" });
+        await sheet.getByRole("radio", { name: /^A template page/ }).click();
+        await sheet.getByText("Our team", { exact: true }).click();
+        // Choosing it opens Add people first (ER3Team T4) when the business
+        // has a team to pick from; Cancel goes back. A business with nobody
+        // to pick goes straight on.
+        const picker = page.getByRole("dialog", {
+            name: "Add people to Our team",
+        });
+        const starts = sheet.locator("[data-page-type-starts=TEAM]");
+        await expect(picker.or(starts).first()).toBeVisible();
+        if (await picker.isVisible()) {
+            await picker.getByRole("button", { name: "Cancel" }).click();
+        }
+        await expect(
+            sheet.locator("[data-page-type-starts=TEAM]"),
+        ).toContainText("Starts with, filled from your business");
+        // The link is said free or taken as it is typed (A8).
+        await sheet.getByRole("textbox").first().fill("Our team");
+        await expect(sheet.locator("[data-link-free]")).toBeVisible();
+        await sheet.getByRole("button", { name: "Cancel" }).click();
+        await expect(sheet).toHaveCount(0);
+
+        // The library files sections under categories, each counted (A2).
+        await panel
+            .getByRole("button", { name: /^Browse all \d+ sections/ })
+            .click();
+        const library = page.getByRole("dialog", { name: "New section" });
+        await expect(
+            library.locator("[data-library-category='Top and about']"),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
+
+        // The service picker says each one's time and price, and offers
+        // Show a Book button (A5). Back adds nothing.
+        const service = panel.getByRole("button", { name: "Add A service" });
+        if ((await service.count()) > 0) {
+            await service.click();
+            const picker = page.getByRole("region", { name: "Add a service" });
+            await expect(picker).toContainText("Show a Book button");
+            await page.getByRole("button", { name: "Back to Add" }).click();
+        }
+    });
 });

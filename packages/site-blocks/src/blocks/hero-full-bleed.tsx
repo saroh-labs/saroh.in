@@ -143,6 +143,7 @@ export default function FullBleedHero({
                         <p className="mt-4 max-w-[46ch] text-pretty text-base leading-[1.55] opacity-90 sm:text-lg">
                             <PhoneText
                                 text={content.subheading}
+                                field="subheading"
                                 phone={content.phoneLine}
                             />
                         </p>

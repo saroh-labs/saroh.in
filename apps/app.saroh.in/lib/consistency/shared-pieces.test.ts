@@ -79,6 +79,10 @@ describe("one of each small piece", () => {
                 "the bulk bar's ten-second hold, a floating toolbar with Undo and Send now",
             "components/invoices/list/source-filter.tsx":
                 "the chip that says a list is narrowed to one pack or course",
+            "components/sites/editor/inspector/everywhere-banner.tsx":
+                "an ink bar over the canvas that says what the header edit reaches, with two ways out: not a notice",
+            "components/sites/editor/shell/preview-label.tsx":
+                "the 'Preview only' chip over the canvas: an ink pill, not a notice",
             "components/sites/editor/phone/first-hint.tsx":
                 "the phone editor's once-only coach line over the bar, inverted, with Got it: a hint, not a notice",
             "components/sites/settings/publish-bar.tsx":
@@ -104,6 +108,8 @@ describe("one of each small piece", () => {
                 "the GSTIN field: a registration number is capitals",
             "components/organizations/setup/setup-billing-step.tsx":
                 "a new billing profile's GSTIN field: a registration number is capitals",
+            "components/sites/editor/inspector/button-colour-picker.tsx":
+                "the custom colour's hex field: a colour code is typed and kept in capitals",
             "components/sites/looks/brand-colour-sheet.tsx":
                 "the brand colour's hex field: a colour code is typed and kept in capitals",
             "components/settings/plan-billing/invoice-details.tsx":

@@ -19,19 +19,26 @@ vi.mock("next/navigation", () => ({
 
 // The rich text editor is browser-heavy; a textarea stands in for it. Like
 // Tiptap (setEditable emits an update), it re-reports its value on mount.
+// `dyn.arriving`: the editor's code is still on its way (its `loading`).
+const dyn = vi.hoisted(() => ({ arriving: false }));
 vi.mock("next/dynamic", async () => {
     const { useEffect } = await import("react");
     return {
-        default: () =>
+        default: (_load: unknown, opts?: { loading?: () => React.ReactNode }) =>
             function Stand({
                 value,
                 onChange,
+                readOnly,
             }: {
                 value: string;
                 onChange: (v: string) => void;
+                readOnly?: boolean;
             }) {
                 // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
                 useEffect(() => onChange(value), []);
+                if (dyn.arriving && opts?.loading) return opts.loading();
+                // A reader's styled post (R3): nothing to type in.
+                if (readOnly) return <div data-styled-post="" />;
                 return (
                     <textarea
                         aria-label="Post body"
@@ -61,6 +68,7 @@ vi.mock("@/components/shared/fields/media-picker", () => ({
 }));
 vi.mock("@/components/shared/share-item/share-item-sheet", () => ({
     ShareItemButton: () => <button type="button">Share</button>,
+    ShareItemSheet: () => null,
 }));
 vi.mock("@/lib/sites/actions", () => ({
     createComment: vi.fn(),
@@ -289,7 +297,7 @@ describe("the desk post editor (U15)", () => {
             "Undo",
             "Redo",
             "Preview",
-            "More: save now, more formatting, take off the site, delete",
+            "More: share, find, save now, more formatting, take off the site, delete",
         ]) {
             expect(named(name), name).toBeDefined();
         }
@@ -305,7 +313,11 @@ describe("the desk post editor (U15)", () => {
     it("a changed page link says the old one forwards on publish", () => {
         act(() => root.render(<PostShell data={data()} post={post} />));
         act(() => named("Search and sharing")?.click());
-        act(() => named("Change search and sharing")?.click());
+        // W8: changed in place, with the previews; no "Change" button first.
+        expect(named("Change search and sharing")).toBeUndefined();
+        expect(document.body.textContent).toContain(
+            "when someone shares the link",
+        );
         expect(document.body.textContent).toContain(
             "Changed from /blog/bridal-makeup-trial. When you publish the post, the old link forwards here.",
         );
@@ -383,7 +395,7 @@ describe("the desk post editor for a reader (DEC-200 U8)", () => {
 });
 
 describe("postTrailTabs", () => {
-    it("is Posts · Add · History · Feedback (Ask AI is the right column's tab), a reader's Posts · Feedback", () => {
+    it("is Post · Add · History · Feedback (Ask AI is the right column’s tab; Post names the In this post panel, ER3Post P2), a reader’s Post · Feedback", () => {
         const keys = (o: Parameters<typeof postTrailTabs>[0]) =>
             postTrailTabs(o).map((t) => t.label);
         expect(
@@ -393,7 +405,7 @@ describe("postTrailTabs", () => {
                 openNotes: 2,
                 feedback: true,
             }),
-        ).toEqual(["Posts", "Add", "History", "Feedback"]);
+        ).toEqual(["Post", "Add", "History", "Feedback"]);
         expect(
             keys({
                 readOnly: true,
@@ -401,7 +413,7 @@ describe("postTrailTabs", () => {
                 openNotes: 0,
                 feedback: true,
             }),
-        ).toEqual(["Posts", "Feedback"]);
+        ).toEqual(["Post", "Feedback"]);
     });
 });
 
@@ -414,11 +426,11 @@ describe("postTrailTabs", () => {
 describe("the post capability table, row by row (U51)", () => {
     const menuItems = () =>
         Array.from(document.querySelectorAll("[role=menuitem]")).map((m) =>
-            m.textContent.replace("⌘S", "").trim(),
+            m.textContent.replace(/⌘[SK]/, "").trim(),
         );
     function openMore() {
         const trigger = named(
-            "More: save now, more formatting, take off the site, delete",
+            "More: share, find, save now, more formatting, take off the site, delete",
         );
         if (!trigger) throw new Error("No More");
         act(() => {
@@ -450,10 +462,11 @@ describe("the post capability table, row by row (U51)", () => {
         expect(named("Publish post")).toBeDefined();
     });
 
-    it("More: Save now, More formatting, Take off the site and Delete", () => {
+    it("More: Find, Save now, More formatting, Take off the site and Delete", () => {
         act(() => root.render(<PostShell data={data()} post={post} />));
         openMore();
         expect(menuItems()).toEqual([
+            "Find",
             "Save now",
             "More formatting",
             "Take off the site…",
@@ -516,6 +529,8 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         const list = el("[data-left-panel]");
         const right = column();
         expect(bar.textContent).toContain("Bridal trial");
+        // 264px, as EBPostLeftPanel draws it (ER3Post P3).
+        expect(list.className).toContain("w-[264px]");
 
         // Another post asked for: the segment's loader stands in its place.
         draw(loader);
@@ -540,7 +555,7 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         expect(el('nav[aria-label="Editor panels"]')).toBe(rail);
         expect(el("[data-left-panel]")).toBe(list);
         expect(column()).toBe(right);
-        expect(list.textContent).toContain("Monsoon hair");
+        expect(list.textContent).toContain("In this post");
         const shapes = Array.from(
             document.querySelectorAll<HTMLElement>("[data-slot=page-loading]"),
         ).map((n) => n.dataset.shape);
@@ -555,6 +570,33 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         expect(document.querySelector("[data-slot=page-loading]")).toBeNull();
     });
 
+    it("switches posts only from the top picker, each row with its state (EBPostLeftPanel)", () => {
+        draw(<PostShell key="p1" data={listed} post={post} />);
+        const panel = el('aside[aria-label="In this post"]');
+        // The panel is this post only: its outline, no list of posts.
+        expect(panel.querySelector('a[href*="/write/"]')).toBeNull();
+        expect(panel.textContent).not.toContain("Monsoon hair");
+        expect(
+            panel.querySelector('[aria-label="Outline of this post"]'),
+        ).not.toBeNull();
+
+        act(() => named("Blog post: Bridal trial. Open another post")?.click());
+        const rows = Array.from(
+            document.querySelectorAll<HTMLAnchorElement>(
+                'nav[aria-label="Posts"] a',
+            ),
+        ).map((a) => a.textContent);
+        expect(rows).toEqual([
+            "Bridal trialLive",
+            "Monsoon hairLive",
+            "New post",
+            "All posts2",
+        ]);
+        expect(
+            el('nav[aria-label="Posts"] a[aria-current="page"]').textContent,
+        ).toContain("Bridal trial");
+    });
+
     it("keeps the rail's tab across posts", () => {
         draw(<PostShell key="p1" data={listed} post={post} />);
         act(() => named("Add")?.click());
@@ -562,5 +604,28 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         draw(loader);
         draw(<PostShell key="p2" data={listed} post={other} />);
         expect(el("[data-left-panel]").dataset.leftPanel).toBe("add");
+    });
+});
+
+describe("opening a post (W7)", () => {
+    afterEach(() => {
+        dyn.arriving = false;
+    });
+
+    it("keeps the whole post a skeleton, and Publish grey, until the editor is here", () => {
+        dyn.arriving = true;
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        expect(document.querySelector("[data-post-opening]")?.textContent).toBe(
+            "Opening the post…",
+        );
+        const publish = Array.from(document.querySelectorAll("button")).find(
+            (b) => b.textContent === "Publish post",
+        );
+        expect(publish?.disabled).toBe(true);
+        expect(
+            document
+                .querySelector("[data-writing-surface]")
+                ?.closest("[aria-hidden]"),
+        ).not.toBeNull();
     });
 });

@@ -56,6 +56,10 @@ test("Publish post: now, Tell people, then later; History shows the live copy", 
             "Goes live now, on its own. Site changes waiting stay waiting.",
         );
         await expect(sheet).toContainText("Short description is set");
+        // Y2: who to tell is asked before it goes.
+        await expect(sheet.locator("[data-tell-once-live]")).toContainText(
+            "Tell people once it is live",
+        );
         await expect(
             sheet.getByRole("button", { name: "Leave out" }),
         ).toHaveCount(0);

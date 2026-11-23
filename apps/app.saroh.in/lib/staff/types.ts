@@ -35,11 +35,19 @@ export interface StaffView {
     name: string;
     title: string | null;
     status: "ACTIVE" | "ARCHIVED";
+    /** Picked for Our team by an owner or admin; absent from an older API. */
+    showOnTeamPage?: boolean;
+    /** Their own photo, or null for initials; absent from an older API. */
+    photo?: { id: string; url: string } | null;
+    /** A few words in their own voice; absent from an older API. */
+    about?: string | null;
     membership: {
         id: string;
         userId: string;
         name: string | null;
         email: string;
+        /** Their role's key; absent from an older API. */
+        role?: string;
     } | null;
     serviceIds: string[];
     hours: WeeklyRange[];

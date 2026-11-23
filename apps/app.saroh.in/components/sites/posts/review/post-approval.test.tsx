@@ -73,6 +73,7 @@ vi.mock("@/components/shared/fields/media-picker", () => ({
 }));
 vi.mock("@/components/shared/share-item/share-item-sheet", () => ({
     ShareItemButton: () => <button type="button">Share</button>,
+    ShareItemSheet: () => null,
 }));
 vi.mock("@/lib/sites/actions", () => ({
     createComment: (...a: unknown[]) => createComment(...a),

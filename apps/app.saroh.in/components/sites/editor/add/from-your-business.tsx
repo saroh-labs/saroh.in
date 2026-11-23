@@ -6,12 +6,20 @@ import { Label } from "@saroh/ui/label";
 import { ListSearch } from "@saroh/ui/list-search";
 import { Notice } from "@saroh/ui/notice";
 import { Segmented } from "@saroh/ui/segmented";
+import { Switch } from "@saroh/ui/switch";
 import { ArrowLeft } from "lucide-react";
 import { useId, useState } from "react";
+
+import { count } from "@/lib/format/plural";
+import { servicePriceWords } from "@/lib/services/price-words";
 
 export interface PickerService {
     id: string;
     name: string;
+    /** Time and price, as Services has them (A5); absent: not said. */
+    durationMinutes?: number | null;
+    priceCents?: number | null;
+    currency?: string | null;
 }
 
 /** "Show as": the services section's looks, in the board's words. */
@@ -41,13 +49,15 @@ export function ServicesPicker({
     /** The section it goes in below, or null: at the end of the page. */
     below: string | null;
     onBack: () => void;
-    onAdd: (serviceIds: string[], showAs: ShowAs) => void;
+    onAdd: (serviceIds: string[], showAs: ShowAs, showBook: boolean) => void;
 }) {
     const [query, setQuery] = useState("");
     const [picked, setPicked] = useState<string[]>([]);
     const [showAs, setShowAs] = useState<ShowAs>("cards");
     const [tried, setTried] = useState(false);
+    const [showBook, setShowBook] = useState(true);
     const listId = useId();
+    const bookId = useId();
     const q = query.trim().toLowerCase();
     const shown = services.filter((s) => s.name.toLowerCase().includes(q));
     const toggle = (id: string, on: boolean) =>
@@ -79,33 +89,67 @@ export function ServicesPicker({
             </div>
 
             <div className="grid gap-2">
-                <h4 id={listId} className="label">
-                    Which services · From Services
+                {/* "Which services" and where they come from as a chip (A5). */}
+                <h4
+                    id={listId}
+                    className="flex items-center gap-2 text-sm font-semibold"
+                >
+                    Which services
+                    <span className="rounded-full border border-dashed px-2 py-px text-xs font-normal text-muted-foreground">
+                        <span className="sr-only">{" · "}</span>From Services
+                    </span>
                 </h4>
                 <ListSearch
                     placeholder={`Search ${services.length} services`}
                     onSearch={setQuery}
                     shortcut={false}
                 />
-                <ul aria-labelledby={listId} className="grid gap-1">
+                <ul
+                    aria-labelledby={listId}
+                    className="divide-y overflow-hidden rounded-lg border bg-card"
+                >
                     {shown.map((s) => {
                         const on = picked.includes(s.id);
                         return (
                             <li key={s.id}>
                                 <Label
                                     data-ph-mask=""
-                                    className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[0.8125rem] hover:bg-muted coarse:min-h-11"
+                                    className="flex min-h-11 cursor-pointer items-center gap-2.5 px-3 py-1.5 text-[0.8125rem] hover:bg-muted"
                                 >
                                     <Checkbox
+                                        className="size-4"
                                         checked={on}
                                         disabled={!on && picked.length >= MOST}
                                         onCheckedChange={(v) =>
                                             toggle(s.id, v === true)
                                         }
                                     />
-                                    <span className="min-w-0 flex-1 truncate">
-                                        {s.name}
+                                    {/* The time under the name (A5). */}
+                                    <span className="grid min-w-0 flex-1">
+                                        <span className="truncate">
+                                            {s.name}
+                                        </span>
+                                        {s.durationMinutes ? (
+                                            <span className="text-xs text-muted-foreground">
+                                                {count(
+                                                    s.durationMinutes,
+                                                    "min",
+                                                    "min",
+                                                )}
+                                            </span>
+                                        ) : null}
                                     </span>
+                                    {s.priceCents !== undefined ? (
+                                        <span
+                                            className="w-16 shrink-0 text-right text-xs tabular-nums"
+                                            data-picker-price={s.id}
+                                        >
+                                            {servicePriceWords(
+                                                s.priceCents,
+                                                s.currency,
+                                            )}
+                                        </span>
+                                    ) : null}
                                 </Label>
                             </li>
                         );
@@ -123,8 +167,21 @@ export function ServicesPicker({
                 value={showAs}
                 onValueChange={setShowAs}
                 size="sm"
-                block
             />
+
+            <div className="flex items-start justify-between gap-3">
+                <span className="grid gap-0.5">
+                    <Label htmlFor={bookId}>Show a Book button</Label>
+                    <span className="text-xs text-muted-foreground">
+                        Opens a time to book each one
+                    </span>
+                </span>
+                <Switch
+                    id={bookId}
+                    checked={showBook}
+                    onCheckedChange={setShowBook}
+                />
+            </div>
 
             {tried && picked.length === 0 ? (
                 <Notice tone="error">Pick at least one service.</Notice>
@@ -135,7 +192,7 @@ export function ServicesPicker({
                     type="button"
                     onClick={() => {
                         setTried(true);
-                        if (picked.length > 0) onAdd(picked, showAs);
+                        if (picked.length > 0) onAdd(picked, showAs, showBook);
                     }}
                 >
                     Add to the page

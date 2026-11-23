@@ -3,12 +3,14 @@
 import { Button } from "@saroh/ui/button";
 import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { cn } from "@saroh/ui/lib/utils";
+import { Popover, PopoverAnchor, PopoverContent } from "@saroh/ui/popover";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Droplet } from "lucide-react";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { useId, useState, useTransition } from "react";
 
+import { useEditorLayout } from "@/components/sites/editor/use-editor-layout";
 import { SiteIconImage } from "@/components/sites/site-icon/site-icon-summary";
 import { runAction } from "@/lib/api/run-action";
 import { colourName } from "@/lib/share-item/share";
@@ -19,7 +21,7 @@ import type {
     SiteStyleOptions,
     StyleColourway,
 } from "@/lib/sites/style";
-import { BrandColourSheet } from "./brand-colour-sheet";
+import { BrandColourPopoverBody, BrandColourSheet } from "./brand-colour-sheet";
 
 // Loaded when Change is first pressed: the sheet brings the media library.
 const SiteIconSheet = dynamic(() =>
@@ -158,28 +160,65 @@ function Chips({ hsls }: { hsls: string[] }) {
 export function BrandColourButton({
     style,
     onChange,
+    onTry,
+    logoUrl,
 }: {
     style: SiteStyle;
     onChange: (next: SiteStyle) => void;
+    /** Each colour is tried on the page behind the sheet (B4). */
+    onTry?: (next: SiteStyle | null) => void;
+    /** The logo "From your logo" reads (B3). */
+    logoUrl?: string | null;
 }) {
     const [open, setOpen] = useState(false);
     // Each opening starts from what the site has.
     const [opened, setOpened] = useState(0);
+    // A wide desk: a popover beside the Brand panel, the page in full view
+    // (B3, `WXBBrandColour`); narrower, the sheet.
+    const wide = useEditorLayout() === "wide";
+    const trigger = (
+        <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-start"
+            data-brand-colour-open=""
+            onClick={() => {
+                setOpened((n) => n + 1);
+                setOpen(true);
+            }}
+        >
+            <Droplet aria-hidden />
+            Colours from my brand colour
+        </Button>
+    );
+    if (wide) {
+        return (
+            <Popover open={open} onOpenChange={setOpen}>
+                <PopoverAnchor asChild>{trigger}</PopoverAnchor>
+                <PopoverContent
+                    side="right"
+                    align="start"
+                    sideOffset={16}
+                    collisionPadding={12}
+                    className="flex max-h-[var(--radix-popover-content-available-height)] w-[360px] flex-col overflow-hidden p-0"
+                >
+                    {open ? (
+                        <BrandColourPopoverBody
+                            key={opened}
+                            style={style}
+                            onClose={() => setOpen(false)}
+                            onUse={onChange}
+                            onTry={onTry}
+                            logoUrl={logoUrl}
+                        />
+                    ) : null}
+                </PopoverContent>
+            </Popover>
+        );
+    }
     return (
         <>
-            <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-start"
-                data-brand-colour-open=""
-                onClick={() => {
-                    setOpened((n) => n + 1);
-                    setOpen(true);
-                }}
-            >
-                <Droplet aria-hidden />
-                Colours from my brand colour
-            </Button>
+            {trigger}
             {opened > 0 ? (
                 <BrandColourSheet
                     key={opened}
@@ -187,6 +226,8 @@ export function BrandColourButton({
                     style={style}
                     onClose={() => setOpen(false)}
                     onUse={onChange}
+                    onTry={onTry}
+                    logoUrl={logoUrl}
                 />
             ) : null}
         </>

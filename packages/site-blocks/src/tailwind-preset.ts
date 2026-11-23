@@ -52,6 +52,8 @@ export const siteColors = {
      */
     "accent-text": "hsl(var(--site-accent-text, var(--site-accent)))",
     "accent-soft": "hsl(var(--site-accent-soft, var(--site-surface)))",
+    /* Brand tint: a soft wash of the brand colour for a highlighted band. */
+    tint: "hsl(var(--site-tint, var(--site-surface)))",
     rule: "hsl(var(--site-rule, var(--site-border)))",
     "footer-muted": "hsl(var(--site-footer-muted, var(--site-footer-fg)))",
 } as const;

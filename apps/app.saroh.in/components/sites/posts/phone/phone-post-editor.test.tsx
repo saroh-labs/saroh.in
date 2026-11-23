@@ -24,10 +24,25 @@ vi.mock("next/dynamic", () => ({
         function Stand({
             value,
             onChange,
+            readOnly,
         }: {
             value: string;
             onChange: (v: string) => void;
+            readOnly?: boolean;
         }) {
+            // A reader's styled post (R2): its paragraphs, nothing to type in.
+            if (readOnly)
+                return (
+                    <div className="ProseMirror">
+                        {value
+                            .split("</p>")
+                            .map((t) => t.replace(/<[^>]*>/g, " ").trim())
+                            .filter(Boolean)
+                            .map((t) => (
+                                <p key={t}>{t}</p>
+                            ))}
+                    </div>
+                );
             return (
                 <textarea
                     aria-label="Post body"
@@ -56,6 +71,7 @@ vi.mock("@/components/shared/fields/media-picker", () => ({
 }));
 vi.mock("@/components/shared/share-item/share-item-sheet", () => ({
     ShareItemButton: () => <button type="button">Share</button>,
+    ShareItemSheet: () => null,
 }));
 vi.mock("@/lib/sites/actions", () => ({
     createComment: vi.fn(),
@@ -336,6 +352,37 @@ describe("the phone post editor (U16)", () => {
         );
         expect(named("Keep post")).toBeTruthy();
         expect(named("Delete post")).toBeTruthy();
+    });
+
+    it("a reader gives feedback on one paragraph, pinned to its words (R2)", async () => {
+        act(() =>
+            root.render(
+                <PostShell
+                    data={data({
+                        readOnly: true,
+                        feedback: {
+                            comments: [],
+                            canComment: true,
+                            canSettle: false,
+                        },
+                    })}
+                    post={post}
+                />,
+            ),
+        );
+        // In the site's look, as on the desk; a tap on a paragraph asks.
+        expect(
+            document
+                .querySelector("[data-post-review]")
+                ?.getAttribute("data-post-review"),
+        ).toBe("styled");
+        const paragraph = document.querySelector<HTMLElement>(
+            "[data-paragraph-feedback] .ProseMirror > p",
+        );
+        if (!paragraph) throw new Error("no paragraph");
+        await settle(() => paragraph.click());
+        expect(text()).toContain("Feedback on this paragraph");
+        expect(document.querySelector("[data-note-quote]")).not.toBeNull();
     });
 
     it("a reader changes nothing: no Publish, no writing tools, no Delete", async () => {

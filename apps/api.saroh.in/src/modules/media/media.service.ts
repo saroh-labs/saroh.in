@@ -312,6 +312,11 @@ export class MediaService {
         }));
     }
 
+    /** A library object's public address, or null when storage can't serve it. */
+    urlOf(media: { key: string; bucket: MediaBucket }): string | null {
+        return this.publicUrlFor(media);
+    }
+
     /**
      * The stable public URL for a key, or null when storage cannot serve it.
      *

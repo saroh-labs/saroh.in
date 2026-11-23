@@ -9,7 +9,12 @@ import { ValidationPipe } from "@nestjs/common";
 
 import { validationPipeOptions } from "../../common/validation";
 import { PERSON_FREE_CANCEL_REFUSAL } from "../bookings/person-rules";
-import { UpdateBookingRulesDto, UpdatePersonRulesDto } from "./dto";
+import {
+    STAFF_ABOUT_MAX,
+    UpdateBookingRulesDto,
+    UpdatePersonRulesDto,
+    UpdateStaffProfileDto,
+} from "./dto";
 
 const pipe = new ValidationPipe(validationPipeOptions);
 const refusal = async (metatype: new () => object, body: unknown) =>
@@ -49,5 +54,34 @@ describe("a person's own booking rules", () => {
         expect(
             await refusal(UpdateBookingRulesDto, { freeCancelHours: 24 }),
         ).toBeNull();
+    });
+});
+
+describe("a person's photo and About them", () => {
+    it("takes a photo id, a few words, or null to clear either", async () => {
+        expect(await refusal(UpdateStaffProfileDto, {})).toBeNull();
+        expect(
+            await refusal(UpdateStaffProfileDto, {
+                photoMediaId: "m1",
+                about: "Ten years on the dock.",
+            }),
+        ).toBeNull();
+        expect(
+            await refusal(UpdateStaffProfileDto, {
+                photoMediaId: null,
+                about: null,
+            }),
+        ).toBeNull();
+    });
+
+    it("refuses words past the limit and a photo that is not an id", async () => {
+        expect(
+            await refusal(UpdateStaffProfileDto, {
+                about: "x".repeat(STAFF_ABOUT_MAX + 1),
+            }),
+        ).not.toBeNull();
+        expect(
+            await refusal(UpdateStaffProfileDto, { photoMediaId: 5 }),
+        ).not.toBeNull();
     });
 });

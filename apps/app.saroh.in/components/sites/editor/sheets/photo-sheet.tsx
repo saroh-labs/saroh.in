@@ -7,9 +7,10 @@ import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListSearch } from "@saroh/ui/list-search";
+import { Notice } from "@saroh/ui/notice";
 import { Segmented } from "@saroh/ui/segmented";
 import { Textarea } from "@saroh/ui/textarea";
-import { Check, Upload } from "lucide-react";
+import { Check, ImageOff, Upload } from "lucide-react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -19,9 +20,9 @@ import {
     pickedSizes,
     uploadWords,
 } from "@/components/shared/fields/picked-image";
-import { Refusal } from "@/components/shared/states/refusal";
 import { DESCRIBE_MAX } from "@/components/sites/publish/describe-photo-dialog";
 import { SAVE_LINES } from "@/components/sites/shell/save-footer";
+import { isRoleRefusal } from "@/lib/api/role-denied";
 import { listLibrary } from "@/lib/media/actions";
 import type { LibraryItem } from "@/lib/media/service";
 
@@ -80,6 +81,11 @@ export function sizeLine(width?: number, height?: number): string {
               ? "Medium, sharp on a phone and most screens"
               : "Small, may look soft on a wide screen";
     return `${width} × ${height} · ${size}`;
+}
+
+/** The API's refusal is about the file's size (its words name a limit). */
+export function tooBig(error: string): boolean {
+    return /\b\d+\s?MB\b|too (big|large)/i.test(error);
 }
 
 /** The file's own name from its address, for a photo the library didn't name. */
@@ -168,6 +174,8 @@ function PhotoDraft({
     );
     const [attempt, setAttempt] = useState(0);
     const [file, setFile] = useState("");
+    // The refusal Cancel put away; a new file brings refusals back.
+    const [dismissed, setDismissed] = useState<string | null>(null);
     const input = useRef<HTMLInputElement>(null);
     const ids = useId();
     const { upload, busy, preparing, progress, error } = useImageUpload();
@@ -192,6 +200,7 @@ function PhotoDraft({
 
     async function onFile(picked: File) {
         setFile(picked.name);
+        setDismissed(null);
         const img: PickedImage | null = await upload(picked);
         if (input.current) input.current.value = "";
         if (!img) return;
@@ -262,8 +271,46 @@ function PhotoDraft({
                             Upload
                         </Button>
                     </div>
-                    {/* The file's name, then why (the limit is the API's). */}
-                    <Refusal>{error ? `${file}: ${error}` : null}</Refusal>
+                    {error && dismissed !== error ? (
+                        // One notice: the file's name in bold, why (the limit
+                        // is the API's), the easy way round it; then the two
+                        // ways on under a line (D7, `fix/WXKStates`).
+                        <div className="grid gap-3">
+                            <Notice
+                                // A refusal by role stays quiet, as `Refusal` says.
+                                tone={
+                                    isRoleRefusal(error) ? "neutral" : "error"
+                                }
+                                icon={<ImageOff />}
+                            >
+                                <p>
+                                    <b className="font-semibold">{file}</b>:{" "}
+                                    {error}
+                                </p>
+                                {tooBig(error) ? (
+                                    <p className="mt-1 text-xs">
+                                        Share it from your phone&apos;s gallery,
+                                        which makes it smaller, or pick another.
+                                    </p>
+                                ) : null}
+                            </Notice>
+                            <div className="flex flex-wrap gap-2 border-t pt-3">
+                                <Button
+                                    type="button"
+                                    onClick={() => input.current?.click()}
+                                >
+                                    Choose another photo
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setDismissed(error)}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
                     {library === "loading" ? (
                         <LoadingState rows={2} label="Loading your photos" />
                     ) : library === null ? (

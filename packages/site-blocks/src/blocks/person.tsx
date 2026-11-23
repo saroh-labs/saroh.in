@@ -1,10 +1,11 @@
 import type { LookId, RenderedPerson } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
+import { withElement } from "../element-theme";
 import { siteImage } from "../lib/site-image";
 import type { LookProps } from "../look-context";
 import { CtaButton } from "./cta";
-import { FrontCta } from "./look-front";
+import { FrontCta, initialsOf } from "./look-front";
 import { InitialsPlate } from "./no-photo";
 import LookTeam from "./person-look";
 
@@ -113,13 +114,17 @@ export default function PersonSection({
                         alt={content.image?.alt ?? ""}
                         width={content.image?.width}
                         height={content.image?.height}
-                        {...siteImage("below", {
-                            src,
-                            width: content.image?.width,
-                            placeholder: content.image?.placeholder,
-                            widths: content.image?.widths,
-                            sizes: "(min-width: 640px) 384px, 100vw",
-                        })}
+                        {...withElement(
+                            "image",
+                            content.image,
+                            siteImage("below", {
+                                src,
+                                width: content.image?.width,
+                                placeholder: content.image?.placeholder,
+                                widths: content.image?.widths,
+                                sizes: "(min-width: 640px) 384px, 100vw",
+                            }),
+                        )}
                         className={
                             siteLook
                                 ? "rounded-site-photo aspect-[4/5] w-full max-w-sm object-cover"
@@ -270,13 +275,17 @@ function PortraitColumn({
                                 alt={content.image?.alt ?? ""}
                                 width={content.image?.width}
                                 height={content.image?.height}
-                                {...siteImage("below", {
-                                    src,
-                                    width: content.image?.width,
-                                    placeholder: content.image?.placeholder,
-                                    widths: content.image?.widths,
-                                    sizes: "300px",
-                                })}
+                                {...withElement(
+                                    "image",
+                                    content.image,
+                                    siteImage("below", {
+                                        src,
+                                        width: content.image?.width,
+                                        placeholder: content.image?.placeholder,
+                                        widths: content.image?.widths,
+                                        sizes: "300px",
+                                    }),
+                                )}
                                 className={
                                     siteLook
                                         ? "bg-site-surface rounded-site-photo aspect-[4/5] w-full object-cover"
@@ -322,8 +331,7 @@ function PortraitColumn({
  * The `team` look (template polish), as the gym design shows its coaches:
  * the block's own person first, then `people`, each with a 3:4 photo, their
  * name, what they do and a line. Four across on a desk, two on a phone.
- * Photo frames are drawn only when someone has a photo, so a team still
- * waiting for its photographs is a row of words, not of empty boxes.
+ * A person with no photo shows their initials in the tile (ERVTeamDesign).
  */
 function TeamGrid({ content }: { content: RenderedPerson }) {
     const members = [
@@ -335,7 +343,6 @@ function TeamGrid({ content }: { content: RenderedPerson }) {
         },
         ...(content.people ?? []),
     ].filter((m) => said(m.name) !== null);
-    const framed = members.some((m) => said(m.image?.src) !== null);
     const title = said(content.title);
     const Title = content.asTitle ? "h1" : "h2";
 
@@ -356,25 +363,36 @@ function TeamGrid({ content }: { content: RenderedPerson }) {
                     const bio = said(m.bio);
                     return (
                         <li key={i} className="min-w-0">
-                            {framed ? (
-                                <div className="bg-site-surface mb-3 aspect-[3/4] overflow-hidden rounded-[var(--site-radius)]">
-                                    {src ? (
-                                        <img
-                                            src={src}
-                                            alt={m.image?.alt ?? ""}
-                                            {...siteImage("below", {
+                            <div className="bg-site-surface border-site-border mb-3 aspect-[3/4] overflow-hidden rounded-[var(--site-radius)] border">
+                                {src ? (
+                                    <img
+                                        src={src}
+                                        alt={m.image?.alt ?? ""}
+                                        {...withElement(
+                                            "image",
+                                            m.image,
+                                            siteImage("below", {
                                                 src,
                                                 width: m.image?.width,
                                                 placeholder:
                                                     m.image?.placeholder,
                                                 widths: m.image?.widths,
                                                 sizes: "(min-width: 1024px) 25vw, 50vw",
-                                            })}
-                                            className="h-full w-full object-cover"
-                                        />
-                                    ) : null}
-                                </div>
-                            ) : null}
+                                            }),
+                                        )}
+                                        className="h-full w-full object-cover"
+                                    />
+                                ) : (
+                                    // No photo: initials in the tile, never an empty box.
+                                    <span
+                                        aria-hidden="true"
+                                        data-team-initials=""
+                                        className="bg-site-accent-soft border-site-border text-site-fg font-site-heading grid h-full w-full select-none place-items-center text-[calc(2.5rem*var(--site-heading-scale))] font-medium"
+                                    >
+                                        {initialsOf(said(m.name) ?? "")}
+                                    </span>
+                                )}
+                            </div>
                             <h3 className="font-site-heading text-[calc(1.0625rem*var(--site-heading-scale))] font-semibold leading-tight [overflow-wrap:anywhere]">
                                 {said(m.name)}
                             </h3>

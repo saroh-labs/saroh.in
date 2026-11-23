@@ -123,6 +123,24 @@ export function usePublish({
         initialPendingUnits,
     );
     const unitsRequest = useRef(0);
+    /*
+     * A page added or deleted elsewhere (Pages, Page settings) answers with
+     * `router.refresh()`, which brings the server's fresh counts as new
+     * props while this state kept the old ones: a deleted unpublished page
+     * left "3 changes waiting" behind (ER3, 22 Nov). New server counts win.
+     */
+    const serverCounts = JSON.stringify([
+        initialPendingChanges,
+        initialPendingSiteChanges,
+        initialPendingUnits,
+    ]);
+    const [seenCounts, setSeenCounts] = useState(serverCounts);
+    if (seenCounts !== serverCounts) {
+        setSeenCounts(serverCounts);
+        setPendingChanges(initialPendingChanges);
+        setPendingSiteChanges(initialPendingSiteChanges);
+        setPendingUnits(initialPendingUnits);
+    }
     const refreshUnits = useCallback(async () => {
         const request = ++unitsRequest.current;
         const read = await readSiteChanges(siteId).catch(() => null);

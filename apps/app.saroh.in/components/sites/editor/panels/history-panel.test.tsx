@@ -13,6 +13,11 @@ import type {
 } from "@/lib/sites/service";
 
 import type { EditorModel } from "../shell/editor-model";
+import {
+    compareLayoutWidth,
+    compareMarks,
+    compareUnits,
+} from "./history-compare";
 import { changeWords, historyAfterReload, HistoryPanel } from "./history-panel";
 
 const refresh = vi.fn();
@@ -305,11 +310,12 @@ describe("HistoryPanel (U46b)", () => {
         expect(readChangesAgainst).toHaveBeenCalledWith("site_1", "pub_1");
         const compare = document.querySelector("[data-history-compare]");
         expect(compare?.textContent).toContain("beside your draft now");
-        // This page: the two differences on it, numbered.
+        // This page: the two differences on it, numbered, marked on the
+        // draft itself rather than listed above it (D3).
         expect(compare?.textContent).toContain("2 differences");
         expect(
             document.querySelectorAll("[data-compare-differences] li"),
-        ).toHaveLength(2);
+        ).toHaveLength(0);
         expect(document.querySelector("[data-version]")).not.toBeNull();
         expect(document.querySelector("[data-draft]")).not.toBeNull();
         // Restore as the draft (owner, 20 Nov 2026): its confirm says it
@@ -364,5 +370,40 @@ describe("changeWords", () => {
         expect(changeWords("Changed · Top of the page")).toBe(
             "changed Top of the page",
         );
+    });
+});
+
+describe("Compare marks the draft's sections (D3)", () => {
+    it("numbers each section of this page as the list does; a removed one is not marked", () => {
+        const gone = {
+            ...unit("section:pg_1:z", "pg_1", "Removed · Old"),
+            change: "removed" as const,
+        };
+        const marks = compareMarks([...UNITS, gone], "pg_1");
+        expect(Array.from(marks)).toEqual([
+            ["a", "1 · Changed"],
+            ["b", "2 · Changed"],
+        ]);
+    });
+});
+
+describe("Compare counts site-wide differences on every page (bug, 22 Nov 2026)", () => {
+    it("a look or menu change (no page) is a difference on this page too", () => {
+        const look = unit("site:look", null, "Changed · Look");
+        const units = compareUnits(changes([...UNITS, look]), "page", "pg_1");
+        expect(units.map((u) => u.key)).toEqual([
+            "section:pg_1:a",
+            "section:pg_1:b",
+            "site:look",
+        ]);
+    });
+});
+
+describe("Compare draws both pages near three quarters (D3)", () => {
+    it("lays the pages out narrower in a 1440 window, never under 640 or over 1024", () => {
+        // 1440 less rail and History: two columns of about 490px.
+        expect(490 / compareLayoutWidth(490)).toBeCloseTo(0.75, 2);
+        expect(compareLayoutWidth(300)).toBe(640);
+        expect(compareLayoutWidth(1200)).toBe(1024);
     });
 });

@@ -78,6 +78,10 @@ export async function updateStaff(
     return staff.updateStaff(staffId, input);
 }
 
+export async function setTeamPage(staffIds: string[]) {
+    return staff.setTeamPage(staffIds);
+}
+
 export async function setStaffServices(staffId: string, serviceIds: string[]) {
     return staff.setStaffServices(staffId, serviceIds);
 }
@@ -119,6 +123,13 @@ export async function removeClosures(ids: string[]) {
 
 export async function previewOff(input: OffRangeInput & { staffId?: string }) {
     return staff.previewOff(input);
+}
+
+export async function saveStaffProfile(
+    staffId: string,
+    changes: { photoMediaId?: string | null; about?: string | null },
+) {
+    return staff.updateStaffProfile(staffId, changes);
 }
 
 export async function updateBookingRules(input: Partial<BookingRules>) {

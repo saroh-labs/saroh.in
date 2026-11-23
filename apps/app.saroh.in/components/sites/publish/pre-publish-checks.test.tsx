@@ -63,6 +63,17 @@ describe("Checked before you publish (U10)", () => {
         expect(html).toContain("Bridal packages · This says ₹2,000 for Trial");
         expect(html).toContain("Show me");
         expect(html).toContain("Describe it");
-        expect(html).toContain("Every link works");
+        // One line: what passed, then the problems in bold (P2).
+        expect(html).toContain(
+            '<b class="font-semibold">Checked:</b> every link works. <b class="font-semibold">1 price doesn’t match Services. 1 photo has no description.</b>',
+        );
+    });
+
+    it("all good: one summary line naming each check (P2)", () => {
+        const html = draw([]);
+        expect(html).toContain("data-all-ok");
+        expect(html).toContain(
+            "prices match Services, every link works, every photo has a description",
+        );
     });
 });

@@ -5,8 +5,8 @@ import type { TrailTab } from "@/components/sites/editor/shell/editor-trail";
 export type PostTrailKey = "posts" | "add" | "history" | "feedback";
 
 /**
- * The post editor's rail (`blogdesk/WXWWrite`, C3): Posts · Add · History ·
- * Feedback; a reader's Posts · Feedback. History once U17 builds it. Ask AI
+ * The post editor’s rail (`blogdesk/WXWWrite`, C3): Post · Add · History ·
+ * Feedback; a reader's Post · Feedback. History once U17 builds it. Ask AI
  * left the rail for the right column's tab (owner, 21 Nov).
  */
 export function postTrailTabs({
@@ -21,7 +21,7 @@ export function postTrailTabs({
     feedback: boolean;
 }): TrailTab<PostTrailKey>[] {
     const tabs: (TrailTab<PostTrailKey> | false)[] = [
-        { key: "posts", label: "Posts", icon: FileText },
+        { key: "posts", label: "Post", icon: FileText },
         !readOnly && { key: "add", label: "Add", icon: Plus },
         !readOnly &&
             history && {

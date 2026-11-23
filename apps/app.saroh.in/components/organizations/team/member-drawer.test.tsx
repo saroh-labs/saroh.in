@@ -18,6 +18,12 @@ import { roleBook } from "./role-book";
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
+// The photo's upload and save are tested with the fields themselves.
+vi.mock("@/components/staff/profile-photo", () => ({
+    StaffProfileFields: ({ name }: { name: string }) => (
+        <div data-photo-for={name}>Photo (optional)</div>
+    ),
+}));
 vi.mock("@/lib/organizations/member-actions", () => ({
     updateMemberRole: vi.fn(),
     setMemberExtraActions: vi.fn(),
@@ -74,11 +80,15 @@ afterEach(() => {
     document.body.innerHTML = "";
 });
 
-function draw(open: OrganizationMember | null) {
+function draw(
+    open: OrganizationMember | null,
+    profile: { staffId: string; photo: null; about: null } | null = null,
+) {
     act(() =>
         root.render(
             <MemberDrawer
                 member={open}
+                profile={profile}
                 members={[asha, ravi, meera]}
                 organizationName="Rye Bakery"
                 book={book}
@@ -118,5 +128,20 @@ describe("the People drawer", () => {
         draw(null);
         draw(meera);
         expect(seeOrders()?.getAttribute("aria-checked")).toBe("false");
+    });
+
+    it("offers the photo only to someone who may set it, at the top, for that person", () => {
+        draw(meera);
+        expect(document.body.querySelector("[data-photo-for]")).toBeNull();
+        draw(meera, { staffId: "st_3", photo: null, about: null });
+        const photo = document.body.querySelector("[data-photo-for]");
+        expect(photo?.getAttribute("data-photo-for")).toBe("Meera");
+        expect(
+            photo?.compareDocumentPosition(
+                document.body.querySelector(
+                    "[role=radiogroup], .label",
+                ) as Node,
+            ) ?? 0,
+        ).toBeGreaterThan(0);
     });
 });

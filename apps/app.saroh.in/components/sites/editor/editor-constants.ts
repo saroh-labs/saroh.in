@@ -7,6 +7,10 @@ import {
     SECTION_TYPES,
 } from "@saroh/block-contract";
 
+// The canvas's hover label draws the kind's icon (D8); re-exported so the
+// canvas imports its blocks from @saroh/site-blocks alone.
+export { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
+
 /**
  * The editor's fixed vocabulary — what each block is called, the order the
  * picker offers them in, and the preview's device and zoom steps.
@@ -51,6 +55,34 @@ export const SECTION_HINTS: Record<SectionType, string> = {
         "This week's classes by day, with who takes each and the places left, always up to date.",
     hours: "Your opening hours as a table, with Open now, always up to date.",
     person: "One person: a photo, their name, what they do, their qualifications and a few lines.",
+};
+
+/**
+ * What a section shows, in two or three words, for a row that names it
+ * (`fix/WXNReorder`: "Reviews", "Booking", "From Services"). Typed like the
+ * hints, so a new block without a line does not compile.
+ */
+export const SECTION_SHOWS: Record<SectionType, string> = {
+    hero: "Heading and button",
+    richText: "Your own words",
+    cta: "A button",
+    gallery: "Photos",
+    enquiry: "A form",
+    booking: "Booking",
+    features: "Short points",
+    faq: "Questions and answers",
+    testimonials: "Reviews",
+    contact: "Address and contact",
+    servicesList: "From Services",
+    visitUs: "Address and hours",
+    journal: "Latest posts",
+    plans: "Plans on sale",
+    packs: "Class packs on sale",
+    productGrid: "From Products",
+    projects: "Your work",
+    timetable: "Classes this week",
+    hours: "Opening hours",
+    person: "One person",
 };
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */

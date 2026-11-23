@@ -60,7 +60,12 @@ export function PhonePostEditor({
     const [panel, setPanel] = useState<ToolPanel>(null);
     const [toolbar, setToolbar] = useState(false);
     const [previewing, setPreviewing] = useState(false);
-    const close = () => setSheet(null);
+    // The paragraph a reader opened Feedback on (R2), else the whole post.
+    const [pin, setPin] = useState<string | null>(null);
+    const close = () => {
+        setSheet(null);
+        setPin(null);
+    };
 
     const feedback = data.feedback;
     const openNotes =
@@ -125,6 +130,10 @@ export function PhonePostEditor({
                         onToolbar={setToolbar}
                         onEditor={setEditor}
                         onCover={openCover}
+                        onParagraphFeedback={(words) => {
+                            setPin(words);
+                            setSheet("feedback");
+                        }}
                     />
                 </main>
             </div>
@@ -220,16 +229,31 @@ export function PhonePostEditor({
                     onClose={close}
                     container={host}
                     side="bottom"
-                    title="Feedback"
+                    title={pin ? "Feedback on this paragraph" : "Feedback"}
                     closeLabel="Close Feedback"
                     className="h-[80%]"
                 >
                     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+                        {pin ? (
+                            <q className="mb-3 block text-[0.8125rem] text-muted-foreground">
+                                {pin.length > 80 ? `${pin.slice(0, 80)}…` : pin}
+                            </q>
+                        ) : null}
                         <PostFeedback
+                            key={pin ?? "post"}
                             siteId={data.siteId}
                             postId={draft.postId}
                             title={draft.fields.title}
                             {...feedback}
+                            comments={
+                                pin
+                                    ? feedback.comments.filter(
+                                          (c) =>
+                                              c.quote && pin.includes(c.quote),
+                                      )
+                                    : feedback.comments
+                            }
+                            pin={pin}
                             onChanged={draft.refresh}
                         />
                     </div>

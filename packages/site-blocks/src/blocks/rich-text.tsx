@@ -1,5 +1,6 @@
 import type { RenderedRichText } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
+import { withElement } from "../element-theme";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
@@ -172,16 +173,20 @@ export default function RichTextSection({
                         alt={image.alt ?? ""}
                         width={image.width}
                         height={image.height}
-                        {...siteImage("below", {
-                            src: image.src,
-                            width: image.width,
-                            placeholder: image.placeholder,
-                            widths: image.widths,
-                            focus: image.focus,
-                            sizes: folio
-                                ? "100vw"
-                                : "(min-width: 1280px) 1280px, 100vw",
-                        })}
+                        {...withElement(
+                            "image",
+                            image,
+                            siteImage("below", {
+                                src: image.src,
+                                width: image.width,
+                                placeholder: image.placeholder,
+                                widths: image.widths,
+                                focus: image.focus,
+                                sizes: folio
+                                    ? "100vw"
+                                    : "(min-width: 1280px) 1280px, 100vw",
+                            }),
+                        )}
                         className={cn(
                             "bg-site-surface block aspect-[3/2] h-auto w-full object-cover",
                             folio
@@ -216,14 +221,18 @@ export default function RichTextSection({
                 alt={image.alt ?? ""}
                 width={image.width}
                 height={image.height}
-                {...siteImage("below", {
-                    src: image.src,
-                    width: image.width,
-                    placeholder: image.placeholder,
-                    widths: image.widths,
-                    focus: image.focus,
-                    sizes: "(min-width: 1280px) 1280px, 100vw",
-                })}
+                {...withElement(
+                    "image",
+                    image,
+                    siteImage("below", {
+                        src: image.src,
+                        width: image.width,
+                        placeholder: image.placeholder,
+                        widths: image.widths,
+                        focus: image.focus,
+                        sizes: "(min-width: 1280px) 1280px, 100vw",
+                    }),
+                )}
                 className="bg-site-surface mb-8 aspect-video h-auto w-full rounded-[var(--site-radius)] object-cover"
             />
         );
@@ -267,14 +276,18 @@ export default function RichTextSection({
                     alt={image.alt ?? ""}
                     width={image.width}
                     height={image.height}
-                    {...siteImage("below", {
-                        src: image.src,
-                        width: image.width,
-                        placeholder: image.placeholder,
-                        widths: image.widths,
-                        focus: image.focus,
-                        sizes: "(min-width: 768px) 50vw, 100vw",
-                    })}
+                    {...withElement(
+                        "image",
+                        image,
+                        siteImage("below", {
+                            src: image.src,
+                            width: image.width,
+                            placeholder: image.placeholder,
+                            widths: image.widths,
+                            focus: image.focus,
+                            sizes: "(min-width: 768px) 50vw, 100vw",
+                        }),
+                    )}
                     className={
                         photoLeft
                             ? "h-auto w-full rounded-[var(--site-radius)] object-cover"

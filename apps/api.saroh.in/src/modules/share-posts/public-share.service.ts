@@ -201,6 +201,55 @@ export class PublicShareService {
     }
 
     /**
+     * A live offer's words for a post's Offer card (W2), the same read
+     * the Offer picture draws (`offer`): what it is, how much off, until
+     * when, and its code. An ended or used-up offer is a 404 like any
+     * other miss, and the post then draws nothing in its place.
+     */
+    async offerWords(
+        siteId: string,
+        id: string,
+        visitor: string,
+    ): Promise<{
+        name: string;
+        headline: string;
+        until: string | null;
+        code: string;
+    }> {
+        // Not `take`: asked by the site's own server for every visitor at
+        // once (no visitor IP reaches us), where a per-visitor limit would
+        // starve it. Only offers a live post embeds are served, so there is
+        // nothing to find by guessing ids.
+        const site = await this.liveSite(siteId);
+        // Only an offer a live post of this site embeds is handed out: a
+        // code the merchant keeps private stays so, and an unpublished post
+        // stops serving its offers.
+        if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) notFound();
+        const embedded = await prisma.post.findFirst({
+            where: {
+                siteId: site.siteId,
+                currentPublicationId: { not: null },
+                currentPublication: {
+                    snapshot: {
+                        path: ["post", "content"],
+                        string_contains: `<div data-embed="offer" data-id="${id}"></div>`,
+                    },
+                },
+            },
+            select: { id: true },
+        });
+        if (!embedded) notFound();
+        const { name, offer } = await this.offer(site, id, visitor, null);
+        if (!offer) notFound();
+        return {
+            name,
+            headline: offer.headline,
+            until: offer.until ?? null,
+            code: offer.code ?? "",
+        };
+    }
+
+    /**
      * The booking page's card with the headline typed in the share sheet
      * (owner, 12 Nov 2026): for the business's own people only, through
      * `organizations/:id/share/book/image`, never the public route, so

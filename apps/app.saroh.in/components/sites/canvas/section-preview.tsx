@@ -19,18 +19,31 @@ import {
 } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 import { showInfo } from "@saroh/ui/toast";
+import type { LucideIcon } from "lucide-react";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { SECTION_LABELS } from "@/components/sites/editor/editor-constants";
+import {
+    SECTION_ICONS,
+    SECTION_LABELS,
+} from "@/components/sites/editor/editor-constants";
+import { TeamEmptyOnCanvas } from "@/components/sites/editor/inspector/team-empty";
+import { useEditorReadOnly } from "@/components/sites/editor/read-only";
 import { env } from "@/env";
 import { merchantLinkUrl, previewLinkTarget } from "@/lib/sites/merchant-link";
+import { isEmptyTeam } from "@/lib/sites/team-people";
 
 import { useSiteFaces } from "@/components/sites/looks/site-faces";
 import type { Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 // From the pure module, not the service: `lib/sites/service` reaches for
 // `next/headers` and cannot be pulled into a client component.
+import type { SelectedElement, StyleScope } from "@/lib/sites/element-style";
+import {
+    elementMark,
+    parseElementMark,
+    stampElements,
+} from "@/lib/sites/element-style";
 import { resolveStyleVariables } from "@/lib/sites/style";
 
 /**
@@ -78,10 +91,14 @@ export const FORM_NOT_SENT_DETAIL = "Forms send from your live site.";
 function toRenderedSection(
     section: Section,
     resolvePage: (pageId: string) => string | undefined,
+    stamp = false,
 ): RenderedSection {
+    const content = toRendered(section.type, section.content, { resolvePage });
     return {
         type: section.type,
-        content: toRendered(section.type, section.content, { resolvePage }),
+        // On the editing canvas each button and photo carries its place,
+        // so a click on it selects it (DEC-253).
+        content: stamp ? stampElements(content) : content,
     };
 }
 
@@ -97,6 +114,7 @@ export function DraftPreview({
     onSelectChrome,
     notesByKey,
     changedByKey,
+    markByKey,
     onOpenNotes,
     siteAddress,
     siteId,
@@ -104,10 +122,22 @@ export function DraftPreview({
     onFormBlocked,
     page: current = null,
     blockTools,
+    headerTools,
     textEdit,
+    selectedElement = null,
+    elementScope = "element",
+    onSelectElement,
 }: {
+    /** The button or photo selected in the selected section (DEC-253). */
+    selectedElement?: SelectedElement | null;
+    /** Its Apply to: what the page outlines as moving with it (CSScope). */
+    elementScope?: StyleScope;
+    /** A click on a button or photo: select its section and it. */
+    onSelectElement?: (index: number, element: SelectedElement) => void;
     /** A phone's toolbar on the selected block (DEC-185). */
     blockTools?: (index: number) => ReactNode;
+    /** On the header while it is selected: its menu edited in place (H1). */
+    headerTools?: ReactNode;
     /**
      * Typing on the page (U47d): the host the selected section's marked
      * words write through. Absent, or for a section it has none for, the
@@ -161,6 +191,11 @@ export function DraftPreview({
     notesByKey?: ReadonlyMap<string, number>;
     /** Changed since live, per section key: a reader's marks (`fix/WXMReviewer`). */
     changedByKey?: ReadonlyMap<string, string>;
+    /**
+     * Words marked on a block of a preview that is not edited, by section
+     * key: History's Compare numbers its differences there (D3).
+     */
+    markByKey?: ReadonlyMap<string, string>;
     /** A pin was pressed: select that block and show its feedback. */
     onOpenNotes?: (index: number) => void;
     /** The merchant's site address, which the page's links open on. */
@@ -249,7 +284,13 @@ export function DraftPreview({
             visible.map(({ section, index }, position) => {
                 const rendered = (
                     <PageSections
-                        sections={[toRenderedSection(section, resolvePage)]}
+                        sections={[
+                            toRenderedSection(
+                                section,
+                                resolvePage,
+                                onSelectElement !== undefined,
+                            ),
+                        ]}
                         siteId={siteId}
                         // The API this app talks to, so the canvas reads the
                         // same place as the site it is drawing; unset, the
@@ -262,7 +303,37 @@ export function DraftPreview({
                         isOwnerPreview
                     />
                 );
-                if (!editing) return <div key={index}>{rendered}</div>;
+                if (!editing) {
+                    const mark =
+                        section.key === undefined
+                            ? undefined
+                            : markByKey?.get(section.key);
+                    return (
+                        <div
+                            key={index}
+                            className={mark ? "relative" : undefined}
+                        >
+                            {rendered}
+                            {mark ? (
+                                // A success outline with its number in a circle
+                                // at the top right (D3, `WXEHistory`), doubled:
+                                // Compare draws the page at about half size.
+                                <span
+                                    data-compare-mark=""
+                                    className="pointer-events-none absolute inset-0 z-10 ring-4 ring-inset ring-success"
+                                >
+                                    <span
+                                        aria-hidden
+                                        className="absolute right-4 top-4 grid size-12 place-items-center rounded-full bg-success font-sans text-2xl font-semibold text-success-foreground"
+                                    >
+                                        {mark.split(" · ")[0]}
+                                    </span>
+                                    <span className="sr-only">{mark}</span>
+                                </span>
+                            ) : null}
+                        </div>
+                    );
+                }
                 const label = SECTION_LABELS[section.type];
                 const host =
                     selectedIndex === index ? textEdit?.(index) : undefined;
@@ -271,9 +342,19 @@ export function DraftPreview({
                         key={index}
                         index={index}
                         label={label}
+                        icon={SECTION_ICONS[section.type]}
                         name={`${label} section, ${position + 1} of ${count}`}
                         selected={selectedIndex === index}
                         onSelect={() => onSelect(index)}
+                        onSelectElement={
+                            onSelectElement
+                                ? (el) => onSelectElement(index, el)
+                                : undefined
+                        }
+                        element={
+                            selectedIndex === index ? selectedElement : null
+                        }
+                        elementScope={elementScope}
                         notes={
                             section.key === undefined
                                 ? 0
@@ -291,7 +372,9 @@ export function DraftPreview({
                                 : undefined
                         }
                     >
-                        {host ? (
+                        {isEmptyTeam(section) ? (
+                            <TeamEmptyOnCanvas onAdd={() => onSelect(index)} />
+                        ) : host ? (
                             <EditableTextContext.Provider value={host}>
                                 {rendered}
                             </EditableTextContext.Provider>
@@ -398,11 +481,14 @@ export function DraftPreview({
             />
             {header && editing && onSelectChrome ? (
                 <CanvasBlock
-                    label="Header"
+                    label="Header · on every page"
                     name="Header, on every page"
                     locked
                     selected={selectedChrome === "header"}
                     onSelect={() => onSelectChrome("header")}
+                    tools={
+                        selectedChrome === "header" ? headerTools : undefined
+                    }
                 >
                     {header}
                 </CanvasBlock>
@@ -413,10 +499,20 @@ export function DraftPreview({
             {/* Back to back, as the live site draws them: each block keeps its
                 own margins, and a full-bleed hero meets both edges under the
                 header (owner, 24 Oct). */}
-            <div>{page}</div>
+            {/* The rest of the page fades while the header or footer, on
+                every page, is selected (H1, `fix/WXMGlobal`). */}
+            <div
+                className={
+                    editing && selectedChrome
+                        ? "opacity-50 transition-opacity duration-fast"
+                        : "transition-opacity duration-fast"
+                }
+            >
+                {page}
+            </div>
             {footer && editing && onSelectChrome ? (
                 <CanvasBlock
-                    label="Footer"
+                    label="Footer · on every page"
                     name="Footer, on every page"
                     locked
                     selected={selectedChrome === "footer"}
@@ -443,6 +539,7 @@ export function DraftPreview({
 function CanvasBlock({
     index,
     label,
+    icon: Icon,
     name,
     selected,
     locked = false,
@@ -452,7 +549,13 @@ function CanvasBlock({
     onOpenNotes,
     tools,
     children,
+    onSelectElement,
+    element = null,
+    elementScope = "element",
 }: {
+    onSelectElement?: (element: SelectedElement) => void;
+    element?: SelectedElement | null;
+    elementScope?: StyleScope;
     /** "changed", "added", "moved" or "hidden" since live, for a reader. */
     changed?: string;
     /** Drawn on the block while it is selected: a phone's toolbar. */
@@ -460,6 +563,8 @@ function CanvasBlock({
     /** Position in the page's block list, so the editor can scroll to it. */
     index?: number;
     label: string;
+    /** The section's kind, drawn before its name (D8, `fix/WXKRest`). */
+    icon?: LucideIcon;
     /** The accessible name: what it is and where it sits. */
     name: string;
     selected: boolean;
@@ -470,10 +575,20 @@ function CanvasBlock({
     onOpenNotes?: () => void;
     children: ReactNode;
 }) {
+    const readOnly = useEditorReadOnly();
     return (
         <div
             data-block-index={index}
-            onClick={onSelect}
+            onClick={(e) => {
+                // A button or photo on the block selects it (DEC-253).
+                const mark = parseElementMark(
+                    (e.target as HTMLElement)
+                        .closest("[data-site-el]")
+                        ?.getAttribute("data-site-el") ?? null,
+                );
+                if (mark && onSelectElement) onSelectElement(mark);
+                else onSelect();
+            }}
             /*
              * Joined by hand, not through `cn`: tailwind-merge reads
              * `outline` and `outline-2` as the same property and drops the
@@ -484,21 +599,47 @@ function CanvasBlock({
              * dark alike: the merchant's page keeps its own ground, so a
              * theme colour could vanish on it (editor audit, 21 Nov).
              */
+            /*
+             * The header and footer: the site's header is sticky at z-30,
+             * which hid its own frame and "Header · on every page" tag
+             * (H1 · 4, `fix/WXMGlobal`), so theirs sit above it.
+             */
             className={`group/block relative cursor-pointer outline outline-offset-[-2px] transition-[outline-color] duration-fast ${
                 selected
-                    ? "outline-2 outline-brand-surface after:pointer-events-none after:absolute after:inset-[2px] after:z-10 after:shadow-[inset_0_0_0_1px_hsl(var(--brand-surface-foreground)/0.9)] after:content-['']"
+                    ? `outline-2 outline-brand-surface after:pointer-events-none after:absolute ${locked ? "after:inset-0 after:z-40 after:shadow-[inset_0_0_0_2px_hsl(var(--brand-surface)),inset_0_0_0_3px_hsl(var(--brand-surface-foreground)/0.9)]" : "after:inset-[2px] after:z-10 after:shadow-[inset_0_0_0_1px_hsl(var(--brand-surface-foreground)/0.9)]"} after:content-['']`
                     : "outline-1 outline-transparent hover:outline-border-strong"
             }`}
         >
             {children}
+            {element ? (
+                <style>{elementOutline(index, element, elementScope)}</style>
+            ) : null}
             {tools}
-            {changed && !selected ? (
-                // Under the label chip, which covers it on hover and selection.
+            {changed ? (
+                /*
+                 * R1 (`WXMReviewer`): a changed block is ringed and tagged,
+                 * selected or not. The tag sits top right, clear of the
+                 * label chip; the selection's ink outline takes over the ring.
+                 */
                 <span
-                    data-changed-mark={changed}
-                    className="pointer-events-none absolute left-0 top-0 z-10 flex h-6 items-center rounded-br-md bg-warning-subtle px-2 font-sans text-xs font-semibold text-warning-subtle-foreground transition-opacity duration-fast group-hover/block:opacity-0"
+                    aria-hidden
+                    className={cn(
+                        "pointer-events-none absolute inset-0 z-10",
+                        !selected &&
+                            "shadow-[inset_0_0_0_2px_hsl(var(--info))]",
+                    )}
                 >
-                    {`${changed[0].toUpperCase()}${changed.slice(1)} since live`}
+                    <span
+                        data-changed-mark={changed}
+                        className={cn(
+                            "absolute right-0 top-0 flex h-6 items-center rounded-bl-md px-2 font-sans text-xs font-semibold",
+                            selected
+                                ? "bg-brand-surface text-brand-surface-foreground"
+                                : "bg-info text-info-foreground",
+                        )}
+                    >
+                        {`${changed[0].toUpperCase()}${changed.slice(1)} since live`}
+                    </span>
                 </span>
             ) : null}
             <button
@@ -510,14 +651,25 @@ function CanvasBlock({
                     onSelect();
                 }}
                 className={cn(
-                    "absolute left-0 top-0 z-10 flex h-6 items-center gap-1 rounded-br-md bg-brand-surface px-2 font-sans text-xs font-semibold text-brand-surface-foreground transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    locked ? "z-40" : "z-10",
+                    "absolute left-0 top-0 flex h-6 items-center gap-1 rounded-br-md bg-brand-surface px-2 font-sans text-xs font-semibold text-brand-surface-foreground transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     selected
                         ? "opacity-100"
                         : "opacity-0 group-hover/block:opacity-100",
                 )}
             >
-                {locked ? <Lock aria-hidden className="size-3" /> : null}
+                {locked ? (
+                    <Lock aria-hidden className="size-3" />
+                ) : Icon ? (
+                    <Icon aria-hidden className="size-3" />
+                ) : null}
                 {label}
+                {/* On hover, what a click does (D8, `fix/WXKRest`). */}
+                {!selected && !readOnly ? (
+                    <span data-click-hint="" className="font-normal opacity-80">
+                        · click to edit
+                    </span>
+                ) : null}
             </button>
             {notes > 0 && onOpenNotes ? (
                 /*
@@ -540,4 +692,35 @@ function CanvasBlock({
             ) : null}
         </div>
     );
+}
+
+/**
+ * The selected button or photo outlined in the canvas's amber, with its
+ * flag (CSI-C "Button · This button"); with Apply to on the section or the
+ * site, every one that will move is outlined too (CSScope).
+ */
+function elementOutline(
+    index: number | undefined,
+    element: SelectedElement,
+    scope: StyleScope,
+): string {
+    const block = `[data-block-index="${index}"]`;
+    const mark = `[data-site-el="${elementMark(element)}"]`;
+    const kind = `[data-site-el^="${element.kind}:"]`;
+    const moving =
+        scope === "site"
+            ? `[data-site-el]${kind}`
+            : scope === "section"
+              ? `${block} ${kind}`
+              : `${block} ${mark}`;
+    const word = element.kind === "button" ? "Button" : "Photo";
+    const where =
+        scope === "site"
+            ? "Whole site"
+            : scope === "section"
+              ? "This section"
+              : `This ${element.kind === "button" ? "button" : "photo"}`;
+    return `${moving}{outline:2px solid hsl(var(--brand-surface));outline-offset:4px}
+${block} ${mark}{position:relative}
+${block} ${mark}::before{content:"${word} · ${where}";position:absolute;left:-6px;top:-34px;white-space:nowrap;background:hsl(var(--brand-surface));color:hsl(var(--brand-surface-foreground));font:600 13px/1.5 system-ui,sans-serif;padding:2px 8px;border-radius:6px;z-index:20;pointer-events:none}`;
 }

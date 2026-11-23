@@ -8,6 +8,7 @@ import type { EditorTestReleases } from "@/components/sites/test-releases/use-te
 import type { ModulePageKind, SitePage } from "@/lib/sites/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
 import type { SiteStyleOptions } from "@/lib/sites/style";
+import type { StyleChoiceRules } from "@/lib/sites/style-access";
 
 import type { AskAiOn } from "../use-editor-ask-ai";
 import type { EditorDraft } from "../use-editor-draft";
@@ -68,6 +69,8 @@ export interface EditorModel {
     /** The Publish sheet's changes by person (loads on open). */
     publishChanges: ReturnType<typeof usePublishChanges>;
     siteStyle: ReturnType<typeof useEditorStyle>;
+    /** Free and paid looks, typefaces and colourways (DEC-177). */
+    styleRules?: StyleChoiceRules;
     chrome: SiteChrome;
     add: ReturnType<typeof useAddBlock>;
     /** Test links (DEC-071) with this person's abilities. */

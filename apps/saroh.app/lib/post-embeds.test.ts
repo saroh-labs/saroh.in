@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { embedsIn, fillPostEmbeds } from "@/components/post-embeds";
+import {
+    embedsIn,
+    fillContents,
+    fillPostEmbeds,
+} from "@/components/post-embeds";
 
 import { getBookingPage } from "./booking-page";
 import { shopFetch } from "./catalogue";
@@ -123,7 +127,7 @@ describe("embedsIn and fillPostEmbeds", () => {
             embedsIn(
                 `${svc("a")}<blockquote>${svc("a")}${prod("b")}</blockquote>`,
             ),
-        ).toEqual({ service: ["a"], product: ["b"] });
+        ).toEqual({ service: ["a"], product: ["b"], book: [], offer: [] });
     });
 
     it("never draws a marker it didn't write", () => {
@@ -131,5 +135,62 @@ describe("embedsIn and fillPostEmbeds", () => {
         expect(fillPostEmbeds(odd, { services: null, products: null })).toBe(
             odd,
         );
+    });
+});
+
+describe("a post's own blocks (W2)", () => {
+    it("draws a Book now button from the service offered now, else nothing", async () => {
+        offered([trial]);
+        const out = await resolvePostEmbeds(
+            '<div data-embed="book" data-id="svc1"></div><div data-embed="book" data-id="gone"></div>',
+            "s",
+        );
+        expect(out).toBe(
+            '<p data-button="link"><a href="/book?service=svc1" aria-label="Book now: Trial session">Book now</a></p>',
+        );
+    });
+
+    it("draws a live offer, escaped, and nothing for an ended one", async () => {
+        const fetch = vi.fn((url: string) =>
+            Promise.resolve(
+                url.endsWith("/offers/d1")
+                    ? new Response(
+                          JSON.stringify({
+                              name: "Buns <b>",
+                              headline: "20% off",
+                              until: "until 30 Nov",
+                              code: "BUN20",
+                          }),
+                      )
+                    : new Response("{}", { status: 404 }),
+            ),
+        );
+        vi.stubGlobal("fetch", fetch);
+        const out = await resolvePostEmbeds(
+            '<div data-embed="offer" data-id="d1"></div><div data-embed="offer" data-id="d2"></div>',
+            "s",
+        );
+        vi.unstubAllGlobals();
+        expect(out).toContain("20% off · Buns &lt;b&gt;");
+        expect(out).toContain("until 30 Nov · Code BUN20");
+        expect(out.match(/data-post-card/g)).toHaveLength(1);
+        expect(fetch.mock.calls[0]?.[0]).toBe(
+            "https://api.test/public/sites/s/offers/d1",
+        );
+    });
+
+    it("lists the headings in the contents block and anchors them", () => {
+        const out = fillContents(
+            '<div data-contents="headings"></div><h2>Before you come</h2><p>x</p><h2 style="text-align: center">Before you come</h2>',
+        );
+        expect(out).toContain('<h2 id="before-you-come">Before you come</h2>');
+        expect(out).toContain(
+            '<h2 id="before-you-come-2" style="text-align: center">',
+        );
+        expect(out).toContain('href="#before-you-come-2"');
+        expect(fillContents("<h2>A</h2>")).toBe("<h2>A</h2>");
+        expect(
+            fillContents('<div data-contents="headings"></div><p>x</p>'),
+        ).toBe("<p>x</p>");
     });
 });

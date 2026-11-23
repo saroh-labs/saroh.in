@@ -264,8 +264,16 @@ const SITE_LAYER_ALLOWED = new Set([
     "apps/app.saroh.in/components/sites/posts/phone/phone-surface.tsx",
     // A reviewer reads the same post on that page ground (U17): the
     // writing surface's read-only twin, in the site's ink.
-    "apps/app.saroh.in/components/sites/posts/review/review-body.tsx",
+    // Drawn as the post looks (R2, R3), its change marks in the site's ink.
+    "apps/app.saroh.in/components/sites/posts/review/styled-review-body.tsx",
+    "apps/app.saroh.in/components/sites/posts/review/change-marks.ts",
     "apps/app.saroh.in/components/sites/rich-text/rich-text-editor.tsx",
+    // A post's cards and blocks inside the writing page (U15b, W2): the
+    // editor's twins of saroh.app's post-embeds.ts, drawing no section block.
+    "apps/app.saroh.in/components/sites/rich-text/embeds/embed-card.tsx",
+    "apps/app.saroh.in/components/sites/rich-text/embeds/post-block-views.tsx",
+    // The live post's cards, beside post-view.tsx above.
+    "apps/saroh.app/components/post-embeds.ts",
 ]);
 
 /**

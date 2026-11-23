@@ -96,13 +96,47 @@ describe("servicesList (#255)", () => {
             json([{ ...cut, description: 42 }]),
         ],
     ])("shows its error state for %s", async (_label, response) => {
-        await renderFetching(response);
+        vi.useFakeTimers();
+        try {
+            await renderFetching(response);
+            // Not yet: one quiet retry first.
+            expect(screen.queryByRole("alert")).toBeNull();
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(1000);
+            });
+        } finally {
+            vi.useRealTimers();
+        }
         expect(screen.getByRole("alert").textContent).toMatch(
             /couldn't load our services/,
         );
         expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
         // No "Book now" for services we could not show.
         expect(screen.queryByRole("link", { name: "Book now" })).toBeNull();
+    });
+
+    it("a read that fails once then works never shows the error (22 Nov flash)", async () => {
+        vi.useFakeTimers();
+        try {
+            const fetchMock = vi
+                .fn()
+                .mockResolvedValueOnce(json({ error: {} }, 503))
+                .mockResolvedValueOnce(json([cut]));
+            globalThis.fetch = fetchMock;
+            render(<ServicesListSection siteId="site_1" content={content} />);
+            await act(async () => {
+                await Promise.resolve();
+            });
+            expect(screen.queryByRole("alert")).toBeNull();
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(1000);
+            });
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+            expect(screen.queryByRole("alert")).toBeNull();
+            expect(screen.getByText("Cut and finish")).toBeTruthy();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("hides prices when the merchant turns them off", () => {
@@ -176,6 +210,21 @@ describe("the services list's states (starter audit)", () => {
         expect(book.className).toContain("coarse:min-h-11");
         expect(book.className).toContain("focus-visible:ring-2");
         expect(book.className).toContain("active:opacity-70");
+    });
+
+    it("draws no Book with Show a Book button off (A5)", () => {
+        render(
+            <ServicesListSection
+                siteId="site_1"
+                content={{ ...content, layout: "list", showBook: false }}
+                services={[cut]}
+                bookHref="/book"
+            />,
+        );
+        expect(
+            document.querySelector('a[href="/book?service=fixture-cut"]'),
+        ).toBeNull();
+        expect(screen.getByText("Cut and finish")).toBeTruthy();
     });
 
     it("gives a card's Book button 44px under a finger", () => {

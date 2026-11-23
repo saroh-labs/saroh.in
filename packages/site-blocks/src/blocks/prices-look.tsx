@@ -181,7 +181,7 @@ export function PriceParts({
                         className={
                             look === "live"
                                 ? // VB10's tag: the accent, 9px corners.
-                                  "bg-site-accent text-site-accent-fg rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold"
+                                  "bg-site-accent text-site-accent-fg rounded-[var(--site-tag-radius,9px)] px-[9px] py-1 text-[12.5px] font-bold"
                                 : "bg-site-accent-soft text-site-fg rounded-site-s px-2 py-0.5 text-[12px] font-semibold"
                         }
                     >

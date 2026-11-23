@@ -52,6 +52,7 @@ import type { Panel } from "./hours-panels";
 import { HoursPanels } from "./hours-panels";
 import { OutsideNote } from "./outside-note";
 import { SeveralDaysSheet } from "./several-days-sheet";
+import { TeamPageSwitch } from "./team-page-switch";
 import { useHours } from "./use-hours";
 import { WeeklyHours } from "./weekly-hours";
 import { EVERYONE, WhoseRow } from "./whose-hours";
@@ -407,6 +408,10 @@ export function AvailabilityEditor({
                     {pr.subject ? (
                         <div data-slot="person-rules" className="min-w-0">
                             <PersonRulesSection pr={pr} />
+                            <TeamPageSwitch
+                                person={pr.subject}
+                                canManage={canManage}
+                            />
                         </div>
                     ) : null}
                     <MoreSection

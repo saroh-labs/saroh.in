@@ -21,6 +21,14 @@
 export const COMPONENT_STYLE_OPTIONS = {
     buttons: ["square", "rounded", "pill"],
     secondButton: ["outline", "text"],
+    /**
+     * DEC-254: how the filled buttons are drawn, their size and their
+     * colour (a palette role; a custom colour is per element or section
+     * only, `element-styles.ts`). Each look's default is "as it draws today".
+     */
+    buttonColour: ["accent", "tint", "fg", "surface", "bg", "rule"],
+    buttonStyle: ["filled", "outline", "soft", "link"],
+    buttonSize: ["s", "m", "l"],
     cards: ["flat", "bordered", "raised"],
     cardCorners: ["square", "soft", "rounded"],
     /** Round is for people and product photos only; others keep Soft. */
@@ -49,6 +57,9 @@ export const COMPONENT_KINDS = Object.keys(
 export const COMPONENT_LABELS: Record<ComponentKind, string> = {
     buttons: "Buttons",
     secondButton: "Second button",
+    buttonStyle: "Button style",
+    buttonSize: "Button size",
+    buttonColour: "Button colour",
     cards: "Cards",
     cardCorners: "Card corners",
     images: "Images",
@@ -63,6 +74,21 @@ export const COMPONENT_OPTION_LABELS: {
 } = {
     buttons: { square: "Square", rounded: "Rounded", pill: "Pill" },
     secondButton: { outline: "Outline", text: "Text" },
+    buttonStyle: {
+        filled: "Filled",
+        outline: "Outline",
+        soft: "Soft",
+        link: "Link",
+    },
+    buttonSize: { s: "Small", m: "Medium", l: "Large" },
+    buttonColour: {
+        accent: "Brand",
+        tint: "Brand tint",
+        fg: "Text",
+        surface: "Panels",
+        bg: "Background",
+        rule: "Lines",
+    },
     cards: { flat: "Flat", bordered: "Bordered", raised: "Raised" },
     cardCorners: { square: "Square", soft: "Soft", rounded: "Rounded" },
     images: { square: "Square", soft: "Soft", arch: "Arch", round: "Round" },
@@ -76,6 +102,9 @@ export const COMPONENT_OPTION_LABELS: {
 export const CLASSIC_COMPONENTS: ComponentDefaults = {
     buttons: "rounded",
     secondButton: "outline",
+    buttonStyle: "filled",
+    buttonSize: "m",
+    buttonColour: "accent",
     cards: "bordered",
     cardCorners: "soft",
     images: "soft",

@@ -464,9 +464,9 @@ function LiveTile({
     return (
         <div
             aria-hidden="true"
-            className="bg-site-bg text-site-fg min-[700px]:rounded-site-photo flex size-[76px] min-w-0 shrink-0 flex-col items-center justify-center overflow-hidden rounded-[14px] p-2 [container-type:inline-size] min-[700px]:h-[200px] min-[700px]:w-auto min-[700px]:items-start min-[700px]:justify-between min-[700px]:p-[18px]"
+            className="bg-site-bg text-site-fg min-[700px]:rounded-site-photo flex size-[76px] min-w-0 shrink-0 flex-col items-center justify-center overflow-hidden rounded-[var(--site-card-radius,14px)] p-2 [container-type:inline-size] min-[700px]:h-[200px] min-[700px]:w-auto min-[700px]:items-start min-[700px]:justify-between min-[700px]:p-[18px]"
         >
-            <span className="bg-site-surface rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold max-[699px]:hidden">
+            <span className="bg-site-surface rounded-[var(--site-tag-radius,9px)] px-[9px] py-1 text-[12.5px] font-bold max-[699px]:hidden">
                 {duration}
             </span>
             <span className="font-site-heading text-[26px] font-extrabold tabular-nums leading-[0.9] tracking-[-0.03em] [font-stretch:80%] min-[700px]:hidden">

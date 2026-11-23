@@ -47,8 +47,9 @@ export function PastVersionPreview({
             // Framed and clipped, unlike the editor's preview, which already
             // sits in a panel. Here the merchant's site would otherwise run
             // straight into Saroh's own chrome, and the two must not read as
-            // one page.
-            className={`${SCOPE} space-y-4 overflow-hidden rounded-[var(--site-radius)] border bg-[hsl(var(--site-bg))] p-[var(--site-page-margin)] text-[hsl(var(--site-fg))]`}
+            // one page. The radius is capped: a pill look's 9999px made
+            // the whole page a circle (History compare, 22 Nov 2026).
+            className={`${SCOPE} space-y-4 overflow-hidden rounded-[min(var(--site-radius),12px)] border bg-[hsl(var(--site-bg))] p-[var(--site-page-margin)] text-[hsl(var(--site-fg))]`}
             {...lookScope(look)}
         >
             <SiteTheme

@@ -8,10 +8,9 @@ import { Textarea } from "@saroh/ui/textarea";
 import { Bold, Link2 } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 
-import type { ServiceOption } from "@/components/sites/section-fields";
 import { count } from "@/lib/format/plural";
 import { EditorSheet } from "../editor-sheet";
-import type { LinkChoice, LinkPlace } from "../link-picker";
+import type { LinkChoice, TextLinks } from "../link-picker";
 import { LinkPicker } from "../link-picker";
 
 /**
@@ -24,13 +23,6 @@ export interface TextField {
     label: string;
     /** "Bridal packages", the section it is in. */
     section: string;
-}
-
-/** Where a link may go, for the link picker on rich text. */
-export interface TextLinks {
-    places: readonly LinkPlace[];
-    services?: readonly ServiceOption[];
-    businessPhone?: string | null;
 }
 
 /** The part of a Tiptap editor the sheet uses: its HTML, in and out. */

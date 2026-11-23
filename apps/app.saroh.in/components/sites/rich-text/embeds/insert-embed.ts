@@ -4,7 +4,7 @@ import type { Editor } from "@tiptap/react";
  * What the menus need of a card (U15b), apart from the node itself, so
  * opening a menu never loads the card or its reads.
  */
-export type EmbedKind = "service" | "product";
+export type EmbedKind = "service" | "product" | "book" | "offer";
 
 /** The node's name in the schema (`business-embed.ts`). */
 export const EMBED_NODE = "businessEmbed";

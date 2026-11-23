@@ -5,7 +5,7 @@
 // where the Tip's words replace it (the theme toggle), or off while the Tip
 // explains why it is disabled (the new order's + button).
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dirname, "..");
@@ -18,6 +18,8 @@ const files = execFileSync("git", ["ls-files", "*.tsx"], {
         (f) =>
             f &&
             !f.includes(".test.") &&
+            // A file deleted in the work tree but not yet committed.
+            existsSync(join(root, f)) &&
             (f.startsWith("apps/") || f.startsWith("packages/")),
     );
 

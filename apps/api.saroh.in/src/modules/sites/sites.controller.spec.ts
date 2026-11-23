@@ -94,6 +94,15 @@ const ROUTES: Route[] = [
         expect: [ctx],
     },
     {
+        handler: "teamPage",
+        method: RequestMethod.GET,
+        path: "team-page",
+        target: "sites",
+        call: "teamPage",
+        args: [ctx],
+        expect: [ctx],
+    },
+    {
         handler: "list",
         method: RequestMethod.GET,
         path: "/",

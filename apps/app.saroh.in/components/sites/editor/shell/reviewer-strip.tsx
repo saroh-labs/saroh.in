@@ -1,7 +1,10 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Label } from "@saroh/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
+import { Switch } from "@saroh/ui/switch";
+import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { formatDate } from "@/lib/format/datetime";
@@ -9,18 +12,22 @@ import { count } from "@/lib/format/plural";
 
 import { nextChange, unitSectionKey } from "../use-editor-review";
 import type { EditorModel } from "./editor-model";
+import { LiveVersionPage } from "./live-version";
 
 /**
  * A reader's strip under the bar (`fix/WXMReviewer`): who asked and when,
  * what is waiting for Publish ("Changed since live · 7 changes", the same
  * change units Publish counts), Next change, and how much of the site they
- * have read. Drawn while a review was asked for or something is waiting.
+ * have read, and Live version (R1), which shows what visitors see now
+ * over the canvas. Drawn while a review was asked for or something is
+ * waiting.
  */
 export function ReviewerStrip({ model }: { model: EditorModel }) {
     const zone = useBusinessZone();
     const { review, changes } = model.review;
     const request = review.pending ? review.request : null;
     const waiting = changes ?? [];
+    const [showLive, setShowLive] = useState(false);
     if (!request && waiting.length === 0) return null;
     const read = review.pagesRead;
     const next = nextChange(waiting, {
@@ -60,7 +67,14 @@ export function ReviewerStrip({ model }: { model: EditorModel }) {
                         <ul className="divide-y text-sm">
                             {waiting.map((unit) => (
                                 <li key={unit.key} className="px-3 py-2">
-                                    <span className="block font-medium">
+                                    {/* R1: what was taken out reads struck through. */}
+                                    <span
+                                        className={
+                                            unit.change === "removed"
+                                                ? "block font-medium text-muted-foreground line-through"
+                                                : "block font-medium"
+                                        }
+                                    >
                                         {unit.label}
                                     </span>
                                     <span className="block text-xs text-muted-foreground">
@@ -73,6 +87,23 @@ export function ReviewerStrip({ model }: { model: EditorModel }) {
                 </Popover>
             ) : null}
             <span className="flex-1" />
+            {waiting.length > 0 ? (
+                // R1: flip the canvas between the draft and the live page.
+                <span className="flex shrink-0 items-center gap-2">
+                    <Switch
+                        id="reviewer-live-version"
+                        checked={showLive}
+                        onCheckedChange={setShowLive}
+                    />
+                    <Label
+                        htmlFor="reviewer-live-version"
+                        className="text-[0.8125rem] font-normal"
+                    >
+                        Live version
+                    </Label>
+                    {showLive ? <LiveVersionPage model={model} /> : null}
+                </span>
+            ) : null}
             {read && read.total > 0 ? (
                 // Last on a phone, on its own line under the changes.
                 <span className="order-last flex w-full shrink-0 items-center gap-2 text-[0.8125rem] text-muted-foreground sm:order-none sm:w-auto">

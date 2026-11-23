@@ -1,5 +1,6 @@
 "use client";
 
+import { POST_BODY_BLOCKS } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
@@ -28,7 +29,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyleKit } from "@tiptap/extension-text-style";
-import type { Editor } from "@tiptap/react";
+import type { AnyExtension, Editor } from "@tiptap/react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -55,13 +56,18 @@ import {
     Underline as UnderlineIcon,
     Undo2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import {
+    LinkPicker,
+    TextLinksContext,
+} from "@/components/sites/editor/link-picker";
 import { editorKey } from "@/lib/tiptap/editor-key";
 import { Tip } from "@saroh/ui/tooltip";
 
 import { BusinessEmbed } from "./embeds/business-embed";
+import { POST_BLOCKS } from "./embeds/post-blocks";
 import { FormatBar, insertImage, SlashMenu } from "./writing-menus";
 
 /**
@@ -95,6 +101,8 @@ import { FormatBar, insertImage, SlashMenu } from "./writing-menus";
  * extensions is dropped on the way in. What the merchant sees after a paste
  * is already what they will get.
  */
+
+const NO_EXTENSIONS: readonly AnyExtension[] = [];
 
 const FONTS: { label: string; value: string | null }[] = [
     { label: "Site font", value: null },
@@ -150,6 +158,8 @@ export function RichTextEditor({
     toolbar = false,
     onToolbarChange,
     onEditor,
+    readOnly = false,
+    extensions: extra = NO_EXTENSIONS,
 }: {
     value: string;
     onChange: (html: string) => void;
@@ -167,6 +177,14 @@ export function RichTextEditor({
     onToolbarChange?: (open: boolean) => void;
     /** The editor once made, for a host that adds to it (rail › Add). */
     onEditor?: (editor: Editor | null) => void;
+    /**
+     * `document` only: drawn as the post looks, nothing editable and no
+     * menus (a reviewer's view, R3). The schema still drops on the way in
+     * whatever it doesn't know, so a draft never renders as raw markup.
+     */
+    readOnly?: boolean;
+    /** More extensions, made once by the host (the reviewer's change marks). */
+    extensions?: readonly AnyExtension[];
 }) {
     const asDocument = variant === "document";
     const editor = useEditor({
@@ -205,16 +223,19 @@ export function RichTextEditor({
             Placeholder.configure({ placeholder }),
             CharacterCount,
             // A post's cards from the business (U15b); a section has none.
-            ...(asDocument ? [BusinessEmbed] : []),
+            ...(asDocument ? [BusinessEmbed, ...POST_BLOCKS] : []),
+            ...extra,
         ],
+        editable: !readOnly,
         content: value,
         editorProps: {
             attributes: {
                 // The merchant's own prose styles, so what they write here
                 // reads like it will on the page.
                 class: asDocument
-                    ? // The site's own type (`--site-*`), set by the host's scope.
-                      "prose max-w-none min-h-[50vh] outline-none font-site-body text-site-body prose-headings:font-site-heading prose-headings:text-site-fg prose-strong:text-site-fg prose-blockquote:text-site-body prose-a:text-site-fg"
+                    ? // The site's own type (`--site-*`), set by the host's scope,
+                      // in the live post's treatment (`saroh.app` post-view).
+                      `prose max-w-none min-h-[50vh] outline-none text-[length:var(--site-body-size,1rem)] ${POST_BODY_BLOCKS} font-site-body text-site-body prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-li:text-site-fg/80 prose-strong:text-site-fg prose-blockquote:text-site-body prose-a:text-site-accent-text`
                     : "prose prose-sm max-w-none min-h-40 px-3 py-2 outline-none dark:prose-invert",
             },
         },
@@ -263,6 +284,7 @@ export function RichTextEditor({
             onChange={onChange}
             className={className}
             asDocument={asDocument}
+            readOnly={readOnly}
             toolbar={toolbar}
             onToolbarChange={onToolbarChange}
         />
@@ -275,9 +297,11 @@ function EditorSurface({
     onChange,
     className,
     asDocument = false,
+    readOnly = false,
     toolbar = false,
     onToolbarChange,
 }: {
+    readOnly?: boolean;
     editor: NonNullable<ReturnType<typeof useEditor>>;
     value: string;
     onChange: (html: string) => void;
@@ -619,11 +643,23 @@ function EditorSurface({
                     (editor.getAttributes("link").href as string | undefined) ??
                     ""
                 }
-                onSet={(href) =>
+                newTab={editor.getAttributes("link").target === "_blank"}
+                words={() => {
+                    const { from, to } = editor.state.selection;
+                    return editor.state.doc.textBetween(from, to, " ");
+                }}
+                onSet={(href, newTab) =>
                     href
                         ? chain()
                               .extendMarkRange("link")
-                              .setLink({ href })
+                              .setLink(
+                                  newTab === undefined
+                                      ? { href }
+                                      : {
+                                            href,
+                                            target: newTab ? "_blank" : null,
+                                        },
+                              )
                               .run()
                         : chain().extendMarkRange("link").unsetLink().run()
                 }
@@ -730,7 +766,7 @@ function EditorSurface({
                 {/* The editor is null on the first render (immediatelyRender
                     off): the menus wait for it rather than read null. */}
                 {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- null at first render whatever Tiptap's types say (see above) */}
-                {editor ? (
+                {editor && !readOnly ? (
                     <>
                         <FormatBar
                             editor={editor}
@@ -894,15 +930,33 @@ function Swatches({
 function LinkTool({
     active,
     current,
+    newTab,
+    words,
     onSet,
 }: {
     active: boolean;
     current: string;
-    onSet: (href: string) => void;
+    newTab: boolean;
+    /** The words chosen, read as the picker opens. */
+    words: () => string;
+    /** `newTab` only from the site editor's picker; else the default. */
+    onSet: (href: string, newTab?: boolean) => void;
 }) {
     const [href, setHref] = useState(current);
+    const [open, setOpen] = useState(false);
+    const [chosen, setChosen] = useState("");
+    // In the site editor, the picker (D2, `fix/WXKText`); elsewhere a box.
+    const links = useContext(TextLinksContext);
     return (
-        <Popover onOpenChange={(open) => open && setHref(current)}>
+        <Popover
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+                if (!next) return;
+                setHref(current);
+                setChosen(words());
+            }}
+        >
             <PopoverTrigger asChild>
                 <Toggle
                     size="sm"
@@ -914,39 +968,64 @@ function LinkTool({
                     <Link2 />
                 </Toggle>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-72">
-                <form
-                    onKeyDown={submitOnModEnter}
-                    className="grid gap-2"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        onSet(href.trim());
-                    }}
+            {links ? (
+                <PopoverContent
+                    align="end"
+                    collisionPadding={12}
+                    // 300px, as the board's popover (D2).
+                    className="max-h-[min(32rem,var(--radix-popover-content-available-height))] w-[300px] overflow-y-auto"
                 >
-                    <Input
-                        dense
-                        value={href}
-                        onChange={(e) => setHref(e.target.value)}
-                        placeholder="https://… or /about"
-                        aria-label="Link address"
+                    <LinkPicker
+                        words={chosen || "these words"}
+                        places={links.places}
+                        services={links.services}
+                        businessPhone={links.businessPhone}
+                        current={current ? { href: current, newTab } : null}
+                        onApply={(link) => {
+                            onSet(link.href, link.newTab);
+                            setOpen(false);
+                        }}
+                        onRemove={() => {
+                            onSet("");
+                            setOpen(false);
+                        }}
                     />
-                    <div className="flex gap-2">
-                        <Button type="submit" size="xs">
-                            Apply
-                        </Button>
-                        {active ? (
-                            <Button
-                                type="button"
-                                size="xs"
-                                variant="ghost"
-                                onClick={() => onSet("")}
-                            >
-                                Remove
+                </PopoverContent>
+            ) : (
+                <PopoverContent align="start" className="w-72">
+                    <form
+                        onKeyDown={submitOnModEnter}
+                        className="grid gap-2"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            onSet(href.trim());
+                        }}
+                    >
+                        <Input
+                            dense
+                            value={href}
+                            onChange={(e) => setHref(e.target.value)}
+                            placeholder="https://… or /about"
+                            aria-label="Link address"
+                        />
+                        <div className="flex gap-2">
+                            <Button type="submit" size="xs">
+                                Apply
                             </Button>
-                        ) : null}
-                    </div>
-                </form>
-            </PopoverContent>
+                            {active ? (
+                                <Button
+                                    type="button"
+                                    size="xs"
+                                    variant="ghost"
+                                    onClick={() => onSet("")}
+                                >
+                                    Remove
+                                </Button>
+                            ) : null}
+                        </div>
+                    </form>
+                </PopoverContent>
+            )}
         </Popover>
     );
 }

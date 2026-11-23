@@ -193,6 +193,16 @@ describe("the canvas in Preview", () => {
         expect(host.textContent).toContain("flour.saroh.app/");
     });
 
+    it("names what a click does on an unselected block, never on the selected one (D8)", () => {
+        render({ previewing: false });
+        const hints = host.querySelectorAll(
+            "[data-block-index] [data-click-hint]",
+        );
+        // Two sections, the first selected: only the second says it.
+        expect(hints).toHaveLength(1);
+        expect(hints.item(0).textContent).toBe("· click to edit");
+    });
+
     it("says what Preview is, and Back to editing leaves it", () => {
         const { setPreviewing } = render();
         expect($("[role=status]")?.textContent).toBe(

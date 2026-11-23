@@ -3,6 +3,7 @@ import type {
     ComponentKind,
     ComponentStyles,
     LookId,
+    SectionStyles,
 } from "@saroh/block-contract";
 import {
     COMPONENT_KINDS,
@@ -11,6 +12,8 @@ import {
     componentStylesOf,
     LOOKS,
 } from "@saroh/block-contract";
+
+import { BUTTON_SIZES, colourPair } from "./element-theme";
 
 import { ACCOUNT_PARTS } from "./account/look-account-rules";
 import { LOOK_DESK_FROM } from "./look-theme";
@@ -49,6 +52,97 @@ import { LOOK_DESK_FROM } from "./look-theme";
 const BUTTON = `:is(:is(a, button):is([class*="rounded-[var(--site-radius)"], [class~="rounded-site"]), ${ACCOUNT_PARTS.button})`;
 
 /**
+ * The filled buttons: Classic's primary and a look's fill. What Button
+ * colour and Button style (DEC-254) recolour or redraw.
+ */
+const FILLED = `${BUTTON}[class~="bg-site-accent"]`;
+
+const FILL = "var(--site-button-fill, hsl(var(--site-accent)))";
+
+/**
+ * The filled buttons painted from variables, read on the button itself, so
+ * each property comes from the closest scope that named it: a section's
+ * colour keeps the style the site set, and a site's style keeps a
+ * section's colour. Tint, edge and words are how much of the colour the
+ * fill, the edge and the words take (Filled 100%, Outline an edge only,
+ * Soft a 16% tint, Link none), the rest the page's own words.
+ */
+function paint(at: string): string {
+    return `
+            ${at} ${FILLED} {
+                background-color: color-mix(in srgb, ${FILL} var(--site-button-tint, 100%), transparent);
+                border-color: color-mix(in srgb, ${FILL} var(--site-button-edge, 100%), transparent);
+                color: color-mix(in srgb, var(--site-button-ink, hsl(var(--site-accent-fg))) var(--site-button-words, 100%), hsl(var(--site-fg)));
+            }`;
+}
+
+/** Button colour: its variables, and the paint that reads them. */
+function buttonColour(at: string, colour: string): string {
+    const pair = colourPair(colour);
+    if (!pair) return "";
+    return `
+            ${at} {
+                --site-button-fill: ${pair.fill};
+                --site-button-ink: ${pair.ink};
+            }${paint(at)}`;
+}
+
+/** Each style's share of the colour, and what else it changes. */
+const STYLE_MIX: Record<string, [string, string, string]> = {
+    filled: ["100%", "100%", "100%"],
+    outline: ["0%", "100%", "0%"],
+    soft: ["16%", "0%", "0%"],
+    link: ["0%", "0%", "0%"],
+};
+const STYLE_SHAPE: Record<string, string> = {
+    filled: "text-decoration-line: none;",
+    outline: "border-width: 1px;\n                border-style: solid;",
+    soft: "",
+    link: `text-decoration-line: underline;
+                text-decoration-color: ${FILL};
+                text-underline-offset: 4px;
+                padding-inline: 0;`,
+};
+
+/** Button style: the filled buttons drawn as another kind (DEC-254). */
+function buttonStyle(at: string, style: string, own = ""): string {
+    const [tint, edge, words] = STYLE_MIX[style];
+    const shape = STYLE_SHAPE[style];
+    return `
+            ${at} {
+                --site-button-tint: ${tint};
+                --site-button-edge: ${edge};
+                --site-button-words: ${words};
+            }${paint(at)}${
+                shape
+                    ? `
+            ${at} ${FILLED}${own} {
+                ${shape}
+            }`
+                    : ""
+            }`;
+}
+
+/** Button size: padding and words; a phone keeps its 44px (`coarse:min-h-11`). */
+function buttonSize(at: string, size: "s" | "l", own = ""): string {
+    const { padding, fontSize } = BUTTON_SIZES[size];
+    return `
+            ${at} ${BUTTON}:not([class~="underline"])${own} {
+                padding: ${padding};
+                font-size: ${fontSize};
+            }`;
+}
+
+/**
+ * What a site-wide rule leaves to a section that names the same thing
+ * (DEC-253): the section's wrapper lists them in `data-site-own`, so its
+ * own value, the look's own included, is what its elements draw.
+ */
+export function siteOwn(kind: ComponentKind): string {
+    return `:not([data-site-own~="${kind}"] *)`;
+}
+
+/**
  * Cards: Classic's rounder-than-a-button boxes, the looks' card fills and
  * the account's cards.
  */
@@ -75,6 +169,8 @@ const LINK = ':is(a[class~="underline"], a[data-site-link])';
 type Rule = (at: string, ctx: Context) => string;
 
 interface Context {
+    /** A site rule's `:not(...)` for sections that name the kind; "" in one. */
+    own: (kind: ComponentKind) => string;
     look: LookId | undefined;
     defaults: ComponentDefaults;
     variables: Readonly<Record<string, string>> | null | undefined;
@@ -98,8 +194,13 @@ const RULES: Record<ComponentKind, Partial<Record<string, Rule>>> = {
     buttons: Object.fromEntries(
         Object.entries(COMPONENT_VALUES.buttonRadius).map(([id, n]) => [
             id,
-            (at) =>
-                radius(at, "--site-button-radius", px(n), BUTTON) +
+            (at: string, ctx: Context) =>
+                radius(
+                    at,
+                    "--site-button-radius",
+                    px(n),
+                    `${BUTTON}${ctx.own("buttons")}`,
+                ) +
                 // A look's account rounds its buttons from the look's own
                 // radius (`accountLookRules`); the merchant's choice wins.
                 `
@@ -124,56 +225,77 @@ const RULES: Record<ComponentKind, Partial<Record<string, Rule>>> = {
                 text-decoration-line: none;
             }`,
     },
+    buttonColour: Object.fromEntries(
+        (["accent", "tint", "fg", "surface", "bg", "rule"] as const).map(
+            (role) => [role, (at: string) => buttonColour(at, role)],
+        ),
+    ),
+    // Filled and Medium are the look's own: never written for the site.
+    buttonStyle: {
+        outline: (at, ctx) =>
+            buttonStyle(at, "outline", ctx.own("buttonStyle")),
+        soft: (at, ctx) => buttonStyle(at, "soft", ctx.own("buttonStyle")),
+        link: (at, ctx) => buttonStyle(at, "link", ctx.own("buttonStyle")),
+    },
+    buttonSize: {
+        s: (at, ctx) => buttonSize(at, "s", ctx.own("buttonSize")),
+        l: (at, ctx) => buttonSize(at, "l", ctx.own("buttonSize")),
+    },
     cards: {
-        flat: (at) => `
-            ${at} ${CARD} {
+        flat: (at, ctx) => `
+            ${at} ${CARD}${ctx.own("cards")} {
                 border-color: transparent;
                 box-shadow: none;
             }`,
-        bordered: (at) => `
-            ${at} ${CARD} {
+        bordered: (at, ctx) => `
+            ${at} ${CARD}${ctx.own("cards")} {
                 border: 1px solid hsl(var(--site-rule, var(--site-border)));
                 box-shadow: none;
             }`,
-        raised: (at) => `
-            ${at} ${CARD} {
+        raised: (at, ctx) => `
+            ${at} ${CARD}${ctx.own("cards")} {
                 border-color: transparent;
                 background-color: hsl(var(--site-surface));
             }
-            ${at} ${CARD}:not(:focus-visible) {
+            ${at} ${CARD}${ctx.own("cards")}:not(:focus-visible) {
                 box-shadow: 0 1px 2px hsl(var(--site-fg) / 0.06), 0 12px 32px -16px hsl(var(--site-fg) / 0.3);
             }`,
     },
     cardCorners: {
         // Soft is the look's own corner: never written.
-        square: (at) =>
+        square: (at, ctx) =>
             radius(
                 at,
                 "--site-card-radius",
                 px(COMPONENT_VALUES.cardRadius.square),
-                CARD,
+                `${CARD}${ctx.own("cardCorners")}`,
             ),
-        rounded: (at) =>
+        rounded: (at, ctx) =>
             radius(
                 at,
                 "--site-card-radius",
                 px(COMPONENT_VALUES.cardRadius.rounded),
-                CARD,
+                `${CARD}${ctx.own("cardCorners")}`,
             ),
     },
     images: {
         // Soft is the look's own photo corner: never written.
-        square: (at) =>
+        square: (at, ctx) =>
             radius(
                 at,
                 "--site-image-radius",
                 px(COMPONENT_VALUES.imageRadius.square),
-                IMAGE,
+                `${IMAGE}${ctx.own("images")}`,
             ),
-        arch: (at) =>
-            radius(at, "--site-image-radius", "999px 999px 0 0", IMAGE),
-        round: (at) => `
-            ${at} ${ROUND_PHOTO} {
+        arch: (at, ctx) =>
+            radius(
+                at,
+                "--site-image-radius",
+                "999px 999px 0 0",
+                `${IMAGE}${ctx.own("images")}`,
+            ),
+        round: (at, ctx) => `
+            ${at} ${ROUND_PHOTO}${ctx.own("images")} {
                 border-radius: 50%;
             }`,
     },
@@ -282,9 +404,72 @@ export function componentRules(
     variables: Readonly<Record<string, string>> | null | undefined,
 ): string {
     const changed = changedComponents(look, componentStylesOf(variables));
-    const ctx: Context = { look, defaults: componentDefaults(look), variables };
+    const ctx: Context = {
+        own: siteOwn,
+        look,
+        defaults: componentDefaults(look),
+        variables,
+    };
     return COMPONENT_KINDS.map((kind) => {
         const id = changed[kind];
         return id ? (RULES[kind][id]?.(at, ctx) ?? "") : "";
     }).join("");
+}
+
+/** The site kinds a section's styles name: its wrapper's `data-site-own`. */
+export function ownedKinds(styles: SectionStyles): string {
+    const { button, card, image } = styles;
+    return [
+        button?.colour && "buttonColour",
+        button?.style && "buttonStyle",
+        button?.size && "buttonSize",
+        button?.corners && "buttons",
+        card?.card && "cards",
+        card?.corners && "cardCorners",
+        image?.corners && "images",
+    ]
+        .filter(Boolean)
+        .join(" ");
+}
+
+/**
+ * One section's styles (DEC-253) as rules under `at`, the section's own
+ * mark: written after the site's and more specific, and the site's rules
+ * skip a section that names the same kind (`siteOwn`), so the section's
+ * value wins per property, the look's own included: Filled and Medium
+ * leave the look's button, Soft corners reset the variable a block reads.
+ */
+export function sectionStyleRules(
+    at: string,
+    look: LookId | undefined,
+    styles: SectionStyles,
+): string {
+    const ctx: Context = {
+        own: () => "",
+        look,
+        defaults: componentDefaults(look),
+        variables: undefined,
+    };
+    const rule = (kind: ComponentKind, id: string | undefined) =>
+        id ? (RULES[kind][id]?.(at, ctx) ?? "") : "";
+    const { button, card, image } = styles;
+    const resets = [
+        card?.corners === "soft" && "--site-card-radius: initial;",
+        image?.corners === "soft" && "--site-image-radius: initial;",
+    ].filter(Boolean);
+    return [
+        resets.length > 0
+            ? `
+            ${at} {
+                ${resets.join("\n                ")}
+            }`
+            : "",
+        button?.colour ? buttonColour(at, button.colour) : "",
+        button?.style ? buttonStyle(at, button.style) : "",
+        rule("buttonSize", button?.size),
+        rule("buttons", button?.corners),
+        rule("cards", card?.card),
+        rule("cardCorners", card?.corners),
+        rule("images", image?.corners),
+    ].join("");
 }

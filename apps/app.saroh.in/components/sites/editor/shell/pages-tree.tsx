@@ -1,29 +1,28 @@
 "use client";
 
+import { firstPhotoOf } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
-import {
-    EyeOff,
-    FileText,
-    Layers,
-    PanelBottom,
-    PanelTop,
-    Plus,
-} from "lucide-react";
+import { EyeOff, Layers, PanelBottom, PanelTop, Plus } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useState } from "react";
 import { useOpenPageId } from "../page-switch";
 
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
+import { count } from "@/lib/format/plural";
 import type { Flag, Section } from "@/lib/sites/service";
+
+import { SiteColoursCard } from "@/components/sites/looks/site-colours-card";
+import { elementsOf } from "@/lib/sites/element-style";
 
 import { sectionTitle } from "../editor-constants";
 import { leavePageMessage } from "../use-editor-selection";
 import type { EditorModel } from "./editor-model";
+import { PageThumb } from "./page-thumb";
 
 /**
  * "Hidden on phone" from the section's frame (KTD-E5, U47a), "Hidden" when
@@ -63,6 +62,11 @@ export function PagesTree({
     const openPageId = useOpenPageId(siteId);
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
+    const waiting = model.review.changes ?? [];
+    const changeCount = waiting.length;
+    const changedPages = new Set(
+        waiting.flatMap((u) => (u.pageId === null ? [] : [u.pageId])),
+    ).size;
 
     function openPage(id: string) {
         if (id === pageId) return;
@@ -157,9 +161,16 @@ export function PagesTree({
                                     page
                                     onClick={() => openPage(page.id)}
                                 >
-                                    <FileText
-                                        aria-hidden
-                                        className="size-4 shrink-0"
+                                    <PageThumb
+                                        photo={
+                                            open
+                                                ? firstPhotoOf(
+                                                      sections.map(
+                                                          (s) => s.content,
+                                                      ),
+                                                  )
+                                                : page.firstPhoto
+                                        }
                                     />
                                     {/* The title wins: the path gives way first. */}
                                     <span
@@ -214,7 +225,7 @@ export function PagesTree({
                                                         setDropIndex(null);
                                                     }}
                                                     className={cn(
-                                                        "group relative flex items-center rounded-md",
+                                                        "group relative flex flex-wrap items-center rounded-md",
                                                         dropIndex === index &&
                                                             dragIndex !==
                                                                 index &&
@@ -243,7 +254,7 @@ export function PagesTree({
                                                                     null,
                                                                 );
                                                             }}
-                                                            className="absolute left-3 cursor-grab select-none text-muted-foreground opacity-0 active:cursor-grabbing group-hover:opacity-100"
+                                                            className="absolute left-3 cursor-grab select-none text-muted-foreground opacity-0 active:cursor-grabbing [@media(hover:hover)]:group-hover:opacity-100"
                                                         >
                                                             ⋮
                                                         </span>
@@ -299,6 +310,18 @@ export function PagesTree({
                                                                 className="size-1.5 shrink-0 rounded-full bg-foreground"
                                                             />
                                                         ) : null}
+                                                        {section.key !==
+                                                            undefined &&
+                                                        model.review.changedByKey.has(
+                                                            section.key,
+                                                        ) ? (
+                                                            // R1: changed since live.
+                                                            <span
+                                                                role="img"
+                                                                aria-label="Changed since live"
+                                                                className="size-2 shrink-0 rounded-full bg-info"
+                                                            />
+                                                        ) : null}
                                                         {mark ? (
                                                             <span className="flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
                                                                 <EyeOff
@@ -309,6 +332,14 @@ export function PagesTree({
                                                             </span>
                                                         ) : null}
                                                     </TreeRow>
+                                                    {selection.selectedIndex ===
+                                                    index ? (
+                                                        <ElementRows
+                                                            model={model}
+                                                            index={index}
+                                                            section={section}
+                                                        />
+                                                    ) : null}
                                                 </li>
                                             );
                                         })}
@@ -327,10 +358,29 @@ export function PagesTree({
                         );
                     })}
                 </ul>
+                {/* The site's palette in view under Pages (CSI-C). */}
+                <SiteColoursCard
+                    style={model.siteStyle.style}
+                    options={model.styleOptions}
+                    rules={model.styleRules}
+                    readOnly={readOnly}
+                    onChange={model.siteStyle.setStyle}
+                    onTry={model.siteStyle.tryStyle}
+                    onBrand={() => model.openRail("brand")}
+                />
             </div>
 
             <div className="shrink-0 border-t px-3 pb-3 pt-2.5">
-                {readOnly ? (
+                {readOnly && changeCount > 0 ? (
+                    // R1 (`WXMReviewer`): what waits, where the dots are.
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span
+                            aria-hidden
+                            className="size-2 shrink-0 rounded-full bg-info"
+                        />
+                        {`Changed since live · ${count(changeCount, "change")}${changedPages > 0 ? ` on ${count(changedPages, "page")}` : ""}`}
+                    </p>
+                ) : readOnly ? (
                     <p className="text-xs leading-relaxed text-muted-foreground">
                         You can read every page and leave notes. Nothing else
                         changes.
@@ -384,5 +434,57 @@ function TreeRow({
         >
             {children}
         </button>
+    );
+}
+
+/**
+ * The selected section's buttons and photos under its row (CSI-C,
+ * "Button · Browse the catalogue"), each selectable on its own (DEC-253).
+ */
+function ElementRows({
+    model,
+    index,
+    section,
+}: {
+    model: EditorModel;
+    index: number;
+    section: Section;
+}) {
+    const items = elementsOf(section.content);
+    if (items.length === 0 || model.layout !== "wide") return null;
+    const chosen = model.selection.element;
+    return (
+        <ul
+            aria-label={`Buttons and photos in ${sectionTitle(section)}`}
+            className="w-full basis-full"
+        >
+            {items.map((el) => {
+                const on = chosen?.kind === el.kind && chosen.path === el.path;
+                return (
+                    <li key={`${el.kind}:${el.path}`}>
+                        <button
+                            type="button"
+                            aria-pressed={on}
+                            data-element-row={`${el.kind}:${el.path}`}
+                            onClick={() => {
+                                model.selection.selectElement(index, el);
+                                model.scrollToSection(index);
+                            }}
+                            className={cn(
+                                "ml-[30px] flex h-8 w-[calc(100%-30px)] items-center rounded-md px-2.5 text-left text-[0.8125rem] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                on
+                                    ? "bg-card font-semibold text-foreground shadow-[inset_0_0_0_1.5px_hsl(var(--foreground))]"
+                                    : "hover:bg-muted",
+                            )}
+                        >
+                            <span className="truncate">
+                                {el.kind === "button" ? "Button" : "Photo"} ·{" "}
+                                {el.name}
+                            </span>
+                        </button>
+                    </li>
+                );
+            })}
+        </ul>
     );
 }

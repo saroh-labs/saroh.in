@@ -182,6 +182,17 @@ afterAll(async () => {
 });
 
 describe("starter content (DEC-182)", () => {
+    it("on a site with no pages yet, the template's home page becomes its home (E1)", async () => {
+        const { owner, siteId } = await business("pro");
+        await prisma.page.deleteMany({ where: { siteId } });
+        await asOrg(owner, () => copyStarterContent(owner, siteId, "live"));
+        const homes = await prisma.page.findMany({
+            where: { siteId, isHome: true },
+            select: { path: true },
+        });
+        expect(homes).toEqual([{ path: "/" }]);
+    });
+
     it("sets the look and copies Live's showcase, Prana, into the draft, sample words and all, leaving other pages alone", async () => {
         const { owner, siteId, homeId, aboutId } = await business("pro");
         const result = await asOrg(owner, () =>

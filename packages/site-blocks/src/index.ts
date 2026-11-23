@@ -139,7 +139,7 @@ export type { PublicService, ServicesFeed } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
 export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
 export { productCardsOf, productGridQuery } from "./lib/product-grid-read";
-export { POST_EMBED_CARD } from "./post-embed-card";
+export { POST_BODY_BLOCKS, POST_EMBED_CARD } from "./post-embed-card";
 // Server-safe (not in the "use client" block): saroh.app reads it for the
 // booking page's header on the server (E6).
 export {

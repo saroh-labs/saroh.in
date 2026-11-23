@@ -380,3 +380,35 @@ export class TurnDownRuleRequestDto {
     @MaxLength(300)
     reason?: string;
 }
+
+/** Who appears on Our team: the whole chosen list (round 3). */
+export class SetTeamPageDto {
+    @IsArray({ message: "staffIds must be a list" })
+    @ArrayMaxSize(200)
+    @IsString({ each: true })
+    @MaxLength(64, { each: true })
+    staffIds!: string[];
+}
+
+/** The most a team member's "About them" may run. */
+export const STAFF_ABOUT_MAX = 600;
+
+/**
+ * A team member's own photo and words (23 Nov 2026). Each is optional; a
+ * field left out stays, `null` clears it. The photo is a library image of
+ * this business's, checked in the service.
+ */
+export class UpdateStaffProfileDto {
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsString()
+    @MaxLength(64)
+    photoMediaId?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @Transform(trim)
+    @IsString()
+    @MaxLength(STAFF_ABOUT_MAX)
+    about?: string | null;
+}

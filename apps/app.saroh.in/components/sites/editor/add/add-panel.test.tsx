@@ -11,6 +11,14 @@ import { AddPanel } from "./add-panel";
 
 const push = vi.fn();
 const refresh = vi.fn();
+// Our team's People list and picker read the team on the server.
+vi.mock("@/lib/staff/team-picker-read", () => ({
+    readTeamForPicker: () => Promise.resolve({ team: [], canChoose: false }),
+}));
+vi.mock("@/lib/staff/actions", () => ({ setTeamPage: vi.fn() }));
+vi.mock("@/lib/product-reviews/picker-read", () => ({
+    readReviewsForPicker: () => Promise.resolve([]),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh }),
 }));
@@ -18,9 +26,17 @@ const listServicesForPicker = vi.fn();
 vi.mock("@/lib/services/actions", () => ({
     listServicesForPicker: () => listServicesForPicker() as unknown,
 }));
+const readAddBusiness = vi.fn();
+vi.mock("@/lib/sites/add-business-read", () => ({
+    readAddBusiness: () => readAddBusiness() as unknown,
+}));
 vi.mock("@/lib/sites/actions", () => ({
     createPage: vi.fn(),
     duplicatePage: vi.fn(),
+}));
+// The suggested cards' small pictures are the library's own, tested there.
+vi.mock("@/components/sites/blocks/block-thumbnail", () => ({
+    BlockThumbnail: () => <span data-thumbnail="" />,
 }));
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: vi.fn(),
@@ -69,6 +85,11 @@ function model(over: Partial<EditorModel> = {}) {
         draft,
         add,
         openRail: vi.fn(),
+        layout: "wide",
+        siteStyle: { style: { colours: {}, scalars: {} } },
+        styleOptions: { rows: [], scalars: [] },
+        viewport: { canvasRef: { current: null } },
+        selection: { setSelectedIndex: vi.fn() },
         ...over,
     } as unknown as EditorModel;
     return { m, add, draft };
@@ -84,9 +105,20 @@ beforeEach(() => {
     listServicesForPicker.mockResolvedValue({
         ok: true,
         services: [
-            { id: "s1", name: "Sample one", status: "ACTIVE" },
+            {
+                id: "s1",
+                name: "Sample one",
+                status: "ACTIVE",
+                durationMinutes: 90,
+                priceCents: 250000,
+                currency: "INR",
+            },
             { id: "s2", name: "Sample two", status: "ACTIVE" },
         ],
+    });
+    readAddBusiness.mockResolvedValue({
+        products: 32,
+        forms: { count: 2, first: "Sample enquiry" },
     });
 });
 
@@ -216,5 +248,70 @@ describe("AddPanel (U46e)", () => {
             await new Promise((r) => setTimeout(r, 400));
         });
         expect(text()).toContain("Shop page");
+    });
+
+    it("counts each group, and says the business's own counts (A2, A9)", async () => {
+        const { m } = model();
+        await render(m);
+        const count = (label: string) =>
+            document
+                .querySelector(
+                    `section[aria-label="${label}"] [data-group-count]`,
+                )
+                ?.getAttribute("data-group-count");
+        expect(Number(count("Suggested for this page"))).toBeGreaterThan(0);
+        expect(Number(count("From your business"))).toBeGreaterThan(0);
+        expect(text()).toContain("32 products");
+        // A form: an enquiry section, named by the business's forms.
+        expect(text()).toContain("Sample enquiry, 1 more");
+        expect(button("Add A form")).toBeTruthy();
+        // Two to a row, a tile per layout, in the board's words (A9).
+        expect(
+            document.querySelector(
+                'section[aria-label="From your business"] ul.grid-cols-2',
+            ),
+        ).toBeTruthy();
+        expect(button("Add A product")).toBeTruthy();
+    });
+
+    it("the service picker shows time and price, and Show a Book button off is kept (A5)", async () => {
+        const { m, add, draft } = model();
+        await render(m);
+        await click(button("Add A service"));
+        expect(text()).toContain("90 min");
+        expect(
+            document.querySelector('[data-picker-price="s1"]')?.textContent,
+        ).toMatch(/2,500/);
+        expect(text()).toContain("Show a Book button");
+        await click(
+            Array.from(document.querySelectorAll("label"))
+                .find((l) => l.textContent.startsWith("Sample one"))
+                ?.querySelector("button"),
+        );
+        await click(document.querySelector("button[role=switch]"));
+        await click(button("Add to the page"));
+        const fill = add.addSection.mock.calls[0]?.[2] as (at: number) => void;
+        fill(0);
+        const update = draft.restoreSections.mock.calls[0]?.[0] as (
+            prev: Section[],
+        ) => Section[];
+        expect(update(sections)[0]?.content).toMatchObject({
+            serviceIds: ["s1"],
+            showBook: false,
+        });
+    });
+
+    it("a suggested Booking card reads the business's first service (A1)", async () => {
+        const { m } = model();
+        await render(m);
+        expect(text()).toMatch(/Sample one · 90 min · ₹2,500/);
+    });
+
+    it("a card can be dragged onto the canvas on a desk only (A4)", async () => {
+        const { m } = model();
+        await render(m);
+        expect(document.querySelector('button[draggable="true"]')).toBeTruthy();
+        await render(model({ layout: "phone" }).m, true);
+        expect(document.querySelector('button[draggable="true"]')).toBeNull();
     });
 });
