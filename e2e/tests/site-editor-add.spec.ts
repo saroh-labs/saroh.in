@@ -116,11 +116,17 @@ test.describe("Rail › Add at 1920", () => {
         const sheet = page.getByRole("dialog", { name: "Add a page" });
         await sheet.getByRole("radio", { name: /^A template page/ }).click();
         await sheet.getByText("Our team", { exact: true }).click();
-        // Choosing it opens Add people first (ER3Team T4); Cancel goes back.
-        await page
-            .getByRole("dialog", { name: "Add people to Our team" })
-            .getByRole("button", { name: "Cancel" })
-            .click();
+        // Choosing it opens Add people first (ER3Team T4) when the business
+        // has a team to pick from; Cancel goes back. A business with nobody
+        // to pick goes straight on.
+        const picker = page.getByRole("dialog", {
+            name: "Add people to Our team",
+        });
+        const starts = sheet.locator("[data-page-type-starts=TEAM]");
+        await expect(picker.or(starts).first()).toBeVisible();
+        if (await picker.isVisible()) {
+            await picker.getByRole("button", { name: "Cancel" }).click();
+        }
         await expect(
             sheet.locator("[data-page-type-starts=TEAM]"),
         ).toContainText("Starts with, filled from your business");

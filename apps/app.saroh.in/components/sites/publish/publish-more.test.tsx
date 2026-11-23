@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from "react";
+import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -8,7 +9,13 @@ import { MoreRow } from "./publish-more";
 (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
+const roots: Root[] = [];
 afterEach(() => {
+    // Unmount inside act, so no React work is left to run after the
+    // environment is torn down ("window is not defined" in CI).
+    act(() => {
+        for (const r of roots.splice(0)) r.unmount();
+    });
     document.body.innerHTML = "";
 });
 
@@ -20,8 +27,10 @@ const button = (name: string) =>
 function draw(phone: boolean, onAsk = vi.fn()) {
     const host = document.createElement("div");
     document.body.append(host);
+    const root = createRoot(host);
+    roots.push(root);
     act(() =>
-        createRoot(host).render(
+        root.render(
             <MoreRow
                 phone={phone}
                 more={{
