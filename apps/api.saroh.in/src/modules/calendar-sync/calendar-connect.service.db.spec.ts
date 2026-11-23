@@ -146,11 +146,26 @@ describe("connecting Google Calendar", () => {
         const status = await service.status(ctx);
         expect(status).toMatchObject({
             state: "CONNECTED",
-            accounts: [{ id: row.id, googleEmail: google.grantEmail }],
+            // Just connected and not checked yet: not "Checking late".
+            accounts: [
+                { id: row.id, googleEmail: google.grantEmail, behind: false },
+            ],
             bookingsGoTo: { accountId: row.id, calendarId: "primary-cal" },
             accountsAllowed: 1,
             meetAccess: "RESTRICTED",
         });
+    });
+
+    it("says an account is late only once it has gone unchecked past the fresh window", async () => {
+        const { ctx, membershipId } = await person();
+        await connectFlow(ctx);
+        const row = await prisma.googleCalendarConnection.findFirstOrThrow({
+            where: { organizationId: ctx.organizationId, membershipId },
+        });
+        // Never checked, connected two days ago.
+        await prisma.$executeRaw`UPDATE "GoogleCalendarConnection" SET "updatedAt" = now() - interval '2 days', "busyRefreshedAt" = NULL WHERE id = ${row.id}`;
+        const status = await service.status(ctx);
+        expect(status.accounts[0]).toMatchObject({ id: row.id, behind: true });
     });
 
     it("refuses with the flag off", async () => {
