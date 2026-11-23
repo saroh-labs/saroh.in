@@ -58,13 +58,17 @@ describe("imageFacts", () => {
 });
 
 describe("parseArgs", () => {
-    it("reads --dry-run and --limit, and refuses anything else", () => {
-        expect(parseArgs([])).toEqual({ dryRun: false });
+    it("is a dry run unless --apply, and refuses anything else", () => {
+        expect(parseArgs([])).toEqual({ dryRun: true });
         expect(parseArgs(["--dry-run", "--limit=20"])).toEqual({
             dryRun: true,
             limit: 20,
         });
+        expect(parseArgs(["--apply", "--limit=20"])).toEqual({
+            dryRun: false,
+            limit: 20,
+        });
         expect(parseArgs(["--limit=0"])).toBeNull();
-        expect(parseArgs(["--apply"])).toBeNull();
+        expect(parseArgs(["--write"])).toBeNull();
     });
 });

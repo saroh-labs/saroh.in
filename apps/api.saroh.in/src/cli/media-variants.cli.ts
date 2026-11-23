@@ -3,8 +3,8 @@
  * before sizing moved to the browser their size, blur and smaller WebP
  * copies. The rule is in media-variants.ts.
  *
- *     node apps/api.saroh.in/dist/cli/media-variants.cli.js --dry-run
- *     node apps/api.saroh.in/dist/cli/media-variants.cli.js [--limit=500]
+ *     node apps/api.saroh.in/dist/cli/media-variants.cli.js            # dry run
+ *     node apps/api.saroh.in/dist/cli/media-variants.cli.js --apply [--limit=500]
  *
  * Run it in a one-off container from the API's image with the API's own
  * environment (R2 and DATABASE_URL), never inside the serving API (its
@@ -14,7 +14,8 @@
  *       removed after> --memory 2g <image> \
  *       node apps/api.saroh.in/dist/cli/media-variants.cli.js --dry-run
  *
- * Dry run first (counts, writes nothing, reads no bytes), then the run, then
+ * A dry run unless `--apply` is given (counts, writes nothing, reads no
+ * bytes). Dry run first, then `--apply`, then
  * a dry run again that must find 0 to do (a failed row is listed by id and
  * stays to do). Safe to stop and run again, and while the API serves.
  * Prints counts and media ids, never a key, a business or a secret.
@@ -37,10 +38,12 @@ export interface VariantsArgs {
 
 /** The arguments, or null when one is not understood. */
 export function parseArgs(argv: readonly string[]): VariantsArgs | null {
-    const args: VariantsArgs = { dryRun: false };
+    // Writes only when told to: a bare run is a dry run.
+    const args: VariantsArgs = { dryRun: true };
     for (const arg of argv) {
-        if (arg === "--dry-run") {
-            args.dryRun = true;
+        if (arg === "--dry-run") continue;
+        if (arg === "--apply") {
+            args.dryRun = false;
             continue;
         }
         const limit = /^--limit=([1-9]\d*)$/.exec(arg);
@@ -56,7 +59,9 @@ export function parseArgs(argv: readonly string[]): VariantsArgs | null {
 async function main(argv: string[]): Promise<number> {
     const args = parseArgs(argv);
     if (!args) {
-        console.error(`${TAG} usage: media-variants [--dry-run] [--limit=N]`);
+        console.error(
+            `${TAG} usage: media-variants [--apply] [--limit=N] (dry run without --apply)`,
+        );
         return 2;
     }
     // Both buckets: each row is read and written where it was stored.

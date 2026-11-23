@@ -158,7 +158,7 @@ export const SOCIAL_WORDS = {
      * own apps never list it; one rule says so for all three.
      */
     heldBySaroh: (channels: string, when: string) =>
-        `Saroh posts this to ${channels} on ${when}. Until then it's only here: it won't show in their own apps.`,
+        `Saroh posts this to ${channels} ${/^(today|tomorrow)\b/i.test(when) ? "" : "on "}${when}. Until then it's only here: it won't show in their own apps.`,
     postingNow: "Posting now. It shows here as each channel answers.",
     tryingAgain: "Trying again.",
     captionSaved: "Caption changed.",

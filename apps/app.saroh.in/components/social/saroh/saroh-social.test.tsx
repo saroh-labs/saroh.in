@@ -11,7 +11,15 @@ import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+    afterEach,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    onTestFinished,
+    vi,
+} from "vitest";
 
 import type {
     SocialAccess,
@@ -22,6 +30,7 @@ import type {
 import type { SocialCompose } from "@/lib/social/use-social-post";
 import { useSocialPost } from "@/lib/social/use-social-post";
 
+import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
 import { ChannelsView } from "./channels/channels-view";
 import { SocialPostPanel } from "./composer/social-post-panel";
 import { PostSheet } from "./post-sheet";
@@ -597,7 +606,24 @@ describe("a post's sheet (S5, S6)", () => {
         expect(q("[data-post-results]")?.textContent).toContain("Nothing yet");
     });
 
+    it("drops 'on' before today or tomorrow in the held-by-Saroh line", () => {
+        expect(
+            SOCIAL_WORDS.heldBySaroh("Instagram", "tomorrow, 7:40 pm"),
+        ).toMatch(/^Saroh posts this to Instagram tomorrow, 7:40 pm\./);
+        expect(
+            SOCIAL_WORDS.heldBySaroh("Instagram", "Tue 24 Nov, 7:40 pm"),
+        ).toMatch(/^Saroh posts this to Instagram on Tue 24 Nov/);
+    });
+
     it("says Saroh holds a scheduled post, with Move and Post now beside it (owner, 22 Nov 2026)", async () => {
+        // A fixed clock: the line says "tomorrow" when the post is a day away.
+        vi.useFakeTimers({
+            toFake: ["Date"],
+            now: new Date("2026-11-20T09:00:00Z"),
+        });
+        onTestFinished(() => {
+            vi.useRealTimers();
+        });
         const waiting = {
             reason: null,
             retryAfter: null,
