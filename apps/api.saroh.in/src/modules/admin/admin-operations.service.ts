@@ -195,7 +195,11 @@ export class AdminOperationsService implements OnApplicationBootstrap {
 
         // Runs after the response; the rows are already durable, so the
         // screen follows progress and a restart picks up where this stopped.
-        void this.run(operation.id);
+        void this.run(operation.id).catch((error: unknown) =>
+            this.logger.error(
+                `Operation ${operation.id} stopped: ${String(error)}`,
+            ),
+        );
         return this.get(operation.id);
     }
 
@@ -326,25 +330,34 @@ export class AdminOperationsService implements OnApplicationBootstrap {
                         error instanceof Error ? error.message : String(error),
                 }),
             );
-            await prisma.$transaction([
-                prisma.adminOperationItem.update({
-                    where: { id: next.id },
-                    data: {
-                        status: outcome.status,
-                        detail: outcome.detail ?? null,
-                        processedAt: new Date(),
-                    },
-                }),
-                prisma.adminOperation.update({
-                    where: { id: operationId },
-                    data:
-                        outcome.status === "DONE"
-                            ? { succeeded: { increment: 1 } }
-                            : outcome.status === "SKIPPED"
-                              ? { skipped: { increment: 1 } }
-                              : { failed: { increment: 1 } },
-                }),
-            ]);
+            try {
+                await prisma.$transaction([
+                    prisma.adminOperationItem.update({
+                        where: { id: next.id },
+                        data: {
+                            status: outcome.status,
+                            detail: outcome.detail ?? null,
+                            processedAt: new Date(),
+                        },
+                    }),
+                    prisma.adminOperation.update({
+                        where: { id: operationId },
+                        data:
+                            outcome.status === "DONE"
+                                ? { succeeded: { increment: 1 } }
+                                : outcome.status === "SKIPPED"
+                                  ? { skipped: { increment: 1 } }
+                                  : { failed: { increment: 1 } },
+                    }),
+                ]);
+            } catch (error) {
+                // The item or its operation was erased while it ran (a
+                // business removed, a table reset): nothing to record.
+                if ((error as { code?: string }).code !== "P2025") throw error;
+                this.logger.warn(
+                    `Operation item ${next.id} is gone; its result was not recorded`,
+                );
+            }
         }
 
         const counts = await prisma.adminOperation.findUnique({
