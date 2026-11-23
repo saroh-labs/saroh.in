@@ -20,6 +20,12 @@ const actions = vi.hoisted(() => ({
     bookFromAnswer: vi.fn(),
 }));
 vi.mock("@/lib/ask-ai/panel-actions", () => actions);
+// Images in the box upload through the media actions: not here.
+vi.mock("@/lib/media/actions", () => ({
+    createUpload: vi.fn(),
+    completeUpload: vi.fn(),
+    listLibrary: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/lib/customers/actions", () => ({
     findCustomers: vi.fn().mockResolvedValue({ ok: true, results: [] }),
     readCustomerAttention: vi.fn(),

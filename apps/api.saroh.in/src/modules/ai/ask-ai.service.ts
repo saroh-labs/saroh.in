@@ -14,6 +14,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { meterWindow } from "../billing/metering";
+import { MediaService } from "../media/media.service";
 import {
     allows,
     authorize,
@@ -43,6 +44,18 @@ export interface BegunTurn {
     refusal: AskAiRefusal | null;
     /** The page it is asked about (AF 2, 5). */
     about?: AskAiAbout;
+    /** The images sent with it, checked: the business's own, ready, readable. */
+    images?: string[];
+}
+
+/** A conversation as the panel reads it: a message's images are links. */
+export interface AskAiConversationView extends Omit<
+    AiConversationView,
+    "messages"
+> {
+    messages: (Omit<AiConversationView["messages"][number], "images"> & {
+        images?: { mediaId: string; url: string; filename: string }[];
+    })[];
 }
 
 /** An event as written on the stream: the turn's own, plus `turn` first. */
@@ -63,6 +76,7 @@ export class AskAiService {
         private readonly access: AskAiAccess,
         private readonly store: TurnStore,
         private readonly conversations: ConversationsService,
+        private readonly media: MediaService,
     ) {}
 
     /**
@@ -76,12 +90,19 @@ export class AskAiService {
         body: AskAiTurnBody,
     ): Promise<BegunTurn> {
         if (body.language) await this.store.setLanguage(ctx, body.language);
+        // Another business's image, one not ready or not readable: an HTTP
+        // error before anything is asked, so nothing counts.
+        const images = [...new Set(body.images ?? [])];
+        if (images.length)
+            await this.media.askAiImages(ctx.organizationId, images);
+        const sent = images.length ? { images } : {};
         if (body.conversationId) {
             await this.conversations.assertOwn(ctx, body.conversationId);
             return {
                 conversationId: body.conversationId,
                 refusal: null,
                 about: body.about,
+                ...sent,
             };
         }
         const entry = await this.access.entry(ctx);
@@ -93,7 +114,12 @@ export class AskAiService {
                 body.question,
                 body.about,
             );
-            return { conversationId: c.id, refusal: null, about: body.about };
+            return {
+                conversationId: c.id,
+                refusal: null,
+                about: body.about,
+                ...sent,
+            };
         } catch (error) {
             if (!(error instanceof AiSettingNotConfiguredError)) throw error;
             return { conversationId: null, refusal: { reason: "unavailable" } };
@@ -131,6 +157,7 @@ export class AskAiService {
                 turnId,
                 signal,
                 ...(begun.about ? { about: begun.about } : {}),
+                ...(begun.images ? { images: begun.images } : {}),
             });
         } finally {
             this.registry.end(turnId);
@@ -170,8 +197,26 @@ export class AskAiService {
         };
     }
 
-    get(ctx: OrganizationContext, id: string): Promise<AiConversationView> {
-        return this.conversations.get(ctx, id);
+    /** A conversation, each message's images as links (one removed is left out). */
+    async get(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<AskAiConversationView> {
+        const c = await this.conversations.get(ctx, id);
+        const ids = c.messages.flatMap((m) => m.images ?? []);
+        const views = ids.length
+            ? await this.media.askAiImageViews(ctx.organizationId, ids)
+            : new Map<
+                  string,
+                  { mediaId: string; url: string; filename: string }
+              >();
+        return {
+            ...c,
+            messages: c.messages.map(({ images, ...m }) => {
+                const shown = (images ?? []).flatMap((i) => views.get(i) ?? []);
+                return shown.length ? { ...m, images: shown } : m;
+            }),
+        };
     }
 
     language(ctx: OrganizationContext): Promise<AskAiLanguage> {

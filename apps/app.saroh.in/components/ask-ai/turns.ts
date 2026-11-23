@@ -29,6 +29,7 @@ export function turnsOf(conversation: AskAiConversation): Turn[] {
             turns.push({
                 key: m.id,
                 question: m.text,
+                ...(m.images?.length ? { images: m.images } : {}),
                 text: "",
                 cards: [],
                 running: false,

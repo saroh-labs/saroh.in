@@ -161,7 +161,21 @@ function toolsOf(request: AiStreamRequest): ToolSet {
 function messagesOf(messages: AiMessage[]): ModelMessage[] {
     return messages.map((message): ModelMessage => {
         if (message.role === "user") {
-            return { role: "user", content: message.text };
+            if (!message.images?.length) {
+                return { role: "user", content: message.text };
+            }
+            // Image blocks first, then the words (Anthropic reads best that way).
+            return {
+                role: "user",
+                content: [
+                    ...message.images.map((i) => ({
+                        type: "image" as const,
+                        image: i.bytes,
+                        mediaType: i.mediaType,
+                    })),
+                    { type: "text" as const, text: message.text },
+                ],
+            };
         }
         if (message.role === "assistant") {
             return {

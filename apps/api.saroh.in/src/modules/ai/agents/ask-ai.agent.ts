@@ -25,6 +25,8 @@ export const ASK_AI_DRAFT_TOOLS = [
     "update_customer",
     "draft_blog_post",
     "edit_section",
+    "place_image",
+    "place_product_photo",
 ] as const;
 
 export const ASK_AI_TOOLS = [
@@ -267,6 +269,16 @@ const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
         "Naye shabdon ka draft bana rahe hain…",
         "नए शब्दों का ड्राफ़्ट बना रहे हैं…",
     ),
+    place_image: words(
+        "Drafting where the image goes…",
+        "Image kahan lagegi, uska draft bana rahe hain…",
+        "तस्वीर कहाँ लगेगी, उसका ड्राफ़्ट बना रहे हैं…",
+    ),
+    place_product_photo: words(
+        "Drafting the product's photo…",
+        "Product ki photo ka draft bana rahe hain…",
+        "प्रोडक्ट की फ़ोटो का ड्राफ़्ट बना रहे हैं…",
+    ),
     get_site: words(
         "Reading your website…",
         "Aapki website dekh rahe hain…",
@@ -295,7 +307,8 @@ const JOB = `Your job: you are Ask AI. The person runs or works in the business 
 - Sizes or colours that sell most, and orders by store: summarise_orders (top_variants, by_location; list_orders takes its location_id). A size or colour low or out: summarise_stock for all, get_product for one product, per store. How full classes are: get_class_fill; who waits for a full class: list_waitlist; class packs held or running out (use-by date in a period): list_class_packs.
 - How many invoices or bills are pending, unpaid or overdue is a question about unpaid bills: answer it from list_unpaid_bills, giving the unpaid count with how many are overdue and not due yet.
 - For their website's pages and sections (what a page says, how to make its words clearer, what a first-time visitor misses), read it with get_page (get_site lists the pages) and answer about its real words. To change a section's heading, the line under it (subheading) or its main button's words, call edit_section once with only the fields to change: it saves nothing, the person sees Now and New on a card and applies it to their draft. Keep every price, offer, time, phone number and claim to what the page or the person already says; if the person asks for a new one, write it as they said it and the card asks them to check it.
-- Ask AI can't do these yet: making, selling or changing class packs, courses, making, sending or changing invoices, reminders, refunds, cancelling, deleting, adding, moving or removing website sections, changing website pages, a section's other fields or pictures, and social posts (Instagram or others). A class pack or course is not a product: never draft one with create_product. For any of these call no tool; say in one line that Ask AI can't do that yet and where in Saroh they can (Class packs, Courses, Invoices, Bookings, Orders, Customers, Website or Social), then one thing you can help with.
+- When the person has attached images, you can see them. To use one as a website section's photo (the target "section" with site_id, page_id and section_key from get_page) or as a blog post's cover ("post_cover" with site_id and post_id), call place_image once; as a product's main photo, call place_product_photo with its product_id; each with that image's media_id and an alt text of what it shows: it saves nothing, the person sees Now and New on a card and applies it. If they say which page or product, read it first; if the image doesn't suit (too dark, wrong shape), say so in the answer rather than drafting. Without an attached image there is nothing to place.
+- Ask AI can't do these yet: making, selling or changing class packs, courses, making, sending or changing invoices, reminders, refunds, cancelling, deleting, adding, moving or removing website sections, changing website pages, a section's other fields, making or retouching pictures, and social posts (Instagram or others). A class pack or course is not a product: never draft one with create_product. For any of these call no tool; say in one line that Ask AI can't do that yet and where in Saroh they can (Class packs, Courses, Invoices, Bookings, Orders, Customers, Website or Social), then one thing you can help with.
 - When it isn't clear what to change or which one ("change the timing", "update the price"), call no tool and ask exactly one short question of one sentence, such as "Which class or service, and to what time?". Never offer choices (hours or a booking) and never add a second question.
 - If the question is not about this business's Saroh data, say briefly that you can only help with the business in Saroh.`;
 

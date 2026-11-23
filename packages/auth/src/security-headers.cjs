@@ -68,8 +68,12 @@ const SOURCES = {
         connect: ["https://*.razorpay.com"],
         img: ["https://*.razorpay.com"],
     },
-    // Presigned PUTs straight to R2 (00-universal §10).
-    uploads: { connect: ["https://*.r2.cloudflarestorage.com"] },
+    // Presigned PUTs straight to R2 (00-universal §10); and, for img-src
+    // only, the short-lived signed GETs of Ask AI's private chat images.
+    uploads: {
+        connect: ["https://*.r2.cloudflarestorage.com"],
+        img: ["https://*.r2.cloudflarestorage.com"],
+    },
     // The seeded sample businesses' photos (database seed, showcase).
     unsplash: { img: ["https://images.unsplash.com"] },
     // Google's tag (Analytics + Ads, after consent; ADS_TRACKING.md), as

@@ -27,7 +27,11 @@ export function aiProviderFakeAllowed(
 /** One scripted answer: an optional tool first, then text. */
 interface Line {
     match: RegExp;
-    tool?: (m: RegExpMatchArray) => { name: string; input: unknown };
+    /** `said` is the whole message, with Saroh's notes (the images' media_ids). */
+    tool?: (
+        m: RegExpMatchArray,
+        said: string,
+    ) => { name: string; input: unknown };
     text: string;
     /** Wait before the first word, so Stop can be pressed before any. */
     waitMs?: number;
@@ -57,6 +61,19 @@ export const FAKE_SCRIPT: readonly Line[] = [
             },
         }),
         // Not reached: a draft ends the turn with its card.
+        text: "The draft is above.",
+    },
+    {
+        // An image attached: the model is told its media_id in Saroh's note.
+        match: /^Use this image as the photo of product (\S+)$/i,
+        tool: (m, said) => ({
+            name: "place_product_photo",
+            input: {
+                product_id: m[1],
+                media_id: /media_id (\S+?)\)/.exec(said)?.[1],
+                alt: "A test photo",
+            },
+        }),
         text: "The draft is above.",
     },
     {
@@ -125,7 +142,7 @@ export class ScriptedAiProvider implements AiProvider {
             .some((m) => m.role === "tool");
 
         if (line?.tool && m && !afterTool && request.toolChoice !== "none") {
-            const { name, input } = line.tool(m);
+            const { name, input } = line.tool(m, said ?? "");
             yield {
                 type: "tool-call",
                 call: { id: `fake-${Date.now()}`, name, input },

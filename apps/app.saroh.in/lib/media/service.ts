@@ -81,7 +81,11 @@ export async function createUpload(
         filename: string;
         /** The library bucket; site images unless said. */
         purpose?:
-            "site-image" | "business-logo" | "staff-photo" | "product-video";
+            | "site-image"
+            | "business-logo"
+            | "product-video"
+            | "staff-photo"
+            | "ask-ai";
     } & UploadSizes,
 ): Promise<MediaResult<UploadTicket>> {
     const base = await mediaBase();
@@ -136,6 +140,7 @@ export interface LibraryItem {
     status: string;
     url: string | null;
     createdAt: string;
+    sizeBytes?: number;
     /** The widths of its smaller copies (DEC-246); empty for older photos. */
     widths?: number[];
     width?: number | null;

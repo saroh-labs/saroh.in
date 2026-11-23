@@ -64,7 +64,15 @@ export function costMicroUsd(t: TurnTokens, p: ModelPrices): number {
  * the prompt cap ever trips on real turns.
  */
 export const estimateTokens = (value: unknown): number =>
-    Math.ceil(JSON.stringify(value).length / 3);
+    Math.ceil(
+        JSON.stringify(value, (_k, v: unknown) =>
+            // An image's bytes are not text: about 1,600 tokens each, at most.
+            v instanceof Uint8Array ? "x".repeat(IMAGE_TOKENS * 3) : v,
+        ).length / 3,
+    );
+
+/** What one image costs the prompt, at the provider's largest size. */
+const IMAGE_TOKENS = 1_600;
 
 /**
  * The messages trimmed to `cap` tokens: the oldest tool results go first

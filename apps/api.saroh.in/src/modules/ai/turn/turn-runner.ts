@@ -1,15 +1,18 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import type { AskAiAbout, AskAiNext } from "@saroh/api-contract";
 import type { AiTurnOutcome } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
+import { MediaService } from "../../media/media.service";
 import type { AskAiRefusal, StartLimits } from "../access/ask-ai-access";
 import { AskAiAccess } from "../access/ask-ai-access";
 import type { AgentDefinition } from "../agents/agent-definition";
 import {
     aboutTail,
     agentVersion,
+    IMAGES_ONLY_QUESTION,
+    imagesTail,
     inLanguage,
     sharedInstructions,
     statusWordsFor,
@@ -71,6 +74,8 @@ export interface TurnInput {
     signal: AbortSignal;
     /** The page it is asked about (AF 2, 5); none, the whole business. */
     about?: AskAiAbout;
+    /** The media ids sent with the question, checked by `AskAiService.begin`. */
+    images?: string[];
 }
 
 interface TurnLimits {
@@ -93,6 +98,8 @@ interface Prepared {
     system: AiSystemPart[];
     tools: AiToolDefinition[];
     messages: AiMessage[];
+    /** The question's images, named but not yet read: bytes wait for admission (L4). */
+    imageFiles: { id: string; filename: string; contentType: string }[];
     /** Messages before this turn's: a starter is free only with none (04-F5). */
     earlierTurns: number;
 }
@@ -149,6 +156,7 @@ export class TurnRunner {
         private readonly flags: FeatureFlagService,
         private readonly store: TurnStore,
         private readonly access: AskAiAccess,
+        @Optional() private readonly media?: MediaService,
     ) {}
 
     /** A new conversation, with the model and effort in effect now stamped on it, titled by its first question. */
@@ -229,6 +237,7 @@ export class TurnRunner {
             input.question,
             now,
             this.access.admit(ctx, entry.row, prepared.start, now),
+            input.images,
         );
         if (refusal) {
             this.logger.log(
@@ -236,6 +245,13 @@ export class TurnRunner {
             );
             yield* refusedTurn(turnId, refusal);
             return;
+        }
+        // Asked: the images are the conversation's now, kept for its days.
+        if (input.images?.length) {
+            await this.media?.markAskAiImagesSent(
+                ctx.organizationId,
+                input.images,
+            );
         }
         const state: TurnState = {
             text: "",
@@ -256,6 +272,7 @@ export class TurnRunner {
             ),
         };
         try {
+            await this.attachImages(ctx.organizationId, prepared);
             yield* this.rounds(input, prepared, state);
         } catch (error) {
             end(state, state.text ? "CUT_OFF" : "FAILED", "provider");
@@ -317,6 +334,12 @@ export class TurnRunner {
             this.store.language(ctx),
         ]);
         const block = await agent.businessBlock(ctx, language, now);
+        const imageFiles = await this.imageFilesOf(
+            ctx.organizationId,
+            input.images,
+        );
+        const question =
+            input.question || (imageFiles.length ? IMAGES_ONLY_QUESTION : "");
         return {
             conversation,
             agent,
@@ -335,12 +358,52 @@ export class TurnRunner {
                 {
                     role: "user",
                     text:
-                        withLanguageTail(input.question, language) +
+                        withLanguageTail(question, language) +
+                        imagesTail(imageFiles) +
                         aboutTail(input.about),
                 },
             ],
+            imageFiles,
             earlierTurns: history.length,
         };
+    }
+
+    /** The images' names and types, from the business's own rows: no bytes read yet. */
+    private async imageFilesOf(
+        organizationId: string,
+        ids: readonly string[] | undefined,
+    ): Promise<{ id: string; filename: string; contentType: string }[]> {
+        if (!ids?.length) return [];
+        if (!this.media) throw new Unavailable();
+        return this.media.askAiImages(organizationId, ids);
+    }
+
+    /** Once the turn is admitted: the bytes, read from the business's own storage, onto the question. */
+    private async attachImages(
+        organizationId: string,
+        p: Prepared,
+    ): Promise<void> {
+        if (!p.imageFiles.length) return;
+        const images = await Promise.all(
+            p.imageFiles.map(async (file) => {
+                const got = await this.media?.readAskAiImage(
+                    organizationId,
+                    file.id,
+                );
+                if (!got) throw new Unavailable();
+                // A plain view: a Buffer would be read as JSON by the prompt estimate.
+                return {
+                    bytes: new Uint8Array(
+                        got.bytes.buffer,
+                        got.bytes.byteOffset,
+                        got.bytes.byteLength,
+                    ),
+                    mediaType: file.contentType,
+                };
+            }),
+        );
+        const question = p.messages[p.messages.length - 1];
+        if (question.role === "user") question.images = images;
     }
 
     private async limits(org: string, model: string): Promise<TurnLimits> {

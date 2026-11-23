@@ -20,7 +20,11 @@ export async function createUpload(
         filename: string;
         /** The library bucket; site images unless said. */
         purpose?:
-            "site-image" | "business-logo" | "staff-photo" | "product-video";
+            | "site-image"
+            | "business-logo"
+            | "product-video"
+            | "staff-photo"
+            | "ask-ai";
     } & UploadSizes,
 ) {
     return createUploadApi(input);

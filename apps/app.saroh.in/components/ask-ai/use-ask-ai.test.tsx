@@ -19,6 +19,17 @@ const actions = vi.hoisted(() => ({
     bookFromAnswer: vi.fn(),
 }));
 vi.mock("@/lib/ask-ai/panel-actions", () => actions);
+// Images in the box upload through the media actions: not here.
+vi.mock("@/lib/media/actions", () => ({
+    createUpload: vi.fn(),
+    completeUpload: vi.fn(),
+    listLibrary: vi.fn().mockResolvedValue([]),
+}));
+const turns = vi.hoisted(() => ({
+    startAskAiTurn: vi.fn(),
+    stopAskAiTurn: vi.fn(),
+}));
+vi.mock("@/lib/ask-ai/turn-requests", () => turns);
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
@@ -93,4 +104,19 @@ it("a new conversation starts empty, on the thread", () => {
     expect(ai.view).toBe("thread");
     expect(ai.conversationId).toBeNull();
     expect(ai.turns).toEqual([]);
+});
+
+it("Ask again sends the question's images again, by their ids, without uploading", async () => {
+    turns.startAskAiTurn.mockResolvedValue(null);
+    actions.readAskAiState.mockResolvedValue(null);
+    await act(async () => {
+        await ai.ask("Alt text", false, [
+            { mediaId: "m1", url: "https://m.test/1.png", filename: "1.png" },
+            { mediaId: "m2", url: "https://m.test/2.png", filename: "2.png" },
+        ]);
+    });
+    expect(turns.startAskAiTurn).toHaveBeenCalledWith(
+        expect.objectContaining({ question: "Alt text", images: ["m1", "m2"] }),
+    );
+    expect(ai.turns[0]?.images).toHaveLength(2);
 });
