@@ -240,6 +240,7 @@ export class CalendarConnectService {
                 googleEmail: true,
                 scopes: true,
                 busyRefreshedAt: true,
+                updatedAt: true,
                 calendars: {
                     orderBy: { createdAt: "asc" },
                     select: {
@@ -272,7 +273,9 @@ export class CalendarConnectService {
                 !rowPaused &&
                 row.status === "CONNECTED" &&
                 checksBusy &&
-                isStale(row.busyRefreshedAt);
+                // Never checked yet counts from when it was connected (or its
+                // calendars changed): a fresh connection is not "late".
+                isStale(row.busyRefreshedAt ?? row.updatedAt);
             // A chain that stopped (a worker lost, a flag flipped) restarts here.
             if (behind) {
                 await scheduleBusy(ctx.organizationId, row.id, new Date());
