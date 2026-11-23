@@ -122,6 +122,28 @@ export function nothingChoseView({
 }
 
 /**
+ * Bookings was last left on List: nothing in the address chose a view, "Where
+ * I left it" is on and the cookie says "list" (`/bookings` then opens the
+ * register). The Calendar switch carries `?calendar=1`, so it always opens
+ * the calendar.
+ */
+export function opensOnList({
+    params,
+    start,
+    lastUsed,
+}: {
+    params: Record<string, unknown>;
+    start: StartView;
+    lastUsed: unknown;
+}): boolean {
+    return (
+        start === "last" &&
+        lastUsed === "list" &&
+        Object.keys(params).length === 0
+    );
+}
+
+/**
  * Whose bookings it opens on, as the address's `person`: the one the
  * address names (when they are among `people`); else Everyone, the person
  * themselves (Just me, when they take bookings) or their last pick (when
@@ -150,11 +172,13 @@ export function openingPerson({
 }
 
 /**
- * Keep the view just used on this device, for "Where I left it". A
+ * Keep the view just used on this device, for "Where I left it": a layout
+ * of the calendar, or "list" once the register was the last Bookings page
+ * (BKVKept: Calendar or List, and the day or week). A
  * year-long cookie the server page reads, so Bookings opens on it with no
  * flash. Storage that refuses leaves Day as the start, nothing worse.
  */
-export function rememberLastView(layout: CalendarLayout): void {
+export function rememberLastView(layout: CalendarLayout | "list"): void {
     try {
         document.cookie = `${LAST_VIEW_COOKIE}=${layout}; path=/; max-age=31536000; samesite=lax`;
     } catch {

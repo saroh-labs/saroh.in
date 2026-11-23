@@ -80,7 +80,7 @@ describe("seats", () => {
         expect(seatPreference("Sell")).toEqual([
             "Home",
             "Sell",
-            "Calendar",
+            "Business calendar",
             "Insights",
         ]);
         const nav = buildMobileNav({

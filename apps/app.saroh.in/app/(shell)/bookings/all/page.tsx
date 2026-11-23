@@ -1,11 +1,11 @@
 import { PageHeader } from "@saroh/ui/page-header";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 
 import {
     BookingsCouldntLoad,
     BookingsView,
 } from "@/components/bookings/all-bookings/bookings-view";
+import { BookingsModeSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
+import { ListOptions } from "@/components/bookings/all-bookings/list-options";
 import {
     NewBookingButton,
     NewBookingHost,
@@ -30,8 +30,11 @@ import { bookingsListMoment } from "@/lib/moments/read";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+import { withoutAmounts } from "@/lib/services/all-bookings";
 import { canTakeDeskPayments } from "@/lib/services/booking-money";
 import { readBookingsByDay } from "@/lib/services/bookings-by-day";
+import { EVERYONE, openingPerson } from "@/lib/services/bookings-opens";
+import { readBookingsOpens } from "@/lib/services/bookings-opens-read";
 import {
     flattenCalendar,
     listServices,
@@ -54,7 +57,8 @@ import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 /**
  * Every booking as one list (S4-003; U11 of the bookings plan,
  * BKMAllBookings and BKDAllBookings): the register behind the calendar,
- * one press from its "…" options and back by "Back to the calendar". Kept
+ * the List of the Calendar | List switch (the calendar's "All bookings" link
+ * and "Back to the calendar" are gone; `/bookings/all` still opens it). Kept
  * whole, because its views (upcoming, waiting to be marked, awaiting
  * payment) answer questions a diary does not.
  *
@@ -71,24 +75,14 @@ import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
  */
 export const metadata = { title: "All bookings" };
 
-const BACK = (
-    <Link
-        href="/bookings"
-        className="mb-2 inline-flex items-center gap-1 rounded-sm text-[12.5px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-        <ArrowLeft aria-hidden className="size-3.5" />
-        Back to the calendar
-    </Link>
-);
-
 export default async function BookingsPage({
     searchParams,
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    await requireSession();
+    const session = await requireSession();
 
-    const [calendar, params, services, organization, staffList] =
+    const [calendar, params, services, organization, staffList, opens] =
         await Promise.all([
             searchParams.then((p) => {
                 // A date filter asks the API for those days (by start);
@@ -103,14 +97,23 @@ export default async function BookingsPage({
             resolveActiveOrganization(),
             // Who they'll see, in New booking (U8); without it, anyone.
             listStaff().catch(() => null),
+            // Where Bookings opens, and for whom, for this person (DEC-170).
+            readBookingsOpens(),
         ]);
     const may = permitsFor(organization);
+    const mine = staffList?.staff.find(
+        (p) =>
+            p.status === "ACTIVE" && p.membership?.userId === session.user.id,
+    );
 
     if (!calendar) {
         return (
             <PageContainer width="full">
-                {BACK}
-                <PageHeader title="All bookings" />
+                <PageHeader
+                    title="All bookings"
+                    holdsData={false}
+                    meta={<BookingsModeSwitch current="list" />}
+                />
                 <BookingsCouldntLoad />
             </PageContainer>
         );
@@ -132,11 +135,17 @@ export default async function BookingsPage({
     // From Home's "Last 24 hours" (F6): the confirmed bookings made since
     // then, as Home counted them.
     const since = sinceParam(params);
-    const rows = since
+    const shown = since
         ? every.filter(
               (b) => b.status === "CONFIRMED" && isSince(b.createdAt, since),
           )
         : every;
+    // DEC-098: amounts leave the server only for someone who may see money
+    // (the Money column) or take it at the desk ("Take ₹X" needs the sum).
+    const rows =
+        may("payment:read") || canTakeDeskPayments(organization)
+            ? shown
+            : withoutAmounts(shown);
 
     // The business's first booking (wave G), said once.
     // Only the whole register can say it is the first.
@@ -151,23 +160,40 @@ export default async function BookingsPage({
             : null;
 
     const canBook = may("booking:write");
+    const me = mine ? { id: mine.id, name: mine.name } : null;
+    // "Show bookings for": Just me, or the last pick, narrows the list at
+    // the start; Everyone narrows nothing.
+    const who = openingPerson({
+        asked: undefined,
+        opens,
+        people: (staffList?.staff ?? [])
+            .filter((p) => p.status === "ACTIVE")
+            .map((p) => p.id),
+        me: mine?.id ?? null,
+    });
     const timezone = calendar.timezone || DEFAULT_BUSINESS_ZONE;
 
     const page = (
         <PageContainer width="full">
-            {BACK}
             <PageHeader
                 title="All bookings"
                 holdsData={false}
-                count={rows.length > 0 ? `${rows.length} in all` : null}
-                description={`Times in ${zoneName(timezone)}, your business's time zone.`}
+                meta={<BookingsModeSwitch current="list" />}
+                description={`Times in ${zoneName(timezone)}`}
                 actions={
                     // Only someone who may book: the API refuses the save
                     // otherwise, as the diary already asks. On a phone it
                     // floats above the tab bar (BKMAllBookings).
-                    canBook ? (
-                        <NewBookingButton className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]" />
-                    ) : null
+                    <>
+                        <ListOptions
+                            opens={opens}
+                            me={me}
+                            showCancelled={params.cancelled === "1"}
+                        />
+                        {canBook ? (
+                            <NewBookingButton className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]" />
+                        ) : null}
+                    </>
                 }
             />
             <div className="space-y-4 max-[759px]:pb-20">
@@ -196,6 +222,9 @@ export default async function BookingsPage({
                     }
                     dates={dates}
                     share={share}
+                    me={me}
+                    showCancelled={params.cancelled === "1"}
+                    initialStaff={who === EVERYONE ? null : who}
                     can={{
                         book: canBook,
                         // "Take ₹X" (P2): the pair a payment link needs.
@@ -203,6 +232,9 @@ export default async function BookingsPage({
                         people: may("contact:read"),
                         refund: may("payment:manage"),
                         readOrder: may("order:read"),
+                        // The Money column follows what the role may read
+                        // (DEC-098): never a Member or Reviewer by default.
+                        money: may("payment:read"),
                         link: people.payLink,
                         online: takesOnlinePayment(await billingAccessOrNull()),
                     }}

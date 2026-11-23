@@ -1,11 +1,13 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { ChevronRight, Clock, Eye, List } from "lucide-react";
+import { ChevronRight, Clock, Eye } from "lucide-react";
 import Link from "next/link";
 import type { ReactElement, ReactNode } from "react";
 
+import { GOOGLE_CALENDAR_HREF } from "@/lib/google-calendar/words";
 import type { ShowFor, StartView } from "@/lib/services/bookings-opens";
+import type { GoogleShow } from "@/lib/services/calendar-href";
 import { SwitchRow } from "@saroh/ui/check-row";
 import { RadioCards } from "@saroh/ui/choice-group";
 
@@ -29,21 +31,21 @@ const STARTS: readonly { value: StartView; label: string; sub: string }[] = [
     {
         value: "last",
         label: "Where I left it",
-        sub: "The view you used last, on each phone or computer",
+        sub: "Calendar or List, and the day or week, as you last used them on each phone or computer",
     },
     { value: "day", label: "Day", sub: "Always opens on the day, by the hour" },
     { value: "week", label: "Week", sub: "Always opens on Mon to Sun" },
     {
         value: "list",
-        label: "List",
-        sub: "Always opens on the list of bookings",
+        label: "Agenda",
+        sub: "Always opens on the day as a list of times",
     },
 ];
 
 /**
  * The "…" options of the view (U2; the "This day" sheet of BKMBookingsDay,
- * BKDCalendarDay's ⋯ popover): show cancelled bookings, All bookings,
- * Hours and time off, where Bookings starts and whose bookings it opens
+ * BKDCalendarDay's ⋯ popover): show cancelled bookings, Hours and time off
+ * (All bookings is the List of the header's Calendar | List switch), where Bookings starts and whose bookings it opens
  * on, and what the colours mean. The calendar's old row of extras (the
  * cancelled toggle, the colour key, the links) live here now.
  */
@@ -54,7 +56,6 @@ export function OptionsSheet({
     title,
     summary,
     cancelled,
-    allBookingsHref,
     hours,
     start,
     onStart,
@@ -62,6 +63,7 @@ export function OptionsSheet({
     onShowFor,
     me,
     whoNow,
+    google = null,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -75,7 +77,6 @@ export function OptionsSheet({
         /** "1 cancelled today". */
         line: string;
     };
-    allBookingsHref: string;
     /** Hours and time off: "Meera's hours and time off" for one person. */
     hours: { href: string; label: string };
     start: StartView;
@@ -86,6 +87,22 @@ export function OptionsSheet({
     me: string | null;
     /** Who is shown now, for "The last person I picked": "everyone". */
     whoNow: string;
+    /**
+     * Google busy times (BKVGoogle), while Google Calendar is on: the layer
+     * in What to show, and who on the diary has connected.
+     */
+    google?: {
+        show: GoogleShow;
+        onChange: (show: GoogleShow) => void;
+        /** The viewer is on the diary, so "Just mine" means something. */
+        mine: boolean;
+        you: string | null;
+        team: readonly {
+            key: string;
+            name: string;
+            state: "CONNECTED" | "LAPSED" | "PAUSED" | "NONE";
+        }[];
+    } | null;
 }) {
     const phone = usePhone();
     const tap = phone ? "Tap" : "Click";
@@ -143,22 +160,6 @@ export function OptionsSheet({
                         </span>
                     </SwitchRow>
                 </div>
-                <Link
-                    href={allBookingsHref}
-                    className={LINK_ROW}
-                    onClick={close}
-                >
-                    <span className={ICON}>
-                        <List aria-hidden />
-                    </span>
-                    <span data-ph-unmask="" className="flex-1">
-                        All bookings
-                    </span>
-                    <ChevronRight
-                        aria-hidden
-                        className="size-3.5 text-muted-foreground max-[759px]:size-4"
-                    />
-                </Link>
                 <Link href={hours.href} className={LINK_ROW} onClick={close}>
                     <span className={ICON}>
                         <Clock aria-hidden />
@@ -169,6 +170,8 @@ export function OptionsSheet({
                         className="size-3.5 text-muted-foreground max-[759px]:size-4"
                     />
                 </Link>
+
+                {google ? <GoogleLayer google={google} /> : null}
 
                 <Choices
                     label="Start Bookings on"
@@ -286,5 +289,103 @@ function Key({
                 </span>
             </span>
         </li>
+    );
+}
+
+const STATE_WORDS = {
+    CONNECTED: "Connected",
+    LAPSED: "Needs reconnecting",
+    PAUSED: "Paused: your plan's calendar connections are used up",
+    NONE: "Not connected",
+} as const;
+
+/**
+ * What to show › Google busy times, and Who's connected (BKVGoogle). Busy
+ * times are drawn as busy only, never what the event is. Everyone on the
+ * diary can see who has connected; connecting is each person's own, in
+ * Settings.
+ */
+function GoogleLayer({
+    google,
+}: {
+    google: NonNullable<Parameters<typeof OptionsSheet>[0]["google"]>;
+}) {
+    const on = google.show !== "off";
+    return (
+        <div data-google-layer="" className="mt-3.5">
+            <div data-ph-unmask="" className={LABEL}>
+                What to show
+            </div>
+            <div className={ROW}>
+                <SwitchRow
+                    checked={on}
+                    onChange={(next) => google.onChange(next ? "all" : "off")}
+                    name="Google busy times"
+                    className="flex-1 justify-between text-[13.5px] font-medium max-[759px]:text-[15px]"
+                >
+                    <span className="min-w-0 flex-1">
+                        <span data-ph-unmask="" className="block">
+                            Google busy times
+                        </span>
+                        <span
+                            data-ph-unmask=""
+                            className="block text-[12px] font-normal text-muted-foreground max-[759px]:text-[12.5px]"
+                        >
+                            Shown as busy, never what the event is
+                        </span>
+                    </span>
+                </SwitchRow>
+            </div>
+            {on && google.mine ? (
+                <RadioCards
+                    label="Whose busy times"
+                    value={google.show === "mine" ? "mine" : "all"}
+                    onChange={(v) => google.onChange(v)}
+                    options={[
+                        { value: "all", label: "Everyone's" },
+                        { value: "mine", label: "Just mine" },
+                    ]}
+                    className="mt-1.5 gap-1.5"
+                    rowClassName="min-h-11 gap-3 rounded-[10px] px-3 text-[13.5px] font-semibold has-[[data-state=checked]]:shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
+                />
+            ) : null}
+
+            <div data-ph-unmask="" className={cn(LABEL, "mt-3.5")}>
+                Who&apos;s connected
+            </div>
+            <ul className="mt-1.5 grid gap-0.5">
+                {google.team.map((p) => (
+                    <li
+                        key={p.key}
+                        className="flex min-h-10 items-center gap-2 px-0.5 text-[13.5px] max-[759px]:min-h-12 max-[759px]:border-b max-[759px]:border-border max-[759px]:text-[14.5px]"
+                    >
+                        <span
+                            data-ph-mask=""
+                            className="min-w-0 flex-1 truncate font-medium"
+                        >
+                            {p.key === google.you ? `You, ${p.name}` : p.name}
+                        </span>
+                        <span
+                            data-ph-unmask=""
+                            className="shrink-0 text-[12.5px] text-muted-foreground"
+                        >
+                            {STATE_WORDS[p.state]}
+                            {p.state === "LAPSED" && p.key !== google.you
+                                ? " · only they can"
+                                : ""}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+            <Link href={GOOGLE_CALENDAR_HREF} className={cn(LINK_ROW, "mt-1")}>
+                <span data-ph-unmask="" className="flex-1">
+                    Open Settings › Integrations › Google Calendar
+                </span>
+                <ChevronRight
+                    aria-hidden
+                    className="size-3.5 text-muted-foreground max-[759px]:size-4"
+                />
+            </Link>
+        </div>
     );
 }

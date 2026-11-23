@@ -255,14 +255,12 @@ describe("Go to a day", () => {
     it("Show as Week keeps the day and whose bookings", () => {
         draw({ picked: "arjun" });
         click(button(/Change the day or the view$/));
-        const views = popover()?.querySelector(
-            'nav[aria-label="Bookings view"]',
-        );
+        const views = popover()?.querySelector('nav[aria-label="Show as"]');
         const links = Array.from(views?.querySelectorAll("a") ?? []);
         expect(links.map((a) => a.textContent)).toEqual([
             "Day",
             "Week",
-            "List",
+            "Agenda",
         ]);
         expect(links[1]?.getAttribute("href")).toBe(
             "/bookings?date=2026-10-19&layout=week&person=arjun",
@@ -402,18 +400,122 @@ describe("Whose bookings", () => {
     });
 });
 
+describe("Calendar | List, Today and the view's name (BKVCalendarB)", () => {
+    it("has the Calendar | List switch beside ⋯, and List is the register", () => {
+        draw();
+        const nav = host.querySelector('nav[aria-label="Bookings"]');
+        expect(nav?.querySelector('a[aria-current="page"]')?.textContent).toBe(
+            "Calendar",
+        );
+        expect(nav?.querySelector('a[href="/bookings/all"]')?.textContent).toBe(
+            "List",
+        );
+    });
+
+    it("has a Today button that goes to today in the view shown", () => {
+        draw({ layout: "week", date: "2026-10-28" });
+        const today = host.querySelector("a[data-today-button]");
+        expect(today?.textContent).toBe("Today");
+        expect(today?.getAttribute("href")).toBe(
+            "/bookings?date=2026-10-19&layout=week&person=all",
+        );
+    });
+
+    it("names the view beside the date", () => {
+        draw();
+        expect(host.querySelector("[data-view-name]")?.textContent).toBe("Day");
+        draw({ layout: "agenda" });
+        expect(host.querySelector("[data-view-name]")?.textContent).toBe(
+            "Agenda",
+        );
+    });
+});
+
+describe("Google busy times in the ⋯ sheet (BKVGoogle)", () => {
+    const google = (over = {}) => ({
+        show: "all" as const,
+        onChange: vi.fn(),
+        people: [
+            { staffId: "meera", state: "CONNECTED" as const },
+            { staffId: "arjun", state: "LAPSED" as const },
+        ],
+        ...over,
+    });
+    const openOpts = () => click(button(/^This day:/));
+
+    it("says a connection held back by the plan is paused, not lapsed", () => {
+        draw({
+            google: google({
+                people: [{ staffId: "neha", state: "PAUSED" as const }],
+            }),
+        });
+        openOpts();
+        expect(popover()?.textContent).toContain(
+            "Paused: your plan's calendar connections are used up",
+        );
+        expect(popover()?.textContent).not.toContain("only they can");
+    });
+
+    it("has no Google part while Google Calendar is off", () => {
+        draw({ google: null });
+        openOpts();
+        expect(popover()?.textContent).not.toContain("Google busy times");
+        expect(popover()?.textContent).not.toContain("Who’s connected");
+    });
+
+    it("shows a Google layer, busy only, and says who is connected", () => {
+        draw({ google: google() });
+        openOpts();
+        const pop = popover();
+        expect(pop?.textContent).toContain("What to show");
+        expect(pop?.textContent).toContain("Google busy times");
+        expect(pop?.textContent).toContain(
+            "Shown as busy, never what the event is",
+        );
+        expect(pop?.textContent).toContain("Who's connected");
+        expect(pop?.textContent).toContain("You, Meera Iyer");
+        expect(pop?.textContent).toContain("Connected");
+        expect(pop?.textContent).toContain(
+            "Needs reconnecting · only they can",
+        );
+        expect(pop?.textContent).toContain("Not connected");
+        expect(
+            pop?.querySelector(
+                'a[href="/settings/integrations/google-calendar"]',
+            ),
+        ).not.toBeNull();
+    });
+
+    it("hides the layer from its switch, and offers Just mine", () => {
+        const g = google();
+        draw({ google: g });
+        openOpts();
+        const switches = Array.from(
+            popover()?.querySelectorAll('button[role="switch"]') ?? [],
+        );
+        // The cancelled switch is first; Google's is second.
+        click(switches[1]);
+        expect(g.onChange).toHaveBeenCalledWith("off");
+        expect(
+            popover()?.querySelector(
+                '[role="radiogroup"][aria-label="Whose busy times"]',
+            ),
+        ).not.toBeNull();
+    });
+});
+
 describe("the ⋯ options", () => {
     const openOpts = () => click(button(/^This day:/));
 
-    it("hold cancelled, All bookings, hours, start on, show for and the colours", () => {
+    it("hold cancelled, hours, start on, show for and the colours; All bookings is the List switch now", () => {
         draw({ picked: "arjun" });
         openOpts();
         const pop = popover();
         expect(pop?.textContent).toContain("This day");
         expect(pop?.textContent).toContain("1 cancelled today");
-        expect(pop?.querySelector('a[href="/bookings/all"]')?.textContent).toBe(
-            "All bookings",
-        );
+        expect(pop?.querySelector('a[href="/bookings/all"]')).toBeNull();
+        expect(pop?.textContent).not.toContain("All bookings");
+        expect(pop?.textContent).toContain("Agenda");
         expect(
             pop?.querySelector('a[href="/bookings/availability?person=arjun"]')
                 ?.textContent,

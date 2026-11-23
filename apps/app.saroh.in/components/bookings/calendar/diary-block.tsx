@@ -27,7 +27,7 @@ export function blockColour(block: Block): string {
         : "bg-diary-one text-diary-foreground";
 }
 
-/** "9:00 to 10:00 am Tariq Ali, Personal training, Booked, to pay". */
+/** "9:00 to 10:00 am Tariq Ali, Personal training, Booked, awaiting payment". */
 export function blockLabel(block: Block): string {
     const owes = toPayText(block);
     return `${formatClockRange(block.start, block.end)} ${blockTitle(block)}, ${blockLine(block)}, ${STATE_LABEL[block.state]}${owes ? `, ${owes.toLowerCase()}` : ""}`;
@@ -42,7 +42,7 @@ const FOCUS =
  * A booking that still happens is the only solid colour on the page. It is
  * never shorter than one readable line, and the name comes first: a short
  * booking keeps its name and gives up its time before that. A booking with
- * money still to take wears a small "To pay", and says so in its name for a
+ * money still to take wears a small "Awaiting payment", and says so in its name for a
  * screen reader.
  *
  * A cancelled booking, when they are shown, is a thin struck line at its

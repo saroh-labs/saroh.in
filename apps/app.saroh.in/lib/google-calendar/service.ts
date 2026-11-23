@@ -6,6 +6,7 @@ import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 import { refusalOf } from "./refusal";
 import type {
     BookingMeeting,
+    CalendarBusy,
     CalendarMember,
     CalendarRead,
     CalendarStatus,
@@ -80,6 +81,16 @@ async function readOrNull<T>(path: string): Promise<T | null> {
 /** Who on the team has connected; null when it couldn't be read or isn't theirs to see. */
 export const readCalendarMembers = () =>
     readOrNull<CalendarMember[]>("/members");
+
+/**
+ * Everyone's Google busy times between two instants, for the Bookings
+ * calendar (start and end only), and who is connected. Null when it
+ * couldn't be read: the diary then draws without them.
+ */
+export const readCalendarBusy = (from: string, to: string) =>
+    readOrNull<CalendarBusy>(
+        `/busy?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    );
 
 /** One booking's Meet and its Google event; null when there is none to say. */
 export const readBookingMeeting = (bookingId: string) =>

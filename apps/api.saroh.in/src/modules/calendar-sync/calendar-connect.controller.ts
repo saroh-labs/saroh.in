@@ -28,12 +28,14 @@ import { OrganizationContextService } from "../organizations/organization-contex
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { apiBase } from "../payments/webhook-setup";
 import { CalendarBookingsService } from "./calendar-bookings.service";
+import { CalendarBusyReadService } from "./calendar-busy-read.service";
 import {
     CALLBACK_PATH,
     CalendarConnectService,
 } from "./calendar-connect.service";
 import type {
     BookingMeetingView,
+    CalendarBusyView,
     CalendarMemberView,
     CalendarStatusView,
     ConnectStartView,
@@ -55,7 +57,22 @@ export class CalendarConnectController {
     constructor(
         private readonly calendars: CalendarConnectService,
         private readonly bookings: CalendarBookingsService,
+        private readonly busyTimes: CalendarBusyReadService,
     ) {}
+
+    /**
+     * Everyone's Google busy times for the days a calendar shows, start and
+     * end only, never what an event is. Anyone who may read bookings.
+     */
+    @Get("busy")
+    @Header("Cache-Control", "no-store")
+    busy(
+        @OrgContext() ctx: OrganizationContext,
+        @Query("from") from: string | undefined,
+        @Query("to") to: string | undefined,
+    ): Promise<CalendarBusyView> {
+        return this.busyTimes.busy(ctx, from, to);
+    }
 
     @Get()
     @Header("Cache-Control", "no-store")

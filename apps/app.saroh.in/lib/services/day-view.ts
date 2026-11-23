@@ -29,10 +29,13 @@ export function dayPill(block: Block): string | null {
     const owes = toPay(b);
     if (block.state === "noshow") return BOOKING_WORDS.didntCome;
     // Someone who came and still owes: the money is what is left to do.
-    if (block.state === "in") return owes ? "To pay" : BOOKING_WORDS.came;
+    if (block.state === "in")
+        return owes ? BOOKING_WORDS.awaitingPayment : BOOKING_WORDS.came;
     if (block.state === "pending") return BOOKING_WORDS.awaitingPayment;
     if (owes) {
-        return b.paidWith === "DESK" ? BOOKING_WORDS.paysAtVisit : "To pay";
+        return b.paidWith === "DESK"
+            ? BOOKING_WORDS.paysAtVisit
+            : BOOKING_WORDS.awaitingPayment;
     }
     if (b.paidAtDesk || b.paidWith === "PAID") return "Paid";
     return null;

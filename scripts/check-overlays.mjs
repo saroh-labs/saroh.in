@@ -39,6 +39,9 @@ for (const app of apps) {
             const lines = readFileSync(join(root, file), "utf8").split("\n");
             lines.forEach((line, i) => {
                 if (!HAND_BUILT.test(line)) return;
+                // Asking whether a dialog is open (a "/" shortcut that waits
+                // for none) reads the DOM; it doesn't build one.
+                if (/\bquerySelector(All)?\(/.test(line)) return;
                 seen.add(file);
                 if (ALLOWED.has(file)) return;
                 console.error(

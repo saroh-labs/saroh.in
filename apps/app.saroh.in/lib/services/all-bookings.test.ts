@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    bookingsWord,
+    cancelledWord,
     dayLabel,
     defaultOrder,
     emptyView,
+    foldsIn,
+    forwardPickOf,
+    forwardRange,
     groupByDay,
     inView,
+    lengthWord,
     matchesMore,
     matchesSearch,
+    moneyCell,
     moreChoices,
     moreCount,
     NO_MORE,
@@ -19,6 +26,8 @@ import {
     takeLabel,
     UNASSIGNED,
     viewCounts,
+    withFolds,
+    withoutAmounts,
 } from "./all-bookings";
 import type { DiaryBooking } from "./booking-calendar";
 
@@ -116,7 +125,7 @@ describe("views", () => {
     it("says what an empty view means, never 'No bookings yet'", () => {
         expect(emptyView("unconfirmed", 42)).toEqual({
             title: "Nothing awaiting payment",
-            line: "Every booking made with a payment link has been paid. 42 bookings in all.",
+            line: "Nobody owes you for a booking. Anyone sent a payment link shows here until they pay.",
         });
         expect(emptyView("outcome", 1).line).toContain("1 booking in all.");
         expect(emptyView("upcoming", 3).title).toBe("Nothing coming up");
@@ -148,10 +157,10 @@ describe("search and More filters", () => {
             }),
         ).toBe(true);
         expect(
-            matchesMore(b, { ...NO_MORE, statuses: ["PENDING", "CANCELLED"] }),
+            matchesMore(b, { ...NO_MORE, statuses: ["ATTENDED", "CANCELLED"] }),
         ).toBe(false);
         expect(
-            moreCount({ service: "a", staff: null, statuses: ["PENDING"] }),
+            moreCount({ service: "a", staff: null, statuses: ["CANCELLED"] }),
         ).toBe(2);
     });
 
@@ -177,6 +186,163 @@ describe("search and More filters", () => {
             "Meera",
             "Nobody yet",
         ]);
+    });
+});
+
+describe("counts hold only bookings still on (BLHB)", () => {
+    const rows = (): [
+        DiaryBooking,
+        DiaryBooking,
+        DiaryBooking,
+        DiaryBooking,
+    ] => [
+        booking(1),
+        booking(2, { status: "CANCELLED" }),
+        booking(30, { status: "CANCELLED" }),
+        booking(24 * 9, { status: "CANCELLED" }),
+    ];
+
+    it("leaves cancelled out of Upcoming, Today and Next 7 days, and keeps them in All", () => {
+        expect(viewCounts(rows(), NOW, ZONE)).toEqual({
+            upcoming: 1,
+            outcome: 0,
+            unconfirmed: 0,
+            today: 1,
+            week: 1,
+            all: 4,
+        });
+    });
+
+    it("folds a cancelled booking under the day it would have been on", () => {
+        const [, today, tomorrow, later] = rows();
+        expect(foldsIn("upcoming", today, NOW, ZONE)).toBe(true);
+        expect(foldsIn("today", today, NOW, ZONE)).toBe(true);
+        expect(foldsIn("today", tomorrow, NOW, ZONE)).toBe(false);
+        expect(foldsIn("week", tomorrow, NOW, ZONE)).toBe(true);
+        expect(foldsIn("week", later, NOW, ZONE)).toBe(false);
+        // All shows them whole; Needs an outcome and Awaiting payment never fold.
+        expect(foldsIn("all", today, NOW, ZONE)).toBe(false);
+        expect(foldsIn("outcome", today, NOW, ZONE)).toBe(false);
+    });
+
+    it("sets folds under their day, and a day of only cancelled between the days shown", () => {
+        const live = [booking(1), booking(44)];
+        const cancelled = [
+            booking(2, { status: "CANCELLED" }),
+            booking(20, { status: "CANCELLED" }),
+            booking(24 * 30, { status: "CANCELLED" }),
+        ];
+        const shown = groupByDay(live, ZONE, NOW);
+        // Not on the last page: a day past the days shown waits for its page.
+        const groups = withFolds(shown, cancelled, ZONE, NOW, false);
+        expect(
+            groups.map((g) => [g.label, g.rows.length, g.cancelled?.length]),
+        ).toEqual([
+            ["Today · Mon 19 Oct", 1, 1],
+            ["Tomorrow · Tue 20 Oct", 0, 1],
+            ["Wed 21 Oct", 1, undefined],
+        ]);
+        // On the last page it is there, with only its fold.
+        const last = withFolds(shown, cancelled, ZONE, NOW, true);
+        expect(last.at(-1)).toMatchObject({ rows: [] });
+        expect(last.at(-1)?.cancelled).toHaveLength(1);
+        expect(cancelledWord(2)).toBe("2 cancelled");
+        expect(bookingsWord(1)).toBe("1 booking");
+        expect(bookingsWord(3)).toBe("3 bookings");
+    });
+});
+
+describe("Status gains how it went (BLHB)", () => {
+    it("narrows by Came, Didn't come and Not marked", () => {
+        const came = booking(-3, { outcome: "ATTENDED" });
+        const didnt = booking(-3, { outcome: "NO_SHOW" });
+        const unmarked = booking(-3);
+        const ahead = booking(3);
+        const pick = (p: "ATTENDED" | "NO_SHOW" | "UNMARKED" | "CONFIRMED") =>
+            [came, didnt, unmarked, ahead]
+                .filter((b) =>
+                    matchesMore(b, { ...NO_MORE, statuses: [p] }, NOW),
+                )
+                .map((b) => b.id);
+        expect(pick("ATTENDED")).toEqual([came.id]);
+        expect(pick("NO_SHOW")).toEqual([didnt.id]);
+        expect(pick("UNMARKED")).toEqual([unmarked.id]);
+        expect(pick("CONFIRMED")).toEqual([unmarked.id, ahead.id]);
+    });
+});
+
+describe("the Money column (DEC-098: only for those who read money)", () => {
+    it("says an amount and where it stands, with one payment word", () => {
+        expect(moneyCell(booking(20, { status: "PENDING" }))).toEqual({
+            amount: "₹800",
+            note: "Awaiting payment",
+        });
+        expect(moneyCell(booking(20))).toEqual({
+            amount: "₹800",
+            note: "Paid",
+        });
+        expect(moneyCell(booking(20, { paidWith: "DESK" }))).toEqual({
+            amount: "₹800",
+            note: "Pays at the visit",
+        });
+        expect(
+            moneyCell(
+                booking(2, {
+                    paidWith: null,
+                    take: { cents: 40000, byLink: false },
+                }),
+            ),
+        ).toEqual({ amount: "₹400", note: "Awaiting payment" });
+    });
+
+    it("says what a cancelled booking's money was, not that it was refunded", () => {
+        expect(moneyCell(booking(2, { status: "CANCELLED" }))).toEqual({
+            amount: "₹800",
+            note: "Paid online · refund on the booking",
+        });
+        expect(
+            moneyCell(booking(2, { status: "CANCELLED", paidWith: null })),
+        ).toEqual({ amount: null, note: "Nothing was paid" });
+        // A Member's read carries no price (DEC-020): nothing to show.
+        const noPrice = booking(2);
+        delete noPrice.service.priceCents;
+        expect(moneyCell(noPrice)).toEqual({ amount: null, note: null });
+    });
+});
+
+describe("times and forward dates", () => {
+    it("says how long a booking runs", () => {
+        expect(lengthWord("2026-10-19T06:30:00Z", "2026-10-19T07:15:00Z")).toBe(
+            "45 min",
+        );
+        expect(lengthWord("2026-10-19T06:30:00Z", "2026-10-19T07:30:00Z")).toBe(
+            "1 hr",
+        );
+        expect(lengthWord("2026-10-19T06:30:00Z", "2026-10-19T08:00:00Z")).toBe(
+            "1 hr 30 min",
+        );
+    });
+
+    it("reads Tomorrow and Next 7 days as custom ranges, and back", () => {
+        expect(forwardRange("tomorrow", "2026-10-19")).toEqual({
+            from: "2026-10-20",
+            to: "2026-10-20",
+        });
+        expect(forwardRange("next7", "2026-10-19")).toEqual({
+            from: "2026-10-19",
+            to: "2026-10-25",
+        });
+        const range = {
+            date: "custom",
+            ...forwardRange("next7", "2026-10-19"),
+        };
+        expect(forwardPickOf(range, "2026-10-19")).toBe("next7");
+        expect(
+            forwardPickOf(
+                { date: "month", from: null, to: null },
+                "2026-10-19",
+            ),
+        ).toBeNull();
     });
 });
 
@@ -328,5 +494,21 @@ describe("a row", () => {
                 }),
             ),
         ).toBe("Open Arun's page");
+    });
+});
+
+describe("rows for a viewer who reads no money (DEC-098)", () => {
+    const take = { cents: 40000, byLink: false } as DiaryBooking["take"];
+    it("carry no price and no amount to take, only that there is one", () => {
+        const [row] = withoutAmounts([booking(1, { take })]);
+        expect(JSON.stringify(row)).not.toContain("40000");
+        expect(row.service.priceCents).toBeUndefined();
+        expect(row.take).toBeUndefined();
+        expect(row.toTake).toBe(true);
+    });
+    it("leave an owner's rows alone (the page only strips without payment:read)", () => {
+        const owner = booking(1, { take });
+        expect(owner.take?.cents).toBe(40000);
+        expect(owner.service.priceCents).toBe(80000);
     });
 });

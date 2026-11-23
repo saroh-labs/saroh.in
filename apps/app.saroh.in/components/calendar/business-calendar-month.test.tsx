@@ -548,7 +548,7 @@ describe("loading and a failed read", () => {
                 <CalendarError error={new Error("boom")} retry={retry} />,
             ),
         );
-        expect(host.textContent).toContain("Calendar");
+        expect(host.textContent).toContain("Business calendar");
         click(button(/Try again/i, host));
         expect(retry).toHaveBeenCalled();
     });

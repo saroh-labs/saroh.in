@@ -12,12 +12,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { BookingsModeSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
 import { formatDay } from "@/lib/format/datetime";
 import type { BookingsOpens, ShowFor } from "@/lib/services/bookings-opens";
 import { EVERYONE } from "@/lib/services/bookings-opens";
 import type { DayFacts } from "@/lib/services/calendar-header";
 import { dayRange, headerTitle } from "@/lib/services/calendar-header";
-import type { CalendarLayout } from "@/lib/services/calendar-href";
+import type { CalendarLayout, GoogleShow } from "@/lib/services/calendar-href";
 import { callName } from "@/lib/services/call-name";
 import type { LocalDate } from "@/lib/services/diary";
 import { addDays, weekStartOf } from "@/lib/services/diary";
@@ -32,8 +33,17 @@ import { OptionsSheet } from "./options-sheet";
 import type { PersonChoice } from "./people-sheet";
 import { PeopleSheet, PersonFace } from "./people-sheet";
 import { useBookingsOpens } from "./use-bookings-opens";
+import { usePhone } from "./use-phone";
+import { WeekStrip } from "./week-strip";
 
 type Open = "date" | "people" | "opts" | null;
+
+/** The layout's own name, said beside the date: List is the register now. */
+const VIEW_NAME: Record<CalendarLayout, string> = {
+    day: "Day",
+    week: "Week",
+    agenda: "Agenda",
+};
 
 const STEP =
     "flex size-8 shrink-0 items-center justify-center rounded-[8px] border border-border bg-card text-foreground transition-colors duration-fast hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:size-11";
@@ -43,9 +53,11 @@ const PHONE_STEP =
 
 /**
  * Header C (U2, #1018; BKMBookingsDay on a phone, BKDCalendarDay on the
- * desk): one header for Day, Week and List. A date title that opens Go to a
- * day (the week, the month, Show as, Go to today); a person chip that opens
- * Whose bookings; "…" with the view's options; one summary line. On the
+ * desk) as BKVCalendarB drew it: one header for Day, Week and Agenda. A
+ * Today button, a date title that names the view and opens Go to a day (the
+ * week, the month, Show as, Go to today); a person chip that opens Whose
+ * bookings; the Calendar | List switch (List is the register of every
+ * booking); "…" with the view's options; one summary line. On the
  * desk the arrows beside the date go a day (or week) back or on and the
  * line ends "Times in IST"; on a phone the arrows are for a keyboard and a
  * screen reader, and the calendar is swiped.
@@ -71,6 +83,7 @@ export function CalendarHeader({
     newBooking,
     calOnly,
     onAddPerson,
+    google,
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -104,10 +117,23 @@ export function CalendarHeader({
     calOnly: boolean;
     /** Add someone who takes bookings, for someone who may. */
     onAddPerson?: () => void;
+    /**
+     * The Google layer and who is connected (BKVGoogle), while Google
+     * Calendar is on for the business; null leaves both out of "…".
+     */
+    google?: {
+        show: GoogleShow;
+        onChange: (show: GoogleShow) => void;
+        people: readonly {
+            staffId: string;
+            state: "CONNECTED" | "LAPSED" | "PAUSED";
+        }[];
+    } | null;
 }) {
     // The screen's transition: the diary greys while the header stays.
     const screenGo = useScreenGo();
     const screenLink = useScreenLink();
+    const phone = usePhone();
     const [open, setOpen] = useState<Open>(null);
     const { opens, change } = useBookingsOpens(kept);
     const toggle = (which: Exclude<Open, null>) => (o: boolean) =>
@@ -130,7 +156,7 @@ export function CalendarHeader({
         layout === "week"
             ? "This week"
             : layout === "agenda"
-              ? "This list"
+              ? "This agenda"
               : "This day";
 
     const person = choices.find((c) => c.key === picked) ?? choices.at(0);
@@ -226,6 +252,21 @@ export function CalendarHeader({
             data-calendar-header=""
             className="relative mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 max-[759px]:mb-3 max-[759px]:gap-x-2 max-[759px]:gap-y-0 max-[759px]:border-b max-[759px]:border-border max-[759px]:pb-0.5"
         >
+            {phone ? (
+                <div className="order-0 mb-1.5 basis-full">
+                    <BookingsModeSwitch current="calendar" />
+                </div>
+            ) : null}
+            <Link
+                href={hrefFor(layout, today)}
+                onNavigate={screenLink(hrefFor(layout, today))}
+                scroll={false}
+                data-today-button=""
+                data-ph-unmask=""
+                className="order-1 inline-flex h-[38px] shrink-0 items-center rounded-[8px] border border-border bg-card px-3 text-[13.5px] font-semibold text-foreground transition-colors duration-fast hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11 max-[759px]:order-3 max-[759px]:h-11 max-[759px]:rounded-full"
+            >
+                Today
+            </Link>
             <Link
                 href={hrefFor(layout, addDays(date, -step))}
                 onNavigate={screenLink(hrefFor(layout, addDays(date, -step)))}
@@ -264,6 +305,12 @@ export function CalendarHeader({
                     onGo={go}
                 />
             </h1>
+            <span
+                data-view-name=""
+                className="order-2 -ml-1 shrink-0 rounded-full bg-muted px-2 py-0.5 text-[12.5px] font-medium text-muted-foreground max-[759px]:hidden"
+            >
+                {VIEW_NAME[layout]}
+            </span>
 
             {showChip && chip ? (
                 <div className="order-3">
@@ -310,6 +357,7 @@ export function CalendarHeader({
             </div>
 
             <div className="order-5 ml-auto flex items-center gap-2 max-[759px]:order-6 max-[759px]:ml-0">
+                {phone ? null : <BookingsModeSwitch current="calendar" />}
                 <OptionsSheet
                     open={open === "opts"}
                     onOpenChange={toggle("opts")}
@@ -324,17 +372,43 @@ export function CalendarHeader({
                                 ? `${cancelled.count} cancelled ${periodWord}`
                                 : `None cancelled ${periodWord}`,
                     }}
-                    allBookingsHref="/bookings/all"
                     hours={{ href: hoursHref, label: hoursLabel }}
                     start={opens.start}
                     onStart={(start) => void change({ start })}
                     showFor={opens.showFor}
                     onShowFor={pickShowFor}
+                    google={
+                        google
+                            ? {
+                                  ...google,
+                                  mine: me !== null,
+                                  team: others.map((c) => ({
+                                      key: c.key,
+                                      name: c.name,
+                                      state:
+                                          google.people.find(
+                                              (p) => p.staffId === c.key,
+                                          )?.state ?? "NONE",
+                                  })),
+                                  you: me?.id ?? null,
+                              }
+                            : null
+                    }
                     me={me ? callName(me.name) : null}
                     whoNow={everyone ? "everyone" : whoName}
                 />
                 {newBooking}
             </div>
+
+            {layout === "week" ? null : (
+                <WeekStrip
+                    layout={layout}
+                    date={date}
+                    today={today}
+                    facts={facts}
+                    hrefFor={(l, d) => hrefFor(l, d)}
+                />
+            )}
 
             {calOnly ? (
                 <p

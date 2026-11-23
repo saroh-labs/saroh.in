@@ -16,6 +16,7 @@ import {
     weekLanes,
 } from "@/lib/services/diary-view";
 
+import { BusyBands } from "./busy-bands";
 import { Hatches, HourRail } from "./day-by-person";
 import { blockLabel, DiaryBlock } from "./diary-block";
 import { tall } from "./geometry";
@@ -35,6 +36,8 @@ export interface WeekDay {
     cols: Column[];
     /** Nobody takes bookings that day: every week, or this date only. */
     closed: "weekly" | "day" | null;
+    /** Google busy times that day, everyone's together, in minutes. */
+    busy?: readonly Span[];
 }
 
 /** Live bookings on a day: the count its heading and the strip show. */
@@ -221,6 +224,7 @@ function WeekColumn({
                     from={from}
                 />
             ) : null}
+            <BusyBands spans={d.busy ?? []} from={from} />
             {words ? (
                 <div
                     data-week-closed=""

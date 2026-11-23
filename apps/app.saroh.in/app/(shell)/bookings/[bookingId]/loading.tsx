@@ -11,9 +11,6 @@ export default function Loading() {
                 <Link data-ph-unmask="" key="0" href="/bookings">
                     Bookings
                 </Link>,
-                <Link data-ph-unmask="" key="1" href="/bookings/all">
-                    All bookings
-                </Link>,
             ]}
             label="Loading the booking"
         />

@@ -68,6 +68,17 @@ export interface GoogleCalendarOption {
     canWrite: boolean;
 }
 
+/**
+ * Everyone's Google busy times for the days a calendar shows, and who is
+ * connected (`GET …/busy`): start and end, never what an event is.
+ */
+export interface CalendarBusy {
+    /** Google Calendar is on for this business. */
+    on: boolean;
+    busy: { staffId: string; startAt: string; endAt: string }[];
+    people: { staffId: string; state: "CONNECTED" | "LAPSED" | "PAUSED" }[];
+}
+
 export interface CalendarMember {
     membershipId: string;
     staffId: string | null;
