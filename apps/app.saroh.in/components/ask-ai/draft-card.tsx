@@ -9,7 +9,7 @@ import { Notice } from "@saroh/ui/notice";
 import { Check, Info, PenLine, TriangleAlert, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { useCanChangePlan } from "@/components/billing/plan-way";
@@ -25,7 +25,7 @@ import { upgradeHref } from "@/lib/billing/access";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
-import { saySiteDraftChanged } from "./open";
+import { saySiteDraftChanged, saySitePhotoPreview } from "./open";
 import {
     draftWords,
     editorHref,
@@ -89,6 +89,33 @@ export function DraftCard({
     const router = useRouter();
     const words = draftWords(card);
     const big = phone ? "coarse:h-11 h-11" : "";
+    // A photo drafted for a section shows on the open page's canvas, dashed
+    // and "not applied yet", for as long as the card is open (AIImgApply A).
+    const place = card.kind === "image" ? card.targetId?.split(":") : undefined;
+    const previewing =
+        place?.[0] === "section" &&
+        card.status === "drafted" &&
+        !cancelled &&
+        !result;
+    const previewSrc = thumbSrc(
+        card.fields.find((f) => f.field === "photo")?.new,
+    );
+    const previewAlt = card.fields.find((f) => f.field === "alt")?.new;
+    const placeKey = place?.join(":");
+    useEffect(() => {
+        if (!previewing || !previewSrc || !placeKey) return;
+        const [, siteId = "", pageId = "", ...key] = placeKey.split(":");
+        const sectionKey = key.join(":");
+        saySitePhotoPreview({
+            kind: "set",
+            siteId,
+            pageId,
+            sectionKey,
+            src: previewSrc,
+            alt: typeof previewAlt === "string" ? previewAlt : "",
+        });
+        return () => saySitePhotoPreview({ kind: "clear", sectionKey });
+    }, [previewing, previewSrc, previewAlt, placeKey]);
 
     const settle = (
         res: Awaited<ReturnType<typeof confirmDraft>> | undefined,
@@ -113,6 +140,15 @@ export function DraftCard({
             (outcome === "done" || outcome === "undone")
         ) {
             saySiteDraftChanged(res.data.card.targetId?.split(":")[0] ?? "");
+        }
+        // A photo on a section or a post changed the website's draft too.
+        const place = res.data.card.targetId?.split(":");
+        if (
+            res.data.card.kind === "image" &&
+            (place?.[0] === "section" || place?.[0] === "post") &&
+            (outcome === "done" || outcome === "undone")
+        ) {
+            saySiteDraftChanged(place[1] ?? "");
         }
     };
 
@@ -300,7 +336,9 @@ export function DraftCard({
                     {card.status === "expired" ? "No longer open" : words.state}
                 </span>
             </div>
-            {card.kind === "section" ? (
+            {card.kind === "image" ? (
+                <PhotoWords card={card} />
+            ) : card.kind === "section" ? (
                 <SectionWords
                     card={card}
                     open={open}
@@ -489,7 +527,9 @@ export function DraftCard({
                         className="ml-1 min-h-11 px-1.5 text-[13px] text-foreground underline decoration-border-strong underline-offset-[3px] min-[760px]:min-h-0"
                         onClick={() => setCancelled(true)}
                     >
-                        {card.kind === "section" ? "Not now" : "Cancel"}
+                        {card.kind === "section" || card.kind === "image"
+                            ? "Not now"
+                            : "Cancel"}
                     </Button>
                 ) : null}
             </div>
@@ -578,6 +618,83 @@ function SectionWords({
                     ))}
                 </div>
             ) : null}
+            {card.basedOn ? (
+                <p className="m-0 text-[12.5px] text-muted-foreground">
+                    Based on: {card.basedOn}.
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+/** A photo's address, only when it is a web address of ours to draw. */
+export function thumbSrc(value: unknown): string | null {
+    return typeof value === "string" && value.startsWith("https://")
+        ? value
+        : null;
+}
+
+/**
+ * A photo placed (owner, 22 Nov): where it goes, then Now and New, each a
+ * thumbnail with its words (the card's only new part), and what the
+ * suggestion is based on.
+ */
+function PhotoWords({ card }: { card: AskAiDraftCard }) {
+    const photo = card.fields.find((f) => f.field === "photo");
+    const alt = card.fields.find((f) => f.field === "alt");
+    const rows = [
+        { key: "Now", value: photo?.old, words: undefined },
+        { key: "New", value: photo?.new, words: alt?.new },
+    ];
+    return (
+        <div data-photo-words="" className="flex flex-col gap-3 px-3.5 py-3">
+            <b className="text-sm [overflow-wrap:anywhere]">
+                {card.targetName}
+            </b>
+            <span className="label text-muted-foreground">
+                {photo?.label ?? "Photo"}
+            </span>
+            {rows.map((r) => {
+                const src = thumbSrc(r.value);
+                return (
+                    <div
+                        key={r.key}
+                        className="grid grid-cols-[44px_minmax(0,1fr)] items-center gap-2 text-[13.5px]"
+                    >
+                        <span
+                            data-ph-unmask=""
+                            className={cn(
+                                "text-[12px] font-semibold",
+                                r.key === "Now" && "text-muted-foreground",
+                            )}
+                        >
+                            {r.key}
+                        </span>
+                        {src ? (
+                            <span className="flex min-w-0 items-center gap-2.5">
+                                {/* eslint-disable-next-line @next/next/no-img-element -- the business's own photo, by address */}
+                                <img
+                                    src={src}
+                                    alt=""
+                                    className="size-14 shrink-0 rounded-[10px] border border-border object-cover"
+                                />
+                                {typeof r.words === "string" && r.words ? (
+                                    <span className="min-w-0 [overflow-wrap:anywhere]">
+                                        {r.words}
+                                    </span>
+                                ) : null}
+                            </span>
+                        ) : (
+                            <span
+                                data-ph-unmask=""
+                                className="text-muted-foreground"
+                            >
+                                No photo
+                            </span>
+                        )}
+                    </div>
+                );
+            })}
             {card.basedOn ? (
                 <p className="m-0 text-[12.5px] text-muted-foreground">
                     Based on: {card.basedOn}.

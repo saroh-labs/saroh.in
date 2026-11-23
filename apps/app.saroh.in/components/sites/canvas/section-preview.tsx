@@ -97,6 +97,7 @@ export function DraftPreview({
     onSelectChrome,
     notesByKey,
     changedByKey,
+    photoPreviewByKey,
     onOpenNotes,
     siteAddress,
     siteId,
@@ -161,6 +162,8 @@ export function DraftPreview({
     notesByKey?: ReadonlyMap<string, number>;
     /** Changed since live, per section key: a reader's marks (`fix/WXMReviewer`). */
     changedByKey?: ReadonlyMap<string, string>;
+    /** A photo Ask AI drafted, by section key: drawn in place, dashed, not applied yet. */
+    photoPreviewByKey?: ReadonlyMap<string, { src: string; alt: string }>;
     /** A pin was pressed: select that block and show its feedback. */
     onOpenNotes?: (index: number) => void;
     /** The merchant's site address, which the page's links open on. */
@@ -246,7 +249,21 @@ export function DraftPreview({
                       "Every block on this page is hidden, so visitors would see an empty page."}
             </p>
         ) : (
-            visible.map(({ section, index }, position) => {
+            visible.map(({ section: drawn, index }, position) => {
+                const previewed =
+                    drawn.key === undefined
+                        ? undefined
+                        : photoPreviewByKey?.get(drawn.key);
+                // The drafted photo in place, on the canvas only: nothing is saved.
+                const section = previewed
+                    ? ({
+                          ...drawn,
+                          content: {
+                              ...(drawn.content as Record<string, unknown>),
+                              image: { src: previewed.src, alt: previewed.alt },
+                          },
+                      } as typeof drawn)
+                    : drawn;
                 const rendered = (
                     <PageSections
                         sections={[toRenderedSection(section, resolvePage)]}
@@ -280,6 +297,7 @@ export function DraftPreview({
                                 : (notesByKey?.get(section.key) ?? 0)
                         }
                         onOpenNotes={() => onOpenNotes?.(index)}
+                        previewing={previewed !== undefined}
                         changed={
                             section.key === undefined
                                 ? undefined
@@ -448,6 +466,7 @@ function CanvasBlock({
     locked = false,
     notes = 0,
     changed,
+    previewing = false,
     onSelect,
     onOpenNotes,
     tools,
@@ -455,6 +474,8 @@ function CanvasBlock({
 }: {
     /** "changed", "added", "moved" or "hidden" since live, for a reader. */
     changed?: string;
+    /** Ask AI's drafted photo is drawn here, not applied yet. */
+    previewing?: boolean;
     /** Drawn on the block while it is selected: a phone's toolbar. */
     tools?: ReactNode;
     /** Position in the page's block list, so the editor can scroll to it. */
@@ -487,11 +508,22 @@ function CanvasBlock({
             className={`group/block relative cursor-pointer outline outline-offset-[-2px] transition-[outline-color] duration-fast ${
                 selected
                     ? "outline-2 outline-brand-surface after:pointer-events-none after:absolute after:inset-[2px] after:z-10 after:shadow-[inset_0_0_0_1px_hsl(var(--brand-surface-foreground)/0.9)] after:content-['']"
-                    : "outline-1 outline-transparent hover:outline-border-strong"
+                    : previewing
+                      ? "outline-dashed outline-2 outline-brand-surface"
+                      : "outline-1 outline-transparent hover:outline-border-strong"
             }`}
         >
             {children}
             {tools}
+            {previewing ? (
+                <span
+                    data-photo-preview=""
+                    data-ph-unmask=""
+                    className="pointer-events-none absolute right-0 top-0 z-10 flex h-6 items-center rounded-bl-md bg-brand-surface px-2 font-sans text-xs font-semibold text-brand-surface-foreground"
+                >
+                    Preview · not applied yet
+                </span>
+            ) : null}
             {changed && !selected ? (
                 // Under the label chip, which covers it on hover and selection.
                 <span

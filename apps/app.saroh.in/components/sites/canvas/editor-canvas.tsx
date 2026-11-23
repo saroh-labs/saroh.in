@@ -134,6 +134,7 @@ export function EditorCanvas({
     selectChrome,
     notesByKey,
     changedByKey,
+    photoPreviewByKey,
     dirty,
     onlyHeldBack,
     heldBack,
@@ -191,6 +192,8 @@ export function EditorCanvas({
     notesByKey: Map<string, number>;
     /** A reader's marks: what changed since live, per section key. */
     changedByKey?: ReadonlyMap<string, string>;
+    /** A photo Ask AI drafted, by section key: shown dashed, not applied yet. */
+    photoPreviewByKey?: ReadonlyMap<string, { src: string; alt: string }>;
     /**
      * Work not yet saved — the page, the look, the name or the footer —
      * which holds a page switch back (review G-3).
@@ -257,6 +260,7 @@ export function EditorCanvas({
                       onSelectChrome: selectChrome,
                       notesByKey,
                       changedByKey,
+                      photoPreviewByKey,
                       onOpenNotes: (index: number) => {
                           setSelectedIndex(index);
                           setInspector("feedback");

@@ -327,6 +327,96 @@ export const editSectionTool = {
     output: pageWrite,
 };
 
+/**
+ * Put one of the person's images on the website (owner, 22 Nov): a
+ * section's photo (a hero's, a text block's) or a blog post's cover. Ask AI
+ * drafts it on a Now and New card; `media_id` is one of the images the
+ * person attached, or one from Your photos. A product's photo is
+ * `place_product_photo`: its own permission and module.
+ */
+const placed = z.looseObject({
+    src: z.string().min(1).max(2000),
+    alt: z.string().max(300).optional(),
+    width: z.number().int().positive().optional(),
+    height: z.number().int().positive().optional(),
+    placeholder: z.string().max(64).optional(),
+    widths: z.array(z.number().int().positive()).max(6).optional(),
+});
+export const placeImageTool = {
+    input: z
+        .object({
+            target: z
+                .enum(["section", "post_cover"])
+                .describe(
+                    "section: a section's photo (site_id, page_id, section_key); post_cover: a blog post's cover (site_id, post_id).",
+                ),
+            media_id: z
+                .string()
+                .min(1)
+                .max(64)
+                .optional()
+                .describe(
+                    "The attached image's media_id (needed unless clear).",
+                ),
+            alt: z
+                .string()
+                .trim()
+                .max(300)
+                .optional()
+                .describe("What the picture shows, for a screen reader."),
+            site_id: siteId,
+            page_id: pageId.optional(),
+            section_key: sectionKey.optional(),
+            post_id: z.string().min(1).max(64).optional(),
+            clear: z
+                .boolean()
+                .optional()
+                .describe("Undo only: take this image off again."),
+            restore: placed
+                .optional()
+                .describe(
+                    "Undo only: put the earlier photo back. Never set this.",
+                ),
+        })
+        .strict(),
+    output: z.object({
+        target: z.string(),
+        media_id: z.string().nullable(),
+        image_url: z.string().nullable(),
+    }),
+};
+
+/** A product's first photo (owner, 22 Nov): the current one moves to second. */
+export const placeProductPhotoTool = {
+    input: z
+        .object({
+            product_id: z.string().min(1).max(64),
+            media_id: z
+                .string()
+                .min(1)
+                .max(64)
+                .optional()
+                .describe(
+                    "The attached image's media_id (needed unless clear).",
+                ),
+            alt: z
+                .string()
+                .trim()
+                .max(300)
+                .optional()
+                .describe("What the picture shows, for a screen reader."),
+            clear: z
+                .boolean()
+                .optional()
+                .describe("Undo only: take the first photo off again."),
+        })
+        .strict(),
+    output: z.object({
+        media_id: z.string().nullable(),
+        image_url: z.string().nullable(),
+    }),
+};
+
 export const removeSectionTool = {
     input: z
         .object({ site_id: siteId, page_id: pageId, section_key: sectionKey })

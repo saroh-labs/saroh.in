@@ -9,6 +9,8 @@ jest.mock("@saroh/database", () => {
                 findUnique: jest.fn(),
                 findMany: jest.fn(),
                 update: jest.fn(),
+                updateMany: jest.fn(),
+                deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
                 delete: jest.fn(),
             },
             // Products showing an object; default "none" as for publications.
@@ -761,7 +763,14 @@ describe("MediaService.list", () => {
         await service.list(ctx());
 
         expect(findMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1" },
+            // Ask AI's images stay with their conversation until applied.
+            where: {
+                organizationId: "org_1",
+                OR: [
+                    { purpose: null },
+                    { purpose: { notIn: ["ask-ai", "ask-ai-sent"] } },
+                ],
+            },
             orderBy: { createdAt: "desc" },
         });
     });
@@ -976,4 +985,196 @@ describe("MediaService.storeUploadBytes — only a pending upload (F4)", () => {
             expect(putObject).not.toHaveBeenCalled();
         },
     );
+});
+
+describe("MediaService — images for Ask AI (owner, 22 Nov)", () => {
+    beforeEach(() => jest.clearAllMocks());
+    const storage = () =>
+        fakeStorage({
+            getPublicUrl: jest.fn((key: string) => `https://m.test/${key}`),
+        });
+    const row = (over: Record<string, unknown> = {}) => ({
+        id: "m1",
+        key: "org/org_1/ask-ai/m1.png",
+        bucket: "MAIN",
+        filename: "aisle.png",
+        contentType: "image/png",
+        sizeBytes: 1000,
+        ...over,
+    });
+
+    it("takes an upload under the Ask AI purpose for ai:use, not media:write", async () => {
+        const createSignedUploadUrl = jest.fn().mockResolvedValue(SIGNED);
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ createSignedUploadUrl }), null),
+        );
+        create.mockResolvedValue({ id: "media_1", key: SIGNED.key });
+        // A person given ai:use but not media:write.
+        const asker = ctx({
+            role: "MEMBER",
+            actions: new Set(["ai:use"] as const),
+        });
+        await expect(
+            service.createUpload(asker, {
+                contentType: "image/png",
+                contentLength: 1000,
+                filename: "a.png",
+                purpose: "ask-ai",
+            }),
+        ).resolves.toMatchObject({ mediaId: "media_1" });
+        await expect(
+            service.createUpload(asker, {
+                contentType: "image/png",
+                contentLength: 1000,
+                filename: "a.png",
+                purpose: "site-image",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("refuses a file Ask AI can't read, and one over 5 MB, in words", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        const input = {
+            contentType: "image/png",
+            contentLength: 1000,
+            filename: "a.png",
+            purpose: "ask-ai",
+        };
+        await expect(
+            service.createUpload(ctx(), {
+                ...input,
+                contentType: "image/avif",
+            }),
+        ).rejects.toThrow("Choose a JPG, PNG, WebP or GIF");
+        await expect(
+            service.createUpload(ctx(), {
+                ...input,
+                contentLength: 5 * 1024 * 1024 + 1,
+            }),
+        ).rejects.toThrow("up to 5 MB");
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it("keeps them out of Your photos", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        findMany.mockResolvedValue([]);
+        await service.list(ctx());
+        expect(findMany.mock.calls[0][0].where.OR).toEqual([
+            { purpose: null },
+            { purpose: { notIn: ["ask-ai", "ask-ai-sent"] } },
+        ]);
+    });
+
+    it("answers only the business's own READY images, in the order asked", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        findMany.mockResolvedValue([row({ id: "m2" }), row()]);
+        const got = await service.askAiImages("org_1", ["m1", "m2"]);
+        expect(got.map((g) => g.id)).toEqual(["m1", "m2"]);
+        // Scoped to the business and to READY in the query itself.
+        expect(findMany.mock.calls[0][0].where).toMatchObject({
+            organizationId: "org_1",
+            status: "READY",
+        });
+    });
+
+    it("an id of another business, or one not ready, is not found", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        findMany.mockResolvedValue([row()]);
+        await expect(
+            service.askAiImages("org_1", ["m1", "other-org-id"]),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("refuses an image over 5 MB or of a type the provider can't read", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        findMany.mockResolvedValue([row({ sizeBytes: 5 * 1024 * 1024 + 1 })]);
+        await expect(
+            service.askAiImages("org_1", ["m1"]),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        findMany.mockResolvedValue([row({ contentType: "image/avif" })]);
+        await expect(
+            service.askAiImages("org_1", ["m1"]),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("lists links only for images still there", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        findMany.mockResolvedValue([row()]);
+        const views = await service.askAiImageViews("org_1", ["m1", "gone"]);
+        expect([...views.keys()]).toEqual(["m1"]);
+        expect(views.get("m1")?.url).toContain("https://m.test/");
+    });
+
+    it("applying one makes it the library's: only an Ask AI image changes purpose", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        await service.adoptAskAiImage("org_1", "m1");
+        expect(prisma.media.updateMany).toHaveBeenCalledWith({
+            where: {
+                id: "m1",
+                organizationId: "org_1",
+                purpose: { in: ["ask-ai", "ask-ai-sent"] },
+            },
+            data: { purpose: "site-image" },
+        });
+    });
+
+    it("a question carrying images makes them the conversation's, only fresh Ask AI uploads", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        await service.markAskAiImagesSent("org_1", ["m1", "m2"]);
+        expect(prisma.media.updateMany).toHaveBeenCalledWith({
+            where: {
+                id: { in: ["m1", "m2"] },
+                organizationId: "org_1",
+                purpose: "ask-ai",
+            },
+            data: { purpose: "ask-ai-sent" },
+        });
+    });
+
+    it("an image picked and never sent goes after a day, files and rows, sparing a held business", async () => {
+        const deleteObject = jest.fn().mockResolvedValue(undefined);
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ deleteObject }), null),
+        );
+        findMany.mockResolvedValue([
+            {
+                id: "m1",
+                key: "org/org_1/ask-ai/m1.png",
+                bucket: "MAIN",
+                variants: null,
+            },
+        ]);
+        const before = new Date("2026-08-01T00:00:00Z");
+        await expect(
+            service.deleteUnsentAskAiImagesBefore(before, ["org_held"]),
+        ).resolves.toBe(1);
+        expect(findMany.mock.calls[0][0].where).toEqual({
+            purpose: "ask-ai",
+            createdAt: { lt: before },
+            organizationId: { notIn: ["org_held"] },
+        });
+        expect(deleteObject).toHaveBeenCalledWith("org/org_1/ask-ai/m1.png");
+    });
+
+    it("a deleted conversation takes the images it carried, never one applied since", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        findMany.mockResolvedValue([]);
+        await service.deleteAskAiImages(["m1", "m2"]);
+        expect(findMany.mock.calls[0][0].where).toEqual({
+            id: { in: ["m1", "m2"] },
+            purpose: "ask-ai-sent",
+        });
+    });
+
+    it("only the server moves an image to sent", async () => {
+        const service = new MediaService(mediaStorages(storage(), null));
+        await expect(
+            service.createUpload(ctx(), {
+                contentType: "image/png",
+                contentLength: 10,
+                filename: "a.png",
+                purpose: "ask-ai-sent",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
 });

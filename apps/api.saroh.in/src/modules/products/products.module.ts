@@ -51,6 +51,12 @@ import { VariantsService } from "./variants.service";
         PublicCatalogueService,
         OrganizationGuard,
     ],
-    exports: [ProductsService, PublicCatalogueService],
+    // ProductAccess and ProductImagesService: Ask AI's place_image puts a photo on a product.
+    exports: [
+        ProductsService,
+        PublicCatalogueService,
+        ProductAccess,
+        ProductImagesService,
+    ],
 })
 export class ProductsModule {}

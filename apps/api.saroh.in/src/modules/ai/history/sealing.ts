@@ -44,6 +44,8 @@ export interface AiSealBinding {
 /** A message as sealed: its text, a draft's card, and the reads' cards under it. */
 export interface AiMessageContent {
     text: string;
+    /** The images a question came with: media ids, never bytes (owner, 22 Nov). */
+    images?: string[];
     card?: Record<string, unknown>;
     cards?: { kind: string; data: Record<string, unknown> }[];
     /** The next steps offered under an answer (AF 3). */

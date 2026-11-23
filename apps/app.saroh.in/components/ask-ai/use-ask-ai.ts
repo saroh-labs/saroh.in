@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { runAction } from "@/lib/api/run-action";
+import type { Attachment } from "@/lib/ask-ai/images";
 import type { AskAiPage } from "@/lib/ask-ai/page-hints";
 import { businessPage } from "@/lib/ask-ai/page-hints";
 import {
@@ -36,6 +37,7 @@ import {
     savedTurn,
     turnsOf,
 } from "./turns";
+import { useAttachments } from "./use-attachments";
 
 /**
  * Ask AI's state and actions (DEC-183): the conversation, the box's draft,
@@ -84,6 +86,8 @@ export function useAskAi({
     );
     const [draft, setDraft] = useState("");
     const [busy, setBusy] = useState(false);
+    // The images in the box (owner, 22 Nov): held here with the draft.
+    const attach = useAttachments();
     // The page it was opened on (AF 1, 2, 5), and whether its label was
     // cleared to ask about the whole business (AF 7). A new page brings
     // its own label back.
@@ -169,33 +173,89 @@ export function useAskAi({
         );
     };
 
-    const ask = async (question: string) => {
+    /** `withImages`: the box's own send takes the images in it; a suggestion or Ask again never does. */
+    const ask = async (
+        question: string,
+        withImages = false,
+        /** Ask again: the question's own images go again, already uploaded. */
+        again: Turn["images"] = [],
+    ) => {
         const q = question.trim().slice(0, ASK_AI_QUESTION_MAX);
-        if (!q || running) return;
+        const resent: Attachment[] = again.map((i) => ({
+            key: i.mediaId,
+            name: i.filename,
+            status: "ready",
+            progress: 100,
+            preview: i.url,
+            mediaId: i.mediaId,
+        }));
+        const pictured = resent.length
+            ? resent
+            : withImages && attach.settled
+              ? attach.items
+              : [];
+        if ((!q && !pictured.length) || running) return;
         const key = nextKey();
         stopWanted.current = false;
         live.current = { key };
         setDraft("");
         setView("thread");
+        const sent = resent.length
+            ? resent
+            : pictured.length
+              ? attach.take()
+              : [];
         setTurns((all) => [
             ...all,
-            { key, question: q, text: "", cards: [], running: true },
+            {
+                key,
+                question: q,
+                text: "",
+                cards: [],
+                running: true,
+                ...(sent.length
+                    ? {
+                          images: sent.flatMap((a) =>
+                              a.mediaId && a.preview
+                                  ? [
+                                        {
+                                            mediaId: a.mediaId,
+                                            url: a.preview,
+                                            filename: a.name,
+                                        },
+                                    ]
+                                  : [],
+                          ),
+                      }
+                    : {}),
+            },
         ]);
         const convo = { id: conversationId };
         let outcome: Turn["outcome"];
+        let refused = false;
         try {
             const body = await startAskAiTurn({
                 question: q,
+                ...(sent.length
+                    ? {
+                          images: sent.flatMap((a) =>
+                              a.mediaId ? [a.mediaId] : [],
+                          ),
+                      }
+                    : {}),
                 ...(conversationId ? { conversationId } : {}),
                 ...(about ? { about } : {}),
             });
             if (!body) {
                 patch(key, { running: false, outcome: "FAILED" });
+                // Not asked: nothing was used, so the images stay in the box.
+                if (sent.length && !resent.length) attach.restore(sent);
                 return;
             }
             for await (const event of readAskAiEvents(body)) {
                 apply(key, event, convo);
                 if (event.type === "done") outcome = event.outcome;
+                if (event.type === "refused") refused = true;
             }
         } catch {
             // The connection dropped: what arrived stays, said as lost.
@@ -213,6 +273,8 @@ export function useAskAi({
             readAskAiState().catch(() => null),
         ]);
         const kept = saved ? savedTurn(saved, q) : null;
+        // Not asked (no Ask AI left, a busy business): the images stay in the box.
+        if (sent.length && refused && !resent.length) attach.restore(sent);
         if (kept && outcome === undefined && kept.question === q) {
             patch(key, { ...kept, key, running: false, lost: false });
         } else if (kept?.messageId) {
@@ -310,6 +372,7 @@ export function useAskAi({
         history,
         draft,
         setDraft,
+        attach,
         busy,
         here,
         about,

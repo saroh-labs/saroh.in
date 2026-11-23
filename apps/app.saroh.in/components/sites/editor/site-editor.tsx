@@ -1,7 +1,11 @@
 "use client";
 
 import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
-import { SITE_DRAFT_CHANGED } from "@/components/ask-ai/open";
+import type { SitePhotoPreview } from "@/components/ask-ai/open";
+import {
+    SITE_DRAFT_CHANGED,
+    SITE_PHOTO_PREVIEW,
+} from "@/components/ask-ai/open";
 import { AddSectionDialog } from "@/components/sites/blocks/add-section-dialog";
 import { useAddBlock } from "@/components/sites/blocks/use-add-block";
 import { queryCanvas } from "@/components/sites/canvas/device-frame";
@@ -47,7 +51,7 @@ import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 import type { LookId } from "@saroh/block-contract";
 import type { EditableTextHost } from "@saroh/site-blocks";
 import type { ReactElement } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BlockToolbar } from "./block-toolbar";
 import type { EditorTopBarProps } from "./editor-bar";
 import { SECTION_LABELS, sectionTitle } from "./editor-constants";
@@ -498,6 +502,38 @@ export function SiteEditor({
         window.addEventListener(SITE_DRAFT_CHANGED, onChanged);
         return () => window.removeEventListener(SITE_DRAFT_CHANGED, onChanged);
     }, [siteId, pageId, reloadDraft, edits]);
+    // A photo Ask AI drafted for a section of this page: drawn on the canvas,
+    // dashed, until its card is applied, dismissed or gone (AIImgApply A).
+    const [photoPreview, setPhotoPreview] = useState<Extract<
+        SitePhotoPreview,
+        { kind: "set" }
+    > | null>(null);
+    useEffect(() => {
+        const onPreview = (e: Event) => {
+            const d = (e as CustomEvent<SitePhotoPreview>).detail;
+            if (d.kind === "set") {
+                if (d.siteId === siteId) setPhotoPreview(d);
+            } else {
+                setPhotoPreview((now) =>
+                    now?.sectionKey === d.sectionKey ? null : now,
+                );
+            }
+        };
+        window.addEventListener(SITE_PHOTO_PREVIEW, onPreview);
+        return () => window.removeEventListener(SITE_PHOTO_PREVIEW, onPreview);
+    }, [siteId]);
+    const photoPreviewByKey = useMemo(
+        () =>
+            photoPreview?.pageId === pageId
+                ? new Map([
+                      [
+                          photoPreview.sectionKey,
+                          { src: photoPreview.src, alt: photoPreview.alt },
+                      ],
+                  ])
+                : undefined,
+        [photoPreview, pageId],
+    );
     const askAiHere = useEditorAskAi({
         siteId,
         pageId,
@@ -692,6 +728,7 @@ export function SiteEditor({
             canvasChrome={canvasChrome}
             notesByKey={review.notesByKey}
             changedByKey={review.changedByKey}
+            photoPreviewByKey={photoPreviewByKey}
             // The boards draw no window round the page (editor audit).
             windowBar={!areaOn}
             saveFailed={

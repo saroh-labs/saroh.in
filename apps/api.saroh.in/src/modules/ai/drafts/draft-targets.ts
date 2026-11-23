@@ -86,6 +86,11 @@ export interface DraftSpec {
     ) => Promise<string>;
     /** What the card says its suggestion is based on. */
     basedOn?: string;
+    /**
+     * Said, in place of a card, to someone whose role can't make this
+     * change: what isn't theirs to change, as the boards word it.
+     */
+    notYoursWords?: string;
     undoNote?: string;
 }
 
@@ -117,6 +122,8 @@ const LABELS: Record<string, string> = {
     heading: "Heading",
     subheading: "Subheading",
     button_label: "Button label",
+    photo: "Photo",
+    alt: "Alt text",
 };
 
 export function labelOf(field: string, currency?: string | null): string {
@@ -429,6 +436,70 @@ async function readSection(
     };
 }
 
+/**
+ * An image's place as a draft id (`place_image`): `section:<site>:<page>:<key>`,
+ * `product:<id>` or `post:<site>:<post>`. Its card shows the photo now and
+ * the photo after, as addresses the card draws as thumbnails.
+ */
+function placeTarget(input: Record<string, unknown>): string {
+    return input.target === "post_cover"
+        ? `post:${String(input.site_id)}:${String(input.post_id)}`
+        : `section:${sectionTarget(input)}`;
+}
+
+async function readPlace(
+    r: ReadContext,
+    id: string,
+): Promise<TargetState | null> {
+    const [kind, ...rest] = id.split(":");
+    const org = r.ctx.organizationId;
+    if (kind === "product") {
+        const p = await prisma.product.findFirst({
+            where: { id: rest.join(":"), organizationId: org },
+            select: { name: true, image: true, updatedAt: true },
+        });
+        return p
+            ? {
+                  name: p.name,
+                  updatedAt: p.updatedAt.toISOString(),
+                  fields: { photo: p.image ?? null },
+              }
+            : null;
+    }
+    if (kind === "post") {
+        const [siteId, postId] = rest;
+        const post = await prisma.post.findFirst({
+            where: { id: postId, siteId, site: { organizationId: org } },
+            select: { title: true, image: true, updatedAt: true },
+        });
+        return post
+            ? {
+                  name: post.title,
+                  updatedAt: post.updatedAt.toISOString(),
+                  fields: { photo: post.image ?? null },
+                  // Kept to put the earlier cover back on Undo.
+                  restore: { image: post.image ? { src: post.image } : null },
+              }
+            : null;
+    }
+    const ids = sectionIds(rest.join(":"));
+    const page = await pageSections(r, ids);
+    const section = page?.sections.find((s) => s.key === ids.section_key);
+    if (!page || !section) return null;
+    const image = (
+        section.content as {
+            image?: { src?: string; alt?: string } & Record<string, unknown>;
+        } | null
+    )?.image;
+    return {
+        name: `${page.title} · ${blockHeading(section.type as SectionType)}`,
+        updatedAt: null,
+        fields: { photo: image?.src ?? null, alt: image?.alt ?? null },
+        // The whole earlier photo, kept to put it back on Undo.
+        restore: { image: image ?? null },
+    };
+}
+
 /** The business write tools Ask AI drafts (Ask AI's `draftTools`). */
 export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
     edit_section: {
@@ -457,6 +528,58 @@ export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
                     ?.text ?? ""
             );
         },
+    },
+    place_image: {
+        kind: "image",
+        targetOf: placeTarget,
+        read: readPlace,
+        undo(id, before) {
+            const [kind, ...rest] = id.split(":");
+            // The earlier photo, whole, kept when the draft was made; none: take this one off.
+            const earlier = before.restore?.image;
+            const back =
+                earlier && typeof earlier === "object"
+                    ? { restore: earlier }
+                    : { clear: true };
+            if (before.fields.photo && !("restore" in back)) {
+                return { cannot: "The earlier photo can't be read back" };
+            }
+            if (kind === "post") {
+                const [site_id, post_id] = rest;
+                return {
+                    tool: "place_image",
+                    input: { target: "post_cover", site_id, post_id, ...back },
+                };
+            }
+            return {
+                tool: "place_image",
+                input: {
+                    target: "section",
+                    ...sectionIds(rest.join(":")),
+                    ...back,
+                },
+            };
+        },
+        notYoursWords: "Changing the website isn't part of your role.",
+        note: "It goes live when you publish.",
+        doneWords: "Saved",
+        undoNote: "Put back as it was.",
+        basedOn: "Your photo and where it goes",
+    },
+    place_product_photo: {
+        kind: "image",
+        targetOf: (input) => `product:${String(input.product_id)}`,
+        read: readPlace,
+        // Clear takes the first photo off: the one before it is first again.
+        undo: (id) => ({
+            tool: "place_product_photo",
+            input: { product_id: id.slice("product:".length), clear: true },
+        }),
+        notYoursWords: "Changing products isn't part of your role.",
+        note: "Shows in your shop as soon as you apply. The current photo moves to second.",
+        doneWords: "Saved",
+        undoNote: "Put back as it was.",
+        basedOn: "Your photo and where it goes",
     },
     create_product: {
         kind: "product",

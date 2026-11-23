@@ -8,6 +8,8 @@ import type { AskAiAbout } from "@saroh/api-contract";
 
 export interface AskAiTurnBody {
     question: string;
+    /** Media ids of the images sent with it (owner, 22 Nov). */
+    images?: string[];
     conversationId?: string;
     about?: AskAiAbout;
 }

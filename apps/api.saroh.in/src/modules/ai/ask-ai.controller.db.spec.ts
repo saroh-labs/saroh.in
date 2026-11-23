@@ -29,6 +29,7 @@ import { env } from "../../env";
 import type { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { meterWindow } from "../billing/metering";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import type { MediaService } from "../media/media.service";
 import { AskAiAccess } from "./access/ask-ai-access";
 import { statusWordsFor } from "./agents/agent-definition";
 import { ASK_AI_AGENT } from "./agents/ask-ai.agent";
@@ -108,6 +109,8 @@ function build(rounds: AiEvent[][]) {
         access,
         store,
         conversations,
+        // These specs send no images: nothing asks the media store.
+        {} as MediaService,
     );
     return { provider, controller: new AskAiController(service) };
 }

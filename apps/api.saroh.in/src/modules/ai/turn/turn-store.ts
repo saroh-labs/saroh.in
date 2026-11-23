@@ -160,8 +160,12 @@ export class TurnStore {
             const history: AiMessage[] = [];
             let question: string | null = null;
             for (const m of messages) {
-                if (m.role === "USER") question = m.text;
-                else if (m.role === "ASSISTANT" && question && m.text) {
+                if (m.role === "USER") {
+                    // Earlier images are not sent again: the model is told they were there.
+                    question = m.images?.length
+                        ? `${m.text}\n(From Saroh, not the person: ${m.images.length} image${m.images.length === 1 ? " was" : "s were"} attached to this message earlier and ${m.images.length === 1 ? "isn't" : "aren't"} shown again.)`
+                        : m.text;
+                } else if (m.role === "ASSISTANT" && question && m.text) {
                     history.push(
                         { role: "user", text: question },
                         { role: "assistant", text: m.text },
@@ -247,6 +251,8 @@ export class TurnStore {
         question: string,
         now: Date,
         admit?: TurnAdmit,
+        /** The media ids sent with it, kept with the question (never bytes). */
+        images: readonly string[] = [],
     ): Promise<AskAiRefusal | null> {
         return asBusiness(ctx.organizationId, () =>
             prisma.$transaction(async (tx) => {
@@ -279,7 +285,10 @@ export class TurnStore {
                 }
                 const messageId = randomUUID();
                 const body = sealMessageBody(
-                    { text: question },
+                    {
+                        text: question,
+                        ...(images.length ? { images: [...images] } : {}),
+                    },
                     {
                         organizationId: ctx.organizationId,
                         conversationId: conversation.id,

@@ -75,7 +75,7 @@ const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime"]);
 export function useImageUpload(
     options: {
         /** The library bucket; site images unless said. */
-        purpose?: "site-image" | "business-logo";
+        purpose?: "site-image" | "business-logo" | "ask-ai";
         /** What to say when storage cannot serve the upload. */
         unserved?: string;
         /**
@@ -186,7 +186,7 @@ export function useImageUpload(
      */
     async function sendPhoto(
         file: File,
-        purpose: "site-image" | "business-logo",
+        purpose: "site-image" | "business-logo" | "ask-ai",
         onProgress: (pct: number) => void,
     ): Promise<{
         mediaId: string;
@@ -207,7 +207,8 @@ export function useImageUpload(
         const dims = prepared
             ? { width: prepared.width, height: prepared.height }
             : await readDimensions(file);
-        const copies = prepared?.variants ?? [];
+        // A picture only Ask AI reads has no page to be sharp on: no smaller copies.
+        const copies = purpose === "ask-ai" ? [] : (prepared?.variants ?? []);
         const ticket = await createUpload({
             contentType: photo.type,
             contentLength: photo.size,
@@ -356,7 +357,9 @@ export function useImageUpload(
         return { mediaId: ticket.data.mediaId, url: done.data.url };
     }
 
-    return { upload, busy, preparing, progress, error, setError };
+    // `sendPhoto`: for a control with several going at once (Ask AI's images),
+    // which keeps each one's progress and words itself.
+    return { upload, sendPhoto, busy, preparing, progress, error, setError };
 }
 
 /**

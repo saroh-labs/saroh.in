@@ -7,6 +7,12 @@ import {
     Logger,
     NotFoundException,
 } from "@nestjs/common";
+import {
+    ASK_AI_IMAGE_MAX_BYTES,
+    ASK_AI_IMAGE_PURPOSE,
+    ASK_AI_IMAGE_TYPES,
+    ASK_AI_SENT_PURPOSE,
+} from "@saroh/api-contract";
 import { variantKey } from "@saroh/block-contract";
 import type { MediaBucket, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
@@ -31,6 +37,8 @@ import type { MediaStorages } from "./object-storage.provider";
 import { OBJECT_STORAGE } from "./object-storage.provider";
 import type { CreateUploadInput } from "./upload-checks";
 import {
+    ASK_AI_NOT_IMAGE_MESSAGE,
+    ASK_AI_TOO_BIG_MESSAGE,
     assertUploadType,
     BAD_SIZES_MESSAGE,
     NOTHING_UPLOADED_MESSAGE,
@@ -40,6 +48,12 @@ import {
 } from "./upload-checks";
 import type { StoredVariant } from "./variants";
 import { mediaFileKeys, storedVariants, variantWidths } from "./variants";
+
+/** A transparent 1 x 1 PNG: what development's in-memory storage stands in with. */
+const STAND_IN_PNG = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+    "base64",
+);
 
 /** A deleted business's stored files, on its deletion trail (#921). */
 const deletionLog = new Logger("OrganizationDeletion");
@@ -103,7 +117,12 @@ export class MediaService {
         ctx: OrganizationContext,
         input: CreateUploadInput,
     ): Promise<CreateUploadResult> {
-        authorize(ctx, "media:write");
+        // An Ask AI image is the asker's own, for the conversation: Ask AI's
+        // action, not the library's.
+        authorize(
+            ctx,
+            input.purpose === ASK_AI_IMAGE_PURPOSE ? "ai:use" : "media:write",
+        );
         assertUploadType(input);
         const sizesProblem = uploadSizesProblem(input);
         if (sizesProblem) throw new BadRequestException(sizesProblem);
@@ -218,9 +237,11 @@ export class MediaService {
         /** Where the object is served from, or null when nothing can serve it. */
         url: string | null;
     }> {
-        authorize(ctx, "media:write");
-
         const media = await this.requireOwned(ctx, mediaId);
+        authorize(
+            ctx,
+            media.purpose === ASK_AI_IMAGE_PURPOSE ? "ai:use" : "media:write",
+        );
         if (media.status === "FAILED") {
             throw new BadRequestException(NOTHING_UPLOADED_MESSAGE);
         }
@@ -300,7 +321,18 @@ export class MediaService {
     async list(ctx: OrganizationContext) {
         authorize(ctx, "media:read");
         const rows = await prisma.media.findMany({
-            where: { organizationId: ctx.organizationId },
+            // Ask AI's images stay with their conversation until one is applied.
+            where: {
+                organizationId: ctx.organizationId,
+                OR: [
+                    { purpose: null },
+                    {
+                        purpose: {
+                            notIn: [ASK_AI_IMAGE_PURPOSE, ASK_AI_SENT_PURPOSE],
+                        },
+                    },
+                ],
+            },
             orderBy: { createdAt: "desc" },
         });
         // The copies' widths, not their keys: a copy's address is its
@@ -558,6 +590,201 @@ export class MediaService {
             placeholder: media.placeholder,
             widths: variantWidths(media.variants),
         };
+    }
+
+    /**
+     * Images for one Ask AI message (owner, 22 Nov): the business's own, READY,
+     * an image Anthropic reads, at most 5 MB; each by its id, in the order given.
+     * Another business's id is "not found", as everywhere in media.
+     */
+    async askAiImages(
+        organizationId: string,
+        ids: readonly string[],
+    ): Promise<
+        {
+            id: string;
+            filename: string;
+            url: string | null;
+            contentType: string;
+            sizeBytes: number;
+        }[]
+    > {
+        const rows = await prisma.media.findMany({
+            where: { id: { in: [...ids] }, organizationId, status: "READY" },
+            select: {
+                id: true,
+                key: true,
+                bucket: true,
+                filename: true,
+                contentType: true,
+                sizeBytes: true,
+            },
+        });
+        const byId = new Map(rows.map((r) => [r.id, r]));
+        return ids.map((id) => {
+            const r = byId.get(id);
+            if (!r) throw new NotFoundException("That image isn't here");
+            if (
+                !(ASK_AI_IMAGE_TYPES as readonly string[]).includes(
+                    r.contentType,
+                )
+            ) {
+                throw new BadRequestException(ASK_AI_NOT_IMAGE_MESSAGE);
+            }
+            if (r.sizeBytes > ASK_AI_IMAGE_MAX_BYTES) {
+                throw new BadRequestException(ASK_AI_TOO_BIG_MESSAGE);
+            }
+            return {
+                id: r.id,
+                filename: r.filename,
+                url: this.publicUrlFor(r),
+                contentType: r.contentType,
+                sizeBytes: r.sizeBytes,
+            };
+        });
+    }
+
+    /** Links for images already sent: only those still there and servable. */
+    async askAiImageViews(
+        organizationId: string,
+        ids: readonly string[],
+    ): Promise<
+        Map<string, { mediaId: string; url: string; filename: string }>
+    > {
+        if (!ids.length) return new Map();
+        const rows = await prisma.media.findMany({
+            where: { id: { in: [...ids] }, organizationId, status: "READY" },
+            select: { id: true, key: true, bucket: true, filename: true },
+        });
+        return new Map(
+            rows.flatMap((r) => {
+                const url = this.publicUrlFor(r);
+                return url
+                    ? [[r.id, { mediaId: r.id, url, filename: r.filename }]]
+                    : [];
+            }),
+        );
+    }
+
+    /**
+     * A READY image's whole bytes (at most 5 MB) for the provider; null when
+     * gone. Local development's in-memory storage never sees the browser's
+     * PUT (#873), so there Ask AI is given a one-pixel stand-in instead of a
+     * failed turn; R2 (`seesUploads`) is always read for real.
+     */
+    async readAskAiImage(
+        organizationId: string,
+        id: string,
+    ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+        const media = await prisma.media.findUnique({
+            where: { id },
+            select: {
+                organizationId: true,
+                key: true,
+                bucket: true,
+                status: true,
+                contentType: true,
+            },
+        });
+        if (
+            media?.organizationId !== organizationId ||
+            media.status !== "READY"
+        ) {
+            return null;
+        }
+        const storage = this.storages.of(media.bucket);
+        const bytes = await storage.readObjectStart(
+            media.key,
+            ASK_AI_IMAGE_MAX_BYTES,
+        );
+        if (bytes) return { bytes, contentType: media.contentType };
+        return storage.seesUploads
+            ? null
+            : { bytes: STAND_IN_PNG, contentType: "image/png" };
+    }
+
+    /**
+     * A question carries these images: from now on they are kept for their
+     * conversation's days, not swept as never used. Only a fresh Ask AI
+     * upload changes; a photo from Your photos is left as it is.
+     */
+    async markAskAiImagesSent(
+        organizationId: string,
+        ids: readonly string[],
+    ): Promise<void> {
+        await prisma.media.updateMany({
+            where: {
+                id: { in: [...ids] },
+                organizationId,
+                purpose: ASK_AI_IMAGE_PURPOSE,
+            },
+            data: { purpose: ASK_AI_SENT_PURPOSE },
+        });
+    }
+
+    /**
+     * Ask AI images never sent with a question (picked, then left) go after
+     * `before`, files and rows; one a question carried is the conversation's
+     * (`deleteAskAiImages`). A business on legal hold keeps them. Returns how many went.
+     */
+    async deleteUnsentAskAiImagesBefore(
+        before: Date,
+        heldOrganizationIds: readonly string[],
+        take = 200,
+    ): Promise<number> {
+        return this.deleteWhere(
+            {
+                purpose: ASK_AI_IMAGE_PURPOSE,
+                createdAt: { lt: before },
+                ...(heldOrganizationIds.length
+                    ? { organizationId: { notIn: [...heldOrganizationIds] } }
+                    : {}),
+            },
+            take,
+        );
+    }
+
+    /** The images a deleted conversation carried, if never applied: files and rows. */
+    async deleteAskAiImages(ids: readonly string[]): Promise<number> {
+        if (!ids.length) return 0;
+        return this.deleteWhere(
+            { id: { in: [...ids] }, purpose: ASK_AI_SENT_PURPOSE },
+            ids.length,
+        );
+    }
+
+    private async deleteWhere(
+        where: Prisma.MediaWhereInput,
+        take: number,
+    ): Promise<number> {
+        const rows = await prisma.media.findMany({
+            where,
+            take,
+            select: { id: true, key: true, bucket: true, variants: true },
+        });
+        for (const row of rows) await this.deleteFiles(row);
+        const gone = await prisma.media.deleteMany({
+            where: { id: { in: rows.map((r) => r.id) }, ...where },
+        });
+        return gone.count;
+    }
+
+    /**
+     * An Ask AI image that was applied now belongs to the library: Your photos
+     * lists it from here on. Idempotent; any other purpose is left as it is.
+     */
+    async adoptAskAiImage(
+        organizationId: string,
+        mediaId: string,
+    ): Promise<void> {
+        await prisma.media.updateMany({
+            where: {
+                id: mediaId,
+                organizationId,
+                purpose: { in: [ASK_AI_IMAGE_PURPOSE, ASK_AI_SENT_PURPOSE] },
+            },
+            data: { purpose: "site-image" },
+        });
     }
 
     /**

@@ -39,6 +39,7 @@ import { upgradeHref } from "@/lib/billing/access";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { AnswerCard } from "./answer-cards";
 import { DraftCard } from "./draft-card";
+import { QuestionImages } from "./question-images";
 import { ReportAnswer } from "./report-sheet";
 import { SafeText } from "./safe-text";
 import {
@@ -58,6 +59,8 @@ import {
 export interface Turn {
     key: string;
     question: string;
+    /** The images it came with, shown above its words. */
+    images?: { mediaId: string; url: string; filename: string }[];
     turnId?: string;
     /** The status line's words, until the answer's text starts. */
     status?: string;
@@ -86,7 +89,7 @@ export interface TurnContext {
     zone: string;
     phone: boolean;
     onEdit: (question: string) => void;
-    onAgain: (question: string) => void;
+    onAgain: (question: string, images?: Turn["images"]) => void;
     /** Book here on a free-times card: drafts the booking under this turn. */
     onBook?: (
         turnKey: string,
@@ -163,7 +166,7 @@ export function TurnView({ turn, ctx }: { turn: Turn; ctx: TurnContext }) {
             variant="outline"
             size="sm"
             className={big}
-            onClick={() => ctx.onAgain(turn.question)}
+            onClick={() => ctx.onAgain(turn.question, turn.images)}
         >
             <RotateCw aria-hidden />
             {turn.outcome === "CUT_OFF" || turn.outcome === "FAILED"
@@ -186,7 +189,10 @@ export function TurnView({ turn, ctx }: { turn: Turn; ctx: TurnContext }) {
 
     return (
         <>
-            <Question>{turn.question}</Question>
+            {turn.images?.length ? (
+                <QuestionImages images={turn.images} />
+            ) : null}
+            {turn.question ? <Question>{turn.question}</Question> : null}
             {waiting ? (
                 <p
                     role="status"

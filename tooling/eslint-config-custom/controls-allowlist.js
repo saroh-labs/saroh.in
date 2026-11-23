@@ -23,6 +23,10 @@ export const RAW_ALLOWED = {
     // button: a suggestion row, and the page label's clear and undo (AF boards)
     "components/ask-ai/about-label.tsx": ["button"],
     "components/ask-ai/suggestions.tsx": ["button"],
+    // button: a thumbnail's remove, and a Your photos tile pressed to choose it; input: the file pickers behind Add images (owner, 22 Nov)
+    "components/ask-ai/attach.tsx": ["button", "input"],
+    // button: a sent image's tile, pressed to open it; the viewer's previous and next
+    "components/ask-ai/question-images.tsx": ["button"],
     // button: a template's row in its preview's list, pressed to show it (DEC-216)
     "components/sites/templates/template-preview.tsx": ["button"],
     // button: a connection, key or address row that is one button, opening its sheet (U14)

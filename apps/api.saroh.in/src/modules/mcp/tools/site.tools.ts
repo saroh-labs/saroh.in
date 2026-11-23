@@ -13,6 +13,8 @@ import {
     getSiteTool,
     listSectionTypesTool,
     listTemplatesTool,
+    placeImageTool,
+    placeProductPhotoTool,
     previewPublishTool,
     removeSectionTool,
     restoreSiteDraftTool,
@@ -57,6 +59,8 @@ import {
     tradeOtherRead,
     tradeRead,
 } from "../../organizations/organization-trade";
+import { ProductAccess } from "../../products/product-access";
+import { ProductImagesService } from "../../products/product-images.service";
 import { pageList } from "../../public-api/v1-support";
 import { changedKeys, stampDraftEditors } from "../../sites/draft-editors";
 import { lockSite } from "../../sites/live-pointer";
@@ -145,6 +149,9 @@ export interface SiteToolDeps {
     media: MediaService;
     restorePoints: RestorePointService;
     queue: Pick<JobQueue, "enqueue">;
+    /** place_image's product photo (optional: tests that don't place one leave them out). */
+    productImages?: ProductImagesService;
+    productAccess?: ProductAccess;
     /** The SSRF-guarded fetch; tests stand in a server. */
     fetchImage?: typeof strictFetch;
     /** The clock publish requests expire by; tests move it. */
@@ -907,6 +914,190 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         },
     });
 
+    /** A READY image of the business's, for an image tool: its address and sizes. */
+    async function readyImage(orgId: string, mediaId: string) {
+        const file = await d.media.readyObject(orgId, mediaId);
+        if (!file.contentType.startsWith("image/") || !file.url) {
+            throw new ToolError(
+                "That isn't an image Saroh can show.",
+                "Use one of the images the person attached.",
+            );
+        }
+        return { ...file, url: file.url };
+    }
+
+    const placeImage = defineTool({
+        name: "place_image",
+        title: "Set an image on a section or a post",
+        description:
+            "Use this when the person has attached an image and wants it used as a website section's photo (a hero's, a text block's) or as a blog post's cover. media_id is the attached image's, from the note after their message. Put an alt text that says what the picture shows. It is only drafted; the person applies it. Never use it to make or change a picture. For a product's photo use place_product_photo. Example: place_image with target \"section\", site_id, page_id, section_key and media_id.",
+        contract: placeImageTool,
+        capability: "section:write",
+        module: "WEBSITE",
+        hints: WRITE,
+        async run(input, call: McpCall) {
+            const { ctx } = call;
+            const orgId = ctx.organizationId;
+            const { site_id, media_id, restore } = input;
+            if (!input.clear && !restore && !media_id) {
+                throw new ToolError(
+                    "media_id is needed.",
+                    "Use the media_id of one of the images the person attached.",
+                );
+            }
+            const missing = (what: string) =>
+                new ToolError(
+                    `${what} ${what.includes(" and ") ? "are" : "is"} needed for target ${input.target}.`,
+                    "Take them from the page the person has open, or from get_page.",
+                );
+            const file = media_id ? await readyImage(orgId, media_id) : null;
+            // What the section's photo becomes: the new one, or (Undo) the earlier.
+            const image = file
+                ? {
+                      src: file.url,
+                      alt: input.alt ?? "",
+                      ...(file.width && file.height
+                          ? { width: file.width, height: file.height }
+                          : {}),
+                      ...(file.placeholder
+                          ? { placeholder: file.placeholder }
+                          : {}),
+                      ...(file.widths.length ? { widths: file.widths } : {}),
+                  }
+                : restore
+                  ? { ...restore, alt: restore.alt ?? "" }
+                  : null;
+            let activity: { target: string; summary: string };
+            let where: string;
+            if (input.target === "section") {
+                const { page_id, section_key } = input;
+                if (!page_id || !section_key) {
+                    throw missing("page_id and section_key");
+                }
+                const out = await saveSections(
+                    call,
+                    site_id,
+                    page_id,
+                    (list) => {
+                        const s = list.find((x) => x.key === section_key);
+                        if (!s) {
+                            throw new ToolError(
+                                `There is no section ${section_key} on this page.`,
+                                "Call get_page for the page's section_key values.",
+                            );
+                        }
+                        const lifted = liftToLatest(
+                            s.type,
+                            s.contractVersion,
+                            (s.content ?? {}) as Record<string, unknown>,
+                        );
+                        const content = { ...lifted.content };
+                        if (image) content.image = image;
+                        else delete content.image;
+                        s.contractVersion = lifted.version;
+                        s.content = content;
+                        return [
+                            image
+                                ? `put the photo on section ${section_key}`
+                                : `took the photo off section ${section_key}`,
+                        ];
+                    },
+                );
+                where = out.changed.join("; ");
+                activity = {
+                    target: revisionsTarget(site_id, {
+                        [page_id]: out.revision,
+                    }),
+                    summary: "Put a photo on a section in the website draft.",
+                };
+            } else {
+                const { post_id } = input;
+                if (!post_id) throw missing("post_id");
+                const post = await prisma.post.updateMany({
+                    where: {
+                        id: post_id,
+                        siteId: site_id,
+                        site: { organizationId: orgId },
+                    },
+                    data: { image: image?.src ?? null },
+                });
+                if (post.count !== 1) {
+                    throw new ToolError(
+                        "There is no such post in this business.",
+                        "Take post_id from the post the person has open.",
+                    );
+                }
+                where = image ? "set the cover" : "took the cover off";
+                activity = {
+                    target: `post:${post_id}`,
+                    summary: "Set a blog post's cover.",
+                };
+            }
+            // Applied, the image is the business's: Your photos lists it from now on.
+            if (file) await d.media.adoptAskAiImage(orgId, file.id);
+            return {
+                text: `Done: ${where}. ${DRAFT_ONLY}`,
+                data: {
+                    target: input.target,
+                    media_id: file?.id ?? null,
+                    image_url: image?.src ?? null,
+                },
+                activity,
+            };
+        },
+    });
+
+    const placeProductPhoto = defineTool({
+        name: "place_product_photo",
+        title: "Set a photo on a product",
+        description:
+            "Use this when the person has attached an image and wants it as a product's main photo: it becomes the first photo and the current one moves to second. media_id is the attached image's, from the note after their message. Put an alt text that says what the picture shows. It is only drafted; the person applies it, and the shop shows it at once. Never use it to make or change a picture. Example: place_product_photo with product_id from list_products and media_id.",
+        contract: placeProductPhotoTool,
+        capability: "store:write",
+        module: "COMMERCE",
+        hints: WRITE,
+        async run({ product_id, media_id, alt, clear }, call: McpCall) {
+            const { ctx } = call;
+            const orgId = ctx.organizationId;
+            if (!clear && !media_id) {
+                throw new ToolError(
+                    "media_id is needed.",
+                    "Use the media_id of one of the images the person attached.",
+                );
+            }
+            const file = media_id ? await readyImage(orgId, media_id) : null;
+            if (!d.productImages || !d.productAccess) {
+                throw new ToolError("Product photos aren't available here.");
+            }
+            const scope = await d.productAccess.edit(ctx, product_id);
+            const have = await d.productImages.listIn(scope, product_id);
+            // Clear (Undo) takes the first photo off: the one Apply put there,
+            // and the photo that moved to second is first again.
+            const kept = have
+                .filter((p) => p.mediaId !== media_id)
+                .slice(clear ? 1 : 0)
+                .map((p) => ({ id: p.id }));
+            await d.productImages.replaceIn(scope, product_id, {
+                images: file
+                    ? [{ mediaId: file.id, alt: alt ?? "" }, ...kept]
+                    : kept,
+            });
+            // Applied, the image is the business's: Your photos lists it from now on.
+            if (file) await d.media.adoptAskAiImage(orgId, file.id);
+            return {
+                text: `Done: ${file ? "made it the product's first photo" : "took the photo off the product"}. The shop shows it at once.`,
+                data: {
+                    media_id: file?.id ?? null,
+                    image_url: file?.url ?? null,
+                },
+                activity: {
+                    target: `product:${product_id}`,
+                    summary: "Put a photo on a product.",
+                },
+            };
+        },
+    });
+
     const removeSection = defineTool({
         name: "remove_section",
         title: "Remove a section",
@@ -1358,6 +1549,8 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         deletePage,
         updateSettings,
         uploadImage,
+        placeImage,
+        placeProductPhoto,
         previewPublish,
         getPublishRequest,
         restoreDraft,
@@ -1681,10 +1874,14 @@ export class SiteTools implements OnModuleInit {
         private readonly previews: SitePreviewLinksService,
         private readonly media: MediaService,
         private readonly restorePoints: RestorePointService,
+        private readonly productImages: ProductImagesService,
+        private readonly productAccess: ProductAccess,
     ) {}
 
     onModuleInit(): void {
         const deps: SiteToolDeps = {
+            productImages: this.productImages,
+            productAccess: this.productAccess,
             sites: this.sites,
             previews: this.previews,
             media: this.media,

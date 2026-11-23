@@ -20,6 +20,7 @@ import { Logger } from "@nestjs/common";
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import type { CatalogueAccessService } from "../../billing/catalogue-access.service";
 import type { FeatureFlagService } from "../../feature-flags/feature-flags.service";
+import type { MediaService } from "../../media/media.service";
 import type { AskAiRefusal } from "../access/ask-ai-access";
 import { AskAiAccess } from "../access/ask-ai-access";
 import type { AgentDefinition } from "../agents/agent-definition";
@@ -137,6 +138,8 @@ interface Setup {
     toolRun?: (name: string) => AiToolRun | Promise<AiToolRun>;
     conversation?: Partial<TurnConversation>;
     asker?: OrganizationContext;
+    /** Images the business has (`MediaService.askAiImages` / `readAskAiImage`). */
+    images?: { id: string; filename: string; contentType: string }[];
 }
 
 function setup(s: Setup) {
@@ -242,6 +245,20 @@ function setup(s: Setup) {
         store as unknown as TurnStore,
         catalogue as unknown as CatalogueAccessService,
     );
+    const media = {
+        askAiImages: jest.fn((_org: string, ids: string[]) =>
+            Promise.resolve(
+                ids.map((id) => s.images?.find((i) => i.id === id)),
+            ),
+        ),
+        markAskAiImagesSent: jest.fn().mockResolvedValue(undefined),
+        readAskAiImage: jest.fn(() =>
+            Promise.resolve({
+                bytes: Buffer.from([1, 2, 3]),
+                contentType: "image/png",
+            }),
+        ),
+    };
     const runner = new TurnRunner(
         provider,
         toolbox,
@@ -250,6 +267,7 @@ function setup(s: Setup) {
         flags as unknown as FeatureFlagService,
         store as unknown as TurnStore,
         access,
+        media as unknown as MediaService,
     );
     const controller = new AbortController();
     const turn = (more: Partial<TurnInput> = {}) =>
@@ -270,6 +288,7 @@ function setup(s: Setup) {
         controller,
         toolbox,
         turn,
+        media,
     };
 }
 
@@ -362,6 +381,70 @@ describe("TurnRunner", () => {
         expect(t.store.started).toEqual([
             expect.objectContaining({ question: QUESTION }),
         ]);
+    });
+
+    it("sends the images as bytes with the question, names them, and counts one question", async () => {
+        const t = setup({
+            rounds: [[text("A warehouse."), done()]],
+            images: [
+                { id: "m1", filename: "aisle.jpg", contentType: "image/jpeg" },
+                { id: "m2", filename: "tape.png", contentType: "image/png" },
+            ],
+        });
+        const events = await collect(
+            t.turn({ question: "What is in these?", images: ["m1", "m2"] }),
+        );
+        const sent = t.provider.requests[0]!.messages.at(-1) as Extract<
+            AiMessage,
+            { role: "user" }
+        >;
+        expect(sent.images).toHaveLength(2);
+        expect(sent.images?.[0]).toMatchObject({ mediaType: "image/jpeg" });
+        // The bytes are a plain view, never a Buffer (the prompt estimate stringifies).
+        expect(sent.images?.[0]?.bytes.constructor).toBe(Uint8Array);
+        expect(sent.text).toContain("media_id m1");
+        expect(sent.text).toContain("media_id m2");
+        // The images ride on the row's start: the ids, never the bytes.
+        expect(t.store.start.mock.calls[0]?.[6]).toEqual(["m1", "m2"]);
+        // Asked: the images are the conversation's, kept for its days.
+        expect(t.media.markAskAiImagesSent).toHaveBeenCalledWith("org_1", [
+            "m1",
+            "m2",
+        ]);
+        // However many images, the message is one question.
+        expect(last(events)).toMatchObject({
+            outcome: "ANSWERED",
+            counted: true,
+        });
+        expect(t.store.finished).toHaveLength(1);
+    });
+
+    it("asks what it sees when the message is only images", async () => {
+        const t = setup({
+            rounds: [[text("Cartons."), done()]],
+            images: [
+                { id: "m1", filename: "a.jpg", contentType: "image/jpeg" },
+            ],
+        });
+        await collect(t.turn({ question: "", images: ["m1"] }));
+        const sent = t.provider.requests[0]!.messages.at(-1) as Extract<
+            AiMessage,
+            { role: "user" }
+        >;
+        expect(sent.text).toContain("What do you see in these images?");
+    });
+
+    it("an image's bytes count as about 1,600 tokens, not as their JSON", () => {
+        const bytes = new Uint8Array(4_000_000);
+        const n = estimateTokens([
+            {
+                role: "user",
+                text: "x",
+                images: [{ bytes, mediaType: "image/png" }],
+            },
+        ]);
+        expect(n).toBeGreaterThan(1_500);
+        expect(n).toBeLessThan(2_000);
     });
 
     it("a common question asked as written is answered and not counted", async () => {

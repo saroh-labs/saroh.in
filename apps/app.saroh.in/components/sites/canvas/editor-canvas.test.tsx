@@ -396,3 +396,30 @@ describe("one renderer", () => {
         ]);
     });
 });
+
+describe("a photo Ask AI drafted for a section (owner, 22 Nov)", () => {
+    it("is drawn in place, dashed, as not applied yet, on that section only", () => {
+        render({
+            previewing: false,
+            photoPreviewByKey: new Map([
+                ["s1", { src: "https://m.test/aisle.webp", alt: "Aisle" }],
+            ]),
+        });
+        const marks = host.querySelectorAll("[data-photo-preview]");
+        expect(marks).toHaveLength(1);
+        expect(marks.item(0).textContent).toBe("Preview · not applied yet");
+        expect(
+            marks
+                .item(0)
+                .closest("[data-block-index]")
+                ?.getAttribute("data-block-index"),
+        ).toBe("0");
+        expect(host.innerHTML).toContain("aisle.webp");
+    });
+
+    it("nothing is previewed unless a card says so", () => {
+        render({ previewing: false });
+        expect(host.querySelector("[data-photo-preview]")).toBeNull();
+        expect(host.innerHTML).not.toContain("aisle.webp");
+    });
+});
