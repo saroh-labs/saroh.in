@@ -116,7 +116,7 @@ export function CustomColour({
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState<"site" | "custom">("custom");
     const [typed, setTyped] = useState(value ?? start);
-    const [fix, setFix] = useState<"dark" | "darken" | null>(null);
+    const [fix, setFix] = useState<"dark" | "darken" | "anyway" | null>(null);
     const [recent, setRecent] = useState<string[]>([]);
     // A popover beside the inspector on a desk; on a phone a bottom sheet
     // (the shadcn Drawer) that leaves the tapped button in view above it.
@@ -187,7 +187,7 @@ export function CustomColour({
     };
     const use = () => {
         if (!chosen || !canUse) return;
-        if (unreadable && !confirming) {
+        if (unreadable && !confirming && fix !== "anyway") {
             setConfirming(true);
             return;
         }
@@ -348,7 +348,7 @@ export function CustomColour({
                     if (e.buttons === 1) fromPointer(e);
                 }}
                 onKeyDown={onSquareKey}
-                className="relative h-[150px] touch-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="relative h-[150px] touch-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[639px]:h-[104px]"
                 style={{
                     background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hue} 100% 50%))`,
                 }}
@@ -423,7 +423,7 @@ export function CustomColour({
                 <Notice tone="error" className="grid gap-2 text-sm">
                     <span>
                         <b>White words on this colour are hard to read</b> (
-                        {contrastRatio("#FFFFFF", hex).toFixed(1)} : 1, it needs
+                        {contrastRatio("#FFFFFF", hex).toFixed(2)} : 1, it needs
                         4.5 : 1). Pick one:
                     </span>
                     {words.words === "dark" && words.readable ? (
@@ -446,6 +446,17 @@ export function CustomColour({
                             ratio={customColourWords(shade).ratio}
                         />
                     ) : null}
+                    {words.readable ? null : (
+                        <FixRow
+                            on={fix === "anyway"}
+                            onClick={() => setFix("anyway")}
+                            fill={hex}
+                            ink={words.ink}
+                            text="Use it anyway"
+                            ratio={words.ratio}
+                            poor
+                        />
+                    )}
                 </Notice>
             ) : null}
             {confirming && unreadable && chosen ? (
@@ -455,7 +466,7 @@ export function CustomColour({
                     className="text-sm"
                 >
                     <b>Words on this colour are hard to read</b> (
-                    {customColourWords(chosen).ratio.toFixed(1)} : 1, it needs
+                    {customColourWords(chosen).ratio.toFixed(2)} : 1, it needs
                     4.5 : 1). Use it anyway to keep it, or pick another.
                 </Notice>
             ) : null}
@@ -523,7 +534,7 @@ export function CustomColour({
                     aria-label="Button colour"
                     data-button-colour=""
                     data-colour-sheet=""
-                    className="max-h-[62dvh]"
+                    className="h-[74dvh] max-h-[74dvh]"
                 >
                     <DrawerHeader>
                         <DrawerTitle>Button colour</DrawerTitle>
@@ -533,11 +544,11 @@ export function CustomColour({
                     </DrawerHeader>
                     <div className="shrink-0 px-4 pt-3">{tabs}</div>
                     {tab === "site" ? (
-                        <div className="flex min-h-0 flex-col [&>div]:px-4">
+                        <div className="flex min-h-0 flex-1 flex-col [&>div]:px-4">
                             {siteBody}
                         </div>
                     ) : (
-                        <div className="flex min-h-0 flex-col pt-3 [&>div]:px-4">
+                        <div className="flex min-h-0 flex-1 flex-col pt-3 [&>div]:px-4">
                             {customBody}
                         </div>
                     )}
@@ -604,7 +615,9 @@ function FixRow({
     ink,
     text,
     ratio,
+    poor = false,
 }: {
+    poor?: boolean;
     on: boolean;
     onClick: () => void;
     fill: string;
@@ -630,8 +643,13 @@ function FixRow({
                 Book
             </span>
             {text}
-            <span className="ml-auto whitespace-nowrap text-xs font-semibold text-success">
-                {ratio.toFixed(1)} : 1
+            <span
+                className={cn(
+                    "ml-auto whitespace-nowrap text-xs font-semibold",
+                    poor ? "text-destructive" : "text-success",
+                )}
+            >
+                {ratio.toFixed(poor ? 2 : 1)} : 1
             </span>
         </button>
     );

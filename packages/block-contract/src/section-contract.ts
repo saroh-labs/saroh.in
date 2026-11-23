@@ -811,6 +811,8 @@ const testimonialItemSchema = z.object({
     role: z.string().max(120).optional(),
     /** Stars out of five, only when set (23 Nov 2026): none is drawn otherwise. */
     rating: z.number().int().min(1).max(5).optional(),
+    /** The product review it was copied from: the live site drops it once that review is hidden or deleted. */
+    reviewId: z.string().max(64).optional(),
 });
 
 const testimonialsV1 = z.object({

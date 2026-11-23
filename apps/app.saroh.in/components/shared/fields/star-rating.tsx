@@ -6,6 +6,13 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Star } from "lucide-react";
 import { useId } from "react";
 
+const ARROWS: Record<string, number> = {
+    ArrowRight: 1,
+    ArrowDown: 1,
+    ArrowLeft: -1,
+    ArrowUp: -1,
+};
+
 /**
  * An optional 1 to 5 star rating (ERVReviewStars, 23 Nov 2026), as one
  * radio group: one Tab stop, the arrows move and pick, each star named
@@ -48,6 +55,19 @@ export function StarRating({
                             key={n}
                             value={String(n)}
                             aria-label={n === 1 ? "1 star" : `${n} stars`}
+                            // WAI-ARIA radio group: an arrow moves AND picks.
+                            onKeyDown={(e) => {
+                                const step = ARROWS[e.key];
+                                if (!step) return;
+                                e.preventDefault();
+                                const to = ((n - 1 + step + 5) % 5) + 1;
+                                onChange(to);
+                                const radios =
+                                    e.currentTarget.parentElement?.querySelectorAll<HTMLElement>(
+                                        "[role=radio]",
+                                    );
+                                radios?.[to - 1]?.focus();
+                            }}
                             className="grid size-10 place-items-center rounded-md text-[#91550C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:size-11"
                         >
                             <Star

@@ -6,6 +6,7 @@ jest.mock("@saroh/database", () => ({
     ...jest.requireActual("@saroh/database"),
     prisma: {
         discount: { findFirst: jest.fn() },
+        post: { findFirst: jest.fn() },
         sharePost: { findUnique: jest.fn() },
         site: { findFirst: jest.fn() },
     },
@@ -31,6 +32,7 @@ import {
 
 const db = prisma as unknown as {
     discount: { findFirst: jest.Mock };
+    post: { findFirst: jest.Mock };
     sharePost: { findUnique: jest.Mock };
     site: { findFirst: jest.Mock };
 };
@@ -39,7 +41,7 @@ const drawn = renderCard as jest.Mock<Promise<Buffer>, [CardRender]>;
 const ORG = "org1";
 const MEDIA = "https://media.saroh.test";
 
-function setup(org = ORG) {
+function setup(org = ORG, limiter?: { take: jest.Mock }) {
     const sites = {
         getPublicationBySiteId: jest.fn((siteId: string) =>
             siteId === "site_1"
@@ -139,6 +141,7 @@ function setup(org = ORG) {
         timetable as never,
         media as never,
         mediaStorages(storage as never, null),
+        limiter as never,
     );
     return { service, sites, catalogue, page, storage, media };
 }
@@ -149,6 +152,7 @@ const missing = (work: Promise<unknown>) =>
 beforeEach(() => {
     drawn.mockClear();
     db.discount.findFirst.mockReset();
+    db.post.findFirst.mockReset();
     db.sharePost.findUnique.mockReset();
     db.site.findFirst.mockReset();
 });
@@ -381,8 +385,43 @@ describe("an offer's picture", () => {
         });
     });
 
+    it("serves an offer only while a live post of that site embeds it, else a 404", async () => {
+        const { service } = setup();
+        db.discount.findFirst.mockResolvedValue(discount());
+        db.post.findFirst.mockResolvedValueOnce(null);
+        await missing(service.offerWords("site_1", "d_1", "v"));
+        expect(db.discount.findFirst).not.toHaveBeenCalled();
+        db.post.findFirst.mockResolvedValueOnce({ id: "p1" });
+        await expect(
+            service.offerWords("site_1", "d_1", "v"),
+        ).resolves.toMatchObject({ code: "BUN20" });
+        // Scoped to the site and to what its live publication holds.
+        expect(db.post.findFirst).toHaveBeenLastCalledWith({
+            where: expect.objectContaining({
+                siteId: "site_1",
+                currentPublication: {
+                    snapshot: expect.objectContaining({
+                        string_contains:
+                            '<div data-embed="offer" data-id="d_1"></div>',
+                    }),
+                },
+            }),
+            select: { id: true },
+        });
+        await missing(service.offerWords("site_1", 'd_1"></div>', "v"));
+    });
+
+    it("never limits the Offer read: the site's own server asks for every visitor", async () => {
+        const limiter = { take: jest.fn(() => Promise.resolve(false)) };
+        const { service } = setup(ORG, limiter);
+        db.post.findFirst.mockResolvedValueOnce(null);
+        await missing(service.offerWords("site_1", "d_1", "v"));
+        expect(limiter.take).not.toHaveBeenCalled();
+    });
+
     it("says a live offer's words for a post's Offer card, and 404s an ended one (W2)", async () => {
         const { service } = setup();
+        db.post.findFirst.mockResolvedValue({ id: "p1" });
         db.discount.findFirst.mockResolvedValue(discount());
         await expect(service.offerWords("site_1", "d_1", "v")).resolves.toEqual(
             {

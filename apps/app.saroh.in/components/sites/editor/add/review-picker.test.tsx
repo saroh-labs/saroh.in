@@ -74,6 +74,8 @@ describe("ReviewPicker", () => {
                 name: "Meera",
                 role: "Kraft Mailer Box",
                 rating: 5,
+                // Kept so the live site drops the copy once it's hidden.
+                reviewId: "r1",
             },
             null,
         );

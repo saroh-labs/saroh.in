@@ -91,7 +91,7 @@ export function ShadeStrip({
                 >
                     <span>
                         <b>Words on this shade are hard to read</b> (
-                        {bad.ratio.toFixed(1)} : 1, it needs 4.5 : 1). Use it
+                        {bad.ratio.toFixed(2)} : 1, it needs 4.5 : 1). Use it
                         anyway, or pick another.
                     </span>
                     <span className="flex gap-2">

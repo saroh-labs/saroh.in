@@ -26,6 +26,8 @@ export interface ReviewItem {
     role?: string;
     /** Stars out of five, when there are some: none is drawn otherwise. */
     rating?: number;
+    /** The product review it was copied from: the live site drops it once hidden. */
+    reviewId?: string;
 }
 
 /** A Testimonials section already on the page, by its place. */
@@ -90,6 +92,7 @@ export function ReviewPicker({
                       role: r.productName,
                       // The stars the customer gave stay with the quote.
                       rating: r.rating,
+                      reviewId: r.id,
                   }
                 : null;
         }

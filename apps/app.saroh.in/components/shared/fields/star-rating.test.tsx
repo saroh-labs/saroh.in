@@ -53,14 +53,14 @@ describe("StarRating", () => {
         expect(onChange).toHaveBeenCalledWith(3);
     });
 
-    it("keeps one Tab stop and moves with the arrow keys", async () => {
+    it("keeps one Tab stop and moves with the arrow keys", () => {
         const onChange = vi.fn();
         act(() => root.render(<StarRating value={2} onChange={onChange} />));
         // Roving focus: the group is the one Tab stop; the arrows go inside.
         expect(
             host.querySelector<HTMLElement>("[role=radiogroup]")?.tabIndex,
         ).toBe(0);
-        await act(async () => {
+        act(() => {
             stars()[1]?.focus();
             stars()[1]?.dispatchEvent(
                 new KeyboardEvent("keydown", {
@@ -68,10 +68,24 @@ describe("StarRating", () => {
                     bubbles: true,
                 }),
             );
-            // Radix picks the star it moved to on the next frame.
-            await new Promise((r) => requestAnimationFrame(r));
         });
+        // The arrow moves AND picks (WAI-ARIA), at once.
         expect(onChange).toHaveBeenCalledWith(3);
+        expect(document.activeElement).toBe(stars()[2]);
+    });
+
+    it("wraps the arrows and goes back with ArrowLeft", () => {
+        const onChange = vi.fn();
+        act(() => root.render(<StarRating value={1} onChange={onChange} />));
+        act(() => {
+            stars()[0]?.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowLeft",
+                    bubbles: true,
+                }),
+            );
+        });
+        expect(onChange).toHaveBeenCalledWith(5);
     });
 
     it("shows Clear once set, and clears to none", () => {

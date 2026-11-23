@@ -431,13 +431,16 @@ describe("person: portrait, team, credential rows, the page's title", () => {
         );
     });
 
-    it("draws no empty frames for a team with no photos yet", () => {
+    it("shows initials in the tile of a team member with no photo (ERVTeamDesign)", () => {
         const content: RenderedPerson = {
             ...BLOCK_META.person.fixtures.team,
             image: undefined,
         };
         const { container } = render(<PersonSection content={content} />);
-        expect(container.querySelector(".aspect-\\[3\\/4\\]")).toBeNull();
+        expect(container.querySelector("img")).toBeNull();
+        expect(
+            container.querySelector("[data-team-initials]")?.textContent,
+        ).toMatch(/^[A-Z]{1,2}$/);
     });
 
     it("reads lines and rows alike, leaving out blanks", () => {

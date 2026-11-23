@@ -114,6 +114,7 @@ import {
     releaseUnderReview,
 } from "./release-under-review";
 import { queueReviewAlert } from "./review-alert-queue";
+import { liveReviewSnapshot } from "./review-live";
 import type { ReviewRoute } from "./review-route";
 import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
@@ -3226,10 +3227,14 @@ export class SitesService {
         );
         return {
             // Our team's bound people, checked live (team-live.ts).
-            snapshot: (await liveTeamSnapshot(
-                snapshot,
+            // Copied product reviews, kept only while still published.
+            snapshot: (await liveReviewSnapshot(
+                await liveTeamSnapshot(
+                    snapshot,
+                    site.organizationId,
+                    this.media,
+                ),
                 site.organizationId,
-                this.media,
             )) as typeof snapshot,
             publishedAt,
             siteId: site.id,

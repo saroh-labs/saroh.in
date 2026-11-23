@@ -254,7 +254,7 @@ export function PagesTree({
                                                                     null,
                                                                 );
                                                             }}
-                                                            className="absolute left-3 cursor-grab select-none text-muted-foreground opacity-0 active:cursor-grabbing group-hover:opacity-100"
+                                                            className="absolute left-3 cursor-grab select-none text-muted-foreground opacity-0 active:cursor-grabbing [@media(hover:hover)]:group-hover:opacity-100"
                                                         >
                                                             ⋮
                                                         </span>
