@@ -23,7 +23,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@next/eslint-plugin-next": "16.4.5",
+    "@next/eslint-plugin-next": "16.4.6",
     "@saroh/eslint-config": "workspace:*",
     "@saroh/tsconfig": "workspace:*",
     "@types/node": "catalog:",
