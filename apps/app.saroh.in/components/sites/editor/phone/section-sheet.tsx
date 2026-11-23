@@ -218,7 +218,7 @@ export function SectionSheet({
             />
         );
     } else if (active && selection.element) {
-        // One button or photo (DEC-251): its Style in the shared sheet,
+        // One button or photo (DEC-253): its Style in the shared sheet,
         // Reset and Done pinned (CSI-C phone).
         const { index, section } = active;
         const el = selection.element;

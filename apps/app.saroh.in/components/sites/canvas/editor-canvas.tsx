@@ -150,7 +150,7 @@ export function EditorCanvas({
     elementScope = "element",
     selectElement,
 }: {
-    /** The button or photo selected on the page (DEC-251). */
+    /** The button or photo selected on the page (DEC-253). */
     element?: SelectedElement | null;
     elementScope?: StyleScope;
     /** Selecting a button or photo; absent, a click selects its section. */

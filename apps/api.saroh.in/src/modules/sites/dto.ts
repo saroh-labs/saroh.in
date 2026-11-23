@@ -222,7 +222,7 @@ export class CreatePageDto {
     inMenu?: boolean;
 
     /**
-     * A new page type (A7, DEC-246) for a free-form page: it starts with
+     * A new page type (A7, DEC-248) for a free-form page: it starts with
      * that type's sections, filled from the business. ABSENT: empty, as
      * ever. Only with the Website area on (DEC-240).
      */

@@ -494,7 +494,7 @@ describe("SitesService.replaceDraftSections sanitizes on the way in (#280)", () 
         expect(sectionCreateMany).not.toHaveBeenCalled();
     });
 
-    it("keeps a button's and a section's own styles, and refuses a custom colour nobody can read (DEC-251, DEC-252)", async () => {
+    it("keeps a button's and a section's own styles, and refuses a custom colour nobody can read (DEC-253, DEC-254)", async () => {
         const cta = (elementStyle: Record<string, unknown>) => ({
             type: "cta",
             contractVersion: 2,

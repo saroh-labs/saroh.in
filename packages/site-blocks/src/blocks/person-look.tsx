@@ -109,7 +109,7 @@ export function PersonFace({
                     look === "folio"
                         ? "rounded-site-photo"
                         : // The look's round face, until the merchant picks
-                          // other photo corners (DEC-253).
+                          // other photo corners (DEC-255).
                           "rounded-[var(--site-image-radius,9999px)]",
                     className,
                 )}

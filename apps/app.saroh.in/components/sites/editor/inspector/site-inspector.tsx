@@ -157,7 +157,7 @@ export function SiteInspector({
         tabs = inspectorTabs(tab, openTab);
         body = <ChromePanel part={part} tab={tab} model={model} />;
     } else if (active && selection.element) {
-        // One button or photo (DEC-251, CSI-C): Content · Style.
+        // One button or photo (DEC-253, CSI-C): Content · Style.
         const { index, section } = active;
         const el = selection.element;
         const name = sectionTitle(section);

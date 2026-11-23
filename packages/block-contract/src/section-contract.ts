@@ -98,7 +98,7 @@ export const sectionFrameSettingsSchema = z
         hideOn: z.literal("phone").optional(),
         tone: z.enum(SECTION_TONES).optional(),
         spacing: z.enum(COMPONENT_STYLE_OPTIONS.spacing).optional(),
-        /** Its buttons', cards' and photos' styles (DEC-251). */
+        /** Its buttons', cards' and photos' styles (DEC-253). */
         styles: sectionStylesSchema.optional(),
     })
     .strict();
@@ -191,7 +191,7 @@ const linkHref = z
 const phoneLabel = z.string().trim().max(40).optional();
 
 /**
- * Filled, Outline, Soft or Link (DEC-252): Soft is new, a tint of the
+ * Filled, Outline, Soft or Link (DEC-254): Soft is new, a tint of the
  * button's colour with the page's words.
  */
 const ctaStyle = z
@@ -379,7 +379,7 @@ const imageSchema = z.object({
     placeholder: imagePlaceholderSchema.optional(),
     /** The widths of its stored smaller copies (DEC-246). */
     widths: imageWidthsSchema.optional(),
-    /** This photo's own corners (DEC-251). */
+    /** This photo's own corners (DEC-253). */
     elementStyle: imageStyleSchema.optional(),
 });
 

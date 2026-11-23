@@ -22,7 +22,7 @@ export const COMPONENT_STYLE_OPTIONS = {
     buttons: ["square", "rounded", "pill"],
     secondButton: ["outline", "text"],
     /**
-     * DEC-252: how the filled buttons are drawn, their size and their
+     * DEC-254: how the filled buttons are drawn, their size and their
      * colour (a palette role; a custom colour is per element or section
      * only, `element-styles.ts`). Each look's default is "as it draws today".
      */

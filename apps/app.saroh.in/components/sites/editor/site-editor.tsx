@@ -710,7 +710,7 @@ export function SiteEditor({
                 ) : undefined
             }
             textEdit={textEdit}
-            // One button or photo is selectable on its own (DEC-251),
+            // One button or photo is selectable on its own (DEC-253),
             // where its Style tab exists: the Website area's inspector.
             selectElement={
                 !areaOn

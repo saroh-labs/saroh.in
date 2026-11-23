@@ -230,7 +230,7 @@ export const RAW_ALLOWED = {
     // button: a Brand tab colour row, one line that opens its swatches (DEC-184)
     "components/sites/looks/colour-picker.tsx": ["button"],
     // button: Custom's swatch, a site colour row, a Recent swatch and the
-    // contrast guard's two fixes; input: the hue strip (DEC-252, CSI-C, CS4)
+    // contrast guard's two fixes; input: the hue strip (DEC-254, CSI-C, CS4)
     "components/sites/editor/inspector/button-colour-picker.tsx": [
         "button",
         "input",

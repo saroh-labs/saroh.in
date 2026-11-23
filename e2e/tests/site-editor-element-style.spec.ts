@@ -7,7 +7,7 @@ import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
- * One button styled on its own (DEC-251, DEC-252; canvas 4 `csi`, CSI-C):
+ * One button styled on its own (DEC-253, DEC-254; canvas 4 `csi`, CSI-C):
  * a button on the page is selected by itself, its Style tab opens with
  * Apply to, Colour (the site's roles and Custom), Style, Corners and Size,
  * and the page outlines what Apply to would move. On a phone the same in

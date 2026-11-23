@@ -11,7 +11,7 @@ import { contrastRatio } from "./palette";
 import { parseSectionContent } from "./section-contract";
 import { toRendered } from "./to-rendered";
 
-describe("element and section styles (DEC-251, DEC-252)", () => {
+describe("element and section styles (DEC-253, DEC-254)", () => {
     it("takes a role, or a custom colour whose words read at 4.5:1", () => {
         expect(colourProblem("accent")).toBeNull();
         expect(colourProblem("#A65E3F")).toBeNull();

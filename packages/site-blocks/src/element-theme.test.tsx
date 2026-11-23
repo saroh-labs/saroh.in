@@ -10,7 +10,7 @@ import { buttonInlineStyle, colourPair, elementProps } from "./element-theme";
 import { PageSections } from "./section-renderer";
 
 /**
- * Element and section styles (DEC-251, DEC-252): what wins, closest
+ * Element and section styles (DEC-253, DEC-254): what wins, closest
  * first, and nothing at all for a page nobody styled.
  */
 describe("one element's own style", () => {
@@ -131,7 +131,7 @@ describe("one section's styles", () => {
     });
 });
 
-describe("the template locks are gone (DEC-253)", () => {
+describe("the template locks are gone (DEC-255)", () => {
     // Each fixed radius now reads the shared variable, with today's value
     // as its fallback, so an untouched site draws as it did.
     const read = (file: string) =>
@@ -180,7 +180,7 @@ describe("the template locks are gone (DEC-253)", () => {
     });
 });
 
-describe("closest choice wins, per property (DEC-251)", () => {
+describe("closest choice wins, per property (DEC-253)", () => {
     const siteRules = (choices: Record<string, string>) =>
         componentRules(
             ":root",

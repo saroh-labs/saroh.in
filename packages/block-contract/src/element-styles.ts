@@ -10,7 +10,7 @@ import {
 } from "./palette";
 
 /**
- * Styles for one element or one section (DEC-251, DEC-252), under the
+ * Styles for one element or one section (DEC-253, DEC-254), under the
  * site's component styles (DEC-237). What wins, closest first: this
  * element › this section › the whole site (`SiteStyle.components`) › the
  * look's own. Each level stores only what was changed, so a page nobody
@@ -21,7 +21,7 @@ import {
  *   Soft or Link), a photo's on its image object.
  * - A section's rides in its `frame.styles`, beside Background and Spacing.
  *
- * Colour is a site palette role, or a custom `#RRGGBB` (DEC-252) whose
+ * Colour is a site palette role, or a custom `#RRGGBB` (DEC-254) whose
  * words read at 4.5:1: white when white reads, else dark ink. A colour
  * neither reads on is refused, and the editor offers the nearest darker
  * shade that does (CS4).

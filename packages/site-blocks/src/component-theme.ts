@@ -53,7 +53,7 @@ const BUTTON = `:is(:is(a, button):is([class*="rounded-[var(--site-radius)"], [c
 
 /**
  * The filled buttons: Classic's primary and a look's fill. What Button
- * colour and Button style (DEC-252) recolour or redraw.
+ * colour and Button style (DEC-254) recolour or redraw.
  */
 const FILLED = `${BUTTON}[class~="bg-site-accent"]`;
 
@@ -104,7 +104,7 @@ const STYLE_SHAPE: Record<string, string> = {
                 padding-inline: 0;`,
 };
 
-/** Button style: the filled buttons drawn as another kind (DEC-252). */
+/** Button style: the filled buttons drawn as another kind (DEC-254). */
 function buttonStyle(at: string, style: string, own = ""): string {
     const [tint, edge, words] = STYLE_MIX[style];
     const shape = STYLE_SHAPE[style];
@@ -135,7 +135,7 @@ function buttonSize(at: string, size: "s" | "l", own = ""): string {
 
 /**
  * What a site-wide rule leaves to a section that names the same thing
- * (DEC-251): the section's wrapper lists them in `data-site-own`, so its
+ * (DEC-253): the section's wrapper lists them in `data-site-own`, so its
  * own value, the look's own included, is what its elements draw.
  */
 export function siteOwn(kind: ComponentKind): string {
@@ -434,7 +434,7 @@ export function ownedKinds(styles: SectionStyles): string {
 }
 
 /**
- * One section's styles (DEC-251) as rules under `at`, the section's own
+ * One section's styles (DEC-253) as rules under `at`, the section's own
  * mark: written after the site's and more specific, and the site's rules
  * skip a section that names the same kind (`siteOwn`), so the section's
  * value wins per property, the look's own included: Filled and Medium

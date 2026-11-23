@@ -69,7 +69,7 @@ export function styleChanges(section: Section): number {
         frame.tone ?? c.band,
         frame.spacing,
         c.padding,
-        // Each kind styled for the section as a whole (DEC-251).
+        // Each kind styled for the section as a whole (DEC-253).
         ...Object.values(frame.styles ?? {}),
     ].filter((v) => v !== undefined).length;
 }

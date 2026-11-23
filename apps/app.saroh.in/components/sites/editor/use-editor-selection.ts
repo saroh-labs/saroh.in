@@ -59,7 +59,7 @@ export function useEditorSelection({
     // Writing through the store is what makes the choice survive a reload;
     // the re-render is the store's notification, not a second source of truth.
     /*
-     * The button or photo chosen inside the selected section (DEC-251),
+     * The button or photo chosen inside the selected section (DEC-253),
      * with its Apply to. Not remembered: a reload comes back to the
      * section, and choosing another section lets the element go.
      */

@@ -146,7 +146,7 @@ describe("every combination keeps the floor (R2)", () => {
             })),
         ),
     );
-    // Button colour (DEC-252) adds the page, the accent and its words:
+    // Button colour (DEC-254) adds the page, the accent and its words:
     // each a role the palette holds to 4.5:1 with its pair.
     const HELD =
         /hsl\(var\(--site-(fg|bg|surface|accent|accent-fg|rule, var\(--site-border\))\)/;

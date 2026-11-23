@@ -87,7 +87,7 @@ async function refusal(promise: Promise<unknown>) {
     };
 }
 
-describe("SitesService.createPage with a page type (A7, DEC-246)", () => {
+describe("SitesService.createPage with a page type (A7, DEC-248)", () => {
     const original = env.WEBSITE_AREA;
     afterEach(() => {
         env.WEBSITE_AREA = original;

@@ -97,7 +97,7 @@ function toRenderedSection(
     return {
         type: section.type,
         // On the editing canvas each button and photo carries its place,
-        // so a click on it selects it (DEC-251).
+        // so a click on it selects it (DEC-253).
         content: stamp ? stampElements(content) : content,
     };
 }
@@ -128,7 +128,7 @@ export function DraftPreview({
     elementScope = "element",
     onSelectElement,
 }: {
-    /** The button or photo selected in the selected section (DEC-251). */
+    /** The button or photo selected in the selected section (DEC-253). */
     selectedElement?: SelectedElement | null;
     /** Its Apply to: what the page outlines as moving with it (CSScope). */
     elementScope?: StyleScope;
@@ -580,7 +580,7 @@ function CanvasBlock({
         <div
             data-block-index={index}
             onClick={(e) => {
-                // A button or photo on the block selects it (DEC-251).
+                // A button or photo on the block selects it (DEC-253).
                 const mark = parseElementMark(
                     (e.target as HTMLElement)
                         .closest("[data-site-el]")

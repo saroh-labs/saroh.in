@@ -5,7 +5,7 @@ import { offeredOnSite } from "../bookings/public-booking-page";
 import type { DefaultSection } from "./module-page-sections";
 
 /**
- * New page types (A7, DEC-246): Service detail, Offer and Our team. Each is
+ * New page types (A7, DEC-248): Service detail, Offer and Our team. Each is
  * an ordinary free-form page that starts with sections filled from the
  * business, which the merchant then edits like any other. Not a page kind:
  * a site may have many of each, at any link, and nothing routes on them.

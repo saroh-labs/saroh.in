@@ -458,7 +458,7 @@ export class StaffService {
     }
 
     /**
-     * Who appears on Our team (round 3, EBTeamPicker, replaces DEC-246's
+     * Who appears on Our team (round 3, EBTeamPicker, replaces DEC-248's
      * opt-in): an owner or admin (`service:write`) picks the people, the
      * whole list at once; nobody adds themselves and nobody is told. The
      * chosen set is read live by every Our team section (`sites/team-live.ts`),

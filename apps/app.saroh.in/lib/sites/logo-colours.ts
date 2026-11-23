@@ -1,5 +1,5 @@
 /**
- * "From your logo" (B3, DEC-247): the logo's two or three main colours,
+ * "From your logo" (B3, DEC-249): the logo's two or three main colours,
  * read in the merchant's browser. Nothing is decoded on the server; the
  * colour picked is a brand colour like a typed one, so the API makes the
  * palette again from it and holds it to 4.5:1 (DEC-241).

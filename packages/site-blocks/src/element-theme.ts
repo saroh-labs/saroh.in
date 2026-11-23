@@ -11,7 +11,7 @@ import {
 } from "@saroh/block-contract";
 
 /**
- * One element's own style (DEC-251), drawn on the element itself as an
+ * One element's own style (DEC-253), drawn on the element itself as an
  * inline style: the closest choice, so it beats the section's and the
  * site's rules without a selector race. An element with no style of its
  * own gets no `style` attribute at all, so a live page is what it was.

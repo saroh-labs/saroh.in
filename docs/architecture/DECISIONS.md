@@ -3264,7 +3264,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A Global-edition business's uploads go to their own R2 bucket, `saroh-global-media` (location Automatic), served at `https://media.saroh.tech`. India keeps `saroh-media` at `media.saroh.in`; development keeps `saroh-media-dev` at `media.saroh.io` for both editions.
 - The API picks the bucket by the business's edition from its organization row, never from the request (`R2_GLOBAL_*`, all four or none; unset, Global uses the main bucket as before). Every stored file keeps the bucket it was written to (`Media.bucket`, `DataExport.bucket`; a social post's picture by its address), and every later read, check, delete, sweep and erasure goes there. Nothing already in `saroh-media` moves.
 - `media.saroh.tech` carries the same sandbox CSP and `nosniff` as the other media domains, and is in the apps' `img-src`.
-## DEC-246 Add a page offers Service detail, Offer and Our team; a person is on Our team only once opted in
+
+## DEC-248 Add a page offers Service detail, Offer and Our team; a person is on Our team only once opted in
 
 **Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, editor missing features A7 and Q5)
 
@@ -3274,7 +3275,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - The names are copied into the page when it is made. Someone who switches it off later is taken off that page by hand.
 - Behind the Website area switch (DEC-240): the page types and `PUT staff/:id/team-page` are refused with it off.
 
-## DEC-247 "From your logo" reads the logo's colours in the merchant's browser
+## DEC-249 "From your logo" reads the logo's colours in the merchant's browser
 
 **Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, B3 and Q7) · keeps DEC-241
 
@@ -3282,30 +3283,30 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A logo whose host won't let it be read is picked from the device instead. It is read there and never uploaded.
 - The colour picked is a brand colour like a typed one: the palette is still made on the server and held to 4.5:1 (DEC-241).
 
-## DEC-248 Video and Instagram embeds in posts are left out
+## DEC-250 Video and Instagram embeds in posts are left out
 
 **Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, W2, Y1 and Q6)
 
 - The post editor's inserts (W2 desk, Y1 phone) are built without **Video** and **Instagram post**. The other inserts are in.
 - No host allow-list is chosen, so nothing embeds a third party's player or post.
 
-## DEC-249 The Ask AI items of the editor's missing features wait
+## DEC-251 The Ask AI items of the editor's missing features wait
 
 **Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, Q1 and Q2)
 
 - Not in this round: AI1–AI10, A3 ("Not here? Describe a section"), E2 (Ask AI on an empty site) and the Ask AI rows in D3's history. They wait for master plan batch 8 (U41–U43, Check this on the server).
 - Ask AI stays a right-column tab, not a dock (21 Nov decision).
 
-## DEC-250 An owner or admin picks who appears on Our team; the page reads them live
+## DEC-252 An owner or admin picks who appears on Our team; the page reads them live
 
-**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round 3, EBTeamPicker) · replaces DEC-246's opt-in
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round 3, EBTeamPicker) · replaces DEC-248's opt-in
 
 - Who appears is chosen by an owner or admin (`service:write`) in the Our team page's People list or picker, the whole list at once (`PUT staff/team-page`). Nobody adds themselves and nobody is told; the Hours screen shows a read-only line.
 - An Our team section's people are bound to staff (`staffId`). The public read shows a bound person only while still chosen and active, under their current name, so someone taken off leaves the live site at once (page-cache cause `team`). People typed in by hand show as typed.
 - One chosen list per business.
 - The post Offer card reads `public/sites/:siteId/offers/:id`, no longer behind SHARE_POSTS.
 
-## DEC-251 One button, photo or section can be styled on its own; the site stays the default
+## DEC-253 One button, photo or section can be styled on its own; the site stays the default
 
 **Status: Accepted — 2026-11-22** · owner (22 Nov 2026, component styling, iteration C, canvas 4 pages `csi` and `cs`) · replaces DEC-237's "never per single instance"; keeps the rest of DEC-237
 
@@ -3317,7 +3318,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - Nothing is written for a level nobody changed, so live sites draw exactly as before. Changes wait for Publish and are free on every plan, as in DEC-237.
 - Consequences: an element's style is drawn inline on the element; a section's as rules under its own mark, after the site's. The editor's canvas stamps each button and photo with its place (never saved or published) so a click can select it. A card can't yet be styled on its own (no card carries an identity in the content); its section and site scopes work.
 
-## DEC-252 A custom button colour, if its words read at 4.5:1; Soft buttons and Size S, M, L
+## DEC-254 A custom button colour, if its words read at 4.5:1; Soft buttons and Size S, M, L
 
 **Status: Accepted — 2026-11-22** · owner (22 Nov 2026, iteration C) · relaxes DEC-090 and DEC-241 for buttons only · keeps DEC-177
 
@@ -3326,7 +3327,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - The whole site gains Button colour (roles only), Button style and Button size in Buttons and shapes; each look's default is how it draws today.
 - Not decided yet (asked, 22 Nov): a sixth "Brand tint" role, shades of each role, and whether "Palettes to try" offers any palette or only the look's colourways. Until then the Site colours card offers the site's colourways only (DEC-090, paid ones gated by DEC-177), and there is no Tint role and no shades.
 
-## DEC-253 Blocks read the merchant's styles; a look only sets defaults
+## DEC-255 Blocks read the merchant's styles; a look only sets defaults
 
 **Status: Accepted — 2026-11-22** · owner (22 Nov 2026, iteration C) · follows DEC-237
 

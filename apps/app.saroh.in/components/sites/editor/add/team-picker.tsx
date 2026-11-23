@@ -21,7 +21,7 @@ export function teamRoleWord(role: string | undefined): string {
     return "Staff";
 }
 
-/** A round avatar of initials; staff carry no photo (DEC-246). */
+/** A round avatar of initials; staff carry no photo (DEC-248). */
 export function TeamAvatar({
     name,
     owner = false,

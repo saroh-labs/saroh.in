@@ -1,7 +1,7 @@
 import { starterSections, teamPageWhere } from "./page-starters";
 
 /**
- * New page types (A7, DEC-246): each starts with sections that pass their
+ * New page types (A7, DEC-248): each starts with sections that pass their
  * contracts, filled from the business, and Our team shows only the people
  * who opted in.
  */

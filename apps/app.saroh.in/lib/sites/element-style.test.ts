@@ -13,7 +13,7 @@ import {
     withElementAt,
 } from "./element-style";
 
-describe("one element in a section's content (DEC-251)", () => {
+describe("one element in a section's content (DEC-253)", () => {
     const content = {
         heading: "Hello",
         cta: { label: "Book", action: { kind: "page", pageId: "p" } },

@@ -61,7 +61,7 @@ describe("the Website area switch (DEC-240)", () => {
                 SitesController.prototype,
                 ["changes", "approveChanges", "askForChanges", "duplicatePage"],
             ],
-            // "Show on Our team" (DEC-246).
+            // "Show on Our team" (DEC-248).
             [StaffController.prototype, ["setTeamPage"]],
             [
                 PostsController.prototype,

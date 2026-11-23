@@ -15,7 +15,7 @@ import {
 } from "@saroh/block-contract";
 
 /**
- * One element on the canvas and its style at each level (DEC-251): this
+ * One element on the canvas and its style at each level (DEC-253): this
  * element, this section, the whole site. Pure, so the desk's Style tab,
  * the phone's sheet and a test share one rule.
  */

@@ -696,7 +696,7 @@ export function PageSections({
         !packs.failed &&
         !nothing(i) &&
         !nothing(i + 1);
-    // Each styled section's rules (DEC-251), keyed by their mark: one
+    // Each styled section's rules (DEC-253), keyed by their mark: one
     // sheet after the sections, so no wrapper's siblings change.
     const sectionSheets = new Map<string, string>();
     return (

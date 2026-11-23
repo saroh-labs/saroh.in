@@ -267,7 +267,7 @@ function BrandColourFields({
  * colours stores the colour as `brandColour` with the palette made from
  * it; the API makes the palette again from the colour and keeps its own.
  *
- * "From your logo" (B3, DEC-247) reads the logo's main colours in this
+ * "From your logo" (B3, DEC-249) reads the logo's main colours in this
  * browser; a logo whose host refuses to be read is picked from the device
  * instead, and never uploaded. Each colour typed or picked is tried on
  * the page behind the undimmed sheet (B4) until Use or Cancel. On a phone

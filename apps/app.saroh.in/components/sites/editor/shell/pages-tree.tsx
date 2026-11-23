@@ -437,7 +437,7 @@ function TreeRow({
 
 /**
  * The selected section's buttons and photos under its row (CSI-C,
- * "Button · Browse the catalogue"), each selectable on its own (DEC-251).
+ * "Button · Browse the catalogue"), each selectable on its own (DEC-253).
  */
 function ElementRows({
     model,

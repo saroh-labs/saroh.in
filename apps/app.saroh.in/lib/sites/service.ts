@@ -2511,7 +2511,7 @@ export async function getSiteFlags(siteId: string): Promise<SiteFlags> {
  * module page names its `kind` and may leave both to the kind's defaults
  * (a Book or Shop page's address is always its route's).
  */
-/** A new page type (A7, DEC-246): a free page filled from the business. */
+/** A new page type (A7, DEC-248): a free page filled from the business. */
 export type PageStarter = "SERVICE" | "OFFER" | "TEAM";
 
 export type CreatePageInput =

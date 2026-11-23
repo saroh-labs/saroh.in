@@ -92,7 +92,7 @@ export const renderedCtaSchema = z.object({
     label: z.string().min(1),
     href: z.string(),
     style: z.enum(["primary", "secondary", "soft", "link"]).optional(),
-    /** This button's own colour, corners and size (DEC-251). */
+    /** This button's own colour, corners and size (DEC-253). */
     elementStyle: z.record(z.string(), z.string()).optional(),
     /** The editor's canvas only: where it sits in the content. */
     editorPath: z.string().optional(),
@@ -127,7 +127,7 @@ export const renderedImageSchema = z.object({
     placeholder: z.string().optional(),
     /** The widths of its stored smaller copies (DEC-246). */
     widths: z.array(z.number()).optional(),
-    /** This photo's own corners (DEC-251). */
+    /** This photo's own corners (DEC-253). */
     elementStyle: z.record(z.string(), z.string()).optional(),
     /** The editor's canvas only: where it sits in the content. */
     editorPath: z.string().optional(),
