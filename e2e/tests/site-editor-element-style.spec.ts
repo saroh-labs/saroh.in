@@ -58,20 +58,41 @@ test("one button, styled on its own", async ({ page }, testInfo) => {
     const panel = page.locator("[data-element-style=button]");
     await expect(panel).toBeVisible();
     await expect(panel).toContainText("Apply to");
-    for (const role of ["Background", "Panels", "Text", "Brand", "Lines"]) {
-        await expect(panel.getByRole("radio", { name: role })).toBeVisible();
+    for (const role of [
+        "Background",
+        "Panels",
+        "Text",
+        "Brand",
+        "Brand tint",
+        "Lines",
+    ]) {
+        await expect(
+            panel.getByRole("radio", { name: role, exact: true }),
+        ).toBeVisible();
     }
     await expect(panel.getByText("Custom")).toBeVisible();
     for (const style of ["Filled", "Outline", "Soft", "Link"]) {
-        await expect(panel.getByText(style, { exact: true })).toBeVisible();
+        // Each tile draws a "Book" button in that style, then says its name.
+        await expect(
+            panel.getByRole("radio", { name: new RegExp(`${style}$`) }),
+        ).toBeVisible();
     }
     await expect(panel).toContainText(/words (read clearly|are hard to read)/);
 
     // The page outlines the button, then every button in its section.
     const mark = await button.getAttribute("data-site-el");
-    await expect(
-        page.locator("style").filter({ hasText: mark ?? "" }),
-    ).toHaveCount(1);
+    // Playwright's text filters skip <style>, so read its text directly.
+    await expect
+        .poll(() =>
+            page
+                .locator("style")
+                .evaluateAll(
+                    (els, m) =>
+                        els.filter((e) => e.textContent.includes(m)).length,
+                    `data-site-el="${mark ?? ""}"`,
+                ),
+        )
+        .toBe(1);
     await panel.getByRole("radio", { name: "This section" }).click();
     await expect(panel).toContainText(/\d+ buttons? in /);
     await panel.getByRole("radio", { name: "This button" }).click();

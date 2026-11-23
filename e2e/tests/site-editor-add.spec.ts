@@ -114,6 +114,7 @@ test.describe("Rail › Add at 1920", () => {
         // Add a page offers the new page types, each with what it starts with (A7).
         await panel.getByRole("button", { name: "Blank page" }).click();
         const sheet = page.getByRole("dialog", { name: "Add a page" });
+        await sheet.getByRole("radio", { name: /^A template page/ }).click();
         await sheet.getByText("Our team", { exact: true }).click();
         // Choosing it opens Add people first (ER3Team T4); Cancel goes back.
         await page

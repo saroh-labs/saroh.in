@@ -132,6 +132,12 @@ export function SiteInspector({
         setSeen(mark);
         if (mark) setOwn("style");
     }
+    // The header or footer opens on its Content, not on the last section tab.
+    const [seenChrome, setSeenChrome] = useState(selection.selectedChrome);
+    if (selection.selectedChrome !== seenChrome) {
+        setSeenChrome(selection.selectedChrome);
+        if (selection.selectedChrome) setOwn("content");
+    }
     const tab: InspectorTab =
         selection.inspector === "feedback" ? "feedback" : own;
     const openTab = (next: InspectorTab) => {

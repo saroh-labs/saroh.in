@@ -78,12 +78,13 @@ test.describe("Round 3 pickers at 1440", () => {
         const panel = page.locator("[data-add-panel=desk]");
         await panel.getByRole("button", { name: "Blank page" }).click();
         const sheet = page.getByRole("dialog", { name: "Add a page" });
+        await sheet.getByRole("radio", { name: /^A template page/ }).click();
         // Choosing the tile opens the picker at once (ER3Team T4).
         await sheet.getByText("Our team", { exact: true }).click();
         const picker = page.getByRole("dialog", {
             name: "Add people to Our team",
         });
-        await expect(picker).toContainText("Search your team");
+        await expect(picker.getByPlaceholder("Search your team")).toBeVisible();
         await expect(picker).toContainText(/On the page|Not on the page/);
         await picker.getByRole("button", { name: "Cancel" }).click();
         await expect(picker).toHaveCount(0);
