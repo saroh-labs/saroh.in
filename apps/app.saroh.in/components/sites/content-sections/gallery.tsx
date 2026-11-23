@@ -1,6 +1,7 @@
 "use client";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import { pickedSizes } from "@/components/shared/fields/picked-image";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -93,7 +94,12 @@ function GalleryFieldsView({
                                         c.images.map((im, idx) =>
                                             idx === i
                                                 ? {
+                                                      // Another address: the
+                                                      // old photo's blur and
+                                                      // copies don't fit it.
                                                       ...im,
+                                                      placeholder: undefined,
+                                                      widths: undefined,
                                                       src: e.target.value,
                                                   }
                                                 : im,
@@ -185,6 +191,7 @@ function GalleryFieldsView({
                                 alt: "",
                                 width: img.width,
                                 height: img.height,
+                                ...pickedSizes(img),
                             },
                         ])
                     }

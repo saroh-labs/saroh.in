@@ -22,6 +22,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import type { AuditService } from "../audit/audit.service";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import { OrganizationSettingsService } from "../organizations/organization-settings.service";
 import { SiteIconService } from "./site-icon.service";
 import { SitesService } from "./sites.service";
@@ -29,7 +30,7 @@ import { SitesService } from "./sites.service";
 const storage = createMemoryStorage({
     publicBaseUrl: "https://media.saroh.test",
 });
-const media = new MediaService(storage);
+const media = new MediaService(mediaStorages(storage, null));
 const icons = new SiteIconService(media);
 const sites = new SitesService({
     check: jest.fn().mockResolvedValue(true),

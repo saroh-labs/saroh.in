@@ -57,6 +57,19 @@ describe("createMemoryStorage", () => {
         ).toThrow();
     });
 
+    it("refuses a second PUT to a key with 412, like R2's If-None-Match", async () => {
+        const storage = createMemoryStorage({ generateId: () => "id-412" });
+        const upload = await storage.createSignedUploadUrl(makeInput());
+        expect(upload.headers["If-None-Match"]).toBe("*");
+        storage.putBytes(upload.key, new Uint8Array([1, 2, 3]));
+        expect(() =>
+            storage.putBytes(upload.key, new Uint8Array([6, 6, 6])),
+        ).toThrow(expect.objectContaining({ status: 412 }));
+        expect(await storage.readObjectStart(upload.key, 3)).toEqual(
+            new Uint8Array([1, 2, 3]),
+        );
+    });
+
     it("headObject resolves null for an unknown key", async () => {
         const storage = createMemoryStorage();
         expect(await storage.headObject("org/x/nope.png")).toBeNull();

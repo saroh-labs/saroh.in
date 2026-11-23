@@ -35,6 +35,9 @@ export interface PublicImage {
     kind: "photo" | "video";
     durationSec: number | null;
     posterUrl: string | null;
+    /** Its blur and its stored copies' widths, made at upload (DEC-246). */
+    placeholder: string | null;
+    widths: number[];
 }
 
 /**
@@ -85,7 +88,14 @@ export interface PublicCatalogueCard {
      */
     gstAdded: boolean;
     /** The cover, or null. A video's poster stands in for a video cover. */
-    image: { url: string; alt: string } | null;
+    image: {
+        url: string;
+        alt: string;
+        /** A photo's own width, blur and copies' widths (DEC-246). */
+        width?: number | null;
+        placeholder?: string | null;
+        widths?: number[];
+    } | null;
     /** "Small · Large", when it is chosen by variant. */
     variantTitles: string[];
     /**

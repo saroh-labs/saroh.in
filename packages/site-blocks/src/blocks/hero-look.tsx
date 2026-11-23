@@ -212,6 +212,8 @@ export default function LookHero({
                     {...siteImage(priority ? "first-hero" : "below", {
                         src: src.src,
                         width: src.width,
+                        placeholder: src.placeholder,
+                        widths: src.widths,
                         sizes,
                         focus: src.focus,
                     })}

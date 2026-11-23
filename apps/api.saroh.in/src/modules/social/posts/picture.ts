@@ -5,6 +5,7 @@ import type { ObjectStorage } from "@saroh/object-storage";
 import { buildObjectKey } from "@saroh/object-storage";
 
 import type { MediaService } from "../../media/media.service";
+import type { MediaStorages } from "../../media/object-storage.provider";
 import { renderPhotoJpeg } from "../../share-posts/cards/card-renderer";
 import type { PublicShareService } from "../../share-posts/public-share.service";
 
@@ -23,6 +24,7 @@ export interface PictureInput {
 export interface PictureDeps {
     share: PublicShareService;
     media: MediaService;
+    /** The business's edition's bucket, where the picture is stored. */
     storage: ObjectStorage;
 }
 
@@ -103,11 +105,15 @@ function notPublic(input: PictureInput): ConflictException {
     });
 }
 
-/** Remove a stored picture; a failure leaves a file, never a broken post. */
+/**
+ * Remove a stored picture from the bucket its address is in (owner, 22 Nov
+ * 2026); a failure leaves a file, never a broken post.
+ */
 export async function removePicture(
-    storage: ObjectStorage,
-    imageKey: string | null,
+    storages: Pick<MediaStorages, "servingUrl">,
+    picture: { imageKey: string | null; imageUrl: string | null } | null,
 ): Promise<void> {
-    if (!imageKey) return;
-    await storage.deleteObject(imageKey).catch(() => undefined);
+    if (!picture?.imageKey || !picture.imageUrl) return;
+    const storage = storages.servingUrl(picture.imageKey, picture.imageUrl);
+    await storage?.deleteObject(picture.imageKey).catch(() => undefined);
 }

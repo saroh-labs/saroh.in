@@ -93,6 +93,14 @@ const envSchema = z.object({
     R2_ACCESS_KEY_ID: z.string().optional(),
     R2_SECRET_ACCESS_KEY: z.string().optional(),
     R2_PUBLIC_BASE_URL: z.string().optional(),
+    // Global-edition businesses' own bucket (owner, 22 Nov 2026): same
+    // account and R2_ENDPOINT, its own bucket, key and public domain. Unset,
+    // Global uploads go to the main bucket as before; set, all four are
+    // required together (checked below). `media/object-storage.provider.ts`.
+    R2_GLOBAL_BUCKET: z.string().optional(),
+    R2_GLOBAL_PUBLIC_BASE_URL: z.string().optional(),
+    R2_GLOBAL_ACCESS_KEY_ID: z.string().optional(),
+    R2_GLOBAL_SECRET_ACCESS_KEY: z.string().optional(),
 
     // Email (Nodemailer). Legacy aliases kept until callers converge.
     EMAIL_FROM: z.string().optional(),
@@ -613,7 +621,31 @@ const TEST_ONLY = [
     "MSG91_BASE_URL",
 ] as const;
 
+/** Global's media bucket: all of these or none (owner, 22 Nov 2026). */
+const R2_GLOBAL = [
+    "R2_GLOBAL_BUCKET",
+    "R2_GLOBAL_PUBLIC_BASE_URL",
+    "R2_GLOBAL_ACCESS_KEY_ID",
+    "R2_GLOBAL_SECRET_ACCESS_KEY",
+    // The same account's endpoint the main bucket uses.
+    "R2_ENDPOINT",
+] as const;
+
 const checkedSchema = envSchema.superRefine((value, ctx) => {
+    // Some of Global's bucket set and not the rest: Global uploads would go
+    // nowhere, or back into the main bucket. Refuse to boot instead.
+    if (R2_GLOBAL.slice(0, 4).some((key) => value[key])) {
+        for (const key of R2_GLOBAL) {
+            if (!value[key]) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: [key],
+                    message:
+                        "required with the other R2_GLOBAL_* variables: set all four (and R2_ENDPOINT) or none",
+                });
+            }
+        }
+    }
     // Two editions never share a series (stage 9, KTD6).
     if (
         value.SAROH_INVOICE_PREFIX_GLOBAL &&

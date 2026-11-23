@@ -89,6 +89,7 @@ import {
     PLAN_LIMITS_OFF_NOTE,
 } from "./admin-business-modules.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
+import { AdminMediaService } from "./admin-media.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsController } from "./admin-organizations.controller";
 import { AdminOrganizationsService } from "./admin-organizations.service";
@@ -208,6 +209,7 @@ beforeAll(async () => {
             { provide: AdminLifecycleService, useValue: {} },
             { provide: AdminOverridesService, useValue: {} },
             { provide: AdminSiteTrackersService, useValue: {} },
+            { provide: AdminMediaService, useValue: {} },
         ],
     }).compile();
     app = moduleRef.createNestApplication({ logger: false });

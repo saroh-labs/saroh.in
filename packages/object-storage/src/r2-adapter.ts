@@ -10,7 +10,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import { buildObjectKey, stripTrailingSlashes } from "./keys";
+import { assertTenantKey, buildObjectKey, stripTrailingSlashes } from "./keys";
 import type {
     ContentTypeAllowlist,
     CreateSignedUploadUrlInput,
@@ -158,12 +158,15 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
             // Validate at the boundary: allowlist + size cap enforced here.
             const parsed = uploadSchema.parse(input);
 
-            const key = buildObjectKey({
-                organizationId: parsed.organizationId,
-                filename: parsed.filename,
-                purpose: parsed.purpose,
-                uuid: randomUUID(),
-            });
+            const key =
+                input.key === undefined
+                    ? buildObjectKey({
+                          organizationId: parsed.organizationId,
+                          filename: parsed.filename,
+                          purpose: parsed.purpose,
+                          uuid: randomUUID(),
+                      })
+                    : assertTenantKey(parsed.organizationId, input.key);
 
             const command = new PutObjectCommand({
                 Bucket: config.bucket,
@@ -172,6 +175,9 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
                 // (see signableHeaders below).
                 ContentType: parsed.contentType,
                 ContentLength: parsed.contentLength,
+                // One-use URL (F3): R2 refuses a PUT to a key that exists
+                // (412), so a confirmed file can't be replaced by reusing it.
+                IfNoneMatch: "*",
             });
 
             // The SDK leaves Content-Type out of a presigned PUT's signature
@@ -181,7 +187,7 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
             // other type (and none at all). Content-Length is signed already.
             const url = await presign(client, command, {
                 expiresIn: uploadExpiry,
-                signableHeaders: new Set(["content-type"]),
+                signableHeaders: new Set(["content-type", "if-none-match"]),
             });
 
             return {
@@ -191,6 +197,7 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
                 headers: {
                     "Content-Type": parsed.contentType,
                     "Content-Length": String(parsed.contentLength),
+                    "If-None-Match": "*",
                 },
                 expiresAt: new Date(
                     Date.now() + uploadExpiry * 1000,
@@ -282,6 +289,27 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
                 // In Node the SDK's body is a Readable: chunks as they come.
                 const body = out.Body as AsyncIterable<Uint8Array> | undefined;
                 return body ?? null;
+            } catch (error) {
+                if (isNotFound(error)) return null;
+                throw error;
+            }
+        },
+
+        async readObjectEnd(
+            key: string,
+            length: number,
+        ): Promise<Uint8Array | null> {
+            try {
+                const out = await client.send(
+                    new GetObjectCommand({
+                        Bucket: config.bucket,
+                        Key: key,
+                        Range: `bytes=-${Math.max(1, length)}`,
+                    }),
+                );
+                if (!out.Body) return null;
+                const bytes = await out.Body.transformToByteArray();
+                return bytes.subarray(Math.max(0, bytes.length - length));
             } catch (error) {
                 if (isNotFound(error)) return null;
                 throw error;

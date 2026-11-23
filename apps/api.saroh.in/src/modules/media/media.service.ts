@@ -7,9 +7,12 @@ import {
     Logger,
     NotFoundException,
 } from "@nestjs/common";
+import { variantKey } from "@saroh/block-contract";
+import type { MediaBucket, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import {
+    IMAGE_END_BYTES,
     IMAGE_SNIFF_BYTES,
     ISO_BMFF_SNIFF_BYTES,
     isVideoContentType,
@@ -24,13 +27,19 @@ import {
     logDeletionProviderCall,
 } from "../organizations/deletion-provider-log";
 import { authorize } from "../organizations/organization-policy";
+import type { MediaStorages } from "./object-storage.provider";
 import { OBJECT_STORAGE } from "./object-storage.provider";
 import type { CreateUploadInput } from "./upload-checks";
 import {
     assertUploadType,
+    BAD_SIZES_MESSAGE,
     NOTHING_UPLOADED_MESSAGE,
     storedBytesProblem,
+    storedEndProblem,
+    uploadSizesProblem,
 } from "./upload-checks";
+import type { StoredVariant } from "./variants";
+import { mediaFileKeys, storedVariants, variantWidths } from "./variants";
 
 /** A deleted business's stored files, on its deletion trail (#921). */
 const deletionLog = new Logger("OrganizationDeletion");
@@ -43,6 +52,14 @@ export interface CreateUploadResult {
     headers: Record<string, string>;
     key: string;
     expiresAt: string;
+    /** One signed PUT per smaller copy, in the order asked (DEC-246). */
+    variants: {
+        width: number;
+        uploadUrl: string;
+        method: "PUT";
+        headers: Record<string, string>;
+        key: string;
+    }[];
 }
 
 /**
@@ -70,7 +87,7 @@ function goneAsNothing(error: unknown, onlyGone = false): void {
 @Injectable()
 export class MediaService {
     constructor(
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+        @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
     ) {}
 
     /**
@@ -88,14 +105,46 @@ export class MediaService {
     ): Promise<CreateUploadResult> {
         authorize(ctx, "media:write");
         assertUploadType(input);
+        const sizesProblem = uploadSizesProblem(input);
+        if (sizesProblem) throw new BadRequestException(sizesProblem);
 
-        const signed = await this.storage.createSignedUploadUrl({
+        // The business's edition's bucket; the row remembers which (owner,
+        // 22 Nov 2026).
+        const { bucket, storage } = await this.storages.forOrganization(
+            ctx.organizationId,
+        );
+        const signed = await storage.createSignedUploadUrl({
             organizationId: ctx.organizationId,
             contentType: input.contentType,
             contentLength: input.contentLength,
             filename: input.filename,
             purpose: input.purpose,
         });
+        // The smaller copies sit beside the photo, at keys the server
+        // makes from its key; the client never names one (DEC-246).
+        const copies = await Promise.all(
+            (input.variants ?? []).map(async (v) => {
+                const key = variantKey(signed.key, v.width) ?? "";
+                const put = await storage.createSignedUploadUrl({
+                    organizationId: ctx.organizationId,
+                    // The same type as the photo (WebP, or JPEG).
+                    contentType: input.contentType,
+                    contentLength: v.contentLength,
+                    filename: input.filename,
+                    purpose: input.purpose,
+                    key,
+                });
+                return { width: v.width, key, bytes: v.contentLength, put };
+            }),
+        );
+        const variants: StoredVariant[] = copies.map(
+            ({ width, key, bytes }) => ({ width, key, bytes }),
+        );
+        // Every file counts against the plan's storage, not only the photo.
+        const allBytes = variants.reduce(
+            (n, v) => n + v.bytes,
+            input.contentLength,
+        );
 
         // The plan's storage, checked before a byte is sent (owner, 20 Nov
         // 2026): a hard cell refuses an upload that would pass it, at the
@@ -112,15 +161,26 @@ export class MediaService {
                     data: {
                         organizationId: ctx.organizationId,
                         key: signed.key,
+                        bucket,
                         contentType: input.contentType,
                         sizeBytes: input.contentLength,
                         filename: input.filename,
                         purpose: input.purpose ?? null,
                         status: "PENDING",
                         uploadedByUserId: ctx.userId,
+                        width: input.width ?? null,
+                        height: input.height ?? null,
+                        placeholder: input.placeholder ?? null,
+                        ...(variants.length > 0
+                            ? {
+                                  variants:
+                                      variants as unknown as Prisma.InputJsonValue,
+                                  variantBytes: allBytes - input.contentLength,
+                              }
+                            : {}),
                     },
                 }),
-            { adding: input.contentLength / BYTES_PER_GB },
+            { adding: allBytes / BYTES_PER_GB },
         );
 
         return {
@@ -130,6 +190,13 @@ export class MediaService {
             headers: signed.headers,
             key: signed.key,
             expiresAt: signed.expiresAt,
+            variants: copies.map((c) => ({
+                width: c.width,
+                uploadUrl: c.put.url,
+                method: c.put.method,
+                headers: c.put.headers,
+                key: c.key,
+            })),
         };
     }
 
@@ -165,29 +232,19 @@ export class MediaService {
          * its object deleted, so nothing can put it on a product, a page or
          * the logo.
          */
-        const start = await this.storage.readObjectStart(
-            media.key,
-            isVideoContentType(media.contentType)
-                ? ISO_BMFF_SNIFF_BYTES
-                : IMAGE_SNIFF_BYTES,
-        );
-        const problem = storedBytesProblem(
-            media,
-            start,
-            this.storage.seesUploads,
-        );
-        if (problem) {
+        const files = await this.checkStoredFiles(media);
+        if (files.problem) {
             await prisma.media
                 .update({
                     where: { id: media.id },
                     data: { status: "FAILED" },
                 })
                 .catch(goneAsNothing);
-            await this.storage.deleteObject(media.key);
-            throw new BadRequestException(problem);
+            await this.deleteFiles(media);
+            throw new BadRequestException(files.problem);
         }
 
-        const head = await this.storage.headObject(media.key);
+        const head = files.head;
         // Reconcile the authoritative size from storage when available; the
         // memory adapter reports the size we recorded, R2 the real object size.
         // Falls back to the recorded size when the head misses (dev/memory).
@@ -220,7 +277,7 @@ export class MediaService {
                         where: { id: media.id },
                         data: { status: "FAILED" },
                     });
-                    await this.storage.deleteObject(media.key);
+                    await this.deleteFiles(media);
                 }
                 throw error;
             });
@@ -235,7 +292,7 @@ export class MediaService {
              * left them holding a key with no way to turn it into an <img src>
              * — an upload that completed and could not be used.
              */
-            url: this.publicUrlFor(updated.key),
+            url: this.publicUrlFor(updated),
         };
     }
 
@@ -246,7 +303,13 @@ export class MediaService {
             where: { organizationId: ctx.organizationId },
             orderBy: { createdAt: "desc" },
         });
-        return rows.map((row) => ({ ...row, url: this.publicUrlFor(row.key) }));
+        // The copies' widths, not their keys: a copy's address is its
+        // photo's, with the width beside it (`variantSrc`).
+        return rows.map(({ variants, bucket, ...row }) => ({
+            ...row,
+            url: this.publicUrlFor({ key: row.key, bucket }),
+            widths: variantWidths(variants),
+        }));
     }
 
     /**
@@ -259,9 +322,12 @@ export class MediaService {
      * up to serve images"); an exception here would have surfaced as a 500 on
      * an upload that succeeded.
      */
-    private publicUrlFor(key: string): string | null {
+    private publicUrlFor(media: {
+        key: string;
+        bucket: MediaBucket;
+    }): string | null {
         try {
-            return this.storage.getPublicUrl(key);
+            return this.storages.of(media.bucket).getPublicUrl(media.key);
         } catch {
             return null;
         }
@@ -350,7 +416,7 @@ export class MediaService {
             );
         }
 
-        await this.storage.deleteObject(media.key);
+        await this.deleteFiles(media);
         await prisma.media.delete({ where: { id: media.id } });
 
         return { id: media.id, deleted: true };
@@ -399,14 +465,14 @@ export class MediaService {
                         ? { id: { notIn: failedIds } }
                         : {}),
                 },
-                select: { id: true, key: true },
+                select: { id: true, key: true, variants: true, bucket: true },
                 orderBy: { id: "asc" },
                 take: 100,
             });
             if (batch.length === 0) break;
             for (const media of batch) {
                 try {
-                    await this.storage.deleteObject(media.key);
+                    await this.deleteFiles(media);
                     logDeletionProviderCall(deletionLog, {
                         organizationId,
                         provider: "storage",
@@ -454,6 +520,11 @@ export class MediaService {
         url: string | null;
         contentType: string;
         sizeBytes: number;
+        /** Its size, blur and copies' widths, when made at upload (DEC-246). */
+        width: number | null;
+        height: number | null;
+        placeholder: string | null;
+        widths: number[];
     }> {
         const media = await prisma.media.findUnique({
             where: { id: mediaId },
@@ -461,9 +532,14 @@ export class MediaService {
                 id: true,
                 organizationId: true,
                 key: true,
+                bucket: true,
                 status: true,
                 contentType: true,
                 sizeBytes: true,
+                width: true,
+                height: true,
+                placeholder: true,
+                variants: true,
             },
         });
         if (
@@ -474,9 +550,13 @@ export class MediaService {
         }
         return {
             id: media.id,
-            url: this.publicUrlFor(media.key),
+            url: this.publicUrlFor(media),
             contentType: media.contentType,
             sizeBytes: media.sizeBytes,
+            width: media.width,
+            height: media.height,
+            placeholder: media.placeholder,
+            widths: variantWidths(media.variants),
         };
     }
 
@@ -497,6 +577,7 @@ export class MediaService {
             select: {
                 organizationId: true,
                 key: true,
+                bucket: true,
                 status: true,
                 contentType: true,
             },
@@ -507,8 +588,112 @@ export class MediaService {
         ) {
             return null;
         }
-        const bytes = await this.storage.readObjectStart(media.key, length);
+        const bytes = await this.storages
+            .of(media.bucket)
+            .readObjectStart(media.key, length);
         return bytes ? { bytes, contentType: media.contentType } : null;
+    }
+
+    /**
+     * Every file of an upload is the file it said, whole (#517, #873,
+     * DEC-246): the photo, and each smaller copy the browser made. First
+     * bytes: the format its type says (`storedBytesProblem`). Last bytes:
+     * it ends where that format ends, nothing appended
+     * (`storedEndProblem`). A copy is the photo's type, and smaller.
+     * Two ranged reads and a head per file; nothing is decoded.
+     */
+    private async checkStoredFiles(media: {
+        key: string;
+        bucket: MediaBucket;
+        contentType: string;
+        purpose: string | null;
+        sizeBytes: number;
+        variants: unknown;
+    }): Promise<{
+        problem: string | null;
+        head: Awaited<ReturnType<ObjectStorage["headObject"]>>;
+    }> {
+        const storage = this.storages.of(media.bucket);
+        const seesUploads = storage.seesUploads;
+        const check = async (file: {
+            key: string;
+            contentType: string;
+            purpose: string | null;
+        }) => {
+            const [start, end, head] = await Promise.all([
+                storage.readObjectStart(
+                    file.key,
+                    isVideoContentType(file.contentType)
+                        ? ISO_BMFF_SNIFF_BYTES
+                        : IMAGE_SNIFF_BYTES,
+                ),
+                isVideoContentType(file.contentType)
+                    ? Promise.resolve(null)
+                    : storage.readObjectEnd(file.key, IMAGE_END_BYTES),
+                storage.headObject(file.key),
+            ]);
+            const problem =
+                storedBytesProblem(file, start, seesUploads) ??
+                storedEndProblem(
+                    file,
+                    start,
+                    end,
+                    head?.contentLength,
+                    seesUploads,
+                );
+            return { problem, head };
+        };
+        const own = await check(media);
+        if (own.problem) return own;
+        const ownSize = own.head?.contentLength ?? media.sizeBytes;
+        for (const v of storedVariants(media.variants)) {
+            const copy = await check({
+                key: v.key,
+                contentType: media.contentType,
+                purpose: media.purpose,
+            });
+            if (copy.problem) return { problem: copy.problem, head: own.head };
+            if ((copy.head?.contentLength ?? v.bytes) >= ownSize) {
+                return { problem: BAD_SIZES_MESSAGE, head: own.head };
+            }
+        }
+        return own;
+    }
+
+    /** Delete every file of an upload: the photo and its copies. Idempotent. */
+    private async deleteFiles(media: {
+        key: string;
+        bucket: MediaBucket;
+        variants: unknown;
+    }): Promise<void> {
+        const storage = this.storages.of(media.bucket);
+        for (const key of mediaFileKeys(media)) {
+            await storage.deleteObject(key);
+        }
+    }
+
+    /**
+     * Put an upload's bytes from the server, for an image the API fetched
+     * itself (MCP `upload_image`): into the bucket its row was signed for.
+     * Then {@link completeUpload} checks them as any other. Refuses a row
+     * that is no longer PENDING.
+     */
+    async storeUploadBytes(
+        ctx: OrganizationContext,
+        mediaId: string,
+        body: Uint8Array,
+    ): Promise<void> {
+        authorize(ctx, "media:write");
+        const media = await this.requireOwned(ctx, mediaId);
+        // Only an upload still waiting for its bytes: a confirmed file is
+        // never replaced after its checks (F4).
+        if (media.status !== "PENDING") {
+            throw new ConflictException("This upload is already finished.");
+        }
+        await this.storages.of(media.bucket).putObject(media.key, body, {
+            contentType: media.contentType,
+            contentLength: media.sizeBytes,
+        });
     }
 
     /**

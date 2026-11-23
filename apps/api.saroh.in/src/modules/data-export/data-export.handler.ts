@@ -7,6 +7,7 @@ import { appBase, editionOf } from "../../common/app-url";
 import { sendDataExportReadyEmail } from "../../common/email";
 import { businessTimezone } from "../bookings/staff-availability";
 import { keepJobLease } from "../jobs/job-lease";
+import type { MediaStorages } from "../media/object-storage.provider";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
 import { legalHoldMessage } from "../organizations/legal-hold";
 import { lifecycleAllows } from "../organizations/organization-lifecycle.policy";
@@ -52,7 +53,7 @@ export class DataExportHandler {
     private readonly logger = new Logger(DataExportHandler.name);
 
     constructor(
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+        @Inject(OBJECT_STORAGE) private readonly storages: MediaStorages,
     ) {}
 
     readonly build = async (job: Job): Promise<void> => {
@@ -103,6 +104,10 @@ export class DataExportHandler {
         });
 
         const release = keepJobLease(job);
+        // The zip goes to its business's edition's bucket (owner, 22 Nov 2026).
+        const { bucket, storage } = this.storages.forEdition(
+            row.organization.edition,
+        );
         // The zip just stored, until its export is marked READY.
         let unclaimed: string | undefined;
         try {
@@ -112,7 +117,8 @@ export class DataExportHandler {
                 businessName: row.organization.name,
                 edition: row.organization.edition,
                 currency: row.organization.currency,
-                storage: this.storage,
+                storage,
+                storages: this.storages,
             });
             unclaimed = built.storageKey;
             const readyAt = new Date();
@@ -125,6 +131,7 @@ export class DataExportHandler {
                     data: {
                         status: DataExportStatus.Ready,
                         storageKey: built.storageKey,
+                        bucket,
                         sizeBytes: BigInt(built.sizeBytes),
                         counts: built.counts as unknown as Prisma.InputJsonValue,
                         failure: null,
@@ -144,16 +151,16 @@ export class DataExportHandler {
                 return true;
             });
             if (!marked) {
-                await this.discard(built.storageKey);
+                await this.discard(storage, built.storageKey);
                 return;
             }
             unclaimed = undefined;
             this.logger.log(
                 `data_export_ready org=${row.organizationId} export=${exportId} bytes=${built.sizeBytes} media=${built.counts.media.included} left_out=${built.counts.media.leftOut}`,
             );
-            await this.tell(row, built.storageKey, readyAt, expiresAt);
+            await this.tell(row, storage, built.storageKey, readyAt, expiresAt);
         } catch (error) {
-            if (unclaimed) await this.discard(unclaimed);
+            if (unclaimed) await this.discard(storage, unclaimed);
             const name = error instanceof Error ? error.name : "Error";
             this.logger.warn(
                 `data_export_failed org=${row.organizationId} export=${exportId} attempt=${job.attempts + 1}/${job.maxAttempts} error=${name}`,
@@ -175,10 +182,12 @@ export class DataExportHandler {
         if (!exportId) return;
         const row = await prisma.dataExport.findUnique({
             where: { id: exportId },
-            select: { id: true, status: true, storageKey: true },
+            select: { id: true, status: true, storageKey: true, bucket: true },
         });
         if (row?.status !== DataExportStatus.Ready) return;
-        if (row.storageKey) await this.storage.deleteObject(row.storageKey);
+        if (row.storageKey) {
+            await this.storages.of(row.bucket).deleteObject(row.storageKey);
+        }
         await prisma.dataExport.updateMany({
             where: { id: exportId, status: DataExportStatus.Ready },
             data: { status: DataExportStatus.Expired, storageKey: null },
@@ -187,8 +196,11 @@ export class DataExportHandler {
     };
 
     /** Delete a zip no export row names. Best-effort: never masks the job's own error. */
-    private async discard(storageKey: string): Promise<void> {
-        await this.storage.deleteObject(storageKey).catch((error: unknown) => {
+    private async discard(
+        storage: ObjectStorage,
+        storageKey: string,
+    ): Promise<void> {
+        await storage.deleteObject(storageKey).catch((error: unknown) => {
             // Never the key: it is what keeps the zip unguessable.
             const name = error instanceof Error ? error.name : "Error";
             this.logger.warn(`data_export_discard_failed error=${name}`);
@@ -209,6 +221,7 @@ export class DataExportHandler {
             requestedByUserId: string;
             organization: { name: string; slug: string };
         },
+        storage: ObjectStorage,
         storageKey: string,
         readyAt: Date,
         keptUntil: Date,
@@ -219,16 +232,13 @@ export class DataExportHandler {
                 select: { email: true },
             });
             if (!user?.email) return;
-            const signed = await this.storage.createSignedDownloadUrl(
-                storageKey,
-                {
-                    expiresInSeconds: DATA_EXPORT_EMAIL_LINK_SECONDS,
-                    downloadFilename: dataExportFilename(
-                        row.organization.slug,
-                        readyAt,
-                    ),
-                },
-            );
+            const signed = await storage.createSignedDownloadUrl(storageKey, {
+                expiresInSeconds: DATA_EXPORT_EMAIL_LINK_SECONDS,
+                downloadFilename: dataExportFilename(
+                    row.organization.slug,
+                    readyAt,
+                ),
+            });
             const edition = await editionOf(row.organizationId);
             const outcome = await sendDataExportReadyEmail(
                 user.email,

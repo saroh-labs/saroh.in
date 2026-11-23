@@ -96,6 +96,8 @@ export default function GallerySection({
                                     {...siteImage("below", {
                                         src: img.src,
                                         width: img.width,
+                                        placeholder: img.placeholder,
+                                        widths: img.widths,
                                         sizes: "(min-width: 640px) 480px, 85vw",
                                     })}
                                     className="h-64 w-auto rounded-[var(--site-radius)] object-cover"
@@ -112,6 +114,8 @@ export default function GallerySection({
                                 {...siteImage("below", {
                                     src: img.src,
                                     width: img.width,
+                                    placeholder: img.placeholder,
+                                    widths: img.widths,
                                     sizes: "(min-width: 640px) 480px, 85vw",
                                 })}
                                 className="h-64 w-auto flex-none snap-start rounded-[var(--site-radius)] object-cover"
@@ -146,6 +150,8 @@ export default function GallerySection({
                             {...siteImage("below", {
                                 src: img.src,
                                 width: img.width,
+                                placeholder: img.placeholder,
+                                widths: img.widths,
                                 sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
                             })}
                             className={cn(

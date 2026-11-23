@@ -39,6 +39,9 @@ export interface LightboxPhoto {
     caption?: string | null;
     width?: number;
     height?: number;
+    /** Its blur and its stored copies' widths (DEC-246). */
+    placeholder?: string | null;
+    widths?: readonly number[] | null;
 }
 
 /** "4 of 9": where the open photo is in the set. */
@@ -225,6 +228,8 @@ export function Lightbox({
                         {...siteImage("above", {
                             src: photo.src,
                             width: photo.width,
+                            placeholder: photo.placeholder,
+                            widths: photo.widths,
                             sizes: "100vw",
                         })}
                         data-site-fade=""

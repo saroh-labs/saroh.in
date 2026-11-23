@@ -48,6 +48,12 @@ export interface EditionProfile {
     sarohPlanMoney: { currency: "INR" | "USD"; tax: "gst" | "none" };
     /** Whether people can sign in to Saroh with a phone (each code costs money). */
     phoneSignIn: boolean;
+    /**
+     * Whether its businesses' uploads go to the edition's own media bucket
+     * (`R2_GLOBAL_*`, `media.saroh.tech`) when one is set, or always to the
+     * main one (owner, 22 Nov 2026, DEC-247).
+     */
+    ownMediaBucket: boolean;
     /** The higher, struck-through price: India's printed MRP, or an original price. */
     struckPrice: "mrp" | "original-price";
     /** Whether the site has each tool's own page, or only the tools hub. */
@@ -99,6 +105,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         sarohBilling: true,
         sarohPlanMoney: { currency: "INR", tax: "gst" },
         phoneSignIn: true,
+        ownMediaBucket: false,
         struckPrice: "mrp",
         toolPages: "own",
         helpAndDocs: "own-addresses",
@@ -125,6 +132,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         sarohBilling: false,
         sarohPlanMoney: { currency: "USD", tax: "none" },
         phoneSignIn: false,
+        ownMediaBucket: true,
         struckPrice: "original-price",
         toolPages: "hub",
         helpAndDocs: "shared",

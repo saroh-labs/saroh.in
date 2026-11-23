@@ -73,6 +73,8 @@ export default function LookGallery({
         caption: img.caption ?? null,
         width: img.width,
         height: img.height,
+        placeholder: img.placeholder,
+        widths: img.widths,
     }));
     const total = images.length;
 
@@ -132,6 +134,8 @@ export default function LookGallery({
                                             {...siteImage("below", {
                                                 src: img.src,
                                                 width: img.width,
+                                                placeholder: img.placeholder,
+                                                widths: img.widths,
                                                 sizes: SIZES[look],
                                             })}
                                             className={cn(

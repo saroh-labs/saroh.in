@@ -45,6 +45,18 @@ describe("ownMediaUrl", () => {
             ownMediaUrl("https://cdn.example.com/other/a.png", base),
         ).toBeNull();
     });
+
+    it("keeps a cover in either bucket's host (owner, 22 Nov 2026)", () => {
+        const both = [MEDIA, "https://media.saroh.tech"];
+        expect(ownMediaUrl("https://media.saroh.tech/org/p.webp", both)).toBe(
+            "https://media.saroh.tech/org/p.webp",
+        );
+        expect(ownMediaUrl(`${MEDIA}/org/p.webp`, both)).toBe(
+            `${MEDIA}/org/p.webp`,
+        );
+        expect(ownMediaUrl("https://evil.test/org/p.webp", both)).toBeNull();
+        expect(ownMediaUrl(`${MEDIA}/p.webp`, [])).toBeNull();
+    });
 });
 
 const seller = (i: number) => ({

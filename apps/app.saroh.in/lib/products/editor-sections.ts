@@ -398,6 +398,8 @@ export interface PhotoDraft {
     /** A video's poster: a library image, and where it is shown from. */
     posterMediaId?: string | null;
     posterUrl?: string | null;
+    /** A photo's stored smaller copies' widths, for its thumbnail (DEC-246). */
+    widths?: readonly number[];
 }
 
 export function isVideo(p: Pick<PhotoDraft, "kind">): boolean {
@@ -418,6 +420,7 @@ export function photosFrom(images: ProductImage[]): PhotoDraft[] {
         durationSec: i.durationSec ?? null,
         posterMediaId: i.posterMediaId ?? null,
         posterUrl: i.posterUrl ?? null,
+        widths: i.widths ?? [],
     }));
 }
 

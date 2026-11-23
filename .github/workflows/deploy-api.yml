@@ -157,3 +157,19 @@ jobs:
                       -o ServerAliveInterval=30 \
                       "root@${VPS_HOST}" "$TAG"
                   echo "### Deployed \`$TAG\` to $TARGET" >> "$GITHUB_STEP_SUMMARY"
+
+    # The media domains' sandbox headers come from a Cloudflare rule, not this
+    # repo, so a dashboard edit can drop them silently. Checked live after each
+    # rollout; any path answers with them (scripts/check-media-headers.mjs).
+    media-headers:
+        needs: deploy
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        env:
+            TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref == 'refs/heads/main' && 'production' || 'development') }}
+        steps:
+            - uses: actions/checkout@v4
+            - name: Media domains carry the sandbox headers
+              # Production serves India's and Global's buckets (owner, 22 Nov 2026).
+              run: node scripts/check-media-headers.mjs $([ "$TARGET" = production ] && echo media.saroh.in media.saroh.tech || echo media.saroh.io)

@@ -3245,3 +3245,22 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Why one rule: Meta's APIs let an app schedule a Facebook Page post natively, but not an Instagram or Threads post (every scheduling tool holds those). Scheduling Facebook natively and the others in Saroh was offered and turned down as two rules to explain.
 - A scheduled post's sheet says so in one line ("Saroh posts this to … on …. Until then it's only here: it won't show in their own apps."), with Move and Post now beside it. Changing or cancelling happens in Saroh.
 - Facebook Login for Business asks for `business_management` too, so Pages a business portfolio owns are offered (Advanced Access through App Review before merchants outside the app's roles can connect).
+
+## DEC-246 Photos are sized, re-encoded and given a blur in the merchant's browser; every image upload is checked to its last byte
+
+**Status: Accepted — 2026-11-22** · owner (21 Nov 2026 plan and upload review; 22 Nov 2026 "work on that now to optimise the images")
+
+- A photo picked in the app is re-drawn in the merchant's browser before it goes up: turned upright from its orientation, a full copy (longest side at most 2560 px) and WebP copies at 480, 1200 and 1920 px narrower than it, at quality 0.8, plus a ThumbHash placeholder. Re-drawing drops the camera's metadata (location included) and anything hidden after the picture. JPEG where the browser can't write WebP. A GIF keeps its animation and goes up as it is, with its size and blur. A video's poster goes the same way.
+- Pages use the stored copies for `srcset` and draw the blur from the ThumbHash on the server, as a tiny PNG in the image's background (no script). Not Cloudflare Images: its cost grows with Saroh (owner, cost). A photo without copies (older, or uploaded through the API, MCP or `upload_image`, which keep the original-only path) keeps today's behaviour; the backfill (`media-variants` CLI, a one-off container) gives older photos copies when the owner runs it.
+- Every image upload, from the browser or the API, is checked at the byte level on confirm: it starts as its type says and ends where its format ends (JPEG `FF D9`, PNG's `IEND`, GIF's trailer, WebP's RIFF length). Anything appended is refused and the upload's files deleted. Nothing is decoded on the server.
+- The plan's storage counts every file of an upload. An upload never confirmed is swept after 15 minutes (was two hours), with all its files.
+- Images sent to Ask AI stay at 5 MB or less (Anthropic's per-image limit): the full copy is always made under 4 MB, lowering the quality and then the size until it fits.
+- Deferred: ClamAV scanning and a private holding bucket, until visitors or customers can upload, documents are accepted, or the first abuse report or real volume arrives.
+
+## DEC-247 Global businesses' media in their own bucket and domain
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026)
+
+- A Global-edition business's uploads go to their own R2 bucket, `saroh-global-media` (location Automatic), served at `https://media.saroh.tech`. India keeps `saroh-media` at `media.saroh.in`; development keeps `saroh-media-dev` at `media.saroh.io` for both editions.
+- The API picks the bucket by the business's edition from its organization row, never from the request (`R2_GLOBAL_*`, all four or none; unset, Global uses the main bucket as before). Every stored file keeps the bucket it was written to (`Media.bucket`, `DataExport.bucket`; a social post's picture by its address), and every later read, check, delete, sweep and erasure goes there. Nothing already in `saroh-media` moves.
+- `media.saroh.tech` carries the same sandbox CSP and `nosniff` as the other media domains, and is in the apps' `img-src`.

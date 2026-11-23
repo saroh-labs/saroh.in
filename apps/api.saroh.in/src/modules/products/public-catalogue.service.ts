@@ -16,6 +16,7 @@ import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { sellUnit } from "../invoices/gst-price";
 import { loadPriceTerms } from "../invoices/price-terms";
+import { variantWidths } from "../media/variants";
 import {
     commerceOpen,
     effectiveStorefront,
@@ -103,6 +104,8 @@ const IMAGE_SELECT = {
     kind: true,
     durationSec: true,
     posterUrl: true,
+    // The library photo's blur and copies (DEC-246).
+    media: { select: { placeholder: true, variants: true } },
 } satisfies Prisma.ProductImageSelect;
 
 const VARIANT_SELECT = {
@@ -126,6 +129,21 @@ function image(row: ImageRow): PublicImage {
         kind: row.kind === "video" ? "video" : "photo",
         durationSec: row.durationSec,
         posterUrl: row.posterUrl,
+        ...photoSizes(row),
+    };
+}
+
+/** A photo's blur and copies' widths; none for a video or a free address. */
+function photoSizes(row: ImageRow): {
+    placeholder: string | null;
+    widths: number[];
+} {
+    if (row.kind === "video" || !row.media) {
+        return { placeholder: null, widths: [] };
+    }
+    return {
+        placeholder: row.media.placeholder,
+        widths: variantWidths(row.media.variants),
     };
 }
 
@@ -501,7 +519,12 @@ export class PublicCatalogueService {
                         ? cover.posterUrl
                             ? { url: cover.posterUrl, alt: cover.alt }
                             : null
-                        : { url: cover.url, alt: cover.alt }
+                        : {
+                              url: cover.url,
+                              alt: cover.alt,
+                              width: cover.width,
+                              ...photoSizes(cover),
+                          }
                     : null,
                 variantTitles: offered.map((v) => v.title),
                 optionName: p.option?.name ?? null,

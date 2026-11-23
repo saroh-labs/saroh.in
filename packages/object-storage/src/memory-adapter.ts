@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { buildObjectKey, stripTrailingSlashes } from "./keys";
+import { assertTenantKey, buildObjectKey, stripTrailingSlashes } from "./keys";
 import type {
     ContentTypeAllowlist,
     CreateSignedUploadUrlInput,
@@ -52,7 +52,8 @@ export interface MemoryStorage extends ObjectStorage {
     reset(): void;
     /**
      * Stand in for the client's PUT: record the bytes of a minted key, so
-     * {@link ObjectStorage.readObjectStart} can read them back.
+     * {@link ObjectStorage.readObjectStart} can read them back. A second
+     * PUT to the same key throws with `status: 412`, as R2 answers it.
      */
     putBytes(key: string, bytes: Uint8Array): void;
 }
@@ -99,12 +100,15 @@ export function createMemoryStorage(
             input: CreateSignedUploadUrlInput,
         ): Promise<SignedUploadUrl> {
             const parsed = uploadSchema.parse(input);
-            const key = buildObjectKey({
-                organizationId: parsed.organizationId,
-                filename: parsed.filename,
-                purpose: parsed.purpose,
-                uuid: generateId(),
-            });
+            const key =
+                input.key === undefined
+                    ? buildObjectKey({
+                          organizationId: parsed.organizationId,
+                          filename: parsed.filename,
+                          purpose: parsed.purpose,
+                          uuid: generateId(),
+                      })
+                    : assertTenantKey(parsed.organizationId, input.key);
 
             store.set(key, {
                 key,
@@ -119,6 +123,7 @@ export function createMemoryStorage(
                 headers: {
                     "Content-Type": parsed.contentType,
                     "Content-Length": String(parsed.contentLength),
+                    "If-None-Match": "*",
                 },
                 expiresAt: new Date(
                     Date.now() + uploadExpiry * 1000,
@@ -160,6 +165,13 @@ export function createMemoryStorage(
             return Promise.resolve(bytes ? bytes.slice(0, length) : null);
         },
 
+        readObjectEnd(key: string, length: number): Promise<Uint8Array | null> {
+            const bytes = bytesByKey.get(key);
+            return Promise.resolve(
+                bytes ? bytes.slice(Math.max(0, bytes.length - length)) : null,
+            );
+        },
+
         async putObject(
             key: string,
             body: PutObjectBody,
@@ -198,17 +210,27 @@ export function createMemoryStorage(
             if (!store.has(key)) {
                 throw new Error(`No upload was minted for ${key}`);
             }
+            // Like R2's signed `If-None-Match: *`: a key is written once (F3).
+            if (bytesByKey.has(key)) {
+                throw Object.assign(
+                    new Error(`412 Precondition Failed: ${key} exists`),
+                    { status: 412 },
+                );
+            }
             bytesByKey.set(key, bytes);
         },
 
         headObject(key: string): Promise<HeadObjectResult | null> {
             const stored = store.get(key);
             if (stored === undefined) return Promise.resolve(null);
+            // The bytes a test "uploaded", when it did, as R2 reports them.
+            const length =
+                bytesByKey.get(key)?.byteLength ?? stored.contentLength;
             return Promise.resolve({
                 key,
                 contentType: stored.contentType,
-                contentLength: stored.contentLength,
-                etag: `"fake-etag-${stored.contentLength}"`,
+                contentLength: length,
+                etag: `"fake-etag-${length}"`,
             });
         },
 

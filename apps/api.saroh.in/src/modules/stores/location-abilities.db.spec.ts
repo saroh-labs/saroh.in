@@ -25,6 +25,7 @@ import { OrdersService } from "../orders/orders.service";
 import { joinTeamFromStorefront } from "../organizations/storefront-team-role";
 import { ProductsService } from "../products/products.service";
 
+import { mediaStorages } from "../media/object-storage.provider";
 import { LocationLogoService } from "./location-logo.service";
 import type { LocationAbilities } from "./stores.service";
 import { StoresService } from "./stores.service";
@@ -39,7 +40,10 @@ const orders = new OrdersService(stores);
 const locations = new LocationLogoService(
     stores,
     new MediaService(
-        createMemoryStorage({ publicBaseUrl: "https://media.saroh.test" }),
+        mediaStorages(
+            createMemoryStorage({ publicBaseUrl: "https://media.saroh.test" }),
+            null,
+        ),
     ),
 );
 

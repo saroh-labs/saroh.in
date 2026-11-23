@@ -24,6 +24,7 @@ import type { DomainVerifier } from "../domains/domain-verifier";
 import { DomainsService } from "../domains/domains.service";
 import { FakeDomainHosting } from "../domains/providers/fake-hosting";
 import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import { mismatchRefundKey } from "../payments/mismatch-refund";
 import { refundsOutstanding } from "../payments/refunds-outstanding";
 import { SEND_REFUND_TYPE } from "../payments/send-refund-type";
@@ -57,7 +58,7 @@ const cleanup = new OrganizationDeletionCleanupHandler(
         {} as EntitlementService,
         new FakeDomainHosting(),
     ),
-    new MediaService(createMemoryStorage()),
+    new MediaService(mediaStorages(createMemoryStorage(), null)),
 );
 
 let orgId = "";

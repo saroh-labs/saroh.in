@@ -136,6 +136,8 @@ export default function PlainHero({
                             {...siteImage(priority ? "first-hero" : "below", {
                                 src: photo.src,
                                 width: photo.width,
+                                placeholder: photo.placeholder,
+                                widths: photo.widths,
                                 focus: photo.focus,
                                 sizes: hasImage
                                     ? "(min-width: 1024px) 50vw, 100vw"

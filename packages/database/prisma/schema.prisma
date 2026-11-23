@@ -970,6 +970,14 @@ model OrganizationInvitation {
 }
 
 // ============================================================================
+/// Which media bucket a stored file is in (owner, 22 Nov 2026).
+enum MediaBucket {
+  /// The environment's main bucket (`R2_BUCKET`).
+  MAIN
+  /// Global businesses' own bucket (`R2_GLOBAL_BUCKET`).
+  GLOBAL
+}
+
 model Media {
   id             String       @id @default(cuid())
   organizationId String
@@ -981,6 +989,20 @@ model Media {
   filename    String
   purpose     String? // logical bucketing, e.g. product-image, avatar
   status      String  @default("PENDING") // PENDING → READY, or FAILED when the bytes are not what the type says
+
+  // Made in the merchant's browser at upload (DEC-246); null on an older
+  // upload, or one from the API, MCP or `upload_image`, kept as sent.
+  width       Int? // the stored (full) copy's size in pixels
+  height      Int?
+  placeholder String? // ThumbHash, base64, at most 64 characters
+  variants    Json? // the smaller WebP copies: [{ width, key, bytes }], narrowest first
+  // The copies' bytes together: the plan's storage counts sizeBytes + this.
+  variantBytes Int @default(0)
+
+  // The bucket it was written to (owner, 22 Nov 2026): a Global business's
+  // own once R2_GLOBAL_BUCKET is set, the main one before and for India.
+  // Every later read or delete goes there, never by the business's edition.
+  bucket MediaBucket @default(MAIN)
 
   uploadedByUserId String?
 
@@ -1026,6 +1048,8 @@ model DataExport {
 
   // Where the zip is, once READY; cleared when it expires.
   storageKey String?
+  // The bucket the zip went to: its business's edition's (owner, 22 Nov 2026).
+  bucket     MediaBucket @default(MAIN)
   sizeBytes  BigInt?
   // What it holds: rows per file, and media files put in or left out.
   counts     Json?

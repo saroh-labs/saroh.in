@@ -18,7 +18,7 @@
  * | `integrations`     | connected payment and messaging providers                              |
  * | `shopLocations`    | locations not deleted whose settings say `SHOP` (customers visit); an online-only one, or one with no settings, never counts |
  * | `sites`            | websites not deleted                                                   |
- * | `storageGb`        | photos and videos uploaded and checked (READY) or still uploading (PENDING, at the size it said, until swept), in GB |
+ * | `storageGb`        | photos (with their smaller copies) and videos uploaded and checked (READY) or still uploading (PENDING, at the size it said, until swept), in GB |
  * | `visitsPerMonth`   | this month's site views (`site.view`), from the daily rollup          |
  * | `aiQuestionsPerMonth` | Ask AI turns that counted (`AiUsage.counted`, DEC-220): answered, drafted or stopped after the answer began |
  * | `socialPostsPerMonth` | Saroh Social posts going out in the window (by `publishAt`, so one scheduled into next month counts there), once each however many channels; drafts and posts cancelled before they started never count |
@@ -472,11 +472,15 @@ export async function countUsage(
                 where: { organizationId, deletedAt: null },
             });
         case "storageGb": {
+            // Every stored file: the photo and its smaller copies (DEC-246).
             const sum = await db.media.aggregate({
                 where: { organizationId, ...STORED_MEDIA },
-                _sum: { sizeBytes: true },
+                _sum: { sizeBytes: true, variantBytes: true },
             });
-            return bytesToGb(Number(sum._sum.sizeBytes ?? 0));
+            return bytesToGb(
+                Number(sum._sum.sizeBytes ?? 0) +
+                    Number(sum._sum.variantBytes ?? 0),
+            );
         }
         case "visitsPerMonth": {
             const { start, zone } = await meterWindow(db, organizationId, now);

@@ -13,6 +13,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import { pickedSizes } from "@/components/shared/fields/picked-image";
 import type {
     PersonContent,
     PersonCredential,
@@ -77,6 +78,7 @@ export function PersonFields({
                                     alt: image?.alt,
                                     width: picked.width,
                                     height: picked.height,
+                                    ...pickedSizes(picked),
                                 },
                             })
                         }
@@ -381,6 +383,7 @@ function TeamFields({
                                         alt: p.image?.alt,
                                         width: picked.width,
                                         height: picked.height,
+                                        ...pickedSizes(picked),
                                     },
                                 })
                             }

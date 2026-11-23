@@ -226,6 +226,23 @@ describe("what the route will fetch", () => {
         expect(none.fetch).not.toHaveBeenCalled();
     });
 
+    it("fetches a /g/ photo from Global's own media address, and never the main one's", async () => {
+        const GLOBAL = "https://media-global.saroh.test";
+        const { ask, fetched, cache } = setup({
+            env: { NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL: GLOBAL },
+        });
+        expect((await ask(`/_img/480/g/${KEY}`)).status).toBe(200);
+        expect(fetched.at(-1)).toBe(`${GLOBAL}/${KEY}`);
+        // Kept apart from the same key in the main bucket.
+        expect(
+            Array.from(cache.entries.keys()).some((k) => k.includes("/g/")),
+        ).toBe(true);
+        // No Global address set: a /g/ photo is none, nothing fetched.
+        const none = setup();
+        expect((await none.ask(`/_img/480/g/${KEY}`)).status).toBe(404);
+        expect(none.fetch).not.toHaveBeenCalled();
+    });
+
     it("refuses a source that isn't an image, and a source that is missing", async () => {
         const html = setup({ source: { type: "text/html", body: "<script>" } });
         expect((await html.ask(`/_img/480/${KEY}`)).status).toBe(404);

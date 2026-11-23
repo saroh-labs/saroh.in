@@ -248,6 +248,8 @@ export default function GalleryLookbook({
                                             {...siteImage("below", {
                                                 src: img.src,
                                                 width: img.width,
+                                                placeholder: img.placeholder,
+                                                widths: img.widths,
                                                 sizes: "252px",
                                             })}
                                             className="h-full w-full object-cover"

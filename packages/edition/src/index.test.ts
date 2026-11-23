@@ -200,6 +200,7 @@ describe("the edition profiles (DEC-204 item 7)", () => {
             GLOBAL: { currency: "USD", tax: "none" },
         },
         phoneSignIn: { INDIA: true, GLOBAL: false },
+        ownMediaBucket: { INDIA: false, GLOBAL: true },
         struckPrice: { INDIA: "mrp", GLOBAL: "original-price" },
         toolPages: { INDIA: "own", GLOBAL: "hub" },
         helpAndDocs: { INDIA: "own-addresses", GLOBAL: "shared" },

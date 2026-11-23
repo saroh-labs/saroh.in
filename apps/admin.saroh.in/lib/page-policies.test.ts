@@ -33,6 +33,13 @@ describe("admin.saroh.in page policies", () => {
         ).toEqual(["https://static.cloudflareinsights.com"]);
         expect(sources("frame-src")).toEqual(["'self'"]);
         expect(sources("base-uri")).toEqual(["'self'"]);
+        // Both editions' media, for a business's uploads (owner, 22 Nov 2026).
+        expect(sources("img-src")).toEqual(
+            expect.arrayContaining([
+                "https://media.saroh.in",
+                "https://media.saroh.tech",
+            ]),
+        );
     });
 
     it("switches payment off with the camera and location", async () => {

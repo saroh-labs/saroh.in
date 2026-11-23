@@ -10,6 +10,8 @@ export default defineConfig((options) => ({
     dts: true,
     entry: ["src/index.ts"],
     format: ["cjs", "esm"],
+    // ESM-only, and small: bundled so the CommonJS build can load it.
+    noExternal: ["thumbhash"],
     minify: isProduction,
     sourcemap: true,
 }));

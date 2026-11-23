@@ -20,8 +20,10 @@ import {
     ForbiddenException,
     HttpException,
 } from "@nestjs/common";
+import { placeholderFromRgba } from "@saroh/block-contract";
 import { prisma, writeCatalogueVersion } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
+import { createMemoryStorage } from "@saroh/object-storage";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { planRows } from "@saroh/pricing-catalog";
 
@@ -30,6 +32,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AuditService } from "../audit/audit.service";
 import { FlagKey } from "../feature-flags/flags";
 import { MediaService } from "../media/media.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import {
     PENDING_UPLOAD_STALE_MS,
     PendingUploadSweepJob,
@@ -165,6 +168,7 @@ function storage(over: Partial<ObjectStorage> = {}): ObjectStorage {
         deleteObject: jest.fn().mockResolvedValue(undefined),
         headObject: jest.fn().mockResolvedValue(null),
         readObjectStart: jest.fn().mockResolvedValue(null),
+        readObjectEnd: jest.fn().mockResolvedValue(null),
         putObject: jest.fn(),
         seesUploads: false,
         ...over,
@@ -186,7 +190,7 @@ const photo = (bytes: number) => ({
 describe("storage follows its catalogue cell (DEC-227)", () => {
     it("refuses an upload at its start when a hard cell would be passed, writing nothing", async () => {
         const b = await business(HARD);
-        const media = new MediaService(storage());
+        const media = new MediaService(mediaStorages(storage(), null));
         await media.createUpload(ctxOf(b), photo(9 * MB));
         await media.createUpload(ctxOf(b), photo(9 * MB));
         await expect(
@@ -199,7 +203,7 @@ describe("storage follows its catalogue cell (DEC-227)", () => {
 
     it("lets uploads started side by side pass the cap no further than one at a time would", async () => {
         const b = await business(HARD);
-        const media = new MediaService(storage());
+        const media = new MediaService(mediaStorages(storage(), null));
         const results = await Promise.allSettled(
             [0, 1, 2, 3].map(() => media.createUpload(ctxOf(b), photo(9 * MB))),
         );
@@ -216,7 +220,7 @@ describe("storage follows its catalogue cell (DEC-227)", () => {
                 contentLength: real,
             }),
         });
-        const media = new MediaService(store);
+        const media = new MediaService(mediaStorages(store, null));
         const started = await media.createUpload(ctxOf(b), photo(9 * MB));
         await prisma.media.create({
             data: {
@@ -240,7 +244,7 @@ describe("storage follows its catalogue cell (DEC-227)", () => {
 
     it("on a soft cell, takes every upload and tells the business once it passes", async () => {
         const b = await business(SOFT);
-        const media = new MediaService(storage());
+        const media = new MediaService(mediaStorages(storage(), null));
         for (let i = 0; i < 3; i++) {
             await media.createUpload(ctxOf(b), photo(9 * MB));
         }
@@ -282,7 +286,7 @@ describe("storage follows its catalogue cell (DEC-227)", () => {
         const ready = await row(b.orgId, "READY", old);
         const kept = await row(held.orgId, "PENDING", old);
         const store = storage();
-        const sweep = new PendingUploadSweepJob(store);
+        const sweep = new PendingUploadSweepJob(mediaStorages(store, null));
         const r = await sweep.sweep(new Date());
         expect(r.removed).toBeGreaterThanOrEqual(1);
         const left = await prisma.media.findMany({
@@ -793,5 +797,164 @@ describe("the trial and the launch discount are once per person (DEC-227, M-2, M
             data: { organizationId: typed.orgId, taxId: "29abcde 1234-f1z5" },
         });
         expect(await trialTakenBy(prisma, typed.orgId)).toBe("other");
+    });
+});
+
+// ── A photo's copies (DEC-246) ─────────────────────────────────────────
+
+/** A whole WebP of `size` bytes: RIFF, its length, WEBP. */
+function webp(size: number): Uint8Array {
+    const out = new Uint8Array(size);
+    out.set([0x52, 0x49, 0x46, 0x46], 0);
+    new DataView(out.buffer).setUint32(4, size - 8, true);
+    out.set([0x57, 0x45, 0x42, 0x50], 8);
+    return out;
+}
+
+/** A photo the browser made: a 2560 px WebP and its three copies. */
+const madePhoto = (full: number, copies: [number, number, number]) => ({
+    contentType: "image/webp",
+    contentLength: full,
+    filename: "shop.webp",
+    width: 2560,
+    height: 1920,
+    placeholder: placeholderFromRgba(2, 2, new Uint8Array(16).fill(255)),
+    variants: [480, 1200, 1920].map((width, i) => ({
+        width,
+        contentLength: copies[i],
+    })),
+});
+
+/** In-memory storage that, like R2, sees what was put. */
+function seeingStorage() {
+    const memory = createMemoryStorage();
+    const store: ObjectStorage = { ...memory, seesUploads: true };
+    jest.spyOn(store, "deleteObject");
+    return { memory, store };
+}
+
+describe("a photo's copies against a real Postgres (DEC-246)", () => {
+    it("counts every file of an upload against the plan's storage", async () => {
+        const b = await business(HARD);
+        const media = new MediaService(
+            mediaStorages(seeingStorage().store, null),
+        );
+        // 4 MB for the photo, 10.4 MB for its copies: two would pass 20 MB.
+        const one = madePhoto(4 * MB, [3 * MB, 3.5 * MB, 3.9 * MB]);
+        await media.createUpload(ctxOf(b), one);
+        await expect(media.createUpload(ctxOf(b), one)).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+        const rows = await prisma.media.findMany({
+            where: { organizationId: b.orgId },
+        });
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+            sizeBytes: 4 * MB,
+            variantBytes: 10.4 * MB,
+            width: 2560,
+            height: 1920,
+        });
+        expect(rows[0].variants).toHaveLength(3);
+    });
+
+    it.each([
+        ["missing", (k: Record<number, string>) => ({ [k[1200]]: null })],
+        [
+            "wrong",
+            (k: Record<number, string>) => ({
+                [k[480]]: new Uint8Array(900).fill(0x3c),
+            }),
+        ],
+        [
+            "oversized",
+            (k: Record<number, string>) => ({ [k[1920]]: webp(5_000) }),
+        ],
+    ])(
+        "refuses a %s copy at confirm, fails the upload and deletes every file",
+        async (_what, change) => {
+            const b = await business(HARD);
+            const { memory, store } = seeingStorage();
+            const media = new MediaService(mediaStorages(store, null));
+            const started = await media.createUpload(
+                ctxOf(b),
+                madePhoto(4_000, [900, 1_800, 2_700]),
+            );
+            const keys: Record<number, string> = Object.fromEntries(
+                started.variants.map((v) => [v.width, v.key]),
+            );
+            const files: Record<string, Uint8Array | null> = {
+                [started.key]: webp(4_000),
+                [keys[480]]: webp(900),
+                [keys[1200]]: webp(1_800),
+                [keys[1920]]: webp(2_700),
+                ...change(keys),
+            };
+            for (const [key, bytes] of Object.entries(files)) {
+                if (bytes) memory.putBytes(key, bytes);
+            }
+            await expect(
+                media.completeUpload(ctxOf(b), started.mediaId),
+            ).rejects.toThrow();
+            const row = await prisma.media.findUniqueOrThrow({
+                where: { id: started.mediaId },
+            });
+            expect(row.status).toBe("FAILED");
+            for (const key of Object.keys(files)) {
+                expect(store.deleteObject).toHaveBeenCalledWith(key);
+                expect(memory.has(key)).toBe(false);
+            }
+        },
+    );
+
+    it("confirms a photo whose every file is whole", async () => {
+        const b = await business(HARD);
+        const { memory, store } = seeingStorage();
+        const media = new MediaService(mediaStorages(store, null));
+        const started = await media.createUpload(
+            ctxOf(b),
+            madePhoto(4_000, [900, 1_800, 2_700]),
+        );
+        memory.putBytes(started.key, webp(4_000));
+        const sizes = [900, 1_800, 2_700];
+        started.variants.forEach((v, i) =>
+            memory.putBytes(v.key, webp(sizes[i])),
+        );
+        const done = await media.completeUpload(ctxOf(b), started.mediaId);
+        expect(done.status).toBe("READY");
+    });
+
+    it("sweeps every file of an upload never confirmed, after 15 minutes", async () => {
+        expect(PENDING_UPLOAD_STALE_MS).toBe(15 * MINUTE);
+        const b = await business(HARD);
+        const key = `${uniq("org/k")}.webp`;
+        const copies = [480, 1200].map((width) => ({
+            width,
+            key: key.replace(/\.webp$/, `@${width}.webp`),
+            bytes: 10,
+        }));
+        const stale = await prisma.media.create({
+            data: {
+                organizationId: b.orgId,
+                key,
+                contentType: "image/webp",
+                sizeBytes: 100,
+                filename: "x.webp",
+                status: "PENDING",
+                variants: copies,
+                variantBytes: 20,
+                createdAt: new Date(Date.now() - 16 * MINUTE),
+            },
+        });
+        const store = storage();
+        await new PendingUploadSweepJob(mediaStorages(store, null)).sweep(
+            new Date(),
+        );
+        expect(
+            await prisma.media.findUnique({ where: { id: stale.id } }),
+        ).toBeNull();
+        for (const k of [key, ...copies.map((c) => c.key)]) {
+            expect(store.deleteObject).toHaveBeenCalledWith(k);
+        }
     });
 });

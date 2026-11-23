@@ -66,6 +66,7 @@ import {
 import type { CatalogueItemDto } from "./serialize";
 import {
     cleanDescription,
+    COVER_THUMB,
     readShopFields,
     serializeCatalogueItem,
     serializeProductDetail,
@@ -124,7 +125,11 @@ export const productDetailInclude = (storeId: string) =>
                 },
             },
         },
-        images: { orderBy: { position: "asc" } },
+        images: {
+            orderBy: { position: "asc" },
+            // Its copies' widths, for the editor's thumbnails (DEC-246).
+            include: { media: { select: { variants: true } } },
+        },
         stockLevels: {
             where: { storeId, variantId: null, ...COUNTING_ROWS },
             ...STOCK_ROW,
@@ -323,6 +328,8 @@ export class ProductsService {
             include: {
                 category: { select: { id: true, name: true } },
                 _count: { select: { variants: true } },
+                // The cover's small copy, for the row's thumbnail (DEC-246).
+                images: COVER_THUMB,
                 listings: {
                     where: { storeId: { in: open } },
                     select: { storeId: true, soldOutAt: true },
@@ -378,6 +385,8 @@ export class ProductsService {
                 // Enough to draw a catalogue row: the variant count, the SKU
                 // the product is known by, and its stock.
                 _count: { select: { variants: true } },
+                // The cover's small copy, for the row's thumbnail (DEC-246).
+                images: COVER_THUMB,
                 // Every variant, briefly: an order is taken for one of them.
                 // Its stock here too, for a product that counts per variant,
                 // and whether this storefront sells it.

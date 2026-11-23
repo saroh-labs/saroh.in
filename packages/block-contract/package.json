@@ -18,6 +18,7 @@
     },
     "dependencies": {
         "@saroh/edition": "workspace:*",
+        "thumbhash": "0.1.1",
         "zod": "catalog:"
     },
     "devDependencies": {

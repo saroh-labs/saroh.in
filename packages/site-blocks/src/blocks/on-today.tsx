@@ -376,6 +376,8 @@ function SplitHero({
                         {...siteImage("below", {
                             src: content.image.src,
                             width: content.image.width,
+                            placeholder: content.image.placeholder,
+                            widths: content.image.widths,
                             sizes: "(min-width: 1280px) 1280px, 100vw",
                         })}
                         className="absolute inset-0 size-full rounded-[calc(var(--site-radius)*1.6)] object-cover"

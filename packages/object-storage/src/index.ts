@@ -24,6 +24,7 @@ export {
     DEFAULT_ALLOWED_CONTENT_TYPES,
     DEFAULT_MAX_UPLOAD_BYTES,
     DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
+    IMAGE_END_BYTES,
     IMAGE_SNIFF_BYTES,
     ISO_BMFF_SNIFF_BYTES,
     VIDEO_CONTENT_TYPES,
@@ -32,6 +33,7 @@ export {
     extensionForContentType,
     hasImageSignature,
     hasIsoBmffSignature,
+    imageEndsCleanly,
     isAllowedContentType,
     isVideoContentType,
 } from "./validation";
@@ -41,7 +43,12 @@ export type {
 } from "./validation";
 
 // Key derivation helpers (pure)
-export { buildObjectKey, sanitizeFilename, sanitizeSegment } from "./keys";
+export {
+    assertTenantKey,
+    buildObjectKey,
+    sanitizeFilename,
+    sanitizeSegment,
+} from "./keys";
 export type { BuildObjectKeyInput } from "./keys";
 
 // Cloudflare R2 adapter (first provider)

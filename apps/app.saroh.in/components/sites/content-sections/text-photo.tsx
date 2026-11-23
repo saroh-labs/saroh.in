@@ -6,6 +6,7 @@ import { Input } from "@saroh/ui/input";
 import { useId } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import { pickedSizes } from "@/components/shared/fields/picked-image";
 import { PhotoSheetButton } from "@/components/sites/editor/sheets/photo-sheet-opener";
 import type { RichTextContent } from "@/lib/sites/service";
 
@@ -72,6 +73,7 @@ export function TextPhotoFields({
                                     alt: image?.alt,
                                     width: picked.width,
                                     height: picked.height,
+                                    ...pickedSizes(picked),
                                 },
                                 imageSide: value.imageSide,
                             })

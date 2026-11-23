@@ -95,6 +95,8 @@ export function PersonFace({
                 {...siteImage("below", {
                     src,
                     width: member.image?.width,
+                    placeholder: member.image?.placeholder,
+                    widths: member.image?.widths,
                     sizes,
                 })}
                 className={cn(

@@ -9,6 +9,7 @@ import {
     logoFileProblem,
 } from "@/lib/organizations/business-logo";
 import { useImageUpload } from "./media-picker";
+import { uploadWords } from "./picked-image";
 
 /** A logo as a form holds it: where it is served, and its library image. */
 export interface LogoValue {
@@ -66,6 +67,7 @@ export function LogoUpload({
     const {
         upload,
         busy,
+        preparing,
         error: uploadError,
     } = useImageUpload({
         purpose,
@@ -136,7 +138,7 @@ export function LogoUpload({
                         disabled={disabled}
                         onClick={() => inputRef.current?.click()}
                         busy={busy}
-                        busyLabel="Uploading…"
+                        busyLabel={uploadWords({ preparing, progress: null })}
                     >
                         {value ? "Replace" : "Upload logo"}
                     </Button>

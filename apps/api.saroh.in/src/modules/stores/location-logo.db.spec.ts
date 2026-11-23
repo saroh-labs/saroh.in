@@ -18,13 +18,14 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { MediaService } from "../media/media.service";
 import { OrganizationSettingsService } from "../organizations/organization-settings.service";
 
+import { mediaStorages } from "../media/object-storage.provider";
 import { LocationLogoService } from "./location-logo.service";
 import { StoresService } from "./stores.service";
 
 const storage = createMemoryStorage({
     publicBaseUrl: "https://media.saroh.test",
 });
-const media = new MediaService(storage);
+const media = new MediaService(mediaStorages(storage, null));
 const audit = {
     record: jest.fn().mockResolvedValue(undefined),
 } as unknown as AuditService;

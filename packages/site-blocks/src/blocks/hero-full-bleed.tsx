@@ -99,6 +99,8 @@ export default function FullBleedHero({
                     {...siteImage(priority ? "first-hero" : "below", {
                         src,
                         width: content.image?.width,
+                        placeholder: content.image?.placeholder,
+                        widths: content.image?.widths,
                         sizes: "100vw",
                         focus: content.image?.focus,
                     })}

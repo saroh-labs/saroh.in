@@ -118,6 +118,9 @@ function Plate({
                     alt={p.image.alt}
                     {...siteImage(lead ? "above" : "below", {
                         src: p.image.url,
+                        width: p.image.width,
+                        placeholder: p.image.placeholder,
+                        widths: p.image.widths,
                         sizes: "(min-width: 768px) 50vw, 100vw",
                     })}
                     className="absolute inset-0 h-full w-full object-cover"

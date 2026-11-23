@@ -1,5 +1,6 @@
 "use server";
 
+import type { UploadSizes } from "./service";
 import {
     completeUpload as completeUploadApi,
     createUpload as createUploadApi,
@@ -12,13 +13,15 @@ import {
  * `lib/media/service.ts` for why.
  */
 
-export async function createUpload(input: {
-    contentType: string;
-    contentLength: number;
-    filename: string;
-    /** The library bucket; site images unless said. */
-    purpose?: "site-image" | "business-logo" | "product-video";
-}) {
+export async function createUpload(
+    input: {
+        contentType: string;
+        contentLength: number;
+        filename: string;
+        /** The library bucket; site images unless said. */
+        purpose?: "site-image" | "business-logo" | "product-video";
+    } & UploadSizes,
+) {
     return createUploadApi(input);
 }
 

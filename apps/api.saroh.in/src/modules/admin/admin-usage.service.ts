@@ -110,7 +110,7 @@ export class AdminUsageService {
             prisma.$queryRaw<RawRow[]>(Prisma.sql`
                 SELECT o."id", o."name", o."slug", o."lifecycleStatus",
                     COUNT(m."id") AS "files",
-                    COALESCE(SUM(m."sizeBytes"), 0) AS "bytes"
+                    COALESCE(SUM(m."sizeBytes" + m."variantBytes"), 0) AS "bytes"
                 FROM "Organization" o
                 LEFT JOIN "Media" m
                     ON m."organizationId" = o."id" AND m."status" <> ${NOT_STORED}
@@ -125,7 +125,7 @@ export class AdminUsageService {
                 SELECT
                     (SELECT COUNT(*) FROM "Organization" o
                         WHERE ${inEdition}) AS "total",
-                    (SELECT COALESCE(SUM(m."sizeBytes"), 0) FROM "Media" m
+                    (SELECT COALESCE(SUM(m."sizeBytes" + m."variantBytes"), 0) FROM "Media" m
                         JOIN "Organization" o ON o."id" = m."organizationId"
                         WHERE m."status" <> ${NOT_STORED} AND ${inEdition}) AS "bytes"`,
             ),

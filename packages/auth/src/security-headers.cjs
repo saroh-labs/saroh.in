@@ -14,8 +14,12 @@
  * browser really loads; a host missing here is blocked.
  */
 
-/** Where business media is served from (R2's public buckets, prod and dev). */
-const MEDIA = ["https://media.saroh.in", "https://media.saroh.io"];
+/**
+ * Where business media is served from (R2's public buckets): India's and
+ * development's, and Global businesses' own (owner, 22 Nov 2026).
+ */
+// prettier-ignore
+const MEDIA = ["https://media.saroh.in", "https://media.saroh.io", "https://media.saroh.tech"];
 
 /**
  * The floor the signed-in apps and the merchant sites enforce (security

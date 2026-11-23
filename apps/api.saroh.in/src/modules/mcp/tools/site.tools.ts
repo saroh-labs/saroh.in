@@ -30,7 +30,6 @@ import {
 } from "@saroh/block-contract";
 import type { PageKind } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
-import type { ObjectStorage } from "@saroh/object-storage";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@saroh/object-storage";
 import type { TemplateFit } from "@saroh/templates";
 import {
@@ -51,7 +50,6 @@ import { JobHandlerRegistry } from "../../jobs/job-handler.registry";
 import type { JobQueue } from "../../jobs/job-queue.port";
 import { JOB_QUEUE } from "../../jobs/job-queue.port";
 import { MediaService } from "../../media/media.service";
-import { OBJECT_STORAGE } from "../../media/object-storage.provider";
 import { IMAGE_TOO_BIG_MESSAGE } from "../../media/upload-checks";
 import { organizationKind } from "../../organizations/organization-kind";
 import { authorize } from "../../organizations/organization-policy";
@@ -145,7 +143,6 @@ export interface SiteToolDeps {
     sites: SitesService;
     previews: SitePreviewLinksService;
     media: MediaService;
-    storage: ObjectStorage;
     restorePoints: RestorePointService;
     queue: Pick<JobQueue, "enqueue">;
     /** The SSRF-guarded fetch; tests stand in a server. */
@@ -1110,10 +1107,8 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 contentLength: got.body.byteLength,
                 filename,
             });
-            await d.storage.putObject(upload.key, got.body, {
-                contentType,
-                contentLength: got.body.byteLength,
-            });
+            // Into the bucket its row was signed for (its edition's).
+            await d.media.storeUploadBytes(ctx, upload.mediaId, got.body);
             // Sniffs the bytes, counts the storage, flips it READY.
             const done = await d.media.completeUpload(ctx, upload.mediaId);
             return {
@@ -1685,7 +1680,6 @@ export class SiteTools implements OnModuleInit {
         private readonly sites: SitesService,
         private readonly previews: SitePreviewLinksService,
         private readonly media: MediaService,
-        @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
         private readonly restorePoints: RestorePointService,
     ) {}
 
@@ -1694,7 +1688,6 @@ export class SiteTools implements OnModuleInit {
             sites: this.sites,
             previews: this.previews,
             media: this.media,
-            storage: this.storage,
             restorePoints: this.restorePoints,
             queue: this.queue,
         };

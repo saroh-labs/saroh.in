@@ -6,6 +6,7 @@ export * from "./delivery-place";
 export * from "./examples";
 export * from "./fixtures";
 export * from "./fonts";
+export * from "./image-variants";
 export * from "./invoice-paper";
 export * from "./looks";
 export * from "./palette";

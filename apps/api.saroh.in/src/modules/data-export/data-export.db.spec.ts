@@ -12,6 +12,7 @@ import { strFromU8, unzipSync } from "fflate";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditService } from "../audit/audit.service";
+import { mediaStorages } from "../media/object-storage.provider";
 import {
     DATA_EXPORT_BUILD_TYPE,
     DATA_EXPORT_EXPIRE_TYPE,
@@ -25,8 +26,11 @@ let seq = 0;
 const uniq = (label: string) => `${label}-${tag}-${++seq}`;
 
 const storage = createMemoryStorage();
-const service = new DataExportService(storage, new AuditService());
-const handler = new DataExportHandler(storage);
+const service = new DataExportService(
+    mediaStorages(storage, null),
+    new AuditService(),
+);
+const handler = new DataExportHandler(mediaStorages(storage, null));
 
 async function business(lifecycleStatus = "ACTIVE") {
     const owner = await prisma.user.create({
@@ -246,7 +250,7 @@ describe("Download your data (DEC-120)", () => {
     it("says it failed, in words, once the tries run out; a deleted business gets none", async () => {
         const broken = createMemoryStorage();
         broken.putObject = () => Promise.reject(new Error("storage down"));
-        const failing = new DataExportHandler(broken);
+        const failing = new DataExportHandler(mediaStorages(broken, null));
         const { org, ctx } = await business();
         const asked = await service.request(ctx("OWNER"));
         const job = await buildJob(org.id);

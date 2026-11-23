@@ -13,7 +13,10 @@
  *   GIF, a data export) keeps its plain `src`.
  * - **Which widths.** A fixed ladder. Any other width is snapped up to the
  *   next step, so the number of versions of a photo is bounded.
- * - **Which address.** `/_img/<width>/<key>` on the site's own host.
+ * - **Which address.** `/_img/<width>/<key>` on the site's own host, or
+ *   `/_img/<width>/g/<key>` for a photo in Global businesses' own bucket
+ *   (`NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL`, owner, 22 Nov 2026), so the
+ *   route fetches it from the bucket it was written to.
  */
 
 /** Every width a photo is served at, smallest first. */
@@ -42,7 +45,19 @@ export interface MediaKey {
     key: string;
     organizationId: string;
     purpose: ImagePurpose;
+    /** In Global businesses' bucket, not the main one. */
+    global?: true;
 }
+
+/** The public media addresses: the main bucket's, and Global's when set. */
+export type MediaBases =
+    | string
+    | null
+    | undefined
+    | { main?: string | null; global?: string | null };
+
+/** The route's marker for a photo in Global's bucket. */
+const GLOBAL_SEGMENT = "g/";
 
 // `org/<organization>/<purpose>/<file>`, exactly as storage builds it
 // (`packages/object-storage/src/keys.ts`): every segment is already reduced
@@ -83,21 +98,32 @@ export function mediaBaseOf(value: string | null | undefined): string | null {
 
 /**
  * The media key of a photo's address, or null when the address is not one
- * of the business's resizable photos in `mediaBase`.
+ * of the business's resizable photos in `mediaBase` (either bucket's).
  */
 export function mediaKeyOf(
     src: string | null | undefined,
-    mediaBase: string | null | undefined,
+    mediaBase: MediaBases,
 ): MediaKey | null {
-    const base = mediaBaseOf(mediaBase);
+    const bases =
+        typeof mediaBase === "object" && mediaBase !== null
+            ? mediaBase
+            : { main: mediaBase };
     const address = src?.trim();
-    if (!base || !address) return null;
-    const prefix = `${base}/`;
-    if (!address.startsWith(prefix)) return null;
-    const key = address.slice(prefix.length);
-    // A query or a fragment is not part of a stored key.
-    if (/[?#%]/.test(key)) return null;
-    return parseMediaKey(key);
+    if (!address) return null;
+    for (const [which, value] of [
+        ["main", bases.main],
+        ["global", bases.global],
+    ] as const) {
+        const base = mediaBaseOf(value);
+        if (!base || !address.startsWith(`${base}/`)) continue;
+        const key = address.slice(base.length + 1);
+        // A query or a fragment is not part of a stored key.
+        if (/[?#%]/.test(key)) return null;
+        const found = parseMediaKey(key);
+        if (!found) return null;
+        return which === "global" ? { ...found, global: true } : found;
+    }
+    return null;
 }
 
 /** The ladder step a requested width is served at. */
@@ -107,8 +133,12 @@ export function snapWidth(width: number): number {
 }
 
 /** The route's address for a key at a width (snapped to the ladder). */
-export function resizedPath(key: string, width: number): string {
-    return `${IMAGE_ROUTE}/${snapWidth(width)}/${key}`;
+export function resizedPath(
+    key: string,
+    width: number,
+    global?: boolean,
+): string {
+    return `${IMAGE_ROUTE}/${snapWidth(width)}/${global ? GLOBAL_SEGMENT : ""}${key}`;
 }
 
 /** What a request to the route asks for, or null when it asks for nothing. */
@@ -122,9 +152,15 @@ export function parseResizedPath(
     if (slash <= 0) return null;
     const widthText = rest.slice(0, slash);
     if (!/^[1-9][0-9]{0,4}$/.test(widthText)) return null;
-    const image = parseMediaKey(rest.slice(slash + 1));
+    let key = rest.slice(slash + 1);
+    const global = key.startsWith(GLOBAL_SEGMENT);
+    if (global) key = key.slice(GLOBAL_SEGMENT.length);
+    const image = parseMediaKey(key);
     if (!image) return null;
-    return { width: snapWidth(Number(widthText)), image };
+    return {
+        width: snapWidth(Number(widthText)),
+        image: global ? { ...image, global: true } : image,
+    };
 }
 
 /** A photo's sources: `src`, `srcSet` and `sizes` for an `<img>`. */
@@ -142,7 +178,7 @@ export interface ResizedSources {
  */
 export function resizedSources(
     image: { src: string; width?: number | null; sizes?: string },
-    mediaBase: string | null | undefined,
+    mediaBase: MediaBases,
 ): ResizedSources | null {
     const found = mediaKeyOf(image.src, mediaBase);
     if (!found) return null;
@@ -155,10 +191,16 @@ export function resizedSources(
     const candidates: { width: number; path: string }[] = [];
     for (const step of IMAGE_WIDTHS) {
         if (own !== null && step >= own) break;
-        candidates.push({ width: step, path: resizedPath(found.key, step) });
+        candidates.push({
+            width: step,
+            path: resizedPath(found.key, step, found.global),
+        });
     }
     if (own !== null && own <= IMAGE_WIDTHS[IMAGE_WIDTHS.length - 1]) {
-        candidates.push({ width: own, path: resizedPath(found.key, own) });
+        candidates.push({
+            width: own,
+            path: resizedPath(found.key, own, found.global),
+        });
     }
     // Never empty: the ladder, or at least the photo's own width.
     const middle =

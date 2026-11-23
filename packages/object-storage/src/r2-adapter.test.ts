@@ -66,6 +66,7 @@ describe("createR2Storage — presigned upload", () => {
         );
         expect(result.headers["Content-Type"]).toBe("image/png");
         expect(result.headers["Content-Length"]).toBe("4096");
+        expect(result.headers["If-None-Match"]).toBe("*");
 
         expect(presignCalls).toHaveLength(1);
         const call = presignCalls[0];
@@ -283,7 +284,14 @@ describe("createR2Storage — the real signature", () => {
             .get("X-Amz-SignedHeaders")
             ?.split(";");
         expect(signed).toEqual(
-            expect.arrayContaining(["content-type", "content-length", "host"]),
+            expect.arrayContaining([
+                "content-type",
+                "content-length",
+                "host",
+                "if-none-match",
+            ]),
         );
+        // A header the client must send, not hoisted into the query.
+        expect(new URL(url).searchParams.has("If-None-Match")).toBe(false);
     });
 });

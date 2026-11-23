@@ -66,6 +66,12 @@ export const env = createEnv({
          * Compiled into the bundle; `siteImage` reads it as written.
          */
         NEXT_PUBLIC_SITE_MEDIA_URL: z.url().optional(),
+        /**
+         * Global businesses' own media address (owner, 22 Nov 2026), set
+         * beside the one above in `wrangler.jsonc`: their photos are
+         * resized from it (`/_img/<w>/g/<key>`). Unset: they keep plain src.
+         */
+        NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL: z.url().optional(),
         NEXT_PUBLIC_VERCEL_ENV: z
             .enum(["development", "preview", "production"])
             .optional(),
@@ -85,6 +91,8 @@ export const env = createEnv({
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
         NEXT_PUBLIC_SITE_MEDIA_URL: process.env.NEXT_PUBLIC_SITE_MEDIA_URL,
+        NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL:
+            process.env.NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
     },
     emptyStringAsUndefined: true,

@@ -319,7 +319,7 @@ export class AdminHealthService {
         return configured
             ? {
                   state: "unmeasured" as const,
-                  summary: `Uploads go to bucket ${env.R2_BUCKET}. Its free space and reachability are not measured here.`,
+                  summary: `Uploads go to bucket ${env.R2_BUCKET}${env.R2_GLOBAL_BUCKET ? `, Global businesses' to ${env.R2_GLOBAL_BUCKET}` : ""}. Their free space and reachability are not measured here.`,
               }
             : {
                   state: "unmeasured" as const,

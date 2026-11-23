@@ -1,5 +1,6 @@
 "use client";
 
+import { thumbnailSrc } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { FailedState, LoadingState } from "@saroh/ui/data-state";
 import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
@@ -14,6 +15,10 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import type { PickedImage } from "@/components/shared/fields/media-picker";
 import { useImageUpload } from "@/components/shared/fields/media-picker";
+import {
+    pickedSizes,
+    uploadWords,
+} from "@/components/shared/fields/picked-image";
 import { Refusal } from "@/components/shared/states/refusal";
 import { DESCRIBE_MAX } from "@/components/sites/publish/describe-photo-dialog";
 import { SAVE_LINES } from "@/components/sites/shell/save-footer";
@@ -45,6 +50,9 @@ interface Photo {
     width?: number;
     height?: number;
     focus?: { x: number; y: number };
+    /** Its blur and its smaller copies' widths (DEC-246). */
+    placeholder?: string;
+    widths?: number[];
 }
 
 /** The photo chosen in the sheet, before Use this photo. */
@@ -53,6 +61,8 @@ interface Chosen {
     filename: string;
     width?: number;
     height?: number;
+    placeholder?: string;
+    widths?: number[];
 }
 
 const CENTRE = { x: 50, y: 50 };
@@ -160,7 +170,7 @@ function PhotoDraft({
     const [file, setFile] = useState("");
     const input = useRef<HTMLInputElement>(null);
     const ids = useId();
-    const { upload, busy, progress, error } = useImageUpload();
+    const { upload, busy, preparing, progress, error } = useImageUpload();
 
     useEffect(() => {
         let live = true;
@@ -190,6 +200,7 @@ function PhotoDraft({
             filename: img.filename ?? picked.name,
             width: img.width,
             height: img.height,
+            ...pickedSizes(img),
         });
         setLibrary((list) =>
             Array.isArray(list) && img.mediaId
@@ -201,6 +212,9 @@ function PhotoDraft({
                           status: "READY",
                           url: img.src,
                           createdAt: new Date().toISOString(),
+                          width: img.width,
+                          height: img.height,
+                          ...pickedSizes(img),
                       },
                       ...list,
                   ]
@@ -241,11 +255,7 @@ function PhotoDraft({
                             type="button"
                             variant="outline"
                             busy={busy}
-                            busyLabel={
-                                progress === null
-                                    ? "Uploading…"
-                                    : `Uploading ${progress}%`
-                            }
+                            busyLabel={uploadWords({ preparing, progress })}
                             onClick={() => input.current?.click()}
                         >
                             <Upload aria-hidden className="mr-1.5 size-4" />
@@ -288,6 +298,18 @@ function PhotoDraft({
                                             choose({
                                                 src: m.url,
                                                 filename: m.filename,
+                                                ...(m.width && m.height
+                                                    ? {
+                                                          width: m.width,
+                                                          height: m.height,
+                                                      }
+                                                    : {}),
+                                                ...pickedSizes({
+                                                    placeholder:
+                                                        m.placeholder ??
+                                                        undefined,
+                                                    widths: m.widths,
+                                                }),
                                             })
                                         }
                                         className={cn(
@@ -299,7 +321,14 @@ function PhotoDraft({
                                         <span className="relative block aspect-square overflow-hidden rounded-md bg-muted">
                                             {/* eslint-disable-next-line @next/next/no-img-element -- a merchant's photo address, not a project asset */}
                                             <img
-                                                src={m.url ?? ""}
+                                                src={
+                                                    m.url
+                                                        ? thumbnailSrc(
+                                                              m.url,
+                                                              m.widths,
+                                                          )
+                                                        : ""
+                                                }
                                                 alt=""
                                                 loading="lazy"
                                                 className="size-full object-cover"
@@ -431,6 +460,7 @@ function PhotoDraft({
                             : {}),
                         // Centred is the default: leave it out, as before.
                         ...(moved ? { focus } : {}),
+                        ...pickedSizes(chosen),
                     });
                 }}
             />

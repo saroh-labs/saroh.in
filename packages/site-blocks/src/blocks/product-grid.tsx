@@ -624,6 +624,9 @@ function ListRowBody({
                         alt={p.image.alt}
                         {...siteImage("below", {
                             src: p.image.url,
+                            width: p.image.width,
+                            placeholder: p.image.placeholder,
+                            widths: p.image.widths,
                             sizes: "(min-width: 640px) 240px, 40vw",
                         })}
                         className={listPhoto}
@@ -655,6 +658,9 @@ function CardBody({
                         alt={p.image.alt}
                         {...siteImage("below", {
                             src: p.image.url,
+                            width: p.image.width,
+                            placeholder: p.image.placeholder,
+                            widths: p.image.widths,
                             sizes: "(min-width: 1024px) 25vw, 50vw",
                         })}
                         className="mb-1.5 h-[130px] w-full object-cover"
@@ -810,6 +816,9 @@ function BareGrid({
                                         alt={p.image.alt}
                                         {...siteImage("below", {
                                             src: p.image.url,
+                                            width: p.image.width,
+                                            placeholder: p.image.placeholder,
+                                            widths: p.image.widths,
                                             sizes: "(min-width: 1024px) 25vw, 50vw",
                                         })}
                                         className="h-full w-full object-cover"

@@ -94,3 +94,21 @@ export function buildObjectKey(input: BuildObjectKeyInput): string {
 
     return segments.join("/");
 }
+
+/**
+ * A server-made key, checked to sit under `org/<organizationId>/` with no
+ * way out of it. Throws otherwise: a key outside the tenant's prefix is a
+ * bug, never something to sign.
+ */
+export function assertTenantKey(organizationId: string, key: string): string {
+    const org = sanitizeSegment(organizationId);
+    if (
+        org.length === 0 ||
+        !key.startsWith(`org/${org}/`) ||
+        key.includes("..") ||
+        !/^[a-z0-9/._@-]+$/.test(key)
+    ) {
+        throw new Error("That key is not under the organization's prefix");
+    }
+    return key;
+}

@@ -175,6 +175,8 @@ export default function RichTextSection({
                         {...siteImage("below", {
                             src: image.src,
                             width: image.width,
+                            placeholder: image.placeholder,
+                            widths: image.widths,
                             focus: image.focus,
                             sizes: folio
                                 ? "100vw"
@@ -217,6 +219,8 @@ export default function RichTextSection({
                 {...siteImage("below", {
                     src: image.src,
                     width: image.width,
+                    placeholder: image.placeholder,
+                    widths: image.widths,
                     focus: image.focus,
                     sizes: "(min-width: 1280px) 1280px, 100vw",
                 })}
@@ -266,6 +270,8 @@ export default function RichTextSection({
                     {...siteImage("below", {
                         src: image.src,
                         width: image.width,
+                        placeholder: image.placeholder,
+                        widths: image.widths,
                         focus: image.focus,
                         sizes: "(min-width: 768px) 50vw, 100vw",
                     })}
