@@ -812,6 +812,7 @@ function TellOnceLive({
                 {rows.map((r) => (
                     <li key={r.key} className="flex items-center gap-3 py-2">
                         <Label
+                            data-ph-unmask=""
                             htmlFor={`${id}-${r.key}`}
                             className="grid min-w-0 flex-1 gap-0.5 font-normal"
                         >

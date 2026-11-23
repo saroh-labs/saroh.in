@@ -27,7 +27,7 @@ import {
  * shade that does (CS4).
  */
 
-/** The palette roles a button can take (board CSI-C, without "Brand tint"). */
+/** The palette roles a button can take (board CSI-C, with Brand tint). */
 export const COLOUR_ROLES = COMPONENT_STYLE_OPTIONS.buttonColour;
 export type ColourRole = (typeof COLOUR_ROLES)[number];
 
@@ -69,15 +69,16 @@ export function darkenToRead(hex: string): string {
     return "#000000";
 }
 
-/** Why a colour can't be used, or null when it can. */
+/**
+ * Why a colour can't be used, or null when it can. A colour whose words
+ * don't read at 4.5:1 is allowed (DEC-256): the editor warns before saving
+ * and the merchant confirms; only a value that isn't a colour is refused.
+ */
 export function colourProblem(value: string): string | null {
     if ((COLOUR_ROLES as readonly string[]).includes(value)) return null;
-    const hex = normalizeHex(value);
-    if (!hex) return "A colour is one of the site's colours or #RRGGBB";
-    const { readable, ratio } = customColourWords(hex);
-    return readable
+    return normalizeHex(value)
         ? null
-        : `Words on ${hex} are hard to read (${ratio.toFixed(1)} : 1; it needs ${PALETTE_MIN_CONTRAST} : 1)`;
+        : "A colour is one of the site's colours or #RRGGBB";
 }
 
 const colour = z.string().superRefine((value, ctx) => {

@@ -895,3 +895,22 @@ describe("a section's frame (KTD-E5)", () => {
         expect(sectionFrameSettingsOf(null)).toEqual({});
     });
 });
+
+describe("testimonials v1 — an optional star rating (23 Nov 2026)", () => {
+    const parse = (rating: unknown) =>
+        parseSectionContent("testimonials", 1, {
+            items: [{ quote: "Quick.", name: "Sam", rating }],
+        });
+
+    it("takes a whole number from 1 to 5, or none", () => {
+        for (const r of [1, 3, 5, undefined]) {
+            expect(parse(r).success).toBe(true);
+        }
+    });
+
+    it("refuses 0, 6, a fraction and a word", () => {
+        for (const r of [0, 6, 4.5, "5", null, -1]) {
+            expect(parse(r).success).toBe(false);
+        }
+    });
+});

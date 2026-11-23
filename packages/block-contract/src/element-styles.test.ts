@@ -12,7 +12,7 @@ import { parseSectionContent } from "./section-contract";
 import { toRendered } from "./to-rendered";
 
 describe("element and section styles (DEC-253, DEC-254)", () => {
-    it("takes a role, or a custom colour whose words read at 4.5:1", () => {
+    it("takes a role, or any custom #RRGGBB (the editor warns when words are hard to read)", () => {
         expect(colourProblem("accent")).toBeNull();
         expect(colourProblem("#A65E3F")).toBeNull();
         expect(customColourWords("#A65E3F").words).toBe("light");
@@ -21,15 +21,17 @@ describe("element and section styles (DEC-253, DEC-254)", () => {
             words: "dark",
             readable: true,
         });
-        // A mid grey reads with neither: refused, with the darker fix.
-        expect(colourProblem("#777777")).toMatch(/hard to read/);
+        // A mid grey reads with neither: kept (DEC-256, the editor warns and
+        // the merchant confirms), with the darker fix on offer.
+        expect(customColourWords("#777777").readable).toBe(false);
+        expect(colourProblem("#777777")).toBeNull();
         const fix = darkenToRead("#777777");
         expect(contrastRatio("#FFFFFF", fix)).toBeGreaterThanOrEqual(4.5);
         expect(colourProblem(fix)).toBeNull();
         expect(colourProblem("red")).toMatch(/#RRGGBB/);
     });
 
-    it("saves a button's own style and refuses an unreadable one", () => {
+    it("saves a button's own style, even one whose words are hard to read", () => {
         const ok = parseSectionContent("cta", 2, {
             label: "Book",
             action: { kind: "url", href: "/book" },
@@ -46,7 +48,7 @@ describe("element and section styles (DEC-253, DEC-254)", () => {
             action: { kind: "url", href: "/book" },
             elementStyle: { colour: "#777777" },
         });
-        expect(bad.success).toBe(false);
+        expect(bad.success).toBe(true);
         const unknown = parseSectionContent("cta", 2, {
             label: "Book",
             action: { kind: "url", href: "/book" },
@@ -93,7 +95,7 @@ describe("element and section styles (DEC-253, DEC-254)", () => {
             image: { corners: "round" },
         });
         expect(
-            buttonElementStyleOf({ colour: "#777777", corners: "pill" }),
+            buttonElementStyleOf({ colour: "red", corners: "pill" }),
         ).toEqual({ corners: "pill" });
     });
 

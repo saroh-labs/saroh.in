@@ -5,6 +5,7 @@ export * from "./component-styles";
 export * from "./delivery-place";
 export * from "./element-styles";
 export * from "./examples";
+export * from "./first-photo";
 export * from "./fixtures";
 export * from "./fonts";
 export * from "./image-variants";

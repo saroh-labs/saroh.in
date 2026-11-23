@@ -264,7 +264,7 @@ export function AddPageSheet({
                 setMissing(true);
                 return;
             }
-            if (await pickTeam()) return;
+            if (await pickTeam().catch(() => false)) return;
         }
         let res;
         if (start === "copy") {

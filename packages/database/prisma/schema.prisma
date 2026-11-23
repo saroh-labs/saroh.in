@@ -1023,6 +1023,8 @@ model Media {
   sharePosts     SharePost[]       @relation("SharePostMedia")
   // The pages that use it as their own share image.
   pageShareImages Page[]           @relation("PageShareImage")
+  // The team members whose profile photo it is.
+  staffPhotos     StaffMember[]    @relation("StaffPhoto")
 
   @@index([organizationId])
   // The sweep of uploads never confirmed (M-5, DEC-227).
@@ -6281,6 +6283,13 @@ model StaffMember {
   // "Show on Our team" (DEC-248): the person's name and role on a website's
   // Our team page. Off until they, or an owner for them, switch it on.
   showOnTeamPage Boolean @default(false)
+
+  // Their own face and a few words (23 Nov 2026): set by them, or by an
+  // owner or admin for them. The photo is a library image (purpose
+  // `staff-photo`); Our team, the diary and the booking page read both live.
+  photoMediaId String?
+  photoMedia   Media?  @relation("StaffPhoto", fields: [photoMediaId], references: [id], onDelete: SetNull)
+  about        String? @db.Text // at most 600 characters, held in the API
 
   services          StaffService[]
   hours             StaffHours[]

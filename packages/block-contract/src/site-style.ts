@@ -9,7 +9,10 @@ import type { LookId } from "./looks";
 import { LOOKS, parseLook } from "./looks";
 import type { PaletteRole, SitePalette } from "./palette";
 import {
+    contrastRatio,
+    hexToHslTriple,
     hslTripleToHex,
+    mixHex,
     PALETTE_ROLES,
     PALETTE_VARIABLES,
     paletteVariables,
@@ -411,14 +414,38 @@ export function withLookColours(
     vars: Record<string, string>,
 ): Record<string, string> {
     const safe = style.look ? safeColoursOf(style, vars) : null;
-    if (!safe) return vars;
-    return {
+    if (!safe) return withBrandTint(vars);
+    return withBrandTint({
         ...vars,
         ...paletteVariables(safe.palette),
         ...(safe.accentTreatment === "outline"
             ? { "--site-accent-treatment": "outline" }
             : {}),
-    };
+    });
+}
+
+/**
+ * Brand tint (DEC-256): a soft wash of the brand colour, `--site-tint`, for a
+ * highlighted band or a button. A look's own accent tint when it has one;
+ * else the accent mixed into the page at 12%, eased back until the page's
+ * text still reads on it at 4.5:1. Unchanged variables when a colour isn't one.
+ */
+export function withBrandTint(
+    vars: Record<string, string>,
+): Record<string, string> {
+    const soft = vars["--site-accent-soft"];
+    if (soft) return { ...vars, "--site-tint": soft };
+    const hex = (v: string | undefined) => (v ? hslTripleToHex(v) : null);
+    const accent = hex(vars["--site-accent"]);
+    const bg = hex(vars["--site-bg"]);
+    const fg = hex(vars["--site-fg"]);
+    if (!accent || !bg || !fg) return vars;
+    let tint = bg;
+    for (const mix of [0.12, 0.09, 0.06, 0.03]) {
+        tint = mixHex(bg, accent, mix);
+        if (contrastRatio(fg, tint) >= 4.5) break;
+    }
+    return { ...vars, "--site-tint": hexToHslTriple(tint) };
 }
 
 /**

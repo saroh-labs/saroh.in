@@ -1,18 +1,12 @@
 "use client";
 
+import { firstPhotoOf } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
-import {
-    EyeOff,
-    FileText,
-    Layers,
-    PanelBottom,
-    PanelTop,
-    Plus,
-} from "lucide-react";
+import { EyeOff, Layers, PanelBottom, PanelTop, Plus } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useState } from "react";
 import { useOpenPageId } from "../page-switch";
@@ -28,6 +22,7 @@ import { elementsOf } from "@/lib/sites/element-style";
 import { sectionTitle } from "../editor-constants";
 import { leavePageMessage } from "../use-editor-selection";
 import type { EditorModel } from "./editor-model";
+import { PageThumb } from "./page-thumb";
 
 /**
  * "Hidden on phone" from the section's frame (KTD-E5, U47a), "Hidden" when
@@ -166,9 +161,16 @@ export function PagesTree({
                                     page
                                     onClick={() => openPage(page.id)}
                                 >
-                                    <FileText
-                                        aria-hidden
-                                        className="size-4 shrink-0"
+                                    <PageThumb
+                                        photo={
+                                            open
+                                                ? firstPhotoOf(
+                                                      sections.map(
+                                                          (s) => s.content,
+                                                      ),
+                                                  )
+                                                : page.firstPhoto
+                                        }
                                     />
                                     {/* The title wins: the path gives way first. */}
                                     <span
@@ -471,7 +473,7 @@ function ElementRows({
                             className={cn(
                                 "ml-[30px] flex h-8 w-[calc(100%-30px)] items-center rounded-md px-2.5 text-left text-[0.8125rem] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 on
-                                    ? "bg-card font-semibold text-foreground shadow-[inset_0_0_0_1.5px_hsl(var(--highlight))]"
+                                    ? "bg-card font-semibold text-foreground shadow-[inset_0_0_0_1.5px_hsl(var(--foreground))]"
                                     : "hover:bg-muted",
                             )}
                         >

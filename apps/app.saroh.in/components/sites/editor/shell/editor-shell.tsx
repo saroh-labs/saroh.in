@@ -188,6 +188,7 @@ export function EditorShell({
                                 zoom={viewport.zoom}
                                 onDevice={viewport.setDevice}
                                 onZoom={viewport.setZoom}
+                                previewing={model.selection.trial !== null}
                             />
                         )}
                         {viewport.previewing && PREVIEW_FRAMES_READY ? (

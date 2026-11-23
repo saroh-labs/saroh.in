@@ -494,7 +494,7 @@ describe("SitesService.replaceDraftSections sanitizes on the way in (#280)", () 
         expect(sectionCreateMany).not.toHaveBeenCalled();
     });
 
-    it("keeps a button's and a section's own styles, and refuses a custom colour nobody can read (DEC-253, DEC-254)", async () => {
+    it("keeps a button's and a section's own styles, and refuses a colour that is not #RRGGBB (DEC-253, DEC-256)", async () => {
         const cta = (elementStyle: Record<string, unknown>) => ({
             type: "cta",
             contractVersion: 2,
@@ -521,7 +521,7 @@ describe("SitesService.replaceDraftSections sanitizes on the way in (#280)", () 
         sectionCreateMany.mockClear();
         await expect(
             service.replaceDraftSections(ctx(), "site_1", "page_1", {
-                sections: [cta({ colour: "#777777" })],
+                sections: [cta({ colour: "red" })],
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(sectionCreateMany).not.toHaveBeenCalled();

@@ -191,6 +191,43 @@ describe("the Person inspector", () => {
     });
 });
 
+describe("the Our team inspector (23 Nov 2026)", () => {
+    it("is the People list and nothing else: no photo, About them, heading or Everyone else", async () => {
+        await act(async () => {
+            root.render(
+                <Harness
+                    start={{
+                        ...(emptySection("person") as Person),
+                        content: {
+                            variant: "team",
+                            staffId: "st_1",
+                            name: "Asha Rao",
+                            // Old per-page copies are ignored, not shown.
+                            bio: "old words",
+                            title: "Who is coaching",
+                            people: [{ name: "Typed Person", bio: "old" }],
+                        },
+                    }}
+                />,
+            );
+            await Promise.resolve();
+        });
+        expect(host.querySelector("[data-team-people]")).not.toBeNull();
+        for (const gone of [
+            "Photo",
+            "Upload a photo…",
+            "About them",
+            "Heading over the team",
+            "Everyone else",
+            "Add a person",
+        ]) {
+            expect(host.textContent).not.toContain(gone);
+        }
+        expect(host.querySelector("textarea")).toBeNull();
+        expect(host.textContent).toContain("Others see this list read-only.");
+    });
+});
+
 describe("the Timetable inspector", () => {
     it("shows every class until some are ticked, and only active services are offered", () => {
         const start = emptySection("timetable") as Timetable;

@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Notice } from "@saroh/ui/notice";
 import { useMemo, useState } from "react";
 
 import { roleFill } from "@/lib/sites/element-style";
@@ -195,10 +196,7 @@ export function SiteColoursCard({
                         </p>
                     ) : null}
                     {trying ? (
-                        <div
-                            role="status"
-                            className="grid gap-2 rounded-lg bg-muted p-2 text-xs"
-                        >
+                        <Notice tone="neutral" className="grid gap-2 text-xs">
                             <span>
                                 Trying {trying.name} on every page. Buttons on a
                                 site colour follow. A custom button keeps its
@@ -227,7 +225,7 @@ export function SiteColoursCard({
                                     Keep
                                 </Button>
                             </div>
-                        </div>
+                        </Notice>
                     ) : null}
                 </div>
             ) : null}

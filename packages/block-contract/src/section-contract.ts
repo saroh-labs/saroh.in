@@ -809,6 +809,8 @@ const testimonialItemSchema = z.object({
     quote: z.string().trim().min(1).max(600),
     name: z.string().trim().min(1).max(120),
     role: z.string().max(120).optional(),
+    /** Stars out of five, only when set (23 Nov 2026): none is drawn otherwise. */
+    rating: z.number().int().min(1).max(5).optional(),
 });
 
 const testimonialsV1 = z.object({

@@ -84,6 +84,7 @@ exports[`a look's theme with no component styles is pinned > bakery in cardamom 
                 --site-accent-soft: 57 25% 84.31%;
                 --site-rule: 54.78 9.39% 48.04%;
                 --site-footer-muted: 64.29 6.93% 39.61%;
+                --site-tint: 57 25% 84.31%;
             }
             :root {
                 --site-radius: 0px;
@@ -445,6 +446,7 @@ exports[`a look's theme with no component styles is pinned > bakery in cardamom 
                 --site-accent-soft: 57 25% 84.31%;
                 --site-rule: 54.78 9.39% 48.04%;
                 --site-footer-muted: 64.29 6.93% 39.61%;
+                --site-tint: 57 25% 84.31%;
             }
             :root {
                 --site-radius: 999px;
@@ -794,6 +796,7 @@ exports[`a look's theme with no component styles is pinned > bakery in cardamom 
                 --site-accent-soft: 57 25% 84.31%;
                 --site-rule: 54.78 9.39% 48.04%;
                 --site-footer-muted: 64.29 6.93% 39.61%;
+                --site-tint: 57 25% 84.31%;
             }
             :root {
                 --site-radius: 999px;
@@ -1162,6 +1165,7 @@ exports[`a look's theme with no component styles is pinned > bakery in crust und
                 --site-accent-soft: 21.82 37.93% 88.63%;
                 --site-rule: 34.29 11.2% 50.98%;
                 --site-footer-muted: 33.33 8.49% 41.57%;
+                --site-tint: 21.82 37.93% 88.63%;
             }
             :root {
                 --site-radius: 0px;
@@ -1523,6 +1527,7 @@ exports[`a look's theme with no component styles is pinned > bakery in crust und
                 --site-accent-soft: 21.82 37.93% 88.63%;
                 --site-rule: 34.29 11.2% 50.98%;
                 --site-footer-muted: 33.33 8.49% 41.57%;
+                --site-tint: 21.82 37.93% 88.63%;
             }
             :root {
                 --site-radius: 999px;
@@ -1872,6 +1877,7 @@ exports[`a look's theme with no component styles is pinned > bakery in crust und
                 --site-accent-soft: 21.82 37.93% 88.63%;
                 --site-rule: 34.29 11.2% 50.98%;
                 --site-footer-muted: 33.33 8.49% 41.57%;
+                --site-tint: 21.82 37.93% 88.63%;
             }
             :root {
                 --site-radius: 999px;
@@ -2238,6 +2244,7 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-accent-soft: 236.25 38.1% 91.76%;
                 --site-rule: 232.8 11.21% 56.27%;
                 --site-footer-muted: 234.78 13.45% 66.47%;
+                --site-tint: 236.25 38.1% 91.76%;
             }
             :root {
                 --site-radius: 0px;
@@ -2597,6 +2604,7 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-accent-soft: 236.25 38.1% 91.76%;
                 --site-rule: 232.8 11.21% 56.27%;
                 --site-footer-muted: 234.78 13.45% 66.47%;
+                --site-tint: 236.25 38.1% 91.76%;
             }
             :root {
                 --site-radius: 999px;
@@ -2944,6 +2952,7 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-accent-soft: 236.25 38.1% 91.76%;
                 --site-rule: 232.8 11.21% 56.27%;
                 --site-footer-muted: 234.78 13.45% 66.47%;
+                --site-tint: 236.25 38.1% 91.76%;
             }
             :root {
                 --site-radius: 999px;
@@ -3310,6 +3319,7 @@ exports[`a look's theme with no component styles is pinned > blogs in red under 
                 --site-accent-soft: 15.79 38.78% 90.39%;
                 --site-rule: 41.54 5.73% 55.49%;
                 --site-footer-muted: 36 2.44% 40.2%;
+                --site-tint: 15.79 38.78% 90.39%;
             }
             :root {
                 --site-radius: 0px;
@@ -3669,6 +3679,7 @@ exports[`a look's theme with no component styles is pinned > blogs in red under 
                 --site-accent-soft: 15 29.41% 86.67%;
                 --site-rule: 36.92 5.35% 52.35%;
                 --site-footer-muted: 36 2.44% 40.2%;
+                --site-tint: 15 29.41% 86.67%;
             }
             :root {
                 --site-radius: 999px;
@@ -4016,6 +4027,7 @@ exports[`a look's theme with no component styles is pinned > blogs in red under 
                 --site-accent-soft: 15.79 38.78% 90.39%;
                 --site-rule: 41.54 5.73% 55.49%;
                 --site-footer-muted: 36 2.44% 40.2%;
+                --site-tint: 15.79 38.78% 90.39%;
             }
             :root {
                 --site-radius: 999px;
@@ -4382,6 +4394,7 @@ exports[`a look's theme with no component styles is pinned > ceramics in green u
                 --site-rule: 45 4.76% 49.41%;
                 --site-footer-muted: 42.86 3.55% 38.63%;
                 --site-accent-treatment: outline;
+                --site-tint: 43.64 12.94% 83.33%;
             }
             :root {
                 --site-radius: 0px;
@@ -4741,6 +4754,7 @@ exports[`a look's theme with no component styles is pinned > ceramics in green u
                 --site-rule: 45 4.76% 49.41%;
                 --site-footer-muted: 42.86 3.55% 38.63%;
                 --site-accent-treatment: outline;
+                --site-tint: 43.64 12.94% 83.33%;
             }
             :root {
                 --site-radius: 999px;
@@ -5088,6 +5102,7 @@ exports[`a look's theme with no component styles is pinned > ceramics in green u
                 --site-rule: 45 4.76% 49.41%;
                 --site-footer-muted: 42.86 3.55% 38.63%;
                 --site-accent-treatment: outline;
+                --site-tint: 43.64 12.94% 83.33%;
             }
             :root {
                 --site-radius: 999px;
@@ -5454,6 +5469,7 @@ exports[`a look's theme with no component styles is pinned > ceramics in oxblood
                 --site-rule: 240 1.63% 48.24%;
                 --site-footer-muted: 240 1.48% 39.8%;
                 --site-accent-treatment: outline;
+                --site-tint: 240 3.9% 84.9%;
             }
             :root {
                 --site-radius: 0px;
@@ -5813,6 +5829,7 @@ exports[`a look's theme with no component styles is pinned > ceramics in oxblood
                 --site-rule: 240 1.63% 48.24%;
                 --site-footer-muted: 240 1.48% 39.8%;
                 --site-accent-treatment: outline;
+                --site-tint: 240 3.9% 84.9%;
             }
             :root {
                 --site-radius: 999px;
@@ -6160,6 +6177,7 @@ exports[`a look's theme with no component styles is pinned > ceramics in oxblood
                 --site-rule: 240 1.63% 48.24%;
                 --site-footer-muted: 240 1.48% 39.8%;
                 --site-accent-treatment: outline;
+                --site-tint: 240 3.9% 84.9%;
             }
             :root {
                 --site-radius: 999px;
@@ -6526,6 +6544,7 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-accent-soft: 262.5 17.39% 90.98%;
                 --site-rule: 261.43 6.03% 54.51%;
                 --site-footer-muted: 262.5 7.14% 43.92%;
+                --site-tint: 262.5 17.39% 90.98%;
             }
             :root {
                 --site-radius: 0px;
@@ -6885,6 +6904,7 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-accent-soft: 262.5 17.39% 90.98%;
                 --site-rule: 261.43 6.03% 54.51%;
                 --site-footer-muted: 262.5 7.14% 43.92%;
+                --site-tint: 262.5 17.39% 90.98%;
             }
             :root {
                 --site-radius: 999px;
@@ -7232,6 +7252,7 @@ exports[`a look's theme with no component styles is pinned > clinic in heather u
                 --site-accent-soft: 262.5 17.39% 90.98%;
                 --site-rule: 261.43 6.03% 54.51%;
                 --site-footer-muted: 262.5 7.14% 43.92%;
+                --site-tint: 262.5 17.39% 90.98%;
             }
             :root {
                 --site-radius: 999px;
@@ -7598,6 +7619,7 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-accent-soft: 192.86 25% 89.02%;
                 --site-rule: 196.15 10.57% 51.76%;
                 --site-footer-muted: 194.48 14.15% 40.2%;
+                --site-tint: 192.86 25% 89.02%;
             }
             :root {
                 --site-radius: 0px;
@@ -7957,6 +7979,7 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-accent-soft: 192.86 25% 89.02%;
                 --site-rule: 196.15 10.57% 51.76%;
                 --site-footer-muted: 194.48 14.15% 40.2%;
+                --site-tint: 192.86 25% 89.02%;
             }
             :root {
                 --site-radius: 999px;
@@ -8304,6 +8327,7 @@ exports[`a look's theme with no component styles is pinned > clinic in tide unde
                 --site-accent-soft: 192.86 25% 89.02%;
                 --site-rule: 196.15 10.57% 51.76%;
                 --site-footer-muted: 194.48 14.15% 40.2%;
+                --site-tint: 192.86 25% 89.02%;
             }
             :root {
                 --site-radius: 999px;
@@ -8670,6 +8694,7 @@ exports[`a look's theme with no component styles is pinned > developer in cobalt
                 --site-accent-soft: 212.31 27.66% 90.78%;
                 --site-rule: 60 0.41% 52.35%;
                 --site-footer-muted: 210 0.97% 40.39%;
+                --site-tint: 212.31 27.66% 90.78%;
             }
             :root {
                 --site-radius: 0px;
@@ -9029,6 +9054,7 @@ exports[`a look's theme with no component styles is pinned > developer in cobalt
                 --site-accent-soft: 212.31 27.66% 90.78%;
                 --site-rule: 60 0.41% 52.35%;
                 --site-footer-muted: 210 0.97% 40.39%;
+                --site-tint: 212.31 27.66% 90.78%;
             }
             :root {
                 --site-radius: 999px;
@@ -9376,6 +9402,7 @@ exports[`a look's theme with no component styles is pinned > developer in cobalt
                 --site-accent-soft: 212.31 27.66% 90.78%;
                 --site-rule: 60 0.41% 52.35%;
                 --site-footer-muted: 210 0.97% 40.39%;
+                --site-tint: 212.31 27.66% 90.78%;
             }
             :root {
                 --site-radius: 999px;
@@ -9742,6 +9769,7 @@ exports[`a look's theme with no component styles is pinned > developer in green 
                 --site-accent-soft: 140 16.98% 89.61%;
                 --site-rule: 60 0.41% 52.35%;
                 --site-footer-muted: 210 0.97% 40.39%;
+                --site-tint: 140 16.98% 89.61%;
             }
             :root {
                 --site-radius: 0px;
@@ -10101,6 +10129,7 @@ exports[`a look's theme with no component styles is pinned > developer in green 
                 --site-accent-soft: 140 16.98% 89.61%;
                 --site-rule: 60 0.41% 52.35%;
                 --site-footer-muted: 210 0.97% 40.39%;
+                --site-tint: 140 16.98% 89.61%;
             }
             :root {
                 --site-radius: 999px;
@@ -10448,6 +10477,7 @@ exports[`a look's theme with no component styles is pinned > developer in green 
                 --site-accent-soft: 140 16.98% 89.61%;
                 --site-rule: 60 0.41% 52.35%;
                 --site-footer-muted: 210 0.97% 40.39%;
+                --site-tint: 140 16.98% 89.61%;
             }
             :root {
                 --site-radius: 999px;
@@ -10814,6 +10844,7 @@ exports[`a look's theme with no component styles is pinned > dietician in clay u
                 --site-accent-soft: 16 31.91% 90.78%;
                 --site-rule: 22.5 6.45% 51.37%;
                 --site-footer-muted: 18 4.55% 43.14%;
+                --site-tint: 16 31.91% 90.78%;
             }
             :root {
                 --site-radius: 0px;
@@ -11173,6 +11204,7 @@ exports[`a look's theme with no component styles is pinned > dietician in clay u
                 --site-accent-soft: 16 31.91% 90.78%;
                 --site-rule: 22.5 6.45% 51.37%;
                 --site-footer-muted: 18 4.55% 43.14%;
+                --site-tint: 16 31.91% 90.78%;
             }
             :root {
                 --site-radius: 999px;
@@ -11520,6 +11552,7 @@ exports[`a look's theme with no component styles is pinned > dietician in clay u
                 --site-accent-soft: 16 31.91% 90.78%;
                 --site-rule: 22.5 6.45% 51.37%;
                 --site-footer-muted: 18 4.55% 43.14%;
+                --site-tint: 16 31.91% 90.78%;
             }
             :root {
                 --site-radius: 999px;
@@ -11886,6 +11919,7 @@ exports[`a look's theme with no component styles is pinned > dietician in sage u
                 --site-accent-soft: 111.43 13.73% 90%;
                 --site-rule: 120 3.36% 53.33%;
                 --site-footer-muted: 130 2.75% 42.75%;
+                --site-tint: 111.43 13.73% 90%;
             }
             :root {
                 --site-radius: 0px;
@@ -12245,6 +12279,7 @@ exports[`a look's theme with no component styles is pinned > dietician in sage u
                 --site-accent-soft: 111.43 13.73% 90%;
                 --site-rule: 120 3.36% 53.33%;
                 --site-footer-muted: 130 2.75% 42.75%;
+                --site-tint: 111.43 13.73% 90%;
             }
             :root {
                 --site-radius: 999px;
@@ -12592,6 +12627,7 @@ exports[`a look's theme with no component styles is pinned > dietician in sage u
                 --site-accent-soft: 111.43 13.73% 90%;
                 --site-rule: 120 3.36% 53.33%;
                 --site-footer-muted: 130 2.75% 42.75%;
+                --site-tint: 111.43 13.73% 90%;
             }
             :root {
                 --site-radius: 999px;
@@ -12959,6 +12995,7 @@ exports[`a look's theme with no component styles is pinned > gym in acid under f
                 --site-rule: 60 2.02% 38.82%;
                 --site-footer-muted: 60 1.57% 62.55%;
                 --site-accent-treatment: outline;
+                --site-tint: 60 2.63% 14.9%;
             }
             :root {
                 --site-radius: 0px;
@@ -13319,6 +13356,7 @@ exports[`a look's theme with no component styles is pinned > gym in acid under l
                 --site-rule: 60 2.02% 38.82%;
                 --site-footer-muted: 60 1.57% 62.55%;
                 --site-accent-treatment: outline;
+                --site-tint: 60 2.63% 14.9%;
             }
             :root {
                 --site-radius: 999px;
@@ -13667,6 +13705,7 @@ exports[`a look's theme with no component styles is pinned > gym in acid under q
                 --site-rule: 60 2.02% 38.82%;
                 --site-footer-muted: 60 1.57% 62.55%;
                 --site-accent-treatment: outline;
+                --site-tint: 60 2.63% 14.9%;
             }
             :root {
                 --site-radius: 999px;
@@ -14034,6 +14073,7 @@ exports[`a look's theme with no component styles is pinned > gym in ice under fo
                 --site-rule: 210 3% 39.22%;
                 --site-footer-muted: 195 2.11% 62.75%;
                 --site-accent-treatment: outline;
+                --site-tint: 200 3.9% 15.1%;
             }
             :root {
                 --site-radius: 0px;
@@ -14394,6 +14434,7 @@ exports[`a look's theme with no component styles is pinned > gym in ice under li
                 --site-rule: 210 3% 39.22%;
                 --site-footer-muted: 195 2.11% 62.75%;
                 --site-accent-treatment: outline;
+                --site-tint: 200 3.9% 15.1%;
             }
             :root {
                 --site-radius: 999px;
@@ -14742,6 +14783,7 @@ exports[`a look's theme with no component styles is pinned > gym in ice under qu
                 --site-rule: 210 3% 39.22%;
                 --site-footer-muted: 195 2.11% 62.75%;
                 --site-accent-treatment: outline;
+                --site-tint: 200 3.9% 15.1%;
             }
             :root {
                 --site-radius: 999px;
@@ -15108,6 +15150,7 @@ exports[`a look's theme with no component styles is pinned > personal in clay un
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 0px;
@@ -15467,6 +15510,7 @@ exports[`a look's theme with no component styles is pinned > personal in clay un
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -15814,6 +15858,7 @@ exports[`a look's theme with no component styles is pinned > personal in clay un
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -16180,6 +16225,7 @@ exports[`a look's theme with no component styles is pinned > personal in harbour
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 0px;
@@ -16539,6 +16585,7 @@ exports[`a look's theme with no component styles is pinned > personal in harbour
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -16886,6 +16933,7 @@ exports[`a look's theme with no component styles is pinned > personal in harbour
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -17252,6 +17300,7 @@ exports[`a look's theme with no component styles is pinned > personal in stone u
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 0px;
@@ -17611,6 +17660,7 @@ exports[`a look's theme with no component styles is pinned > personal in stone u
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 999px;
@@ -17958,6 +18008,7 @@ exports[`a look's theme with no component styles is pinned > personal in stone u
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 999px;
@@ -18324,6 +18375,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in clay u
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 0px;
@@ -18683,6 +18735,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in clay u
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -19030,6 +19083,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in clay u
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -19396,6 +19450,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in harbou
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 0px;
@@ -19755,6 +19810,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in harbou
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -20102,6 +20158,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in harbou
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -20468,6 +20525,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in stone 
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 0px;
@@ -20827,6 +20885,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in stone 
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 999px;
@@ -21174,6 +21233,7 @@ exports[`a look's theme with no component styles is pinned > portfolio in stone 
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 999px;
@@ -21540,6 +21600,7 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-accent-soft: 18.46 41.94% 87.84%;
                 --site-rule: 20 9.45% 50.2%;
                 --site-footer-muted: 20 8.67% 66.08%;
+                --site-tint: 18.46 41.94% 87.84%;
             }
             :root {
                 --site-radius: 0px;
@@ -21899,6 +21960,7 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-accent-soft: 18.46 41.94% 87.84%;
                 --site-rule: 20 9.45% 50.2%;
                 --site-footer-muted: 20 8.67% 66.08%;
+                --site-tint: 18.46 41.94% 87.84%;
             }
             :root {
                 --site-radius: 999px;
@@ -22246,6 +22308,7 @@ exports[`a look's theme with no component styles is pinned > salon in kesar unde
                 --site-accent-soft: 18.46 41.94% 87.84%;
                 --site-rule: 20 9.45% 50.2%;
                 --site-footer-muted: 20 8.67% 66.08%;
+                --site-tint: 18.46 41.94% 87.84%;
             }
             :root {
                 --site-radius: 999px;
@@ -22612,6 +22675,7 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-accent-soft: 307.5 27.59% 88.63%;
                 --site-rule: 304.62 5.18% 50.78%;
                 --site-footer-muted: 313.33 5.26% 66.47%;
+                --site-tint: 307.5 27.59% 88.63%;
             }
             :root {
                 --site-radius: 0px;
@@ -22971,6 +23035,7 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-accent-soft: 307.5 27.59% 88.63%;
                 --site-rule: 304.62 5.18% 50.78%;
                 --site-footer-muted: 313.33 5.26% 66.47%;
+                --site-tint: 307.5 27.59% 88.63%;
             }
             :root {
                 --site-radius: 999px;
@@ -23318,6 +23383,7 @@ exports[`a look's theme with no component styles is pinned > salon in mauve unde
                 --site-accent-soft: 307.5 27.59% 88.63%;
                 --site-rule: 304.62 5.18% 50.78%;
                 --site-footer-muted: 313.33 5.26% 66.47%;
+                --site-tint: 307.5 27.59% 88.63%;
             }
             :root {
                 --site-radius: 999px;
@@ -23684,6 +23750,7 @@ exports[`a look's theme with no component styles is pinned > starter in clay und
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 0px;
@@ -24043,6 +24110,7 @@ exports[`a look's theme with no component styles is pinned > starter in clay und
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -24390,6 +24458,7 @@ exports[`a look's theme with no component styles is pinned > starter in clay und
                 --site-accent-soft: 21.6 40.98% 88.04%;
                 --site-rule: 23.48 9.24% 51.18%;
                 --site-footer-muted: 25.26 10.05% 62.94%;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -24756,6 +24825,7 @@ exports[`a look's theme with no component styles is pinned > starter in harbour 
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 0px;
@@ -25115,6 +25185,7 @@ exports[`a look's theme with no component styles is pinned > starter in harbour 
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -25462,6 +25533,7 @@ exports[`a look's theme with no component styles is pinned > starter in harbour 
                 --site-accent-soft: 208 24.59% 88.04%;
                 --site-rule: 211.76 7.05% 52.75%;
                 --site-footer-muted: 210 6.59% 64.31%;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root {
                 --site-radius: 999px;
@@ -25828,6 +25900,7 @@ exports[`a look's theme with no component styles is pinned > starter in stone un
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 0px;
@@ -26187,6 +26260,7 @@ exports[`a look's theme with no component styles is pinned > starter in stone un
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 999px;
@@ -26534,6 +26608,7 @@ exports[`a look's theme with no component styles is pinned > starter in stone un
                 --site-accent-soft: 82.5 11.43% 86.27%;
                 --site-rule: 38.57 5.6% 50.98%;
                 --site-footer-muted: 41.54 6.67% 61.76%;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root {
                 --site-radius: 999px;
@@ -26900,6 +26975,7 @@ exports[`a look's theme with no component styles is pinned > studio in ivory und
                 --site-rule: 30 5.56% 50.59%;
                 --site-footer-muted: 30 6.12% 38.43%;
                 --site-accent-treatment: outline;
+                --site-tint: 34.29 18.92% 85.49%;
             }
             :root {
                 --site-radius: 0px;
@@ -27259,6 +27335,7 @@ exports[`a look's theme with no component styles is pinned > studio in ivory und
                 --site-rule: 30 5.56% 50.59%;
                 --site-footer-muted: 30 6.12% 38.43%;
                 --site-accent-treatment: outline;
+                --site-tint: 34.29 18.92% 85.49%;
             }
             :root {
                 --site-radius: 999px;
@@ -27606,6 +27683,7 @@ exports[`a look's theme with no component styles is pinned > studio in ivory und
                 --site-rule: 30 5.56% 50.59%;
                 --site-footer-muted: 30 6.12% 38.43%;
                 --site-accent-treatment: outline;
+                --site-tint: 34.29 18.92% 85.49%;
             }
             :root {
                 --site-radius: 999px;
@@ -27972,6 +28050,7 @@ exports[`a look's theme with no component styles is pinned > studio in mono unde
                 --site-rule: 60 0.4% 51.18%;
                 --site-footer-muted: 60 0.51% 38.63%;
                 --site-accent-treatment: outline;
+                --site-tint: 60 1.41% 86.08%;
             }
             :root {
                 --site-radius: 0px;
@@ -28331,6 +28410,7 @@ exports[`a look's theme with no component styles is pinned > studio in mono unde
                 --site-rule: 60 0.4% 51.18%;
                 --site-footer-muted: 60 0.51% 38.63%;
                 --site-accent-treatment: outline;
+                --site-tint: 60 1.41% 86.08%;
             }
             :root {
                 --site-radius: 999px;
@@ -28678,6 +28758,7 @@ exports[`a look's theme with no component styles is pinned > studio in mono unde
                 --site-rule: 60 0.4% 51.18%;
                 --site-footer-muted: 60 0.51% 38.63%;
                 --site-accent-treatment: outline;
+                --site-tint: 60 1.41% 86.08%;
             }
             :root {
                 --site-radius: 999px;

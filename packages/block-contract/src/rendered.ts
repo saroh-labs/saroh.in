@@ -334,6 +334,7 @@ const renderedTestimonials = z.object({
                 quote: z.string(),
                 name: z.string(),
                 role: z.string().optional(),
+                rating: z.number().int().min(1).max(5).optional(),
             }),
         )
         .min(1),

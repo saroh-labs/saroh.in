@@ -44,7 +44,12 @@ export type {
  * knows about, and the exhaustive `Record<SectionType, …>` maps in the editor
  * start demanding their entries instead of silently accepting six.
  */
-import type { HeroPanelKind, LookId, SectionType } from "@saroh/block-contract";
+import type {
+    FirstPhoto,
+    HeroPanelKind,
+    LookId,
+    SectionType,
+} from "@saroh/block-contract";
 import type { SiteChangeKind } from "./pending";
 
 export type { SectionType };
@@ -198,6 +203,8 @@ export interface TestimonialItem {
     quote: string;
     name: string;
     role?: string;
+    /** Stars out of five (1 to 5), when set. */
+    rating?: number;
 }
 
 /** `testimonials` — what customers said, under their names. */
@@ -747,6 +754,8 @@ export interface SitePage {
     shareImageMediaId?: string | null;
     shareImageUrl?: string | null;
     noindex?: boolean;
+    /** The first photo on the page, for the editor's page rows (null: none). */
+    firstPhoto?: FirstPhoto | null;
 }
 
 /**

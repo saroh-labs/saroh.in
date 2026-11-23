@@ -73,6 +73,7 @@ describe("ReviewPicker", () => {
                 quote: "Boxes arrived the next morning.",
                 name: "Meera",
                 role: "Kraft Mailer Box",
+                rating: 5,
             },
             null,
         );
@@ -97,6 +98,47 @@ describe("ReviewPicker", () => {
             null,
         );
         expect(host.textContent).toContain("without a “verified” mark");
+    });
+
+    it("draws a product review's stars in its row", () => {
+        render();
+        expect(
+            host.querySelector('[aria-label="5 of 5 stars"]'),
+        ).not.toBeNull();
+    });
+
+    it("adds a written review with the stars set, and none when left empty", async () => {
+        const onAdd = render({ reviews: [] });
+        const quote = host.querySelector("textarea");
+        const who = host.querySelector("input");
+        if (!quote || !who) throw new Error("No fields");
+        await type(quote, "Sorted our packing room.");
+        await type(who, "Kavya");
+        expect(host.textContent).toContain("Leave empty and no stars show.");
+        const star = (n: number) =>
+            host.querySelector<HTMLButtonElement>(
+                `[role=radio][aria-label="${n} stars"]`,
+            );
+        await act(async () => {
+            star(4)?.click();
+            await Promise.resolve();
+        });
+        expect(host.textContent).toContain(
+            "Shows 4 of 5 stars with the quote.",
+        );
+        act(() => button("Add to the page")?.click());
+        expect(onAdd.mock.calls[0]?.[0]).toEqual({
+            quote: "Sorted our packing room.",
+            name: "Kavya",
+            rating: 4,
+        });
+        // Clear puts it back to none.
+        act(() => button("Clear")?.click());
+        act(() => button("Add to the page")?.click());
+        expect(onAdd.mock.calls[1]?.[0]).toEqual({
+            quote: "Sorted our packing room.",
+            name: "Kavya",
+        });
     });
 
     it("asks which section when a Testimonials section is on the page", () => {

@@ -14,6 +14,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { MapPin } from "lucide-react";
 import { useState } from "react";
 
+import { StarRating } from "@/components/shared/fields/star-rating";
 import { formatDate } from "@/lib/format/datetime";
 import { stars } from "@/lib/product-reviews/describe";
 import type { PickerReview } from "@/lib/product-reviews/picker-read";
@@ -23,6 +24,8 @@ export interface ReviewItem {
     quote: string;
     name: string;
     role?: string;
+    /** Stars out of five, when there are some: none is drawn otherwise. */
+    rating?: number;
 }
 
 /** A Testimonials section already on the page, by its place. */
@@ -72,6 +75,7 @@ export function ReviewPicker({
     const [picked, setPicked] = useState<string | null>(list[0]?.id ?? null);
     const [quote, setQuote] = useState("");
     const [name, setName] = useState("");
+    const [rating, setRating] = useState<number | null>(null);
     const [tried, setTried] = useState(false);
     const open = targets.filter((t) => !t.full);
     const [into, setInto] = useState<string>("new");
@@ -80,11 +84,21 @@ export function ReviewPicker({
         if (source === "products") {
             const r = list.find((x) => x.id === picked);
             return r
-                ? { quote: r.quote, name: r.name, role: r.productName }
+                ? {
+                      quote: r.quote,
+                      name: r.name,
+                      role: r.productName,
+                      // The stars the customer gave stay with the quote.
+                      rating: r.rating,
+                  }
                 : null;
         }
         if (source === "write" && quote.trim() && name.trim()) {
-            return { quote: quote.trim(), name: name.trim() };
+            return {
+                quote: quote.trim(),
+                name: name.trim(),
+                ...(rating === null ? {} : { rating }),
+            };
         }
         return null;
     };
@@ -226,6 +240,7 @@ export function ReviewPicker({
                                 onChange={(e) => setName(e.target.value)}
                             />
                         </Field>
+                        <StarRating value={rating} onChange={setRating} />
                         <p className="text-xs text-muted-foreground">
                             Write what a customer told you, in their words.
                             Shown as it is, without a &ldquo;verified&rdquo;

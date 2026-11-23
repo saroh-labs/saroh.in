@@ -4,6 +4,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import { LeaveBusiness } from "@/components/organizations/team/leave-business";
 import type { AlertPreferencesRead } from "@/lib/notifications/preferences";
 
+import { StaffProfileFields } from "@/components/staff/profile-photo";
+
 import { AlertsGrid } from "./alerts-grid";
 import { UsageSharingCard } from "./usage-sharing-card";
 
@@ -32,7 +34,18 @@ export function YourProfile({
     alerts,
     leave = null,
     sharesUsage,
+    mine = null,
 }: {
+    /**
+     * Your place on the diary, when you are on it: your photo and "About
+     * them", which show on the website's Our team and the calendar. Null
+     * when you are not on the diary or it couldn't be read: left out.
+     */
+    mine?: {
+        staffId: string;
+        photo: string | null;
+        about: string | null;
+    } | null;
     name: string;
     email: string;
     /** Your account on accounts.saroh.in. */
@@ -77,6 +90,16 @@ export function YourProfile({
                 aria-label="You"
                 className="overflow-hidden rounded-xl border border-border bg-card"
             >
+                {mine ? (
+                    <div className="border-b border-border/70 px-[18px] py-3.5">
+                        <StaffProfileFields
+                            staffId={mine.staffId}
+                            name={name}
+                            photo={mine.photo}
+                            about={mine.about}
+                        />
+                    </div>
+                ) : null}
                 <dl>
                     {rows.map((row, i) => (
                         <div

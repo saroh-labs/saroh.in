@@ -19,7 +19,7 @@ import {
 import { cn } from "@saroh/ui/lib/utils";
 import { Segmented } from "@saroh/ui/segmented";
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { count } from "@/lib/format/plural";
 import type {
@@ -33,6 +33,7 @@ import {
     compact,
     CTA_OF_FILL,
     elementAt,
+    elementMark,
     elementsOf,
     imageLevels,
     inForce,
@@ -48,13 +49,15 @@ import { resolveStyleVariables, withComponents } from "@/lib/sites/style";
 
 import { useEditorReadOnly } from "../read-only";
 import { CustomColour, ReadableLine } from "./button-colour-picker";
+import { ShadeStrip } from "./shade-strip";
 
-/** The Colour row's roles, in the board's order (CSI-C, without Tint). */
+/** The Colour row's roles, in the board's order (ERVPalette, with Brand tint). */
 const ROLES = [
     { value: "bg", label: "Background" },
     { value: "surface", label: "Panels" },
     { value: "fg", label: "Text" },
     { value: "accent", label: "Brand" },
+    { value: "tint", label: "Brand tint" },
     { value: "rule", label: "Lines" },
 ] as const;
 
@@ -296,7 +299,7 @@ export function ElementStyleTab({
             {changed.has(key) ? (
                 <span
                     data-style-changed={key}
-                    className="rounded-full bg-highlight-subtle px-2 text-xs font-semibold leading-[18px] text-highlight-subtle-foreground"
+                    className="rounded-full bg-muted px-2 text-xs font-semibold leading-[18px] text-foreground"
                 >
                     Changed
                 </span>
@@ -338,6 +341,8 @@ export function ElementStyleTab({
                                 value={colour}
                                 vars={vars}
                                 allowCustom={scope !== "site"}
+                                about={`${scopes.find((s) => s.value === scope)?.label ?? ""}`}
+                                onOpen={() => revealElement(element)}
                                 onChange={(v) => set("colour", v)}
                                 onTry={(hex) =>
                                     tryRef.current?.(
@@ -430,7 +435,7 @@ export function ElementStyleTab({
                     {changed.size > 0 ? (
                         <span
                             aria-hidden
-                            className="size-2 shrink-0 rounded-full bg-highlight"
+                            className="size-2 shrink-0 rounded-full bg-foreground"
                         />
                     ) : null}
                     <span className="min-w-0 flex-1">{changeLine}</span>
@@ -458,6 +463,16 @@ export function withSectionStyles(
     return { ...section, content } as Section;
 }
 
+/**
+ * On a phone the colour sheet covers the lower page: scroll the tapped
+ * button to the top of the canvas so it stays in view above the sheet.
+ */
+function revealElement(el: SelectedElement) {
+    document
+        .querySelector(`[data-site-el="${elementMark(el)}"]`)
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
 /** The site's colour roles as swatches, then Custom (CSI-C). */
 function ColourRow({
     labelledBy,
@@ -466,6 +481,8 @@ function ColourRow({
     allowCustom,
     onChange,
     onTry,
+    about,
+    onOpen,
 }: {
     labelledBy: string;
     value: string;
@@ -473,59 +490,85 @@ function ColourRow({
     allowCustom: boolean;
     onChange: (next: string) => void;
     onTry: (hex: string | null) => void;
+    about?: string;
+    onOpen?: () => void;
 }) {
     const custom = normalizeHex(value);
+    // The shade strip sits under the role last chosen; a shade is a custom
+    // colour, so a whole-site choice (roles only) has none.
+    const [baseRole, setBaseRole] = useState(custom ? "accent" : value);
+    const base = readableLine(baseRole, vars)?.fill ?? null;
+    const baseLabel = ROLES.find((r) => r.value === baseRole)?.label ?? "Brand";
     return (
-        <div className="flex flex-wrap items-start gap-0.5">
-            <ChoiceGroup
-                labelledBy={labelledBy}
-                value={custom ? null : value}
-                onChange={onChange}
-                className="flex flex-wrap gap-0.5"
-                itemClassName={(on) =>
-                    cn(
-                        "flex w-[52px] flex-col items-center gap-1 rounded-lg text-[11px] tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        on
-                            ? "font-semibold text-foreground"
-                            : "text-muted-foreground",
-                    )
-                }
-                choices={ROLES.map((r) => ({
-                    value: r.value,
-                    ariaLabel: r.label,
-                    data: { "data-colour-role": r.value },
-                    label: (
-                        <>
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "size-10 rounded-lg border",
-                                    value === r.value &&
-                                        "ring-2 ring-foreground ring-offset-2 ring-offset-background",
-                                )}
-                                style={{ background: roleFill(vars, r.value) }}
-                            />
-                            {r.label}
-                        </>
-                    ),
-                }))}
-            />
-            {allowCustom ? (
-                <CustomColour
-                    value={custom}
-                    start={readableLine(value, vars)?.fill ?? "#A65E3F"}
-                    role={custom ? null : value}
-                    roles={ROLES.map((r) => ({
+        <>
+            <div className="flex flex-wrap items-start gap-0.5">
+                <ChoiceGroup
+                    labelledBy={labelledBy}
+                    value={custom ? null : value}
+                    onChange={(next) => {
+                        setBaseRole(next);
+                        onChange(next);
+                    }}
+                    className="flex flex-wrap gap-0.5"
+                    itemClassName={(on) =>
+                        cn(
+                            "flex w-[52px] flex-col items-center gap-1 rounded-lg text-[11px] tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            on
+                                ? "font-semibold text-foreground"
+                                : "text-muted-foreground",
+                        )
+                    }
+                    choices={ROLES.map((r) => ({
                         value: r.value,
-                        label: r.value === "accent" ? "Brand colour" : r.label,
-                        hex: readableLine(r.value, vars)?.fill ?? null,
+                        ariaLabel: r.label,
+                        data: { "data-colour-role": r.value },
+                        label: (
+                            <>
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "size-10 rounded-lg border",
+                                        value === r.value &&
+                                            "ring-2 ring-foreground ring-offset-2 ring-offset-background",
+                                    )}
+                                    style={{
+                                        background: roleFill(vars, r.value),
+                                    }}
+                                />
+                                {r.label}
+                            </>
+                        ),
                     }))}
-                    onRole={onChange}
-                    onUse={onChange}
-                    onTry={onTry}
+                />
+                {allowCustom ? (
+                    <CustomColour
+                        value={custom}
+                        start={readableLine(value, vars)?.fill ?? "#A65E3F"}
+                        role={custom ? null : value}
+                        roles={ROLES.map((r) => ({
+                            value: r.value,
+                            label:
+                                r.value === "accent" ? "Brand colour" : r.label,
+                            hex: readableLine(r.value, vars)?.fill ?? null,
+                        }))}
+                        onRole={onChange}
+                        onUse={onChange}
+                        onTry={onTry}
+                        about={about}
+                        onOpen={onOpen}
+                    />
+                ) : null}
+            </div>
+            {allowCustom && base ? (
+                <ShadeStrip
+                    label={baseLabel}
+                    base={base}
+                    current={custom}
+                    onRole={() => onChange(baseRole)}
+                    onShade={onChange}
                 />
             ) : null}
-        </div>
+        </>
     );
 }
 

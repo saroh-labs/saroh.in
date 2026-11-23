@@ -149,6 +149,7 @@ exports[`Classic's theme is pinned > bakery in cardamom 1`] = `
                 --site-body-size: 16.5px;
                 --site-measure: 58ch;
                 --site-content-width: 1240px;
+                --site-tint: 57 25% 84.31%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -424,6 +425,7 @@ exports[`Classic's theme is pinned > bakery in crust 1`] = `
                 --site-body-size: 16.5px;
                 --site-measure: 58ch;
                 --site-content-width: 1240px;
+                --site-tint: 21.82 37.93% 88.63%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -697,6 +699,7 @@ exports[`Classic's theme is pinned > blogs in indigo 1`] = `
                 --site-body-size: 18.5px;
                 --site-measure: 76ch;
                 --site-content-width: 980px;
+                --site-tint: 236.25 38.1% 91.76%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -978,6 +981,7 @@ exports[`Classic's theme is pinned > blogs in red 1`] = `
                 --site-body-size: 18.5px;
                 --site-measure: 76ch;
                 --site-content-width: 980px;
+                --site-tint: 15.79 38.78% 90.39%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -1258,6 +1262,7 @@ exports[`Classic's theme is pinned > ceramics in green 1`] = `
                 --site-body-size: 16px;
                 --site-measure: 62ch;
                 --site-content-width: 1180px;
+                --site-tint: 66 12.2% 83.92%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -1538,6 +1543,7 @@ exports[`Classic's theme is pinned > ceramics in oxblood 1`] = `
                 --site-body-size: 16px;
                 --site-measure: 62ch;
                 --site-content-width: 1180px;
+                --site-tint: 336 7.04% 86.08%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -1819,6 +1825,7 @@ exports[`Classic's theme is pinned > clinic in heather 1`] = `
                 --site-body-size: 16px;
                 --site-measure: 68ch;
                 --site-content-width: 1120px;
+                --site-tint: 262.5 17.39% 90.98%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -2100,6 +2107,7 @@ exports[`Classic's theme is pinned > clinic in tide 1`] = `
                 --site-body-size: 16px;
                 --site-measure: 68ch;
                 --site-content-width: 1120px;
+                --site-tint: 192.86 25% 89.02%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -2381,6 +2389,7 @@ exports[`Classic's theme is pinned > developer in cobalt 1`] = `
                 --site-body-size: 16.5px;
                 --site-measure: 76ch;
                 --site-content-width: 820px;
+                --site-tint: 212.31 27.66% 90.78%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -2662,6 +2671,7 @@ exports[`Classic's theme is pinned > developer in green 1`] = `
                 --site-body-size: 16.5px;
                 --site-measure: 76ch;
                 --site-content-width: 820px;
+                --site-tint: 140 16.98% 89.61%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -2943,6 +2953,7 @@ exports[`Classic's theme is pinned > dietician in clay 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 66ch;
                 --site-content-width: 1080px;
+                --site-tint: 16 31.91% 90.78%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -3216,6 +3227,7 @@ exports[`Classic's theme is pinned > dietician in sage 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 66ch;
                 --site-content-width: 1080px;
+                --site-tint: 111.43 13.73% 90%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -3489,6 +3501,7 @@ exports[`Classic's theme is pinned > gym in acid 1`] = `
                 --site-body-size: 15.5px;
                 --site-measure: 52ch;
                 --site-content-width: 1240px;
+                --site-tint: 72.5 42.86% 10.98%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -3762,6 +3775,7 @@ exports[`Classic's theme is pinned > gym in ice 1`] = `
                 --site-body-size: 15.5px;
                 --site-measure: 52ch;
                 --site-content-width: 1240px;
+                --site-tint: 196.36 15.07% 14.31%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -4035,6 +4049,7 @@ exports[`Classic's theme is pinned > personal in clay 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -4308,6 +4323,7 @@ exports[`Classic's theme is pinned > personal in harbour 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -4581,6 +4597,7 @@ exports[`Classic's theme is pinned > personal in stone 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -4854,6 +4871,7 @@ exports[`Classic's theme is pinned > portfolio in clay 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -5127,6 +5145,7 @@ exports[`Classic's theme is pinned > portfolio in harbour 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -5400,6 +5419,7 @@ exports[`Classic's theme is pinned > portfolio in stone 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -5673,6 +5693,7 @@ exports[`Classic's theme is pinned > salon in kesar 1`] = `
                 --site-body-size: 16px;
                 --site-measure: 60ch;
                 --site-content-width: 1200px;
+                --site-tint: 18.46 41.94% 87.84%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -5946,6 +5967,7 @@ exports[`Classic's theme is pinned > salon in mauve 1`] = `
                 --site-body-size: 16px;
                 --site-measure: 60ch;
                 --site-content-width: 1200px;
+                --site-tint: 307.5 27.59% 88.63%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -6219,6 +6241,7 @@ exports[`Classic's theme is pinned > starter in clay 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 21.6 40.98% 88.04%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -6492,6 +6515,7 @@ exports[`Classic's theme is pinned > starter in harbour 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 208 24.59% 88.04%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -6765,6 +6789,7 @@ exports[`Classic's theme is pinned > starter in stone 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 64ch;
                 --site-content-width: 1120px;
+                --site-tint: 82.5 11.43% 86.27%;
             }
             :root [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
                 max-width: var(--site-content-width);
@@ -7037,6 +7062,7 @@ exports[`Classic's theme is pinned > studio in ivory 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 70ch;
                 --site-content-width: 1320px;
+                --site-tint: 34.29 18.92% 85.49%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
@@ -7317,6 +7343,7 @@ exports[`Classic's theme is pinned > studio in mono 1`] = `
                 --site-body-size: 17px;
                 --site-measure: 70ch;
                 --site-content-width: 1320px;
+                --site-tint: 60 1.41% 86.08%;
             }
             :root :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;

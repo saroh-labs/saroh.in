@@ -23,6 +23,7 @@ const ROLE_PAIR: Record<ColourRole, { fill: string; ink: string }> = {
         fill: "hsl(var(--site-accent))",
         ink: "hsl(var(--site-accent-fg))",
     },
+    tint: { fill: "hsl(var(--site-tint))", ink: "hsl(var(--site-fg))" },
     fg: { fill: "hsl(var(--site-fg))", ink: "hsl(var(--site-bg))" },
     surface: { fill: "hsl(var(--site-surface))", ink: "hsl(var(--site-fg))" },
     bg: { fill: "hsl(var(--site-bg))", ink: "hsl(var(--site-fg))" },

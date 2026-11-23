@@ -147,7 +147,13 @@ export function TeamPeople({
                                 />
                             </button>
                         ) : null}
-                        <TeamAvatar name={m.name} />
+                        <TeamAvatar
+                            name={m.name}
+                            photo={
+                                read?.team?.find((p) => p.id === m.staffId)
+                                    ?.photo?.url
+                            }
+                        />
                         <span className="grid min-w-0 flex-1 gap-0.5">
                             <b className="truncate text-[0.84rem]">{m.name}</b>
                             {can ? (

@@ -149,7 +149,7 @@ describe("every combination keeps the floor (R2)", () => {
     // Button colour (DEC-254) adds the page, the accent and its words:
     // each a role the palette holds to 4.5:1 with its pair.
     const HELD =
-        /hsl\(var\(--site-(fg|bg|surface|accent|accent-fg|rule, var\(--site-border\))\)/;
+        /hsl\(var\(--site-(fg|bg|surface|accent|accent-fg|tint|rule, var\(--site-border\))\)/;
 
     it.each(cases)("$name", ({ out }) => {
         // No control is made shorter than its 44px touch floor.

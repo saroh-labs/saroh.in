@@ -106,6 +106,23 @@ export default async function PeoplePage() {
     const teamLimit = seats ? { full: seats.full, why: seats.why } : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);
     const pausedPeople = pausedTeam(paused);
+    // An owner or admin sets a team member's photo from their sheet; it is
+    // theirs to see only where the diary could be read.
+    const staffProfiles: Record<
+        string,
+        { staffId: string; photo: string | null; about: string | null }
+    > = {};
+    if (may("service:write")) {
+        for (const p of staff?.staff ?? []) {
+            if (p.membership) {
+                staffProfiles[p.membership.userId] = {
+                    staffId: p.id,
+                    photo: p.photo?.url ?? null,
+                    about: p.about ?? null,
+                };
+            }
+        }
+    }
 
     return (
         <SettingsPanel width="full">
@@ -129,6 +146,7 @@ export default async function PeoplePage() {
                     invitations,
                 )}
                 rolesLock={canEditRoles ? rolesLock(access) : null}
+                staffProfiles={staffProfiles}
                 paused={pausedPeople}
                 calendar={calendar}
                 // Over the limit (#800), the paused notes say it and link

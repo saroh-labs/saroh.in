@@ -3333,3 +3333,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 - The hard-coded radii that a merchant's choice never reached now read the shared variables, with today's value as the fallback: Live's timetable day cards (20px) and phone service tiles (14px) the card corners; the price, timetable and next-free badges (9px, 4px) the tag corners; Quiet and Live team photos (round) and the phone hero photo (square) the image corners. Live's header button is drawn as a button, so it follows Buttons, not Slots and tags.
 - An untouched site draws exactly as before. No lock state is shown: nothing is locked any more.
+
+## DEC-256 Colourways plus one colour of your own; a Brand tint; shades; a warning, not a wall
+
+**Status: Accepted — 2026-11-23** · owner (23 Nov 2026, boards ERVPalette, ERVPhoneColour, ERVPreviewLabel, ERVBoardFixes) · answers DEC-254's "not decided yet" · relaxes DEC-254's refusal
+
+- **Colourways only:** the template's ready colourways, plus one colour of your own ("Your colour"). The six curated rows ("Edit each colour") stay as they are today; whether they are a free palette builder to retire is the owner's call.
+- **Brand tint** is a role beside Background, Panels, Text, Brand and Lines: a soft wash of the brand colour for a highlighted band or a button, `--site-tint` in the `--site-*` layer (a look's accent tint when it has one, else the accent mixed into the page at 12% and eased back until the page's text reads on it at 4.5:1). It follows Brand. A button can take it (`tint` in `buttonColour`).
+- **Shades:** a five-step strip, lighter to darker, under the selected role in a button's Colour row; the middle step is the role, the others are custom colours.
+- **Contrast is a warning, not a wall:** a custom colour or shade neither white nor dark words read on at 4.5:1 says so before it is saved, and the merchant confirms ("Use it anyway"). The API now refuses only a value that is not `#RRGGBB`.
+- **Phone:** Custom opens as a bottom sheet (the shared Drawer), the tapped button scrolled into view above it, Use this colour pinned on top of Cancel. While a colour is tried on the canvas, "Preview only · not saved" shows (desk: in the canvas bar; phone: under the top bar) and goes on Use, Cancel or the Site colours tab.
+- **Cards are styled per section or for the whole site only;** there is no "This card" (and no per-card storage).
+- **Page rows** in the editor show the first photo on the page (its stored smaller copy), or a plain page icon.

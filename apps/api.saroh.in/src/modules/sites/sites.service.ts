@@ -7,6 +7,7 @@ import {
     Optional,
     ServiceUnavailableException,
 } from "@nestjs/common";
+import { firstPhotoOf } from "@saroh/block-contract";
 import type { PageKind } from "@saroh/database";
 import {
     getSectionContract,
@@ -1636,6 +1637,18 @@ export class SitesService {
                         ...PAGE_HEAD_SELECT,
                         // The Pages tab's Updated column (#908).
                         ...pageUpdatedSelect,
+                        // And the editor's page rows' first photo.
+                        versions: {
+                            ...pageUpdatedSelect.versions,
+                            select: {
+                                updatedAt: true,
+                                sections: {
+                                    where: { hidden: false },
+                                    orderBy: { order: "asc" as const },
+                                    select: { content: true },
+                                },
+                            },
+                        },
                     },
                 },
             },
@@ -1676,6 +1689,9 @@ export class SitesService {
                     updatedAt: page.updatedAt,
                     versions,
                 }),
+                firstPhoto: firstPhotoOf(
+                    (versions[0]?.sections ?? []).map((s) => s.content),
+                ),
             })),
             // As it applies now (DEC-103): switched on under a plan without
             // the approval row, it reads as off, as publishing treats it.
@@ -3213,6 +3229,7 @@ export class SitesService {
             snapshot: (await liveTeamSnapshot(
                 snapshot,
                 site.organizationId,
+                this.media,
             )) as typeof snapshot,
             publishedAt,
             siteId: site.id,

@@ -26,7 +26,7 @@ export const COMPONENT_STYLE_OPTIONS = {
      * colour (a palette role; a custom colour is per element or section
      * only, `element-styles.ts`). Each look's default is "as it draws today".
      */
-    buttonColour: ["accent", "fg", "surface", "bg", "rule"],
+    buttonColour: ["accent", "tint", "fg", "surface", "bg", "rule"],
     buttonStyle: ["filled", "outline", "soft", "link"],
     buttonSize: ["s", "m", "l"],
     cards: ["flat", "bordered", "raised"],
@@ -83,6 +83,7 @@ export const COMPONENT_OPTION_LABELS: {
     buttonSize: { s: "Small", m: "Medium", l: "Large" },
     buttonColour: {
         accent: "Brand",
+        tint: "Brand tint",
         fg: "Text",
         surface: "Panels",
         bg: "Background",

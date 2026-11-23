@@ -89,8 +89,8 @@ describe("Our team, read live", () => {
         const out = liveTeamSection(
             team.content,
             new Map([
-                ["st_1", "Asha Rao"],
-                ["st_2", "Farah Sheikh"],
+                ["st_1", { name: "Asha Rao" }],
+                ["st_2", { name: "Farah Sheikh" }],
             ]),
         );
         expect(out).toMatchObject({
@@ -105,8 +105,44 @@ describe("Our team, read live", () => {
         });
     });
 
+    it("draws a bound person's photo and About them from the profile, not the page's old copies", () => {
+        const image = { src: "https://m.example/asha.webp", alt: "Asha Rao" };
+        const out = liveTeamSection(
+            {
+                ...team.content,
+                image: { src: "https://old.example/x.jpg", alt: "" },
+                bio: "old words",
+                people: [
+                    { staffId: "st_2", name: "Farah", bio: "old farah" },
+                    { name: "Typed Person", bio: "typed words" },
+                ],
+            },
+            new Map([
+                [
+                    "st_1",
+                    {
+                        name: "Asha Rao",
+                        image,
+                        about: "Ten years on the dock.",
+                    },
+                ],
+                ["st_2", { name: "Farah" }],
+            ]),
+        ) as Record<string, unknown> & { people: Record<string, unknown>[] };
+        expect(out.image).toEqual(image);
+        expect(out.bio).toBe("Ten years on the dock.");
+        // No photo or words on the profile: initials, and nothing stale.
+        expect(out.people[0]).not.toHaveProperty("image");
+        expect(out.people[0]).not.toHaveProperty("bio");
+        // Typed by hand: as typed.
+        expect(out.people[1]).toMatchObject({ bio: "typed words" });
+    });
+
     it("takes off someone no longer chosen, moving the next person up", () => {
-        const out = liveTeamSection(team.content, new Map([["st_2", "Farah"]]));
+        const out = liveTeamSection(
+            team.content,
+            new Map([["st_2", { name: "Farah" }]]),
+        );
         expect(out).toMatchObject({
             staffId: "st_2",
             name: "Farah",

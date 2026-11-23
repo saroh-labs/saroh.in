@@ -61,11 +61,18 @@ describe("one element's own style", () => {
                 "color-mix(in srgb, hsl(var(--site-fg)) 16%, transparent)",
         });
         expect(buttonInlineStyle("link", { size: "l" })).toBeUndefined();
-        // An unreadable custom colour never reaches CSS.
-        expect(buttonInlineStyle("primary", { colour: "#777777" })).toBe(
-            undefined,
-        );
+        // Not a colour, never reaches CSS; a hard-to-read one is the
+        // merchant's confirmed choice (DEC-256) and draws.
+        expect(buttonInlineStyle("primary", { colour: "red" })).toBe(undefined);
+        expect(
+            buttonInlineStyle("primary", { colour: "#777777" }),
+        ).toMatchObject({ backgroundColor: "#777777" });
         expect(colourPair("url(x)")).toBeNull();
+        // Brand tint (DEC-256): the site's tint, the page's own words on it.
+        expect(colourPair("tint")).toEqual({
+            fill: "hsl(var(--site-tint))",
+            ink: "hsl(var(--site-fg))",
+        });
     });
 
     it("draws Soft as a tint with the page's words", () => {

@@ -232,6 +232,7 @@ export function readableLine(
     }
     const PAIRS: Record<string, [string, string]> = {
         accent: ["--site-accent", "--site-accent-fg"],
+        tint: ["--site-tint", "--site-fg"],
         fg: ["--site-fg", "--site-bg"],
         surface: ["--site-surface", "--site-fg"],
         bg: ["--site-bg", "--site-fg"],
@@ -285,6 +286,7 @@ const ROLE_VARIABLE: Record<string, string> = {
     surface: "--site-surface",
     fg: "--site-fg",
     accent: "--site-accent",
+    tint: "--site-tint",
     rule: "--site-rule",
 };
 

@@ -1,5 +1,6 @@
 import { prisma } from "@saroh/database";
 
+import type { MediaService } from "../media/media.service";
 import { teamPageWhere } from "./page-starters";
 
 /**
@@ -24,6 +25,14 @@ const MEMBER_KEYS = [
 ] as const;
 
 type Obj = Record<string, unknown>;
+
+/** What a chosen person's profile says now. */
+export interface LivePerson {
+    name: string;
+    /** Their photo as a section's image, or none: initials show. */
+    image?: Obj;
+    about?: string;
+}
 
 const isObj = (v: unknown): v is Obj =>
     v !== null && typeof v === "object" && !Array.isArray(v);
@@ -70,7 +79,7 @@ export function boundStaffIds(snapshot: unknown): Set<string> {
  */
 export function liveTeamSection(
     content: Obj,
-    chosen: ReadonlyMap<string, string>,
+    chosen: ReadonlyMap<string, LivePerson>,
 ): Obj | null {
     const kept: Obj[] = [];
     for (const m of membersOf(content)) {
@@ -79,8 +88,16 @@ export function liveTeamSection(
             kept.push(m);
             continue;
         }
-        const name = chosen.get(id);
-        if (name) kept.push({ ...m, name });
+        const live = chosen.get(id);
+        if (!live) continue;
+        // The profile's photo and words, never the page's own copies.
+        const { image: _image, imageBrief: _brief, bio: _bio, ...rest } = m;
+        kept.push({
+            ...rest,
+            name: live.name,
+            ...(live.image ? { image: live.image } : {}),
+            ...(live.about ? { bio: live.about } : {}),
+        });
     }
     const first = kept.shift();
     if (first === undefined) return null;
@@ -105,7 +122,7 @@ export function liveTeamSection(
  */
 export function withLiveTeam(
     snapshot: unknown,
-    chosen: ReadonlyMap<string, string>,
+    chosen: ReadonlyMap<string, LivePerson>,
 ): unknown {
     if (!isObj(snapshot) || !Array.isArray(snapshot.pages)) return snapshot;
     const keys = isObj(snapshot.keys) ? { ...snapshot.keys } : null;
@@ -159,12 +176,56 @@ export function withLiveTeam(
 export async function liveTeamSnapshot(
     snapshot: unknown,
     organizationId: string,
+    media?: MediaService,
 ): Promise<unknown> {
     const ids = boundStaffIds(snapshot);
     if (ids.size === 0) return snapshot;
     const rows = await prisma.staffMember.findMany({
         where: { ...teamPageWhere(organizationId), id: { in: [...ids] } },
-        select: { id: true, name: true },
+        select: { id: true, name: true, about: true, photoMediaId: true },
     });
-    return withLiveTeam(snapshot, new Map(rows.map((r) => [r.id, r.name])));
+    const people = await Promise.all(
+        rows.map(async (r): Promise<[string, LivePerson]> => [
+            r.id,
+            {
+                name: r.name,
+                ...(r.about ? { about: r.about } : {}),
+                ...(r.photoMediaId && media
+                    ? await photoOf(
+                          media,
+                          organizationId,
+                          r.photoMediaId,
+                          r.name,
+                      )
+                    : {}),
+            },
+        ]),
+    );
+    return withLiveTeam(snapshot, new Map(people));
+}
+
+/** A profile photo as a section's image; nothing when it can't be served. */
+async function photoOf(
+    media: MediaService,
+    organizationId: string,
+    mediaId: string,
+    name: string,
+): Promise<{ image?: Obj }> {
+    try {
+        const m = await media.readyObject(organizationId, mediaId);
+        if (!m.url) return {};
+        return {
+            image: {
+                src: m.url,
+                alt: name,
+                ...(m.width && m.height
+                    ? { width: m.width, height: m.height }
+                    : {}),
+                ...(m.placeholder ? { placeholder: m.placeholder } : {}),
+                ...(m.widths.length > 0 ? { widths: m.widths } : {}),
+            },
+        };
+    } catch {
+        return {};
+    }
 }

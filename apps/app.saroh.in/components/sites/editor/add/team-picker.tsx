@@ -21,14 +21,27 @@ export function teamRoleWord(role: string | undefined): string {
     return "Staff";
 }
 
-/** A round avatar of initials; staff carry no photo (DEC-248). */
+/** A round avatar: their profile photo, or their initials when none. */
 export function TeamAvatar({
     name,
     owner = false,
+    photo = null,
 }: {
     name: string;
     owner?: boolean;
+    /** Their profile photo's address, when they have one. */
+    photo?: string | null;
 }) {
+    if (photo) {
+        return (
+            // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photo, outside next/image's allowlist
+            <img
+                src={photo}
+                alt=""
+                className="size-8 flex-none rounded-full border border-border object-cover coarse:size-[34px]"
+            />
+        );
+    }
     return (
         <span
             aria-hidden
@@ -99,7 +112,7 @@ export function TeamPicker({
             pending={busy}
             saveLabel={
                 phone
-                    ? `Save · ${count(picked.length, "person", "people")}`
+                    ? `Save ${count(picked.length, "person", "people")}`
                     : "Save"
             }
             savingLabel="Saving…"
@@ -141,6 +154,7 @@ export function TeamPicker({
                                     <TeamAvatar
                                         name={p.name}
                                         owner={role === "OWNER"}
+                                        photo={p.photo?.url}
                                     />
                                     <span className="grid min-w-0 flex-1">
                                         <span className="truncate text-[0.84rem] font-semibold">

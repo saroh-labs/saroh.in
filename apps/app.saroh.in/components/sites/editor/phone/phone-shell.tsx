@@ -12,6 +12,7 @@ import { selectRailTab } from "../editor-rail";
 import { EditorSheet } from "../editor-sheet";
 import type { InspectorHost } from "../inspector-host";
 import type { EditorModel } from "../shell/editor-model";
+import { PreviewLabel } from "../shell/preview-label";
 import { ReviewerStrip } from "../shell/reviewer-strip";
 import { FirstHint } from "./first-hint";
 import { PageMenuSheet, PhonePageBar } from "./page-menu-sheet";
@@ -142,6 +143,11 @@ export function PhoneShell({ model, topBar, children }: PhoneShellProps) {
                 className="relative grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]"
             >
                 {canvas}
+                {selection.trial ? (
+                    <div className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center">
+                        <PreviewLabel />
+                    </div>
+                ) : null}
             </div>
             {foot}
 

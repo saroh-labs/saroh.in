@@ -720,7 +720,7 @@ function elementOutline(
             : scope === "section"
               ? "This section"
               : `This ${element.kind === "button" ? "button" : "photo"}`;
-    return `${moving}{outline:2px solid hsl(var(--highlight));outline-offset:4px}
+    return `${moving}{outline:2px solid hsl(var(--brand-surface));outline-offset:4px}
 ${block} ${mark}{position:relative}
 ${block} ${mark}::before{content:"${word} · ${where}";position:absolute;left:-6px;top:-34px;white-space:nowrap;background:hsl(var(--brand-surface));color:hsl(var(--brand-surface-foreground));font:600 13px/1.5 system-ui,sans-serif;padding:2px 8px;border-radius:6px;z-index:20;pointer-events:none}`;
 }

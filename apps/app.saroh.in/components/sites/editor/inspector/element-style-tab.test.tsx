@@ -16,11 +16,16 @@ import { ElementStyleTab } from "./element-style-tab";
 
 let host: HTMLDivElement;
 let root: Root;
+/** True: a phone-width screen, where the colour picker is a bottom sheet. */
+let phone = false;
 beforeEach(() => {
-    // jsdom has no matchMedia: the picker asks it which side to open on.
+    phone = false;
+    // jsdom has no matchMedia: the picker asks it whether this is a phone.
     window.matchMedia = ((q: string) => ({
-        matches: true,
+        matches: phone,
         media: q,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
     })) as unknown as typeof window.matchMedia;
     host = document.createElement("div");
     document.body.append(host);
@@ -116,7 +121,14 @@ describe("a button's Style tab (CSI-C, CS1)", () => {
         expect(at("Colour")).toBeLessThan(at("Style"));
         expect(at("Corners")).toBeLessThan(at("Size"));
         expect(text).toContain("Only “Browse the catalogue” changes.");
-        for (const role of ["Background", "Panels", "Text", "Brand", "Lines"]) {
+        for (const role of [
+            "Background",
+            "Panels",
+            "Text",
+            "Brand",
+            "Brand tint",
+            "Lines",
+        ]) {
             expect(host.querySelector(`[aria-label="${role}"]`)).not.toBeNull();
         }
         expect(text).toContain("Custom");
@@ -296,5 +308,130 @@ describe("a button's Style tab (CSI-C, CS1)", () => {
             ),
         );
         expect(onTry.mock.calls.at(-1)?.[0]).toBeNull();
+    });
+
+    it("puts the colour picker in a bottom sheet on a phone, Use on top and pinned", () => {
+        phone = true;
+        const reveal = vi.fn();
+        draw({ onTry: vi.fn() });
+        // The tapped button is scrolled into view above the sheet.
+        const target = document.createElement("a");
+        target.dataset.siteEl = "button:cta";
+        document.body.append(target);
+        const scroll = vi.fn();
+        target.scrollIntoView = scroll;
+        press(host.querySelector("[data-colour-custom]"));
+        const sheet = document.querySelector("[data-colour-sheet]");
+        expect(sheet).not.toBeNull();
+        expect(sheet?.textContent).toContain("Button colour");
+        expect(sheet?.textContent).toContain("Recent");
+        expect(sheet?.textContent).toContain("Hex");
+        expect(scroll).toHaveBeenCalled();
+        expect(reveal).not.toHaveBeenCalled();
+        const buttons = Array.from(
+            document.querySelectorAll("[data-picker-actions] button"),
+        ).map((b) => b.textContent);
+        expect(buttons).toEqual(["Use this colour", "Cancel"]);
+        // No scrim: the page stays in reach.
+        expect(document.querySelector("[data-vaul-overlay]")).toBeNull();
+    });
+
+    it("hides the Style sheet while the phone colour sheet is open, and brings it back", () => {
+        phone = true;
+        host.dataset.editorSheet = "Button";
+        const { onChange } = draw({ onTry: vi.fn() });
+        const sheetHidden = () => host.hasAttribute("data-colour-open");
+        press(host.querySelector("[data-colour-custom]"));
+        expect(sheetHidden()).toBe(true);
+        // Cancel: back to the Style sheet.
+        press(
+            Array.from(
+                document.querySelectorAll("[data-picker-actions] button"),
+            ).find((b) => b.textContent === "Cancel"),
+        );
+        expect(sheetHidden()).toBe(false);
+        expect(onChange).not.toHaveBeenCalled();
+        // Use this colour: saved, and back.
+        press(host.querySelector("[data-colour-custom]"));
+        expect(sheetHidden()).toBe(true);
+        const hex = document.querySelector<HTMLInputElement>(
+            "[data-button-colour] input[aria-invalid]",
+        );
+        act(() => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )?.set?.call(hex, "#1F5F8B");
+            hex?.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        press(radio("Use this colour"));
+        expect(onChange).toHaveBeenCalled();
+        expect(sheetHidden()).toBe(false);
+    });
+
+    it("warns before saving a colour no words read on, and keeps it when confirmed", () => {
+        window.localStorage.clear();
+        const onTry = vi.fn<(next: Section | null) => void>();
+        const { onChange } = draw({ onTry });
+        press(host.querySelector("[data-colour-custom]"));
+        const hex = document.querySelector<HTMLInputElement>(
+            "[data-button-colour] input[aria-invalid]",
+        );
+        act(() => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )?.set?.call(hex, "#777777");
+            hex?.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        press(radio("Use this colour"));
+        // Warned, not saved, not silent.
+        expect(onChange).not.toHaveBeenCalled();
+        expect(
+            document.querySelector("[data-confirm-unreadable]")?.textContent,
+        ).toContain("hard to read");
+        press(radio("Use it anyway"));
+        expect(wrote(onChange, 0).cta.elementStyle).toEqual({
+            colour: "#777777",
+        });
+    });
+
+    it("shows a five-step shade strip under the selected role; a failing shade waits for a yes", () => {
+        const { onChange } = draw({
+            // The palette the strip's base colour comes from.
+            style: {
+                colours: {},
+                scalars: {},
+                palette: {
+                    bg: "#FFFFFF",
+                    surface: "#F7F2EC",
+                    fg: "#1C1A18",
+                    body: "#1C1A18",
+                    muted: "#4A4843",
+                    border: "#D9D6CC",
+                    accent: "#A65E3F",
+                    accentFg: "#FFFFFF",
+                    heroBg: "#FFFFFF",
+                    heroFg: "#1C1A18",
+                    ctaBg: "#A65E3F",
+                    ctaFg: "#FFFFFF",
+                    footerBg: "#FFFFFF",
+                    footerFg: "#1C1A18",
+                },
+            } as unknown as SiteStyle,
+        });
+        const strip = host.querySelector("[data-shade-strip]");
+        expect(strip).not.toBeNull();
+        expect(strip?.querySelectorAll("[data-shade]")).toHaveLength(5);
+        expect(strip?.textContent).toContain("Brand · shade");
+        // A readable shade is applied at once, as a custom colour.
+        const shades = Array.from(
+            strip?.querySelectorAll<HTMLElement>("[data-shade]") ?? [],
+        );
+        press(shades[4]);
+        expect(onChange).toHaveBeenCalledTimes(1);
+        expect(wrote(onChange, 0).cta.elementStyle).toEqual({
+            colour: expect.stringMatching(/^#[0-9A-F]{6}$/) as string,
+        });
     });
 });

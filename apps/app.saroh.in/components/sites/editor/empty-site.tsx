@@ -70,9 +70,15 @@ export function EmptySite({
     const start = async (look: LookChoice) => {
         setBusy(look);
         setError(null);
-        const done = await starter.copy(look === "classic" ? null : look, true);
-        setBusy(null);
-        if (!done.ok) setError(done.error);
+        try {
+            const done = await starter.copy(
+                look === "classic" ? null : look,
+                true,
+            );
+            if (!done.ok) setError(done.error);
+        } finally {
+            setBusy(null);
+        }
     };
     return (
         <>
@@ -107,6 +113,7 @@ export function EmptySite({
                                 {looks.map((look) => (
                                     <li key={look}>
                                         <Button
+                                            data-ph-unmask=""
                                             type="button"
                                             variant="outline"
                                             size="sm"

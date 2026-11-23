@@ -162,6 +162,8 @@ describe("a list draws the one toolbar", () => {
                     "the editor's Add panel: one search over pages and sections to add, in a side panel with no list toolbar (U46e)",
                 "components/sites/editor/add/from-your-business.tsx":
                     "Add › A service: a search over services to pick, inside the Add panel (U46e)",
+                "components/sites/editor/add/team-picker.tsx":
+                    "Our team's Add people sheet: a search over the business's team to pick, in a sheet with no list toolbar (DEC-252)",
                 "components/sites/editor/sheets/photo-sheet.tsx":
                     "the photo sheet's search over the business's photos, inside the sheet beside Upload (U46d)",
             },

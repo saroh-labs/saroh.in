@@ -211,6 +211,8 @@ export const RAW_ALLOWED = {
     "components/shared/fields/gst-rate-picker.tsx": ["button"],
     // input: a file picker
     "components/shared/fields/logo-upload.tsx": ["input"],
+    // input: a file picker (a team member's photo)
+    "components/staff/profile-photo.tsx": ["input"],
     // button: a control styled by its screen's own helper
     "components/shared/shell/tab-bar.tsx": ["button"],
     // button: a chip
@@ -231,6 +233,8 @@ export const RAW_ALLOWED = {
     "components/sites/looks/colour-picker.tsx": ["button"],
     // button: Custom's swatch, a site colour row, a Recent swatch and the
     // contrast guard's two fixes; input: the hue strip (DEC-254, CSI-C, CS4)
+    // button: one step of the shade strip, a colour swatch (ERVPalette)
+    "components/sites/editor/inspector/shade-strip.tsx": ["button"],
     "components/sites/editor/inspector/button-colour-picker.tsx": [
         "button",
         "input",

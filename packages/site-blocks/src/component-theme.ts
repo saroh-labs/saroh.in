@@ -226,10 +226,9 @@ const RULES: Record<ComponentKind, Partial<Record<string, Rule>>> = {
             }`,
     },
     buttonColour: Object.fromEntries(
-        (["accent", "fg", "surface", "bg", "rule"] as const).map((role) => [
-            role,
-            (at: string) => buttonColour(at, role),
-        ]),
+        (["accent", "tint", "fg", "surface", "bg", "rule"] as const).map(
+            (role) => [role, (at: string) => buttonColour(at, role)],
+        ),
     ),
     // Filled and Medium are the look's own: never written for the site.
     buttonStyle: {

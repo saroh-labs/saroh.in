@@ -14,6 +14,7 @@ import { Minus, Monitor, Plus, Smartphone, Tablet } from "lucide-react";
 
 import type { Device, Zoom } from "../editor-constants";
 import { ZOOMS } from "../editor-constants";
+import { PreviewLabel } from "./preview-label";
 
 /** The desk's words for the three widths (RULES §1). */
 const WIDTHS: { value: Device; label: string; icon: React.ReactNode }[] = [
@@ -46,6 +47,7 @@ export function CanvasBar({
     zoom,
     onDevice,
     onZoom,
+    previewing = false,
 }: {
     address: string | null;
     path: string;
@@ -53,6 +55,8 @@ export function CanvasBar({
     zoom: Zoom;
     onDevice: (device: Device) => void;
     onZoom: (zoom: Zoom) => void;
+    /** A custom colour is drawn on the page and not saved. */
+    previewing?: boolean;
 }) {
     const link = address ? `${address}${path === "/" ? "" : path}` : path;
     return (
@@ -69,6 +73,7 @@ export function CanvasBar({
             </b>
             <span className="shrink-0 font-mono">Draft</span>
             <span className="flex-1" />
+            {previewing ? <PreviewLabel /> : null}
             <Segmented<Device>
                 label="Preview width"
                 value={device}

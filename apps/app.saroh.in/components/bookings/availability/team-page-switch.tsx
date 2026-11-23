@@ -26,11 +26,12 @@ export function TeamPageSwitch({
             className="mt-4 flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-sm"
             data-team-page-line=""
         >
-            <span className="min-w-0 flex-1">
+            <span data-ph-unmask="" className="min-w-0 flex-1">
                 On the website&apos;s Our team page
             </span>
             {canManage ? (
                 <Link
+                    data-ph-unmask=""
                     href="/sites/our-team"
                     className="shrink-0 whitespace-nowrap font-semibold underline decoration-border underline-offset-[3px] hover:decoration-foreground"
                 >

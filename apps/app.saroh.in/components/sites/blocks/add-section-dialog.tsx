@@ -240,6 +240,7 @@ export function AddSectionDialog({
                                     {categories.map(({ name, families }) => (
                                         <li key={name}>
                                             <Button
+                                                data-ph-unmask=""
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
