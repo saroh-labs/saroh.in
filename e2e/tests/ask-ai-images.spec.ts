@@ -117,6 +117,12 @@ test.describe("Ask AI: images", { tag: "@serial" }, () => {
             );
             expect(await before.json()).toEqual([]);
 
+            if (isMobile) {
+                // The panel is as wide as the screen: nothing runs off it (the card is gone once applied).
+                const box = await card.boundingBox();
+                expect(box?.x ?? 0).toBeGreaterThanOrEqual(0);
+            }
+
             await panel.getByRole("button", { name: "Apply" }).click();
             await expect(panel).toContainText("Saved · shows in your shop");
             const after = await page.request.get(
@@ -124,11 +130,6 @@ test.describe("Ask AI: images", { tag: "@serial" }, () => {
                 { headers: orgHeader },
             );
             expect(await after.json()).toHaveLength(1);
-            if (isMobile) {
-                // The panel is as wide as the screen: nothing runs off it.
-                const box = await card.boundingBox();
-                expect(box?.x ?? 0).toBeGreaterThanOrEqual(0);
-            }
         } finally {
             await removeProducts(page.request, NW, name);
             const library = await page.request.get(
