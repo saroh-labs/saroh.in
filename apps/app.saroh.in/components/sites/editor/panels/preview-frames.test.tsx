@@ -152,7 +152,12 @@ describe("PreviewFrames (U46f)", () => {
 
 describe("fitScale", () => {
     it("fits the three side by side, never above the page's own size", () => {
-        expect(fitScale([1280, 768, 390], 1920)).toBeCloseTo(0.7285, 3);
+        // (1920 - 64 - 80 - 6) / 2598: frames and gaps fit, no sideways scroll
+        expect(fitScale([1440, 768, 390], 1920)).toBeCloseTo(0.6813, 3);
+        for (const room of [1280, 1920, 2560]) {
+            const s = fitScale([1440, 768, 390], room);
+            expect(2598 * s + 64 + 80 + 6).toBeLessThanOrEqual(room + 0.01);
+        }
         expect(fitScale([390], 1920)).toBe(1);
         expect(fitScale([1280], 0)).toBe(0.25);
     });
