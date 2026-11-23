@@ -204,7 +204,12 @@ export class AskAiService {
     ): Promise<AskAiConversationView> {
         const c = await this.conversations.get(ctx, id);
         const ids = c.messages.flatMap((m) => m.images ?? []);
-        const views = await this.media.askAiImageViews(ctx.organizationId, ids);
+        const views = ids.length
+            ? await this.media.askAiImageViews(ctx.organizationId, ids)
+            : new Map<
+                  string,
+                  { mediaId: string; url: string; filename: string }
+              >();
         return {
             ...c,
             messages: c.messages.map(({ images, ...m }) => {

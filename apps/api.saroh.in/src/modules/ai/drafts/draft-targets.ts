@@ -456,13 +456,27 @@ async function readPlace(
     if (kind === "product") {
         const p = await prisma.product.findFirst({
             where: { id: rest.join(":"), organizationId: org },
-            select: { name: true, image: true, updatedAt: true },
+            select: {
+                name: true,
+                image: true,
+                updatedAt: true,
+                // The first photo's words: the card shows what the new one says.
+                images: {
+                    where: { kind: "photo" },
+                    orderBy: { position: "asc" },
+                    take: 1,
+                    select: { alt: true },
+                },
+            },
         });
         return p
             ? {
                   name: p.name,
                   updatedAt: p.updatedAt.toISOString(),
-                  fields: { photo: p.image ?? null },
+                  fields: {
+                      photo: p.image ?? null,
+                      alt: p.images[0]?.alt || null,
+                  },
               }
             : null;
     }
