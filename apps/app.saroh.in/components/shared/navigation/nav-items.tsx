@@ -334,6 +334,8 @@ export interface NavChild {
 export interface NavItem {
     href: string;
     label: string;
+    /** The phone's bottom tab says this instead (owner, 23 Nov). */
+    shortLabel?: string;
     icon: LucideIcon;
     /** What the actor must be able to do to reach it; see {@link navRoleCan}. */
     action?: NavAction | readonly NavAction[];
@@ -445,6 +447,7 @@ export const NAV_GROUPS: NavGroup[] = [
             {
                 href: "/calendar",
                 label: "Business calendar",
+                shortLabel: "Calendar",
                 icon: Calendar,
                 action: "org:read",
             },

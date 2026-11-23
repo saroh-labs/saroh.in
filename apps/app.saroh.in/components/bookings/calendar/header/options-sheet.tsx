@@ -100,7 +100,7 @@ export function OptionsSheet({
         team: readonly {
             key: string;
             name: string;
-            state: "CONNECTED" | "LAPSED" | "NONE";
+            state: "CONNECTED" | "LAPSED" | "PAUSED" | "NONE";
         }[];
     } | null;
 }) {
@@ -295,6 +295,7 @@ function Key({
 const STATE_WORDS = {
     CONNECTED: "Connected",
     LAPSED: "Needs reconnecting",
+    PAUSED: "Paused: your plan's calendar connections are used up",
     NONE: "Not connected",
 } as const;
 

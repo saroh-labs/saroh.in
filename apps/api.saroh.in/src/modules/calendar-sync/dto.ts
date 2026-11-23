@@ -164,7 +164,7 @@ export interface CalendarBusyView {
     on: boolean;
     busy: { staffId: string; startAt: string; endAt: string }[];
     /** Someone on the diary with a Google account here, and how it stands. */
-    people: { staffId: string; state: "CONNECTED" | "LAPSED" }[];
+    people: { staffId: string; state: "CONNECTED" | "LAPSED" | "PAUSED" }[];
 }
 
 /** `POST …/move-bookings`: how many are on their way. */

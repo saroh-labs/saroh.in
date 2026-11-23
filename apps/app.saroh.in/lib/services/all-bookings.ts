@@ -418,6 +418,18 @@ export function rowMenu(
     return items;
 }
 
+/**
+ * The rows as a viewer who may not read money gets them (DEC-098): no price
+ * and no amount to take, only `toTake`. Done in the server read, so the
+ * amounts never reach the browser, not only hidden by the Money column.
+ */
+export function withoutAmounts(rows: readonly DiaryBooking[]): DiaryBooking[] {
+    return rows.map(({ take, service, ...b }) => {
+        const { priceCents: _price, ...rest } = service;
+        return { ...b, service: rest, toTake: b.toTake ?? take != null };
+    });
+}
+
 /** "Take ₹400", or null when there is nothing to take. */
 export function takeLabel(b: DiaryBooking): string | null {
     return b.take

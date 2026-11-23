@@ -443,6 +443,19 @@ describe("Google busy times in the ⋯ sheet (BKVGoogle)", () => {
     });
     const openOpts = () => click(button(/^This day:/));
 
+    it("says a connection held back by the plan is paused, not lapsed", () => {
+        draw({
+            google: google({
+                people: [{ staffId: "neha", state: "PAUSED" as const }],
+            }),
+        });
+        openOpts();
+        expect(popover()?.textContent).toContain(
+            "Paused: your plan's calendar connections are used up",
+        );
+        expect(popover()?.textContent).not.toContain("only they can");
+    });
+
     it("has no Google part while Google Calendar is off", () => {
         draw({ google: null });
         openOpts();

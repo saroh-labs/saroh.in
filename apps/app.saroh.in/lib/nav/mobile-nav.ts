@@ -168,7 +168,7 @@ export function buildMobileNav({
         const section = isSection(item);
         return {
             key: item.href,
-            label: item.label,
+            label: item.shortLabel ?? item.label,
             href: section ? (pagesOf(item)[0]?.href ?? item.href) : item.href,
             icon: item.icon,
             count: section ? sectionCount(item) : count(item.href),

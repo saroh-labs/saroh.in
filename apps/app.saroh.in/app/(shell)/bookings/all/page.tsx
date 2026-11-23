@@ -30,6 +30,7 @@ import { bookingsListMoment } from "@/lib/moments/read";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+import { withoutAmounts } from "@/lib/services/all-bookings";
 import { canTakeDeskPayments } from "@/lib/services/booking-money";
 import { readBookingsByDay } from "@/lib/services/bookings-by-day";
 import { EVERYONE, openingPerson } from "@/lib/services/bookings-opens";
@@ -134,11 +135,17 @@ export default async function BookingsPage({
     // From Home's "Last 24 hours" (F6): the confirmed bookings made since
     // then, as Home counted them.
     const since = sinceParam(params);
-    const rows = since
+    const shown = since
         ? every.filter(
               (b) => b.status === "CONFIRMED" && isSince(b.createdAt, since),
           )
         : every;
+    // DEC-098: amounts leave the server only for someone who may see money
+    // (the Money column) or take it at the desk ("Take ₹X" needs the sum).
+    const rows =
+        may("payment:read") || canTakeDeskPayments(organization)
+            ? shown
+            : withoutAmounts(shown);
 
     // The business's first booking (wave G), said once.
     // Only the whole register can say it is the first.

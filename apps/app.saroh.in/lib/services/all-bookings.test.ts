@@ -27,6 +27,7 @@ import {
     UNASSIGNED,
     viewCounts,
     withFolds,
+    withoutAmounts,
 } from "./all-bookings";
 import type { DiaryBooking } from "./booking-calendar";
 
@@ -493,5 +494,21 @@ describe("a row", () => {
                 }),
             ),
         ).toBe("Open Arun's page");
+    });
+});
+
+describe("rows for a viewer who reads no money (DEC-098)", () => {
+    const take = { cents: 40000, byLink: false } as DiaryBooking["take"];
+    it("carry no price and no amount to take, only that there is one", () => {
+        const [row] = withoutAmounts([booking(1, { take })]);
+        expect(JSON.stringify(row)).not.toContain("40000");
+        expect(row.service.priceCents).toBeUndefined();
+        expect(row.take).toBeUndefined();
+        expect(row.toTake).toBe(true);
+    });
+    it("leave an owner's rows alone (the page only strips without payment:read)", () => {
+        const owner = booking(1, { take });
+        expect(owner.take?.cents).toBe(40000);
+        expect(owner.service.priceCents).toBe(80000);
     });
 });

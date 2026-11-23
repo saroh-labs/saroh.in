@@ -124,7 +124,10 @@ export function CalendarHeader({
     google?: {
         show: GoogleShow;
         onChange: (show: GoogleShow) => void;
-        people: readonly { staffId: string; state: "CONNECTED" | "LAPSED" }[];
+        people: readonly {
+            staffId: string;
+            state: "CONNECTED" | "LAPSED" | "PAUSED";
+        }[];
     } | null;
 }) {
     // The screen's transition: the diary greys while the header stays.

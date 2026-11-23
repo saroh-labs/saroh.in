@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import { busyPeople } from "./busy-people";
 import { readRange } from "./busy-range";
 import { businessPause, googleBusyConnections } from "./calendar-allowed";
 import type { CalendarBusyView } from "./dto";
@@ -68,15 +69,6 @@ export class CalendarBusyReadService {
                 },
             }),
         ]);
-        const states = new Map<string, "CONNECTED" | "LAPSED">();
-        for (const c of connections) {
-            const staffId = c.membership.staffMember?.id;
-            if (!staffId) continue;
-            const live = c.status === "CONNECTED" && allowed?.has(c.id);
-            // One account working is a person connected; else needs a look.
-            if (live) states.set(staffId, "CONNECTED");
-            else if (!states.has(staffId)) states.set(staffId, "LAPSED");
-        }
         return {
             on: true,
             busy: rows.map((r) => ({
@@ -84,7 +76,7 @@ export class CalendarBusyReadService {
                 startAt: r.startAt.toISOString(),
                 endAt: r.endAt.toISOString(),
             })),
-            people: [...states].map(([staffId, state]) => ({ staffId, state })),
+            people: busyPeople(connections, allowed),
         };
     }
 }

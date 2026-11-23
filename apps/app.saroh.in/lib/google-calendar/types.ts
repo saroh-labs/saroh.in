@@ -76,7 +76,7 @@ export interface CalendarBusy {
     /** Google Calendar is on for this business. */
     on: boolean;
     busy: { staffId: string; startAt: string; endAt: string }[];
-    people: { staffId: string; state: "CONNECTED" | "LAPSED" }[];
+    people: { staffId: string; state: "CONNECTED" | "LAPSED" | "PAUSED" }[];
 }
 
 export interface CalendarMember {
