@@ -257,4 +257,24 @@ describe("AdminOperationsService — execution", () => {
         expect(replay).toHaveBeenCalledWith("w1");
         expect(itemUpdate.mock.calls[0][0].data.status).toBe("DONE");
     });
+
+    it("skips an item erased while it ran, instead of throwing", async () => {
+        opFind.mockResolvedValue({
+            kind: "webhooks.replay",
+            failed: 0,
+            total: 1,
+        });
+        itemNext
+            .mockResolvedValueOnce({ id: "i1", targetId: "w1" })
+            .mockResolvedValueOnce(null);
+        itemClaim.mockResolvedValue({ count: 1 });
+        itemUpdate.mockImplementationOnce(() =>
+            Promise.reject(Object.assign(new Error("gone"), { code: "P2025" })),
+        );
+        const { service } = build({
+            replay: jest.fn(async () => ({ status: "processed" as const })),
+        });
+
+        await expect(service.run("op_1")).resolves.toBeUndefined();
+    });
 });

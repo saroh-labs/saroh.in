@@ -169,6 +169,8 @@ describe("retrying and cancelling jobs from a console", () => {
                 [job],
                 `none-${edition}`,
             );
+            // Let the background run finish before the next file truncates.
+            await running;
             await expect(
                 service.get(operation.id, edition),
             ).resolves.toBeTruthy();
