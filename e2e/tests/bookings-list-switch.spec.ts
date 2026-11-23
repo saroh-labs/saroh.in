@@ -61,10 +61,11 @@ test.describe("Calendar | List", () => {
     }) => {
         await page.goto("/bookings?layout=week");
         await expect(page.getByRole("link", { name: "Today" })).toBeVisible();
-        await page
-            .getByRole("button", { name: /Change the day or the view$/ })
-            .click();
         const sheet = page.getByRole("dialog", { name: "Go to a day" });
+        await pressUntil(
+            page.getByRole("button", { name: /Change the day or the view$/ }),
+            sheet,
+        );
         await expect(
             sheet
                 .getByRole("navigation", { name: "Show as" })

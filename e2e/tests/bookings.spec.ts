@@ -169,11 +169,16 @@ async function openPeek(
         .toISOString()
         .slice(0, 10);
     await page.goto(`/bookings?date=${day}&layout=agenda`);
-    await page
-        .getByRole("button", { name: new RegExp(booking.bookerName ?? "") })
-        .first()
-        .click();
-    return page.getByRole("dialog");
+    const sheet = page.getByRole("dialog");
+    // A row pressed before the agenda hydrates opens nothing: press until
+    // the sheet answers (`fixtures/press.ts`).
+    await pressUntil(
+        page
+            .getByRole("button", { name: new RegExp(booking.bookerName ?? "") })
+            .first(),
+        sheet,
+    );
+    return sheet;
 }
 
 async function diaries(request: APIRequestContext, from: string, to: string) {
@@ -281,7 +286,11 @@ test.describe("bookings calendar", () => {
             // Wednesday: picked at once, kept in the address, and the
             // list's count is the strip's.
             const wed = strip.getByRole("radio", { name: /^Wed / });
-            await wed.click();
+            // Pressed before hydration, a day does nothing: press until picked.
+            await pressUntil(
+                wed,
+                async () => (await wed.getAttribute("aria-checked")) === "true",
+            );
             await expect(wed).toHaveAttribute("aria-checked", "true");
             await expect(page).toHaveURL(/layout=week/);
             const label = (await wed.getAttribute("aria-label")) ?? "";
