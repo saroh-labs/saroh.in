@@ -15,7 +15,10 @@ import { whoCanChange } from "@/components/shared/states/who-can-change";
 export function CalendarNothing() {
     return (
         <>
-            <PageHeader breadcrumb={["Home", "Calendar"]} title="Calendar" />
+            <PageHeader
+                breadcrumb={["Home", "Business calendar"]}
+                title="Business calendar"
+            />
             <ModuleOffState
                 icon={<CalendarDays />}
                 name="Calendar"

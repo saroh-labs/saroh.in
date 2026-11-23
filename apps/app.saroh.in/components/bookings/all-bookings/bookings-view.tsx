@@ -1,20 +1,17 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
-import { ListSearch } from "@saroh/ui/list-search";
 import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
-import { ListFilter, ListToolbar } from "@saroh/ui/list-toolbar";
 import { useLocalPages } from "@saroh/ui/page-sizes";
-import { ScrollX } from "@saroh/ui/scroll-x";
 import { CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 
 import { TakePayment } from "@/components/bookings/booking-page/take-payment";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
-import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
 import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { useHold } from "@/components/shared/undo/use-hold";
@@ -30,8 +27,10 @@ import type {
 } from "@/lib/services/all-bookings";
 import {
     asksOutcome,
+    bookingsWord,
     defaultOrder,
     emptyView,
+    foldsIn,
     groupByDay,
     inView,
     matchesMore,
@@ -39,19 +38,22 @@ import {
     moreChoices,
     moreCount,
     NO_MORE,
+    NOBODY_ELSE_TODAY,
     ordered,
     personLabel,
     readView,
     rowMenu,
     rowStatus,
+    STATUS_PICKS,
     takeLabel,
     viewCounts,
     VIEWS,
+    withFolds,
 } from "@/lib/services/all-bookings";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { BookingOutcome } from "@/lib/services/booking-state";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
-import { whoFor } from "@/lib/services/diary";
+import { localDateOf, whoFor } from "@/lib/services/diary";
 import { zoneShortName } from "@/lib/services/time-picker";
 import type { ShareLink } from "@/lib/sites/share-links";
 import type { DateRange } from "@/lib/views/date-range";
@@ -60,9 +62,14 @@ import {
     NO_DATE_RANGE,
     writeDateRange,
 } from "@/lib/views/date-range";
-import { ChipGroup } from "@saroh/ui/choice-group";
 import { BookingRow, ROW_GRID } from "./booking-row";
-import { MoreBookingFilters } from "./more-filters";
+import {
+    FoldLine,
+    NarrowPill,
+    SearchToggle,
+    ShowingPicker,
+} from "./list-header";
+import { BookingFilters, datesWords } from "./more-filters";
 import { MoveSheet } from "./move-sheet";
 
 /**
@@ -71,14 +78,17 @@ import { MoveSheet } from "./move-sheet";
  * questions a diary does not — what's coming, what's waiting to be
  * marked, what's awaiting payment.
  *
- * - The views are chips with counts (Upcoming, Needs an outcome, Awaiting
- *   payment, Today, Next 7 days, All), after the search; More filters
- *   narrows by service, by who it is with and by status. `?view=` names
- *   the view, as Home's links do.
+ * - The views are one picker, "Showing: Upcoming 2 ▾" (Upcoming, Needs an
+ *   outcome, Awaiting payment, Today, Next 7 days, All, each with its
+ *   count; BLHB variant B). Search is an icon; one Filters button holds
+ *   Sort, Dates, Bookings for, Service and Status. `?view=` names the
+ *   view, as Home's links do. Counts hold only bookings still on: each
+ *   day's cancelled ones fold under it ("2 cancelled · Show").
  * - Rows sit under day headings ("Today · Mon 19 Oct", "Earlier today"),
  *   every time in the business's zone, labelled ("When · IST", Q10).
- * - A booking that has ended unmarked asks "Did they come?" on its row:
- *   Came or Didn't come, held ten seconds with Undo.
+ * - A booking that has ended unmarked asks "Did they come?" in its Status:
+ *   Came or Didn't come, held ten seconds with Undo. Owners and admins
+ *   also see a Money column (DEC-098: it follows `payment:read`).
  * - Each row's menu: Mark arrived, Take ₹X, Move to another time, Open the
  *   booking, Open their page, Cancel booking. Every cancel goes through the
  *   one cancel sheet (U3), which asks about the money (BA-01).
@@ -90,6 +100,8 @@ export interface AllBookingsCan extends RowAbilities {
     refund: boolean;
     /** `order:read`: a treatment's visit links to its order. */
     readOrder: boolean;
+    /** `payment:read`: the Money column (never for a Member or Reviewer). */
+    money: boolean;
     /** A payment link may be sent from Take ₹X. */
     link: boolean;
     /** The plan takes payment online. */
@@ -99,11 +111,6 @@ export interface AllBookingsCan extends RowAbilities {
 const EMPTY_LINE =
     "They show here when a customer books from your booking page, or when you add one.";
 
-const ORDERS = [
-    { value: "soonest", label: "Soonest first" },
-    { value: "latest", label: "Latest first" },
-] as const;
-
 export function BookingsView({
     bookings,
     timezone,
@@ -112,6 +119,9 @@ export function BookingsView({
     can,
     share = null,
     dates = NO_DATE_RANGE,
+    me = null,
+    showCancelled = false,
+    initialStaff = null,
 }: {
     bookings: DiaryBooking[];
     /** The business's zone: every time is read in it (Q10). */
@@ -130,14 +140,25 @@ export function BookingsView({
      * while the page is live (DEC-069, L8); null leaves it out.
      */
     share?: ShareLink | null;
+    /** The viewer on the diary, for "Just me"; null when they aren't on it. */
+    me?: { id: string; name: string } | null;
+    /** "Show cancelled bookings" in the "…" sheet: every day's fold is open. */
+    showCancelled?: boolean;
+    /** "Show bookings for" opens on this person (Just me, or the last pick). */
+    initialStaff?: string | null;
 }) {
     const router = useRouter();
     const [datesPending, startDates] = useTransition();
     const [view, setViewState] = useState<ViewId>(() => readView(initialView));
     const [term, setTerm] = useState("");
     const [searchKey, setSearchKey] = useState(0);
-    const [more, setMore] = useState<MoreFilters>(NO_MORE);
+    const [more, setMore] = useState<MoreFilters>({
+        ...NO_MORE,
+        staff: initialStaff,
+    });
     const [orderPick, setOrderPick] = useState<Order | null>(null);
+    // Days whose cancelled bookings are shown ("2 cancelled · Show").
+    const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set());
     const order = orderPick ?? defaultOrder(view);
 
     // Came / Didn't come, shown at once and held ten seconds with Undo.
@@ -170,9 +191,9 @@ export function BookingsView({
     const narrowed = useMemo(
         () =>
             bookings.filter(
-                (b) => matchesSearch(b, term) && matchesMore(b, more),
+                (b) => matchesSearch(b, term) && matchesMore(b, more, now),
             ),
-        [bookings, term, more],
+        [bookings, term, more, now],
     );
     const counts = useMemo(
         () => viewCounts(narrowed, now, timezone),
@@ -186,19 +207,76 @@ export function BookingsView({
             ),
         [narrowed, view, now, timezone, order],
     );
+    const folded = useMemo(
+        () => narrowed.filter((b) => foldsIn(view, b, now, timezone)),
+        [narrowed, view, now, timezone],
+    );
     const choices = useMemo(() => moreChoices(bookings), [bookings]);
     const { rows: pageRows, paging } = useLocalPages("bookings", shown, {
         label: "Pages of bookings",
         resetOn: `${view}|${term}|${JSON.stringify(more)}|${order}`,
     });
     const groups = useMemo(
-        () => groupByDay(pageRows, timezone, now),
-        [pageRows, timezone, now],
+        () =>
+            withFolds(
+                groupByDay(pageRows, timezone, now),
+                folded,
+                timezone,
+                now,
+            ),
+        [pageRows, folded, timezone, now],
     );
+    const today = localDateOf(new Date(now), timezone);
 
     const searching = term.trim() !== "";
     const dated = dateRangeOn(dates);
     const filtering = moreCount(more) > 0 || dated;
+    const narrowedBy = moreCount(more) + (dated ? 1 : 0);
+    const viewLabel = VIEWS.find((v) => v.id === view)?.label ?? "Upcoming";
+    const staffName = (id: string) =>
+        id === me?.id
+            ? "Just me"
+            : (choices.staff.find((c) => c.value === id)?.label ?? "");
+    const serviceName = (id: string) =>
+        choices.services.find((c) => c.value === id)?.label ?? "";
+    const pills: { key: string; text: string; remove: () => void }[] = [
+        ...(more.staff
+            ? [
+                  {
+                      key: "staff",
+                      text: `With: ${staffName(more.staff)}`,
+                      remove: () => setMore({ ...more, staff: null }),
+                  },
+              ]
+            : []),
+        ...(more.service
+            ? [
+                  {
+                      key: "service",
+                      text: `Service: ${serviceName(more.service)}`,
+                      remove: () => setMore({ ...more, service: null }),
+                  },
+              ]
+            : []),
+        ...more.statuses.map((st) => ({
+            key: `status:${st}`,
+            text: `Status: ${STATUS_PICKS.find((o) => o.value === st)?.label ?? st}`,
+            remove: () =>
+                setMore({
+                    ...more,
+                    statuses: more.statuses.filter((x) => x !== st),
+                }),
+        })),
+        ...(dated
+            ? [
+                  {
+                      key: "dates",
+                      text: `Dates: ${datesWords(dates, today) ?? ""}`,
+                      remove: () => pickDates(NO_DATE_RANGE),
+                  },
+              ]
+            : []),
+    ];
 
     // The date filter is read on the server, so a change goes by the
     // address; the view, the search and the rest stay as they are.
@@ -250,6 +328,62 @@ export function BookingsView({
     const whenLine = (b: DiaryBooking) =>
         `${formatDateTime(b.startAt, timezone, { weekday: "short", relative: true, now })} · ${b.service.name}${b.staff ? ` with ${b.staff.name}` : ""}`;
 
+    const renderRow = (b: DiaryBooking) => {
+        const markKey = `outcome:${b.id}`;
+        const markedNow = marks[b.id];
+        const items = rowMenu(b, can, now);
+        return (
+            <BookingRow
+                key={b.id}
+                booking={b}
+                zone={timezone}
+                status={rowStatus(b, now)}
+                asks={asksOutcome(b, now)}
+                canMark={can.book}
+                showMoney={can.money}
+                marked={
+                    markedNow
+                        ? {
+                              outcome: markedNow,
+                              undo: pending.includes(markKey)
+                                  ? () => undo(markKey)
+                                  : null,
+                          }
+                        : null
+                }
+                onMark={(o) => mark(b, o)}
+                onUndo={() => undo(markKey)}
+                when={whenLine(b)}
+                heading={`${whoFor(b)} · ${formatDateTime(b.startAt, timezone, { relative: "lower", now })}`}
+                triggerRef={(el) => {
+                    if (el) triggers.current.set(b.id, el);
+                    else triggers.current.delete(b.id);
+                }}
+                menu={{
+                    actions: items,
+                    takeLabel: takeLabel(b),
+                    personLabel: personLabel(b),
+                    openHref: `/bookings/${b.id}`,
+                    personHref: b.contact ? personHref(b.contact.id) : null,
+                    cancelling: pending.includes(`cancel-booking:${b.id}`),
+                    onArrived: () => mark(b, "ATTENDED"),
+                    onTake: () => {
+                        lastRow.current = b.id;
+                        setTaking(b);
+                    },
+                    onMove: () => {
+                        lastRow.current = b.id;
+                        setMoving(b);
+                    },
+                    onCancel: () => {
+                        lastRow.current = b.id;
+                        setCancelling(b);
+                    },
+                }}
+            />
+        );
+    };
+
     if (bookings.length === 0 && !dates.date) {
         return (
             <EmptyState
@@ -265,85 +399,75 @@ export function BookingsView({
 
     return (
         <div className="grid gap-3.5">
-            <ListToolbar
-                search={
-                    <ListSearch
-                        key={searchKey}
-                        placeholder="Search bookings"
-                        describe="By name, phone or service"
+            <div className="grid gap-2.5">
+                <div className="flex items-center gap-2 max-[759px]:flex-wrap">
+                    <ShowingPicker
+                        view={view}
+                        counts={counts}
+                        onChange={setView}
+                    />
+                    <SearchToggle
+                        term={term}
+                        fieldKey={searchKey}
                         onSearch={setTerm}
                     />
-                }
-                filters={
-                    // A flex item is as wide as its chips unless told it
-                    // may shrink: without min-w-0 the strip set the page
-                    // 816px wide on a phone, which then zoomed out.
-                    <div className="min-w-0 max-[759px]:w-full">
-                        <ScrollX
-                            bare
-                            label="Show"
-                            current='[aria-checked="true"]'
-                            revealKey={view}
-                            className="max-[759px]:-mx-4 max-[759px]:px-4 min-[760px]:overflow-visible"
-                        >
-                            <div className="flex items-center gap-1.5 max-[759px]:w-max min-[760px]:flex-wrap">
-                                <ChipGroup
-                                    label="Show"
-                                    value={view}
-                                    onChange={setView}
-                                    className="flex-nowrap max-[759px]:w-max min-[760px]:flex-wrap"
-                                    choices={VIEWS.map((v) => ({
-                                        value: v.id,
-                                        label: (
-                                            <>
-                                                {v.label}
-                                                {/* A real space: it is named "Upcoming 18". */}{" "}
-                                                <span className="tabular-nums opacity-70">
-                                                    {counts[v.id]}
-                                                </span>
-                                            </>
-                                        ),
-                                    }))}
-                                />
-                                <MoreBookingFilters
-                                    value={more}
-                                    onChange={setMore}
-                                    services={choices.services}
-                                    staff={choices.staff}
-                                    showing={shown.length}
-                                />
-                            </div>
-                        </ScrollX>
-                    </div>
-                }
-                // The day it starts, read by the API; on a phone it wraps
-                // to its own line under the views.
-                more={
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <DateRangeFilter
-                            label="Starts"
-                            value={dates}
-                            onChange={pickDates}
-                        />
-                    </div>
-                }
-                onClear={searching || filtering ? clearAll : undefined}
-                clearLabel={filtering ? "Clear filters" : "Clear search"}
-                end={
-                    <ListFilter
-                        label="Order"
-                        value={order}
-                        onValueChange={(v) => setOrderPick(v)}
-                        options={ORDERS}
-                        narrowed={false}
+                    <BookingFilters
+                        className="ml-auto max-[759px]:ml-0"
+                        value={more}
+                        onChange={setMore}
+                        order={order}
+                        onOrder={setOrderPick}
+                        dates={dates}
+                        onDates={pickDates}
+                        today={today}
+                        services={choices.services}
+                        staff={choices.staff}
+                        me={me}
+                        showing={shown.length}
+                        narrowedBy={narrowedBy}
+                        viewLabel={viewLabel}
+                        onClear={() => {
+                            setMore(NO_MORE);
+                            if (dates.date) pickDates(NO_DATE_RANGE);
+                        }}
                     />
-                }
-                count={
-                    searching || filtering
-                        ? `${narrowed.length} of ${bookings.length} bookings`
-                        : undefined
-                }
-            />
+                </div>
+                {searching || filtering ? (
+                    <div
+                        role="status"
+                        className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"
+                    >
+                        {searching ? (
+                            <NarrowPill
+                                onRemove={() => {
+                                    setTerm("");
+                                    setSearchKey((k) => k + 1);
+                                }}
+                            >
+                                {`Search: ${term.trim()}`}
+                            </NarrowPill>
+                        ) : null}
+                        {pills.map((pill) => (
+                            <NarrowPill key={pill.key} onRemove={pill.remove}>
+                                {pill.text}
+                            </NarrowPill>
+                        ))}
+                        <Button
+                            type="button"
+                            variant="link"
+                            size="inline"
+                            onClick={clearAll}
+                            className="max-[759px]:min-h-11"
+                        >
+                            Clear all
+                        </Button>
+                        <span aria-hidden>·</span>
+                        <span className="tabular-nums">
+                            {shown.length} of {bookings.length} shown
+                        </span>
+                    </div>
+                ) : null}
+            </div>
 
             {/* A date range is read on the server: the rows grey until it lands. */}
             <PendingRegion pending={datesPending}>
@@ -373,12 +497,17 @@ export function BookingsView({
                         day is its own card under its heading (BKMAllBookings). */}
                         <ListTable className="max-[759px]:grid max-[759px]:gap-4 max-[759px]:overflow-visible max-[759px]:rounded-none max-[759px]:border-0 max-[759px]:bg-transparent">
                             <ListTableHead
-                                className={`${ROW_GRID} max-[759px]:hidden`}
+                                className={cn(
+                                    ROW_GRID(can.money),
+                                    "max-[759px]:hidden",
+                                )}
                             >
                                 <span>When · {zoneLabel}</span>
                                 <span data-ph-unmask="">Customer</span>
                                 <span data-ph-unmask="">Service · with</span>
-                                <span data-ph-unmask="">Did they come?</span>
+                                {can.money ? (
+                                    <span data-ph-unmask="">Money</span>
+                                ) : null}
                                 <span data-ph-unmask="">Status</span>
                                 <span data-ph-unmask="" className="sr-only">
                                     Actions
@@ -393,91 +522,55 @@ export function BookingsView({
                                     <h2
                                         className={cn(
                                             listTable.group,
-                                            "max-[759px]:border-0 max-[759px]:px-0 max-[759px]:pt-0",
+                                            "flex items-center gap-2 max-[759px]:border-0 max-[759px]:px-0 max-[759px]:pt-0",
                                         )}
                                     >
                                         {g.label}
+                                        {g.rows.length === 0 &&
+                                        g.key === today ? (
+                                            <span
+                                                data-ph-unmask=""
+                                                className="text-[12.5px] font-normal normal-case tracking-normal text-muted-foreground"
+                                            >
+                                                · {NOBODY_ELSE_TODAY}
+                                            </span>
+                                        ) : null}
+                                        {g.rows.length > 0 ? (
+                                            <span className="ml-auto text-[12.5px] font-normal normal-case tracking-normal text-muted-foreground">
+                                                {bookingsWord(g.rows.length)}
+                                            </span>
+                                        ) : null}
                                     </h2>
                                     <ul className="max-[759px]:overflow-hidden max-[759px]:rounded-[12px] max-[759px]:border max-[759px]:border-border max-[759px]:bg-card">
-                                        {g.rows.map((b) => {
-                                            const markKey = `outcome:${b.id}`;
-                                            const markedNow = marks[b.id];
-                                            const items = rowMenu(b, can, now);
-                                            return (
-                                                <BookingRow
-                                                    key={b.id}
-                                                    booking={b}
-                                                    zone={timezone}
-                                                    status={rowStatus(b, now)}
-                                                    asks={asksOutcome(b, now)}
-                                                    canMark={can.book}
-                                                    marked={
-                                                        markedNow
-                                                            ? {
-                                                                  outcome:
-                                                                      markedNow,
-                                                                  undo: pending.includes(
-                                                                      markKey,
-                                                                  )
-                                                                      ? () =>
-                                                                            undo(
-                                                                                markKey,
-                                                                            )
-                                                                      : null,
-                                                              }
-                                                            : null
+                                        {g.rows.map(renderRow)}
+                                        {g.cancelled?.length ? (
+                                            <>
+                                                {showCancelled ||
+                                                unfolded.has(g.key)
+                                                    ? g.cancelled.map(renderRow)
+                                                    : null}
+                                                <FoldLine
+                                                    count={g.cancelled.length}
+                                                    open={
+                                                        showCancelled ||
+                                                        unfolded.has(g.key)
                                                     }
-                                                    onMark={(o) => mark(b, o)}
-                                                    onUndo={() => undo(markKey)}
-                                                    when={whenLine(b)}
-                                                    heading={`${whoFor(b)} · ${formatDateTime(b.startAt, timezone, { relative: "lower", now })}`}
-                                                    triggerRef={(el) => {
-                                                        if (el)
-                                                            triggers.current.set(
-                                                                b.id,
-                                                                el,
-                                                            );
-                                                        else
-                                                            triggers.current.delete(
-                                                                b.id,
-                                                            );
-                                                    }}
-                                                    menu={{
-                                                        actions: items,
-                                                        takeLabel: takeLabel(b),
-                                                        personLabel:
-                                                            personLabel(b),
-                                                        openHref: `/bookings/${b.id}`,
-                                                        personHref: b.contact
-                                                            ? personHref(
-                                                                  b.contact.id,
-                                                              )
-                                                            : null,
-                                                        cancelling:
-                                                            pending.includes(
-                                                                `cancel-booking:${b.id}`,
-                                                            ),
-                                                        onArrived: () =>
-                                                            mark(b, "ATTENDED"),
-                                                        onTake: () => {
-                                                            lastRow.current =
-                                                                b.id;
-                                                            setTaking(b);
-                                                        },
-                                                        onMove: () => {
-                                                            lastRow.current =
-                                                                b.id;
-                                                            setMoving(b);
-                                                        },
-                                                        onCancel: () => {
-                                                            lastRow.current =
-                                                                b.id;
-                                                            setCancelling(b);
-                                                        },
-                                                    }}
+                                                    onToggle={() =>
+                                                        setUnfolded((all) => {
+                                                            const next =
+                                                                new Set(all);
+                                                            if (
+                                                                !next.delete(
+                                                                    g.key,
+                                                                )
+                                                            )
+                                                                next.add(g.key);
+                                                            return next;
+                                                        })
+                                                    }
                                                 />
-                                            );
-                                        })}
+                                            </>
+                                        ) : null}
                                     </ul>
                                 </section>
                             ))}

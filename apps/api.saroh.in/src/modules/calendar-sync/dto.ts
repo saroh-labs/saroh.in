@@ -154,6 +154,19 @@ export interface CalendarMemberView {
     pausedBecause: PauseReason | null;
 }
 
+/**
+ * `GET …/busy`: each connected person's Google busy times, as start and end
+ * and nothing else (never a title), and who is connected, for the Bookings
+ * calendar (BKVGoogle).
+ */
+export interface CalendarBusyView {
+    /** Google Calendar is on for this business (the flag and the plan). */
+    on: boolean;
+    busy: { staffId: string; startAt: string; endAt: string }[];
+    /** Someone on the diary with a Google account here, and how it stands. */
+    people: { staffId: string; state: "CONNECTED" | "LAPSED" }[];
+}
+
 /** `POST …/move-bookings`: how many are on their way. */
 export interface MoveBookingsView {
     moving: number;

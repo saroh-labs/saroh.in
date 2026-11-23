@@ -437,14 +437,14 @@ export const NAV_GROUPS: NavGroup[] = [
     {
         items: [
             { href: "/", label: "Home", icon: Home },
-            // Home › Calendar (the "Saroh Business Calendar" design): one
+            // Home › Business calendar (the "Saroh Business Calendar" design): one
             // month of everything dated. Named Overview from UX-039 until the
             // owner chose Calendar (Q9, DEC-170, 19 Oct). Not module-gated — it spans
             // modules, and each layer on it follows its own module and
             // permission (the API leaves out what the viewer may not see).
             {
                 href: "/calendar",
-                label: "Calendar",
+                label: "Business calendar",
                 icon: Calendar,
                 action: "org:read",
             },
@@ -544,9 +544,9 @@ export const NAV_GROUPS: NavGroup[] = [
                 label: "Bookings",
                 icon: CalendarClock,
                 children: [
-                    // "Bookings", as the phone's tab bar says: "Calendar" is
-                    // Home's business calendar (owner, 19 Oct), so the
-                    // menu names each once.
+                    // "Bookings", as the phone's tab bar says: "Business
+                    // calendar" is Home's, across every module (owner, 22 Nov),
+                    // so the menu names each once.
                     {
                         href: "/bookings",
                         label: "Bookings",

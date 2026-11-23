@@ -20,6 +20,7 @@ import {
 } from "@/lib/services/diary-view";
 
 import { FreeGap } from "@/components/bookings/free-time/free-gap";
+import { BusyBands } from "./busy-bands";
 import { DayBlock } from "./day-block";
 import { lanePlace } from "./diary-block";
 import { at, CLOSED_HATCH, OFF_HATCH, tall } from "./geometry";
@@ -136,8 +137,7 @@ const CLOSED_LABEL_MINUTES = 30;
 
 /**
  * Closed time in a person's column (U4): hatched, with a pill that says
- * what a press does, "Closed · click to open" on the desk and "Closed · tap
- * to open" on a phone, and it opens these hours. For someone who can't
+ * what a press does, "Closed · Open these hours", and it opens these hours. For someone who can't
  * change hours (Calendar only), and for the services' own hours, it is
  * hatched and says "Closed" only.
  */
@@ -209,12 +209,7 @@ function ClosedTime({
                         "group-hover:border-foreground group-hover:text-foreground",
                     )}
                 >
-                    <span data-ph-unmask="" className="max-[759px]:hidden">
-                        Closed · click to open
-                    </span>
-                    <span data-ph-unmask="" className="min-[760px]:hidden">
-                        Closed · tap to open
-                    </span>
+                    <span data-ph-unmask="">Closed · Open these hours</span>
                 </span>
             ) : null}
         </button>
@@ -229,8 +224,7 @@ function ClosedTime({
  *
  * Bookings are the solid colour. Free time long enough for something the
  * person takes is a green "Free · … + Book" that opens the free-time sheet;
- * closed time is hatched and says "Closed · click to open" (a phone: "tap
- * to open"), opening those hours; time off is hatched the other way and
+ * closed time is hatched and says "Closed · Open these hours", opening those hours; time off is hatched the other way and
  * says so. A 2px line marks now on today, and the day opens there, else at
  * the first booking or opening hour. On a phone a minute is drawn twice as
  * tall, so every block and free time is a thumb's height.
@@ -249,6 +243,7 @@ export function DayByPerson({
     onBlock,
     onFree,
     onClosed,
+    busy,
 }: {
     columns: Column[];
     span: Span;
@@ -266,6 +261,14 @@ export function DayByPerson({
     onBlock: (block: Block) => void;
     onFree: (column: Column, free: Span) => void;
     onClosed: (column: Column, minute: number) => void;
+    /**
+     * Google busy times to draw: each column's by its key, and everyone's
+     * together for a phone's one list. Left out, none are drawn.
+     */
+    busy?: {
+        byColumn: ReadonlyMap<string, readonly Span[]>;
+        all: readonly Span[];
+    };
 }) {
     const [from, to] = span;
     const height = tall(from, to);
@@ -318,6 +321,10 @@ export function DayByPerson({
                         from={from}
                     />
                 ) : null}
+                <BusyBands
+                    spans={busy?.byColumn.get(c.key) ?? []}
+                    from={from}
+                />
                 {bookable
                     ? c.day?.free.map((f) => (
                           <FreeGap
@@ -401,6 +408,7 @@ export function DayByPerson({
                         style={{ height }}
                     >
                         <HourLines span={span} />
+                        <BusyBands spans={busy?.all ?? []} from={from} />
                         {all.map(({ block: b, who }) => (
                             <DayBlock
                                 key={b.key}

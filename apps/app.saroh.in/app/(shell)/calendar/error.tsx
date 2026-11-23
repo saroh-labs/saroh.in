@@ -14,7 +14,7 @@ export default function Error({
         <SectionError
             error={error}
             retry={retry}
-            heading="Calendar"
+            heading="Business calendar"
             things="the calendar"
             reassurance="Your orders, subscriptions, invoices and bookings are where they were."
         />

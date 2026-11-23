@@ -5,20 +5,10 @@ import { calendarHref } from "@/lib/services/calendar-href";
 import type { LocalDate } from "@/lib/services/diary";
 
 /**
- * A view of the bookings: one of the calendar's layouts, or the list of
- * all bookings (`/bookings/all`, "list" in the address of this switch).
- */
-export type BookingsView = CalendarLayout | "list";
-
-/**
- * The views of the same bookings: the calendar by day, by week or as a list
- * of the day (the agenda, called List since header C, Q4), and All bookings
- * (`/bookings/all`). On the calendar it is "Show as" in the date sheet and
- * offers the three layouts alone (`withAll={false}`); All bookings is in the
- * "…" sheet there. All bookings' own page still carries all four.
+ * "Show as" in the calendar's date sheet: Day, Week or Agenda (the one-day
+ * list of times, called List until the register took that name).
  *
- * Links, not state, so each view keeps its address: a deep link and a
- * booking's "All bookings" crumb still land on the list. From the calendar
+ * Links, not state, so each layout keeps its address. From the calendar
  * the layouts keep the day shown, whose bookings, and whether cancelled
  * bookings are drawn (`hrefFor`).
  */
@@ -27,40 +17,74 @@ export function BookingsViewSwitch({
     date,
     cancelled = false,
     hrefFor,
-    withAll = true,
     className,
 }: {
-    current: BookingsView;
+    current: CalendarLayout;
     /** The day the calendar shows; left out, a layout opens on today. */
     date?: LocalDate;
     /** Cancelled bookings are drawn, and stay drawn in another layout. */
     cancelled?: boolean;
     /** The calendar's own address for a layout, when it keeps more. */
     hrefFor?: (layout: CalendarLayout) => string;
-    /** Offer All bookings as the fourth view. */
-    withAll?: boolean;
     className?: string;
 }) {
     const to = (layout: CalendarLayout) =>
         hrefFor ? hrefFor(layout) : calendarHref(layout, date, { cancelled });
     return (
         <Segmented
-            label="Bookings view"
+            label="Show as"
             className={className}
             value={current}
             options={[
                 { value: "day", href: to("day"), label: "Day" },
                 { value: "week", href: to("week"), label: "Week" },
-                { value: "agenda", href: to("agenda"), label: "List" },
-                ...(withAll
-                    ? [
-                          {
-                              value: "list" as const,
-                              href: "/bookings/all",
-                              label: "All bookings",
-                          },
-                      ]
-                    : []),
+                { value: "agenda", href: to("agenda"), label: "Agenda" },
+            ]}
+        />
+    );
+}
+
+/**
+ * Calendar | List, in the header of both Bookings views: Calendar is the
+ * day, week or agenda (where it was left), List is the register of every
+ * booking (`/bookings/all`). Two addresses, so a deep link and the back
+ * button work. On a phone it is full width, 44px options.
+ */
+export function BookingsModeSwitch({
+    current,
+    calendarTo,
+    className,
+}: {
+    current: "calendar" | "list";
+    /** The calendar's own address, keeping its day and person. */
+    calendarTo?: string;
+    className?: string;
+}) {
+    return (
+        <Segmented
+            label="Bookings"
+            size="md"
+            className={`max-[759px]:w-full ${className ?? ""}`}
+            value={current}
+            options={[
+                {
+                    value: "calendar",
+                    // From List the Calendar always opens the calendar, not
+                    // "Where I left it" (which may be List).
+                    href:
+                        calendarTo ??
+                        (current === "list"
+                            ? "/bookings?calendar=1"
+                            : "/bookings"),
+                    label: "Calendar",
+                    className: "max-[759px]:flex-1",
+                },
+                {
+                    value: "list",
+                    href: "/bookings/all",
+                    label: "List",
+                    className: "max-[759px]:flex-1",
+                },
             ]}
         />
     );

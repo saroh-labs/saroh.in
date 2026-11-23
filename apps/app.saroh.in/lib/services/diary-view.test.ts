@@ -154,8 +154,8 @@ describe("who still owes", () => {
         ).toBe(false);
     });
 
-    it("marks a booking To pay and a class by how many places owe", () => {
-        expect(toPayText(one("a", 540, 600))).toBe("To pay");
+    it("marks a booking Awaiting payment and a class by how many places owe", () => {
+        expect(toPayText(one("a", 540, 600))).toBe("Awaiting payment");
         expect(toPayText(one("a", 540, 600, { paidWith: "PAID" }))).toBeNull();
         expect(
             toPayText(
@@ -166,7 +166,7 @@ describe("who still owes", () => {
                     booking({ id: "s4", status: "CANCELLED" }),
                 ]),
             ),
-        ).toBe("2 to pay");
+        ).toBe("2 awaiting payment");
         expect(
             toPayText(one("x", 540, 600, { status: "CANCELLED" })),
         ).toBeNull();

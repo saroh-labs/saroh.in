@@ -156,9 +156,9 @@ describe("closed time and time off are hatched", () => {
         expect(html).toContain(">Time off<");
     });
 
-    it("says what a press on closed time does: click on the desk, tap on a phone", () => {
-        expect(html).toContain(">Closed · click to open<");
-        expect(html).toContain(">Closed · tap to open<");
+    it("says what a press on closed time does, in one line for desk and phone", () => {
+        expect(html).toContain(">Closed · Open these hours<");
+        expect(html).not.toContain("click to open");
         expect(tag(html, "data-closed-time")).toContain(
             'aria-label="Closed 8:00 to 9:00 am. Open these hours for Asha Rao on Tue 29 Sep"',
         );
@@ -221,14 +221,14 @@ describe("a booking block", () => {
         ]);
         expect(owing).toMatch(/data-day-pill=""[^>]*>Pays at the visit</);
         expect(tag(owing, 'data-diary-block="one"')).toMatch(
-            /aria-label="[^"]*, to pay"/,
+            /aria-label="[^"]*, awaiting payment"/,
         );
         // The same colour as a paid booking: the pill is words, not a hue.
         expect(tag(owing, 'data-diary-block="one"')).toContain("bg-diary-one");
 
         const paid = draw([asha([block("b1", "Tariq Ali", 600, 660)])]);
         expect(paid).toMatch(/data-day-pill=""[^>]*>Paid</);
-        expect(paid).not.toContain("to pay");
+        expect(paid).not.toContain("awaiting payment");
     });
 
     it("draws a cancelled booking as a thin struck line that still opens", () => {
@@ -386,12 +386,39 @@ describe("the week agrees with the day", () => {
         const one = tag(html, 'data-diary-block="one"');
         expect(one).toContain("min-height:calc(28 * var(--ppm, 0.8px))");
         expect(one).toContain('aria-label="Tue 29 Sep, 10:00');
-        expect(html).toMatch(/data-to-pay=""[^>]*>To pay</);
+        expect(html).toMatch(/data-to-pay=""[^>]*>Awaiting payment</);
     });
 
     it("draws a cancelled booking as the thin line, whole, not a cut chip", () => {
         const line = tag(html, 'data-diary-block="cancelled"');
         expect(line).toContain("h-[18px]");
         expect(line).not.toContain("overflow-hidden");
+    });
+});
+
+describe("Google busy times (BKVGoogle)", () => {
+    const busy = {
+        byColumn: new Map<string, readonly [number, number][]>([
+            ["asha", [[690, 750]]],
+        ]),
+        all: [[690, 750]] as [number, number][],
+    };
+
+    it("draws a busy band in the person's column: busy only, never what it is", () => {
+        const html = draw([asha([])], { busy });
+        const bands = html.match(/<div[^>]*data-google-busy[^>]*>/g) ?? [];
+        expect(bands).toHaveLength(1);
+        expect(bands[0]).toContain("pointer-events-none");
+        expect(bands[0]).toContain(
+            'aria-label="Busy 11:30 am to 12:30 pm, from Google Calendar"',
+        );
+        expect(html).toContain("Busy · Google Calendar");
+    });
+
+    it("draws none when it is hidden or unread", () => {
+        expect(draw([asha([])])).not.toContain("data-google-busy");
+        expect(
+            draw([asha([])], { busy: { byColumn: new Map(), all: [] } }),
+        ).not.toContain("data-google-busy");
     });
 });

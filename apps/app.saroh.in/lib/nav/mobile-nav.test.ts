@@ -38,7 +38,7 @@ describe("seats", () => {
         expect(labels(nav.tabs)).toEqual([
             "Home",
             "Sell",
-            "Calendar",
+            "Business calendar",
             "Insights",
         ]);
         expect(nav.tabs).toHaveLength(TAB_SEATS);
@@ -53,7 +53,7 @@ describe("seats", () => {
             "Home",
             "Payments",
             "Sell",
-            "Calendar",
+            "Business calendar",
         ]);
     });
 
@@ -80,7 +80,7 @@ describe("seats", () => {
         expect(seatPreference("Sell")).toEqual([
             "Home",
             "Sell",
-            "Calendar",
+            "Business calendar",
             "Insights",
         ]);
         const nav = buildMobileNav({
@@ -88,7 +88,7 @@ describe("seats", () => {
             pathname: "/commerce/orders",
         });
         const tabs = labels(nav.tabs);
-        expect(tabs).toEqual(["Home", "Sell", "Calendar", "Insights"]);
+        expect(tabs).toEqual(["Home", "Sell", "Business calendar", "Insights"]);
         expect(new Set(tabs).size).toBe(tabs.length);
         expect(tabs).toHaveLength(TAB_SEATS);
     });
@@ -100,13 +100,13 @@ describe("seats", () => {
         });
         expect(labels(nav.tabs)).toEqual([
             "Home",
-            "Calendar",
+            "Business calendar",
             "Sell",
             "Insights",
         ]);
-        expect(nav.tabs.find((t) => t.label === "Calendar")?.current).toBe(
-            true,
-        );
+        expect(
+            nav.tabs.find((t) => t.label === "Business calendar")?.current,
+        ).toBe(true);
     });
 
     it("fills a seat the preference cannot, in rail order, skipping sections", () => {
@@ -121,7 +121,7 @@ describe("seats", () => {
         expect(labels(nav.tabs)).toEqual([
             "Home",
             "Sell",
-            "Calendar",
+            "Business calendar",
             "Website",
         ]);
     });

@@ -53,7 +53,7 @@ const ONLINE_LINE = "E2E Online Line";
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
-    { label: "Calendar", href: "/calendar" },
+    { label: "Business calendar", href: "/calendar" },
     {
         label: "Sell",
         href: "/commerce/orders",

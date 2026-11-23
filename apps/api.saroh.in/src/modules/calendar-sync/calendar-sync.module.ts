@@ -11,6 +11,7 @@ import { setMemberLeavingHook } from "../organizations/member-leaving";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
 import { googleBusyConnections } from "./calendar-allowed";
 import { CalendarBookingsService } from "./calendar-bookings.service";
+import { CalendarBusyReadService } from "./calendar-busy-read.service";
 import {
     CALENDAR_BUSY_TYPE,
     CalendarBusyHandler,
@@ -47,6 +48,7 @@ import { googleCalendarProvider } from "./google/google-calendar.provider";
         googleCalendarProvider,
         CalendarConnectService,
         CalendarBookingsService,
+        CalendarBusyReadService,
         CalendarLapseService,
         CalendarSyncHandler,
         CalendarBusyHandler,

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 /**
- * All bookings (U11, BKMAllBookings / BKDAllBookings), at a desk and on a
- * phone: the views as chips with counts, search, More filters, rows under
- * day headings, "Did they come?" on the row with Undo, the row menu, every
+ * All bookings (U11, BKMAllBookings / BKDAllBookings; BLHB variant B), at a
+ * desk and on a phone: the "Showing" picker with counts, search as an icon,
+ * one Filters button, cancelled bookings folded under their day, the Money
+ * column for those who read money, rows under day headings, "Did they come?" on the row with Undo, the row menu, every
  * cancel asking about the money (in time, late, nothing paid; Refund
  * locked with why for someone who can't refund), a Member, a read-only
  * role, the first run, no matches, an empty view, couldn't load, and the
@@ -137,6 +138,7 @@ function rows(): DiaryBooking[] {
 }
 
 const OWNER: AllBookingsCan = {
+    money: true,
     book: true,
     take: true,
     people: true,
@@ -145,8 +147,14 @@ const OWNER: AllBookingsCan = {
     link: false,
     online: true,
 };
-const MEMBER: AllBookingsCan = { ...OWNER, take: false, refund: false };
+const MEMBER: AllBookingsCan = {
+    ...OWNER,
+    money: false,
+    take: false,
+    refund: false,
+};
 const READ_ONLY: AllBookingsCan = {
+    money: false,
     book: false,
     take: false,
     people: false,
@@ -201,8 +209,26 @@ const press = (el: Element | undefined) => {
     if (!el) throw new Error("nothing to press");
     act(() => (el as HTMLElement).click());
 };
-const chip = (label: string) =>
-    byText('[role="radio"]', new RegExp(`^${label} \\d+$`));
+const showing = () =>
+    document.querySelector<HTMLButtonElement>("[data-showing]");
+/** The picker's choice by name: a radio inside its label. */
+const choice = (label: string) =>
+    byText<HTMLLabelElement>(
+        "label",
+        new RegExp(`^${label}\\d+$`),
+    )?.querySelector<HTMLElement>('[role="radio"]');
+async function pickView(label: string) {
+    press(showing() ?? undefined);
+    await flush();
+    press(choice(label) ?? undefined);
+    await flush();
+}
+const filtersButton = () =>
+    document.querySelector<HTMLButtonElement>("[data-filters]");
+async function openFilters() {
+    press(filtersButton() ?? undefined);
+    await flush();
+}
 const rowOf = (first: string) =>
     all("[data-booking-row]").find((r) =>
         r.getAttribute("data-booking-row")?.includes(first.toLowerCase()),
@@ -311,28 +337,49 @@ describe.each([
 ])("All bookings %s", (_size, narrow) => {
     beforeEach(() => phone(narrow));
 
-    it("shows the views as chips with counts, Upcoming first", () => {
+    it("shows one picker, Showing: Upcoming, with every view and its count inside", async () => {
         draw();
+        // Six chips became one button: no row of them.
+        expect(all('[role="radiogroup"][aria-label="Show"]')).toHaveLength(0);
+        expect(showing()?.textContent).toBe("Showing:Upcoming3");
+        press(showing() ?? undefined);
+        await flush();
         expect(
-            all('[role="radiogroup"][aria-label="Show"] [role="radio"]').map(
-                (c) => c.textContent,
+            all('[role="radiogroup"][aria-label="Show"] label').map(
+                (l) => l.textContent,
             ),
         ).toEqual([
-            "Upcoming 4",
-            "Needs an outcome 2",
-            "Awaiting payment 1",
-            "Today 4",
-            "Next 7 days 4",
-            "All 7",
+            "Upcoming3",
+            "Needs an outcome2",
+            "Awaiting payment1",
+            "Today4",
+            "Next 7 days3",
+            "All7",
         ]);
-        expect(chip("Upcoming")?.getAttribute("aria-checked")).toBe("true");
+        expect(choice("Upcoming")?.getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("counts only bookings still on, and folds each day's cancelled ones under it", async () => {
+        draw();
+        // Isha's cancelled booking is not among Upcoming's 3, nor in the rows.
+        expect(rowOf("Isha")).toBeUndefined();
+        expect(text()).toContain("1 cancelled");
+        expect(text()).not.toContain("Isha Singh");
+        press(byText("[data-fold] button", "Show"));
+        expect(rowOf("Isha")?.textContent).toContain("Cancelled");
+        press(byText("[data-fold] button", "Hide"));
+        expect(rowOf("Isha")).toBeUndefined();
+        // All lists them whole, with no fold.
+        await pickView("All");
+        expect(rowOf("Isha")).toBeDefined();
+        expect(document.querySelector("[data-fold]")).toBeNull();
     });
 
     it("sets rows under day headings, in the business's zone", () => {
         draw();
         expect(all("section > h2").map((h) => h.textContent)).toEqual([
-            "Today · Mon 19 Oct",
-            "Tomorrow · Tue 20 Oct",
+            "Today · Mon 19 Oct2 bookings",
+            "Tomorrow · Tue 20 Oct1 booking",
             "Wed 21 Oct",
         ]);
         expect(text()).toContain("When · IST");
@@ -341,57 +388,141 @@ describe.each([
         expect(rowOf("Dev")?.textContent).toContain("Sports massage · Arjun");
     });
 
-    it("keeps the view in the address", () => {
+    it("keeps the view in the address", async () => {
         draw();
-        press(chip("Needs an outcome"));
+        await pickView("Needs an outcome");
         expect(window.location.search).toBe("?view=outcome");
-        press(chip("Upcoming"));
+        await pickView("Upcoming");
         expect(window.location.search).toBe("");
     });
 
-    it("searches by name, phone or service", () => {
+    it("searches by name, phone or service, from an icon that opens the field", () => {
         draw();
+        expect(
+            document.querySelector('input[placeholder="Search bookings"]'),
+        ).toBeNull();
+        press(document.querySelector("[data-search-open]") ?? undefined);
         search("massage");
         expect(all("[data-booking-row]")).toHaveLength(1);
         expect(rowOf("Dev")).toBeDefined();
-        expect(text()).toContain("1 of 7 bookings");
-        expect(chip("Upcoming")?.textContent).toBe("Upcoming 1");
+        expect(text()).toContain("1 of 7 shown");
+        expect(text()).toContain("Search: massage");
+        expect(showing()?.textContent).toBe("Showing:Upcoming1");
     });
 
     it("says when a search finds nothing, with Clear search", () => {
         draw();
+        press(document.querySelector("[data-search-open]") ?? undefined);
         search("zzz");
         expect(text()).toContain("No bookings match “zzz”");
         press(byText("button, a", "Clear search"));
         expect(all("[data-booking-row]").length).toBeGreaterThan(0);
     });
 
-    it("narrows by status in More filters, and Show closes it", async () => {
-        draw({ initialView: "all" });
-        const more = document.querySelector<HTMLButtonElement>(
-            "[data-more-filters]",
+    it("holds sort, dates, who, service and status in one Filters button, and Show closes it", async () => {
+        draw({ initialView: "all", me: { id: "st_meera", name: "Meera" } });
+        await openFilters();
+        for (const word of [
+            "Sort by",
+            "Most recent first",
+            "Dates",
+            "Any date",
+            "Tomorrow",
+            "Next 7 days",
+            "This month",
+            "Pick dates",
+            "Bookings for",
+            "Everyone",
+            "Just me",
+            "Service",
+            "Status",
+            "Came",
+            "Didn't come",
+            "Not marked",
+        ]) {
+            expect(text()).toContain(word);
+        }
+        // The two cuts: Today is the view's job, and so is Awaiting payment.
+        const group = (name: string) =>
+            all(`[role="radiogroup"][aria-label="${name}"], [role="group"]`)
+                .map((g) => g.textContent)
+                .join("|");
+        expect(group("Dates")).not.toMatch(/Today/);
+        expect(all("[aria-pressed]").map((b) => b.textContent)).not.toContain(
+            "Awaiting payment",
         );
-        act(() => more?.click());
-        await flush();
-        expect(text()).toContain("Service");
-        expect(text()).toContain("With");
         press(byText("[aria-pressed]", "Cancelled"));
         expect(all("[data-booking-row]")).toHaveLength(1);
         expect(rowOf("Isha")).toBeDefined();
-        expect(more?.getAttribute("aria-label")).toBe("More filters, 1 on");
-        press(byText("button", "Show 1"));
+        expect(filtersButton()?.getAttribute("aria-label")).toBe(
+            "Filters, 1 on",
+        );
+        press(byText("button", "Show 1 booking"));
         await flush();
-        expect(text()).not.toContain("Show 1");
-        press(byText("button", "Clear filters"));
+        expect(text()).not.toContain("Show 1 booking");
+        expect(text()).toContain("Status: Cancelled");
+        press(byText("button", "Clear all"));
         expect(all("[data-booking-row]")).toHaveLength(7);
     });
 
-    it("asks 'Did they come?' on a finished row, held with Undo", () => {
+    it("narrows to Just me, and says so in a removable pill", async () => {
+        draw({
+            initialView: "all",
+            me: { id: "st_arjun", name: "Arjun" },
+        });
+        await openFilters();
+        press(byText('[role="radio"]', "Just me"));
+        expect(all("[data-booking-row]")).toHaveLength(1);
+        expect(rowOf("Dev")).toBeDefined();
+        press(byText("button", "Show 1 booking"));
+        await flush();
+        expect(text()).toContain("With: Just me");
+        press(
+            document.querySelector(
+                'button[aria-label="Remove With: Just me"]',
+            ) ?? undefined,
+        );
+        expect(all("[data-booking-row]")).toHaveLength(7);
+    });
+
+    it("sets the sort in Filters, for this view", async () => {
+        draw();
+        expect(all("section > h2")[0]?.textContent).toContain("Today");
+        await openFilters();
+        expect(text()).toContain("for this view");
+        press(byText('[role="radio"]', "Most recent first"));
+        expect(all("section > h2")[0]?.textContent).toContain("Tomorrow");
+    });
+
+    it("sends a forward date pick to the address as a custom range", async () => {
+        draw();
+        await openFilters();
+        press(byText('[role="radio"]', "Tomorrow"));
+        expect(replace).toHaveBeenCalledWith(
+            "/bookings/all?date=custom&from=2026-10-20&to=2026-10-20",
+            { scroll: false },
+        );
+    });
+
+    it("asks 'Did they come?' in Status on a finished row, held with Undo", () => {
         draw({ initialView: "outcome" });
+        // No column of its own: it is the Status.
+        expect(
+            all("span").filter(
+                (el) =>
+                    el.textContent === "Did they come?" &&
+                    !el.closest("[data-booking-row]"),
+            ),
+        ).toHaveLength(0);
+        expect(
+            all("[data-booking-row]").every(
+                (r) => !r.textContent.includes("Booked"),
+            ),
+        ).toBe(true);
         // The latest first.
         expect(all("section > h2").map((h) => h.textContent)).toEqual([
-            "Today · Mon 19 Oct",
-            "Sat 17 Oct",
+            "Today · Mon 19 Oct1 booking",
+            "Sat 17 Oct1 booking",
         ]);
         const row = rowOf("Ananya");
         expect(
@@ -597,27 +728,27 @@ describe.each([
         expect(menuItems()).toEqual(["Open the booking"]);
     });
 
-    it("says an empty view plainly, with Show all bookings", () => {
+    it("says an empty view plainly, with Show all bookings", async () => {
         draw({
             bookings: rows().filter((b) => b.status !== "PENDING"),
             initialView: "unconfirmed",
         });
         expect(text()).toContain("Nothing awaiting payment");
         expect(text()).toContain(
-            "Every booking made with a payment link has been paid. 6 bookings in all.",
+            "Nobody owes you for a booking. Anyone sent a payment link shows here until they pay.",
         );
         press(byText("button, a", "Show all bookings"));
-        expect(chip("All")?.getAttribute("aria-checked")).toBe("true");
+        await flush();
+        expect(showing()?.textContent).toBe("Showing:All6");
         expect(all("[data-booking-row]")).toHaveLength(6);
     });
 
-    it("shows the date filter, a custom range with its two days", () => {
+    it("shows a custom range of dates as a pill, with its two days in Filters", async () => {
         draw({
             dates: { date: "custom", from: "2026-08-01", to: "2026-10-31" },
         });
-        expect(
-            document.querySelector('[aria-label="Starts"]')?.textContent,
-        ).toContain("Custom range…");
+        expect(text()).toContain("Dates: 1 Aug to 31 Oct");
+        await openFilters();
         expect(
             all<HTMLInputElement>('[aria-label="From"], [aria-label="To"]')
                 .length,
@@ -636,28 +767,46 @@ describe.each([
             dates: { date: "custom", from: "2026-08-01", to: "2026-08-31" },
         });
         expect(text()).not.toContain("No bookings yet");
-        press(byText("button", "Clear filters"));
+        press(byText("button", /^Clear (?:all|filters)$/));
         expect(replace).toHaveBeenCalledWith("/bookings/all?view=all", {
             scroll: false,
         });
     });
 
-    it("moves the view with the arrow keys", () => {
-        draw();
-        const first = chip("Upcoming");
-        act(() => {
-            first?.focus();
-            first?.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                    key: "ArrowRight",
-                    bubbles: true,
-                }),
-            );
+    it("says Nobody else today when only today's cancelled bookings are left", () => {
+        n = 0;
+        draw({
+            bookings: [
+                booking(3, "Zed", { status: "CANCELLED" }),
+                booking(30, "Dev"),
+            ],
         });
-        expect(chip("Needs an outcome")?.getAttribute("aria-checked")).toBe(
-            "true",
+        expect(all("section > h2")[0]?.textContent).toContain(
+            "Nobody else today",
         );
-        expect(document.activeElement).toBe(chip("Needs an outcome"));
+        expect(text()).toContain("1 cancelled");
+    });
+
+    it("shows the Money column to those who read money, never to a Member", () => {
+        draw({ initialView: "all" });
+        expect(byText("span", "Money")).toBeDefined();
+        expect(rowOf("Priya")?.textContent).toContain("₹800");
+        expect(rowOf("Priya")?.textContent).toContain("Awaiting payment");
+        expect(rowOf("Kabir")?.textContent).toContain("₹400");
+        expect(rowOf("Rohan")?.textContent).toContain("Paid");
+        act(() => root.unmount());
+        root = createRoot(host);
+        draw({ can: MEMBER, initialView: "all" });
+        expect(byText("span", "Money")).toBeUndefined();
+        expect(document.querySelector("[data-money]")).toBeNull();
+        expect(document.querySelector("[data-money-line]")).toBeNull();
+        expect(text()).not.toContain("₹");
+    });
+
+    it("says how long each booking runs, not when it ends", () => {
+        draw();
+        expect(rowOf("Dev")?.textContent).toContain("45 min");
+        expect(rowOf("Dev")?.textContent).not.toMatch(/\bto \d/);
     });
 
     it("gives the keyboard back to the row's ⋯ when the cancel sheet closes", async () => {
@@ -756,6 +905,7 @@ describe("every cancel on All bookings asks about the money (BA-01)", () => {
         "booking-row.tsx",
         "row-menu.tsx",
         "more-filters.tsx",
+        "list-header.tsx",
         "move-sheet.tsx",
     ].map((f) => readFileSync(path.resolve(__dirname, f), "utf8"));
 

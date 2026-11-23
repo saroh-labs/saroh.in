@@ -1,4 +1,5 @@
 import type { DiaryBooking } from "./booking-calendar";
+import { BOOKING_WORDS } from "./booking-words";
 import type { Block, Column, PersonDay, Span } from "./diary";
 import {
     isLive,
@@ -86,15 +87,16 @@ export function toPay(b: DiaryBooking): boolean {
 }
 
 /**
- * The mark a block wears while money is still to take: "To pay" on a
- * booking, "2 to pay" on a class with two places that owe. Null when
+ * The mark a block wears while money is still to take: "Awaiting payment"
+ * on a booking, "2 awaiting payment" on a class with two places that owe. Null when
  * nothing is owed.
  */
 export function toPayText(block: Block): string | null {
     if (!isLive(block)) return null;
-    if (block.kind === "one") return toPay(block.booking) ? "To pay" : null;
+    if (block.kind === "one")
+        return toPay(block.booking) ? BOOKING_WORDS.awaitingPayment : null;
     const n = liveSeats(block.session).filter(toPay).length;
-    return n > 0 ? `${n} to pay` : null;
+    return n > 0 ? `${n} ${BOOKING_WORDS.awaitingPayment.toLowerCase()}` : null;
 }
 
 // ── What is drawn ───────────────────────────────────────────────────────────

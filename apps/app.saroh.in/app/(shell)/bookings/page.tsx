@@ -1,9 +1,10 @@
 import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
-import { BookingsViewSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
+import { BookingsModeSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import { GoogleCalendarLine } from "@/components/bookings/calendar/google-calendar-line";
 import {
@@ -25,6 +26,7 @@ import { readCustomerPick } from "@/lib/customers/prefill-read";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import {
     googleMeetOffered,
+    readCalendarBusy,
     readGoogleCalendar,
 } from "@/lib/google-calendar/service";
 import { bookingsCalendarLine } from "@/lib/google-calendar/words";
@@ -40,6 +42,7 @@ import {
     nothingChoseView,
     openingLayout,
     openingPerson,
+    opensOnList,
 } from "@/lib/services/bookings-opens";
 import { readBookingsOpens } from "@/lib/services/bookings-opens-read";
 import { calendarHref } from "@/lib/services/calendar-href";
@@ -66,7 +69,7 @@ import { withClosures } from "@/lib/staff/time-off";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
- * Bookings › Calendar (U15). The day by person, the week, or the List (U6,
+ * Bookings › Calendar (U15). The day by person, the week, or the Agenda (U6,
  * the first view on a phone) — each one read of the bookings (U4) over the
  * range it shows, with the staff read (U3) for hours, time off and free gaps.
  *
@@ -75,7 +78,7 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
  * the page failing — a diary with nothing in it would be a lie.
  *
  * The register this page used to be lives on at /bookings/all, the List
- * view of the header's one view switch.
+ * of the header's Calendar | List switch.
  */
 export const metadata = { title: "Bookings" };
 
@@ -121,6 +124,17 @@ export default async function BookingsPage({
         readBookingsOpens(),
         cookies(),
     ]);
+
+    // "Where I left it" was the List: `/bookings` opens it there (BKVKept).
+    if (
+        opensOnList({
+            params,
+            start: opens.start,
+            lastUsed: jar.get(LAST_VIEW_COOKIE)?.value,
+        })
+    ) {
+        redirect("/bookings/all");
+    }
 
     const may = permitsFor(organization);
     // New booking finds the customer by search (E4, `contact:read`) and can
@@ -172,26 +186,33 @@ export default async function BookingsPage({
     const monthLast = days.at(-1) ?? date;
     const first = weekFirst < monthFirst ? weekFirst : monthFirst;
     const last = weekLast > monthLast ? weekLast : monthLast;
-    const [calendar, serviceHours, calendarRead, access] = await Promise.all([
-        readBookingsCalendar(
-            dayBounds(first, timezone).from.toISOString(),
-            dayBounds(last, timezone).to.toISOString(),
-        ),
-        // With nobody on the diary, customers book each service in its own
-        // hours: the calendar draws them, as the booking page offers them
-        // (UX-023).
-        readServiceHours(services, staffList),
-        readGoogleCalendar(),
-        billingAccessOrNull(),
-    ]);
+    const [calendar, serviceHours, calendarRead, access, googleBusy] =
+        await Promise.all([
+            readBookingsCalendar(
+                dayBounds(first, timezone).from.toISOString(),
+                dayBounds(last, timezone).to.toISOString(),
+            ),
+            // With nobody on the diary, customers book each service in its own
+            // hours: the calendar draws them, as the booking page offers them
+            // (UX-023).
+            readServiceHours(services, staffList),
+            readGoogleCalendar(),
+            billingAccessOrNull(),
+            // Everyone's Google busy times for the week shown: start and end,
+            // never a title. A read that fails draws the diary without them.
+            readCalendarBusy(
+                dayBounds(weekFirst, timezone).from.toISOString(),
+                dayBounds(addDays(weekLast, 1), timezone).from.toISOString(),
+            ),
+        ]);
 
     if (!calendar) {
         return (
             <PageContainer width="full">
                 <PageHeader
-                    breadcrumb={["Bookings", "Calendar"]}
-                    title="Calendar"
-                    meta={<BookingsViewSwitch current={layout} date={date} />}
+                    title="Bookings"
+                    holdsData={false}
+                    meta={<BookingsModeSwitch current="calendar" />}
                 />
                 <div>
                     <FailedState
@@ -232,72 +253,82 @@ export default async function BookingsPage({
     // A day, a week, a person: only the diary greys (`ScreenPending`).
     const screen = (
         <ScreenPending>
-        <CalendarScreen
-            layout={layout}
-            date={date}
-            today={today}
-            now={now}
-            timezone={calendar.timezone || timezone}
-            calendar={calendar}
-            staff={staffList?.staff ?? null}
-            services={services}
-            rules={rules}
-            notices={notices}
-            limitNotice={<PlanLimitNotice moduleId="bookings" />}
-            calendarLine={
-                gcLine ? (
-                    <GoogleCalendarLine
-                        line={gcLine}
-                        userId={session.user.id}
-                    />
-                ) : null
-            }
-            serviceHours={serviceHours}
-            // Cancelled bookings stay off the diary unless the address
-            // asks for them, so a reload keeps the choice.
-            showCancelled={params.cancelled === "1"}
-            person={person}
-            opens={opens}
-            me={mine ? { id: mine.id, name: mine.name } : null}
-            share={
-                share ? <ShareLinkButton link={share} className="mt-0" /> : null
-            }
-            // Nothing chose the view: a phone moves to List (Q4, U6).
-            listFirst={nothingChoseView(chosen)}
-            // A booked message names the business (U9, Q12).
-            business={organization?.name ?? null}
-            people={people}
-            can={{
-                book: may("booking:write"),
-                // Open or block time: a Member keeps anyone's hours
-                // (DEC-170, Q13); adding people stays `service:write`.
-                hours: may("hours:write"),
-                addPeople: may("service:write"),
-                order: may("order:read"),
-                // Refund what a late cancel keeps, or keep what the
-                // policy returns (DEC-170, Q14).
-                refund: may("payment:manage"),
-                // "Take ₹X" (P2): the pair a payment link needs, and the
-                // link itself only where the plan and a provider take it.
-                desk: {
-                    canTake: canTakeDeskPayments(organization),
-                    canLink: people.payLink,
-                    online: takesOnlinePayment(access),
-                },
-            }}
-            newBooking={
-                may("booking:write") ? (
-                    <NewBookingButton
-                        // Keyed: it renders among the screen's own children.
-                        key="new-booking"
-                        // Beside "…" on the desk; on a phone it floats
-                        // over the calendar, above the tab bar (U2).
-                        className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]"
-                        date={params.date === undefined ? null : date}
-                    />
-                ) : null
-            }
-        />
+            <CalendarScreen
+                layout={layout}
+                date={date}
+                today={today}
+                now={now}
+                timezone={calendar.timezone || timezone}
+                calendar={calendar}
+                staff={staffList?.staff ?? null}
+                services={services}
+                rules={rules}
+                notices={notices}
+                limitNotice={<PlanLimitNotice moduleId="bookings" />}
+                calendarLine={
+                    gcLine ? (
+                        <GoogleCalendarLine
+                            line={gcLine}
+                            userId={session.user.id}
+                        />
+                    ) : null
+                }
+                serviceHours={serviceHours}
+                // Cancelled bookings stay off the diary unless the address
+                // asks for them, so a reload keeps the choice.
+                showCancelled={params.cancelled === "1"}
+                googleBusy={googleBusy}
+                googleShow={
+                    params.google === "0"
+                        ? "off"
+                        : params.google === "mine"
+                          ? "mine"
+                          : "all"
+                }
+                person={person}
+                opens={opens}
+                me={mine ? { id: mine.id, name: mine.name } : null}
+                share={
+                    share ? (
+                        <ShareLinkButton link={share} className="mt-0" />
+                    ) : null
+                }
+                // Nothing chose the view: a phone moves to List (Q4, U6).
+                listFirst={nothingChoseView(chosen)}
+                // A booked message names the business (U9, Q12).
+                business={organization?.name ?? null}
+                people={people}
+                can={{
+                    book: may("booking:write"),
+                    // Open or block time: a Member keeps anyone's hours
+                    // (DEC-170, Q13); adding people stays `service:write`.
+                    hours: may("hours:write"),
+                    addPeople: may("service:write"),
+                    order: may("order:read"),
+                    // Refund what a late cancel keeps, or keep what the
+                    // policy returns (DEC-170, Q14).
+                    refund: may("payment:manage"),
+                    // "Take ₹X" (P2): the pair a payment link needs, and the
+                    // link itself only where the plan and a provider take it.
+                    desk: {
+                        canTake: canTakeDeskPayments(organization),
+                        canLink: people.payLink,
+                        online: takesOnlinePayment(access),
+                    },
+                }}
+                newBooking={
+                    may("booking:write") ? (
+                        <NewBookingButton
+                            // Keyed: it renders among the screen's own children.
+                            key="new-booking"
+                            // Beside "…" on the desk; on a phone it floats
+                            // over the calendar, above the tab bar (U2).
+                            className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]"
+                            date={params.date === undefined ? null : date}
+                        />
+                    ) : null
+                }
+            />
         </ScreenPending>
     );
     return (

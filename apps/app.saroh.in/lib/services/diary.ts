@@ -537,7 +537,7 @@ export function dayColumns(
         columns.push({
             key: UNASSIGNED,
             name: "Unassigned",
-            title: "Booked before staff",
+            title: "Booked before you added people",
             day: null,
             blocks: unassigned,
         });

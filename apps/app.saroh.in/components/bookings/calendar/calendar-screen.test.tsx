@@ -381,11 +381,18 @@ describe("the Unassigned column", () => {
 });
 
 describe("header C", () => {
-    it("has the date as the page's heading, and no visible view switch", () => {
+    it("has the date as the page's heading, and the Calendar | List switch", () => {
         draw(calendarOf([booking("b1", "Tariq Ali", 10, 60)]));
         expect(host.querySelectorAll("h1")).toHaveLength(1);
         expect(host.querySelector("h1")?.textContent).toBe("Tue 29 Sep");
-        expect(host.querySelectorAll("[data-segmented]")).toHaveLength(0);
+        // Show as lives in the date sheet; the one switch on view is
+        // Calendar | List, and List is the register.
+        expect(host.querySelectorAll("[data-segmented]")).toHaveLength(1);
+        expect(
+            host.querySelector(
+                'nav[aria-label="Bookings"] a[href="/bookings/all"]',
+            )?.textContent,
+        ).toBe("List");
         // No standing sentence under the diary.
         expect(host.textContent).not.toContain("Customers can book");
     });

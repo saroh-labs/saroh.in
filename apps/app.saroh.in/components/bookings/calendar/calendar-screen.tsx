@@ -6,15 +6,22 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
 
+import type { CalendarBusy } from "@/lib/google-calendar/types";
 import type { NoticeChannels } from "@/lib/messages/notice-reach";
 import type { BookingsCalendar } from "@/lib/services/booking-calendar";
 import type { BookingPeople } from "@/lib/services/booking-pay";
 import type { BookingsOpens } from "@/lib/services/bookings-opens";
 import { EVERYONE, OPENS_DEFAULT } from "@/lib/services/bookings-opens";
-import type { CalendarLayout } from "@/lib/services/calendar-href";
+import { busySpans } from "@/lib/services/busy-blocks";
+import type { CalendarLayout, GoogleShow } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
 import { firstDayName, isFirstDay } from "@/lib/services/day-view";
-import type { Block, LocalDate, ServiceHours } from "@/lib/services/diary";
+import type {
+    Block,
+    LocalDate,
+    ServiceHours,
+    Span,
+} from "@/lib/services/diary";
 import { addDays } from "@/lib/services/diary";
 import type { Service } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
@@ -48,7 +55,7 @@ import { WeekView } from "./week-view";
 
 // The calendar's address lives in a plain module so the server page can
 // build it too; a server component can't call into this client file.
-export { calendarHref, type CalendarLayout };
+export { calendarHref, type CalendarLayout, type GoogleShow };
 
 /**
  * Bookings › Calendar (U15, the "Saroh Bookings" design): the day by person
@@ -86,6 +93,8 @@ export function CalendarScreen({
     share = null,
     listFirst = false,
     business = null,
+    googleBusy = null,
+    googleShow = "all",
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -147,6 +156,14 @@ export function CalendarScreen({
     listFirst?: boolean;
     /** The business, as its customers know it, for a booked message (U9). */
     business?: string | null;
+    /**
+     * Everyone's Google busy times for this week (start and end, never a
+     * title) and who is connected; null when Google Calendar is off for the
+     * business or couldn't be read, and nothing is drawn.
+     */
+    googleBusy?: CalendarBusy | null;
+    /** The Google layer in What to show: everyone's, just mine, or hidden. */
+    googleShow?: GoogleShow;
 }) {
     const router = useRouter();
     // Flipped here and written to the address without a round trip; a
@@ -157,6 +174,7 @@ export function CalendarScreen({
         setAsked(showCancelled);
         setCancelledShown(showCancelled);
     }
+    const [googleMode, setGoogleMode] = useState<GoogleShow>(googleShow);
     const [peek, setPeek] = useState<string | null>(null);
     const [addingPerson, setAddingPerson] = useState(false);
     // A phone that nothing has chosen a view for opens on List (Q4, U6);
@@ -219,6 +237,45 @@ export function CalendarScreen({
         askedPerson,
     });
 
+    // Google busy times, as spans of the day or of each day of the week.
+    const busyFor = useCallback(
+        (day: LocalDate, keys: readonly string[] | null) => {
+            if (!googleBusy?.on || googleMode === "off") return [];
+            const only = googleMode === "mine" ? me?.id : null;
+            if (googleMode === "mine" && !only) return [];
+            const ids = keys
+                ? new Set(keys.filter((k) => !only || k === only))
+                : only
+                  ? new Set([only])
+                  : null;
+            return busySpans(googleBusy.busy, ids, day, timezone, span);
+        },
+        [googleBusy, googleMode, me, timezone, span],
+    );
+    const dayBusy = useMemo(
+        () => ({
+            byColumn: new Map<string, readonly Span[]>(
+                columns.map((c) => [c.key, busyFor(date, [c.key])]),
+            ),
+            all: busyFor(
+                date,
+                columns.map((c) => c.key),
+            ),
+        }),
+        [columns, busyFor, date],
+    );
+    const weekDrawn = useMemo(
+        () =>
+            week.map((d) => ({
+                ...d,
+                busy: busyFor(
+                    d.date,
+                    d.cols.map((c) => c.key),
+                ),
+            })),
+        [week, busyFor],
+    );
+
     // From everything on the view, drawn or not: a booking cancelled from
     // its quick look leaves the diary, and the quick look keeps its Undo.
     const peekBlock = peek
@@ -241,7 +298,11 @@ export function CalendarScreen({
     } = useGapTargets({ date, person, me, staff, staffById });
 
     const hrefFor = (l: CalendarLayout, d: LocalDate, who = person) =>
-        calendarHref(l, d, { cancelled: cancelledShown, person: who });
+        calendarHref(l, d, {
+            cancelled: cancelledShown,
+            person: who,
+            google: googleMode,
+        });
     // In the screen's transition: the diary greys, the header stays.
     const screenGo = useScreenGo();
     const go = (l: CalendarLayout, d: LocalDate) => screenGo(hrefFor(l, d));
@@ -257,8 +318,20 @@ export function CalendarScreen({
         window.history.replaceState(
             null,
             "",
-            calendarHref(layout, date, { cancelled: on, person }),
+            calendarHref(layout, date, {
+                cancelled: on,
+                person,
+                google: googleMode,
+            }),
         );
+    };
+
+    const showGoogle = (mode: GoogleShow) => {
+        setGoogleMode(mode);
+        const url = new URL(window.location.href);
+        if (mode === "all") url.searchParams.delete("google");
+        else url.searchParams.set("google", mode === "off" ? "0" : mode);
+        window.history.replaceState(null, "", url.toString());
     };
 
     const nobodyYet =
@@ -301,152 +374,170 @@ export function CalendarScreen({
                 newBooking={newBooking}
                 calOnly={!can.book}
                 onAddPerson={addPerson}
+                google={
+                    googleBusy?.on
+                        ? {
+                              show: googleMode,
+                              onChange: showGoogle,
+                              people: googleBusy.people,
+                          }
+                        : null
+                }
             />
             <PendingRegion>
-            <div className="max-[759px]:touch-pan-y" {...swipe}>
-                {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
-                {staff === null ? (
-                    <PartialRead
-                        className="mb-3"
-                        things="hours and time off"
-                        so="Open and closed times aren't shown. The bookings below are complete."
-                    />
-                ) : null}
+                <div className="max-[759px]:touch-pan-y" {...swipe}>
+                    {limitNotice ? (
+                        <div className="mb-3">{limitNotice}</div>
+                    ) : null}
+                    {staff === null ? (
+                        <PartialRead
+                            className="mb-3"
+                            things="hours and time off"
+                            so="Open and closed times aren't shown. The bookings below are complete."
+                        />
+                    ) : null}
 
-                {nobodyYet && ownHours ? (
-                    // How the one column works, said once, with the action.
-                    <ServiceHoursNote onAdd={addPerson} />
-                ) : nobodyYet && layout === "day" ? (
-                    <div className="mb-3">
-                        <NobodyTakesBookings onAdd={addPerson} />
-                    </div>
-                ) : nobodyYet ? (
-                    <p className="mb-3 text-[12.5px] text-muted-foreground">
-                        Nobody is on the diary and no service has hours of its
-                        own yet, so customers have no free times to book.{" "}
-                        {addPerson ? (
-                            <TextLink
-                                data-ph-unmask=""
-                                onClick={addPerson}
-                                className="coarse:min-h-11"
-                            >
-                                Add who takes bookings
-                            </TextLink>
-                        ) : null}
-                    </p>
-                ) : null}
-                {/* One message at a time: the plan, a partial read and
+                    {nobodyYet && ownHours ? (
+                        // How the one column works, said once, with the action.
+                        <ServiceHoursNote onAdd={addPerson} />
+                    ) : nobodyYet && layout === "day" ? (
+                        <div className="mb-3">
+                            <NobodyTakesBookings onAdd={addPerson} />
+                        </div>
+                    ) : nobodyYet ? (
+                        <p className="mb-3 text-[12.5px] text-muted-foreground">
+                            Nobody is on the diary and no service has hours of
+                            its own yet, so customers have no free times to
+                            book.{" "}
+                            {addPerson ? (
+                                <TextLink
+                                    data-ph-unmask=""
+                                    onClick={addPerson}
+                                    className="coarse:min-h-11"
+                                >
+                                    Add who takes bookings
+                                </TextLink>
+                            ) : null}
+                        </p>
+                    ) : null}
+                    {/* One message at a time: the plan, a partial read and
                     nobody on the diary come first, and the first day's
                     help (U4). */}
-                {calendarLine && staff !== null && !nobodyYet && !firstDay ? (
-                    <div className="mb-3">{calendarLine}</div>
-                ) : null}
-                {layout === "day" ? (
-                    <>
-                        {firstDay ? (
-                            <FirstDayHelp
-                                name={firstDayName(columns)}
-                                hoursHref={
-                                    can.hours
-                                        ? shownPerson
-                                            ? `/bookings/availability?person=${encodeURIComponent(shownPerson)}`
-                                            : "/bookings/availability"
-                                        : null
-                                }
-                            />
-                        ) : null}
-                        {columns.length ? (
-                            <DayByPerson
-                                columns={columns}
-                                span={span}
-                                today={date === today}
-                                timezone={timezone}
-                                sightKey={`day:${date}`}
-                                everyone={person === EVERYONE}
-                                selected={peek}
-                                canBook={can.book}
-                                canOpenHours={can.hours}
-                                dayText={formatDay(date, {
-                                    weekday: "short",
-                                    year: "never",
-                                })}
-                                onBlock={peekFromDay}
-                                onFree={bookGap}
-                                onClosed={openClosed}
-                            />
-                        ) : (
-                            <NobodyTakesBookings onAdd={addPerson} />
-                        )}
-                        {columns.length ? <DayFoot first={firstDay} /> : null}
-                    </>
-                ) : null}
+                    {calendarLine &&
+                    staff !== null &&
+                    !nobodyYet &&
+                    !firstDay ? (
+                        <div className="mb-3">{calendarLine}</div>
+                    ) : null}
+                    {layout === "day" ? (
+                        <>
+                            {firstDay ? (
+                                <FirstDayHelp
+                                    name={firstDayName(columns)}
+                                    hoursHref={
+                                        can.hours
+                                            ? shownPerson
+                                                ? `/bookings/availability?person=${encodeURIComponent(shownPerson)}`
+                                                : "/bookings/availability"
+                                            : null
+                                    }
+                                />
+                            ) : null}
+                            {columns.length ? (
+                                <DayByPerson
+                                    columns={columns}
+                                    span={span}
+                                    today={date === today}
+                                    timezone={timezone}
+                                    sightKey={`day:${date}`}
+                                    everyone={person === EVERYONE}
+                                    selected={peek}
+                                    canBook={can.book}
+                                    canOpenHours={can.hours}
+                                    dayText={formatDay(date, {
+                                        weekday: "short",
+                                        year: "never",
+                                    })}
+                                    onBlock={peekFromDay}
+                                    onFree={bookGap}
+                                    onClosed={openClosed}
+                                    busy={dayBusy}
+                                />
+                            ) : (
+                                <NobodyTakesBookings onAdd={addPerson} />
+                            )}
+                            {columns.length ? (
+                                <DayFoot first={firstDay} />
+                            ) : null}
+                        </>
+                    ) : null}
 
-                {layout === "week" ? (
-                    <>
-                        <div className="max-[759px]:hidden">
-                            <WeekView
-                                days={week}
-                                span={span}
-                                timezone={timezone}
-                                sightKey={`week:${weekStart}`}
-                                selected={peek}
-                                canBook={can.book}
-                                canOpenHours={can.hours}
-                                offersFree={offersFree}
-                                onDay={(d) => go("day", d)}
-                                onBlock={(b) => setPeek(b.key)}
-                                onFree={bookGap}
-                                onOpenDay={openDay}
-                            />
-                        </div>
-                        <div className="min-[760px]:hidden">
-                            <WeekPhone
-                                days={week}
-                                date={date}
-                                person={
-                                    person === EVERYONE
-                                        ? null
-                                        : (staffById.get(person)?.name ??
-                                          columns.at(0)?.name ??
-                                          null)
-                                }
-                                canBook={can.book}
-                                canOpenHours={can.hours}
-                                offersFree={offersFree}
-                                selected={peek}
-                                onPick={(d) => go("week", d)}
-                                onBlock={(b) => setPeek(b.key)}
-                                onFree={bookGap}
-                                onOpenDay={openDay}
-                            />
-                        </div>
-                    </>
-                ) : null}
+                    {layout === "week" ? (
+                        <>
+                            <div className="max-[759px]:hidden">
+                                <WeekView
+                                    days={weekDrawn}
+                                    span={span}
+                                    timezone={timezone}
+                                    sightKey={`week:${weekStart}`}
+                                    selected={peek}
+                                    canBook={can.book}
+                                    canOpenHours={can.hours}
+                                    offersFree={offersFree}
+                                    onDay={(d) => go("day", d)}
+                                    onBlock={(b) => setPeek(b.key)}
+                                    onFree={bookGap}
+                                    onOpenDay={openDay}
+                                />
+                            </div>
+                            <div className="min-[760px]:hidden">
+                                <WeekPhone
+                                    days={week}
+                                    date={date}
+                                    person={
+                                        person === EVERYONE
+                                            ? null
+                                            : (staffById.get(person)?.name ??
+                                              columns.at(0)?.name ??
+                                              null)
+                                    }
+                                    canBook={can.book}
+                                    canOpenHours={can.hours}
+                                    offersFree={offersFree}
+                                    selected={peek}
+                                    onPick={(d) => go("week", d)}
+                                    onBlock={(b) => setPeek(b.key)}
+                                    onFree={bookGap}
+                                    onOpenDay={openDay}
+                                />
+                            </div>
+                        </>
+                    ) : null}
 
-                {layout === "agenda" ? (
-                    <ListView
-                        blocks={dayBlocks}
-                        columns={columns}
-                        staff={staff}
-                        person={
-                            person === EVERYONE
-                                ? null
-                                : (columns[0]?.name ?? null)
-                        }
-                        date={date}
-                        today={today}
-                        now={now}
-                        timezone={timezone}
-                        selected={peek}
-                        canBook={can.book}
-                        canHours={can.hours}
-                        share={share}
-                        onBlock={peekFromDay}
-                        onFree={bookGap}
-                        onOpenDay={() => openDay(date)}
-                    />
-                ) : null}
-            </div>
+                    {layout === "agenda" ? (
+                        <ListView
+                            blocks={dayBlocks}
+                            columns={columns}
+                            staff={staff}
+                            person={
+                                person === EVERYONE
+                                    ? null
+                                    : (columns[0]?.name ?? null)
+                            }
+                            date={date}
+                            today={today}
+                            now={now}
+                            timezone={timezone}
+                            selected={peek}
+                            canBook={can.book}
+                            canHours={can.hours}
+                            share={share}
+                            onBlock={peekFromDay}
+                            onFree={bookGap}
+                            onOpenDay={() => openDay(date)}
+                        />
+                    ) : null}
+                </div>
             </PendingRegion>
 
             <BookingQuickLook

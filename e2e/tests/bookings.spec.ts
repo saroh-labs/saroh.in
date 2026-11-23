@@ -201,8 +201,9 @@ test.describe("bookings calendar", () => {
         // A press before the calendar hydrates is lost on CI's slower phone
         // runs: press until the sheet answers (`fixtures/press.ts`).
         await pressUntil(title, sheet);
-        // Day, Week and List live under Show as, and nowhere else.
-        const views = sheet.getByRole("navigation", { name: "Bookings view" });
+        // Day, Week and Agenda live under Show as; List is the register,
+        // in the header's Calendar | List switch.
+        const views = sheet.getByRole("navigation", { name: "Show as" });
         await expect(views.getByRole("link", { name: "Day" })).toHaveAttribute(
             "aria-current",
             "page",
@@ -222,14 +223,14 @@ test.describe("bookings calendar", () => {
         );
         await expect(
             sheet
-                .getByRole("navigation", { name: "Bookings view" })
-                .getByRole("link", { name: "List" }),
+                .getByRole("navigation", { name: "Show as" })
+                .getByRole("link", { name: "Agenda" }),
         ).toHaveAttribute("aria-current", "page");
         // The standing sentence under the diary is gone.
         await expect(page.getByText(/Customers can book/)).toHaveCount(0);
     });
 
-    test("the … sheet holds cancelled, All bookings, hours and what the colours mean", async ({
+    test("the … sheet holds cancelled, hours and what the colours mean; All bookings is List", async ({
         page,
     }) => {
         await signIn(page);
@@ -247,7 +248,7 @@ test.describe("bookings calendar", () => {
         ).toBeVisible();
         await expect(
             sheet.getByRole("link", { name: "All bookings" }),
-        ).toBeVisible();
+        ).toHaveCount(0);
         // "Hours and time off" for Everyone, "Meera's hours and time off"
         // for one person.
         await expect(
@@ -545,7 +546,7 @@ test.describe("bookings calendar", () => {
                 await page.goto(
                     `/bookings?date=${day}&layout=day&person=${person.id}`,
                 );
-                // Closed time says "Closed · click to open" (a phone: tap)
+                // Closed time says "Closed · Open these hours"
                 // and opens from the half hour pressed (U4).
                 await page
                     .getByRole("button", {
@@ -1328,7 +1329,7 @@ test.describe("the Service Editor on Northwind (E2)", () => {
 });
 
 test.describe("All bookings (U11)", () => {
-    test("views are chips with counts, search and More filters narrow, nothing scrolls sideways", async ({
+    test("one Showing picker with counts, search and Filters narrow, nothing scrolls sideways", async ({
         page,
     }) => {
         // Read on Pulse: nothing is saved.
@@ -1337,6 +1338,10 @@ test.describe("All bookings (U11)", () => {
         await expect(
             page.getByRole("heading", { level: 1, name: "All bookings" }),
         ).toBeVisible();
+        // The six chips are one picker, with the counts inside it.
+        const picker = page.getByRole("button", { name: /^Showing: Upcoming/ });
+        await expect(picker).toBeVisible();
+        await picker.click();
         const views = page.getByRole("radiogroup", { name: "Show" });
         await expect(
             views.getByRole("radio", { name: /^Upcoming\s*\d+$/ }),
@@ -1354,31 +1359,36 @@ test.describe("All bookings (U11)", () => {
                 }),
             ).toBeVisible();
         }
-        await expect(
-            page.getByText(/Times in \w+, your business's time zone\./),
-        ).toBeVisible();
+        await expect(page.getByText(/^Times in \w+$/)).toBeVisible();
+        // "23 in all" and "Back to the calendar" are gone.
+        await expect(page.getByText(/\d+ in all$/)).toHaveCount(0);
+        await expect(page.getByText("Back to the calendar")).toHaveCount(0);
 
         // A view is kept in the address.
         await views.getByRole("radio", { name: /^All\s*\d+$/ }).click();
         await expect(page).toHaveURL(/view=all/);
 
-        // More filters: Service, With and Status, then Show closes it.
-        await page.getByRole("button", { name: /More filters/ }).click();
-        const panel = page.getByRole("dialog", { name: "More filters" });
+        // Filters: Sort, Dates, Service and Status in one button, then Show
+        // closes it.
+        await page.getByRole("button", { name: /^Filters/ }).click();
+        const panel = page.getByRole("dialog", { name: "Filters" });
+        await expect(panel.getByText("Sort by")).toBeVisible();
         await expect(panel.getByText("Service", { exact: true })).toBeVisible();
-        await expect(panel.getByText("With", { exact: true })).toBeVisible();
         await panel.getByRole("button", { name: "Cancelled" }).click();
-        await panel.getByRole("button", { name: /^Show \d+$/ }).click();
+        await panel
+            .getByRole("button", { name: /^Show \d+ bookings?$/ })
+            .click();
         await expect(panel).toBeHidden();
-        await page.getByRole("button", { name: "Clear filters" }).click();
+        await page.getByRole("button", { name: "Clear all" }).click();
 
         // A search that finds nothing says so, and clears.
-        await page.getByLabel("Search bookings").fill("zzzz-nobody");
-        await page.getByLabel("Search bookings").press("Enter");
+        await page.getByRole("button", { name: "Search bookings" }).click();
+        await page.getByPlaceholder("Search bookings").fill("zzzz-nobody");
+        await page.getByPlaceholder("Search bookings").press("Enter");
         await expect(
             page.getByText("No bookings match “zzzz-nobody”"),
         ).toBeVisible();
-        // The toolbar's Clear search, and the empty panel's beside it.
+        // The narrowing line's Clear all, and the empty panel's beside it.
         await page
             .getByRole("button", { name: "Clear search" })
             .first()
@@ -1415,8 +1425,9 @@ test.describe("All bookings (U11)", () => {
         const booked = await bookOwn(owner, who.id, 2);
         try {
             await page.goto("/bookings/all");
-            await page.getByLabel("Search bookings").fill(stamp);
-            await page.getByLabel("Search bookings").press("Enter");
+            await page.getByRole("button", { name: "Search bookings" }).click();
+            await page.getByPlaceholder("Search bookings").fill(stamp);
+            await page.getByPlaceholder("Search bookings").press("Enter");
             await page
                 .getByRole("button", { name: `More for ${who.name}` })
                 .filter({ visible: true })

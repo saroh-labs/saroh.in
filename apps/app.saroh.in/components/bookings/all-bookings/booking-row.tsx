@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { listTable } from "@saroh/ui/list-table";
@@ -9,23 +10,34 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatTime } from "@/lib/format/datetime";
 import type { RowStatus } from "@/lib/services/all-bookings";
-import { ROW_STATUS } from "@/lib/services/all-bookings";
+import {
+    cancelledLine,
+    lengthWord,
+    moneyCell,
+    ROW_STATUS,
+} from "@/lib/services/all-bookings";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { BookingOutcome } from "@/lib/services/booking-state";
-import { BOOKING_WORDS, outcomeWord } from "@/lib/services/booking-words";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { whoFor } from "@/lib/services/diary";
 
 import type { RowMenuItems } from "./row-menu";
 import { RowMenu } from "./row-menu";
 
 /**
- * The columns at a desk (BKDAllBookings): When, Customer, Service · with,
- * Did they come?, Status, and the ⋯. On a phone (BKMAllBookings) the same
- * row is a card line: the time, who and what, the badge and the ⋯, with
- * "Did they come?" on a line of its own under it.
+ * The columns at a desk (BLHB): When, Customer, Service · with, Money (for
+ * those who read money), Status, and the ⋯. Status holds the badge, or
+ * Came and Didn't come once the visit has ended unmarked. On a phone the
+ * same row is a card line: the time, who and what, the badge and the ⋯,
+ * with the money and the question on lines of their own under it.
  */
-export const ROW_GRID =
-    "grid grid-cols-[68px_minmax(0,1fr)_auto_auto] items-center gap-x-3 min-[760px]:grid-cols-[110px_minmax(0,1fr)_minmax(0,1.2fr)_220px_150px_44px]";
+export const ROW_GRID = (money: boolean) =>
+    cn(
+        "grid grid-cols-[68px_minmax(0,1fr)_auto_auto] items-center gap-x-3",
+        money
+            ? "min-[760px]:grid-cols-[110px_minmax(0,1fr)_minmax(0,1.2fr)_150px_230px_44px]"
+            : "min-[760px]:grid-cols-[110px_minmax(0,1fr)_minmax(0,1.2fr)_230px_44px]",
+    );
 
 const OUTCOME_CHIP =
     "relative z-[1] inline-flex h-[30px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 text-[13px] font-medium transition-colors duration-fast hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-default disabled:text-disabled-foreground max-[759px]:h-11 max-[759px]:px-3.5 max-[759px]:text-[13.5px] [&_svg]:size-3.5";
@@ -50,6 +62,7 @@ export function BookingRow({
     when,
     heading,
     triggerRef,
+    showMoney,
 }: {
     booking: DiaryBooking;
     /** The business's zone (Q10). */
@@ -69,6 +82,8 @@ export function BookingRow({
     /** "Kabir Singh · today, 11:30 am". */
     heading: string;
     triggerRef?: (el: HTMLButtonElement | null) => void;
+    /** `payment:read`: the Money column (owners and admins, DEC-098). */
+    showMoney: boolean;
 }) {
     const who = whoFor(b);
     const what = b.staff
@@ -81,9 +96,15 @@ export function BookingRow({
         : status;
     const badge = ROW_STATUS[shownStatus];
 
+    const money = showMoney ? moneyCell(b) : null;
+    const moneyWords = money
+        ? [money.amount, money.note].filter(Boolean).join(" · ")
+        : "";
+
+    // Status: the badge, or the question once the visit has ended unmarked.
     const outcome = marked ? (
         <span className="flex items-center gap-2 text-[12.5px] text-muted-foreground max-[759px]:min-h-11">
-            <span>{outcomeWord(marked.outcome)}</span>
+            <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
             {marked.undo ? (
                 <Button
                     type="button"
@@ -134,16 +155,22 @@ export function BookingRow({
                     </button>
                 </>
             ) : (
-                <span className="text-[12.5px] text-muted-foreground">
-                    {BOOKING_WORDS.notMarked}
-                </span>
+                <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
             )}
         </span>
-    ) : b.outcome ? (
-        <span className="text-[12.5px] text-muted-foreground">
-            {outcomeWord(b.outcome)}
+    ) : (
+        <span className="grid justify-items-start gap-0.5">
+            <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+            {shownStatus === "cancelled" ? (
+                <span className="text-[12px] text-muted-foreground">
+                    {cancelledLine(b, zone).replace("Cancelled · ", "")}
+                </span>
+            ) : null}
         </span>
-    ) : null;
+    );
+    // On a phone the question has its own line under the row; otherwise
+    // the badge stays on the row.
+    const lineBelow = asks || Boolean(marked);
 
     return (
         <li
@@ -151,7 +178,8 @@ export function BookingRow({
             className={cn(
                 listTable.rule,
                 listTable.wash,
-                ROW_GRID,
+                ROW_GRID(showMoney),
+                shownStatus === "cancelled" && "opacity-70",
                 "relative gap-y-2 px-[14px] py-[11px] focus-within:bg-foreground/[0.035]",
             )}
         >
@@ -160,10 +188,7 @@ export function BookingRow({
                     {formatTime(b.startAt, zone)}
                 </span>
                 <span className="block text-[12px] text-muted-foreground">
-                    <span data-ph-unmask="" className="max-[759px]:hidden">
-                        to{" "}
-                    </span>
-                    {formatTime(b.endAt, zone)}
+                    {lengthWord(b.startAt, b.endAt)}
                 </span>
             </span>
             <span className="min-w-0 min-[760px]:contents">
@@ -177,19 +202,44 @@ export function BookingRow({
                 <span className="block truncate text-[12.5px] text-muted-foreground min-[760px]:text-[13.5px]">
                     {what}
                 </span>
+                {moneyWords ? (
+                    <span
+                        data-money-line=""
+                        className="block truncate text-[12.5px] tabular-nums text-muted-foreground min-[760px]:hidden"
+                    >
+                        {moneyWords}
+                    </span>
+                ) : null}
             </span>
+            {money ? (
+                <span
+                    className="hidden min-w-0 text-[13.5px] tabular-nums min-[760px]:block"
+                    data-money=""
+                >
+                    {money.note || money.amount ? (
+                        <>
+                            <span className="block font-medium">
+                                {money.amount ?? <AbsentValue />}
+                            </span>
+                            {money.note ? (
+                                <span className="block text-[12px] text-muted-foreground">
+                                    {money.note}
+                                </span>
+                            ) : null}
+                        </>
+                    ) : (
+                        <AbsentValue />
+                    )}
+                </span>
+            ) : null}
             <span
                 className={cn(
-                    "min-w-0 max-[759px]:order-5 max-[759px]:col-span-full",
-                    // On a phone the badge says how it went: the line under
-                    // the row is only for the question.
-                    !asks && !marked && "max-[759px]:hidden",
+                    "min-w-0 max-[759px]:order-3",
+                    lineBelow &&
+                        "max-[759px]:order-5 max-[759px]:col-span-full",
                 )}
             >
                 {outcome}
-            </span>
-            <span className="max-[759px]:order-3">
-                <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
             </span>
             <span className="flex justify-end max-[759px]:order-4">
                 <RowMenu

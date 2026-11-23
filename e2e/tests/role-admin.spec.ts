@@ -38,7 +38,7 @@ import { people } from "../fixtures/sessions";
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
-    { label: "Calendar", href: "/calendar" },
+    { label: "Business calendar", href: "/calendar" },
     { label: "Website", href: "/sites" },
     {
         label: "Sell",

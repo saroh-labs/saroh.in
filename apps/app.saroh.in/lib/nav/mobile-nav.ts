@@ -28,7 +28,7 @@ export const TAB_SEATS = 4;
 export const DEFAULT_PREFERENCE = [
     "Home",
     "Sell",
-    "Calendar",
+    "Business calendar",
     "Insights",
 ] as const;
 
@@ -108,8 +108,8 @@ export function seatPreference(currentSection: string | null): string[] {
         new Set([
             "Home",
             currentSection,
-            currentSection === "Sell" ? "Calendar" : "Sell",
-            "Calendar",
+            currentSection === "Sell" ? "Business calendar" : "Sell",
+            "Business calendar",
             "Insights",
         ]),
     );

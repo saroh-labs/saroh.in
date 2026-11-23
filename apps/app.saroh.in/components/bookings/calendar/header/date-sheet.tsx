@@ -28,12 +28,12 @@ const STEP_SMALL =
 /** The eyebrow over each part: the `.label` utility. */
 const LABEL = "label";
 const HELP = "mt-1.5 text-[12.5px] leading-normal text-muted-foreground";
-const VIEW_NAME = { day: "Day", week: "Week", list: "List" } as const;
+const VIEW_NAME = { day: "Day", week: "Week", list: "Agenda" } as const;
 
 /**
  * "Go to a day" (U2; BKMBookingsDayMonthSheet, BKDCalendarDay's date
  * popover): this week with each day's count, the month with dots for busy
- * days and "Closed" on days nobody works, Show as Day / Week / List, and
+ * days and "Closed" on days nobody works, Show as Day / Week / Agenda, and
  * Go to today. Picking a day goes to it in the view shown; nothing here
  * changes a booking.
  *
@@ -118,7 +118,6 @@ export function DateSheet({
                 <BookingsViewSwitch
                     current={layout}
                     hrefFor={(l) => hrefFor(l, date)}
-                    withAll={false}
                     className="w-full [&>*]:flex-1"
                 />
             </div>

@@ -156,6 +156,8 @@ describe("a list draws the one toolbar", () => {
                     "the Products search field itself; catalogue-screen hands it to DataView's toolbarSearch",
                 "components/commerce/product-variants/find-row.tsx":
                     "the product editor's search over a long variants list, inside a section card that has no list toolbar",
+                "components/bookings/all-bookings/list-header.tsx":
+                    "All bookings' header (BLHB, DEC-257): search is an icon that opens the same field in its row, beside the Showing picker and Filters, not a ListToolbar",
                 "components/sites/blocks/add-block-panel.tsx":
                     "a phone's Add a block sheet: a search over the blocks to add, in a sheet with no list toolbar (DEC-185)",
                 "components/sites/editor/add/add-panel.tsx":
@@ -325,10 +327,6 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
                 /aria-current=\{[^}]*\}\s*className=\{chipClass\(/.test(code) ||
                 (listScreen(code) &&
                     /<(?:Chip|ChipGroup)\b|chipClass\(/.test(code)),
-            {
-                "components/bookings/all-bookings/bookings-view.tsx":
-                    "All bookings (U11): its six views are chips with counts in the toolbar's one row, as the boards the owner signed off on 19 Oct draw them (BKMAllBookings, BKDAllBookings; DEC-170)",
-            },
         );
     });
 
