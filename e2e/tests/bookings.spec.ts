@@ -1341,8 +1341,8 @@ test.describe("All bookings (U11)", () => {
         // The six chips are one picker, with the counts inside it.
         const picker = page.getByRole("button", { name: /^Showing: Upcoming/ });
         await expect(picker).toBeVisible();
-        await picker.click();
         const views = page.getByRole("radiogroup", { name: "Show" });
+        await pressUntil(picker, views);
         await expect(
             views.getByRole("radio", { name: /^Upcoming\s*\d+$/ }),
         ).toHaveAttribute("aria-checked", "true");

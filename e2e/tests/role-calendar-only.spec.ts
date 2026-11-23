@@ -42,7 +42,7 @@ const HERS = { id: "seed_booking_calendar-only", booker: "Meera Nair" };
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
-    { label: "Calendar", href: "/calendar" },
+    { label: "Business calendar", href: "/calendar" },
     {
         label: "Bookings",
         href: "/bookings",

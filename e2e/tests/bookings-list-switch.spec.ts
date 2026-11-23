@@ -1,6 +1,7 @@
 // @covers accounts:/login app:/open app:/bookings app:/bookings/all api:bookings api:staff
 import { expect, test } from "@playwright/test";
 
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 
 /**
@@ -86,8 +87,11 @@ test.describe("the list's header", () => {
         await expect(
             page.getByRole("radiogroup", { name: "Show" }),
         ).toHaveCount(0);
-        await page.getByRole("button", { name: /^Showing: Upcoming/ }).click();
         const views = page.getByRole("radiogroup", { name: "Show" });
+        await pressUntil(
+            page.getByRole("button", { name: /^Showing: Upcoming/ }),
+            views,
+        );
         for (const label of [
             "Upcoming",
             "Needs an outcome",
@@ -112,9 +116,11 @@ test.describe("the list's header", () => {
     test("Filters holds Sort and Dates, and Today is not one of the dates", async ({
         page,
     }) => {
-        await page.getByRole("button", { name: /^Filters/ }).click();
         const panel = page.getByRole("dialog", { name: "Filters" });
-        await expect(panel.getByText("Sort by")).toBeVisible();
+        await pressUntil(
+            page.getByRole("button", { name: /^Filters/ }),
+            panel.getByText("Sort by"),
+        );
         await expect(panel.getByText("for this view")).toBeVisible();
         const dates = panel.getByRole("radiogroup", { name: "Dates" });
         await expect(
