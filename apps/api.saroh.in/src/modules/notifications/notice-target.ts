@@ -64,6 +64,9 @@ export const NOTICE_KINDS = {
     "provider.back": "providers",
     "payment.event_unapplied": "providers",
     "team.joined": "team",
+    // An owner or admin set or changed someone's profile photo (23 Nov
+    // 2026): to that person alone (`userId`), on their own Your profile.
+    "staff.photo": "profile",
     // A customer asked to remove their data (DEC-172): the customer, when
     // the request names one; else the Customers requests list.
     "customer.data-request": "customer-request",
@@ -117,6 +120,7 @@ interface TargetColumns {
     domain: { siteId: string | null };
     providers: Record<never, never>;
     team: Record<never, never>;
+    profile: Record<never, never>;
     hours: { staffId: string };
     plan: Record<never, never>;
     products: Record<never, never>;
@@ -251,6 +255,7 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     domain: (n) => n.siteId ?? null,
     providers: () => null,
     team: () => null,
+    profile: () => null,
     // The person, for a row written since #1038; an older one opens the page.
     hours: (n) => n.staffId ?? null,
     plan: () => null,

@@ -232,6 +232,40 @@ export function updateStaff(
     );
 }
 
+/** Who appears on Our team (round 3): an owner or admin, the whole list. */
+export function setTeamPage(staffIds: string[]) {
+    return send<{ staffIds: string[] }>(
+        `/staff/team-page`,
+        "PUT",
+        { staffIds },
+        "Couldn't save who appears.",
+    );
+}
+
+/**
+ * A team member's photo and "About them" (23 Nov 2026): themselves, or an
+ * owner or admin for them. A field left out stays; null clears it.
+ */
+export function updateStaffProfile(
+    staffId: string,
+    changes: { photoMediaId?: string | null; about?: string | null },
+) {
+    return send<StaffView>(
+        `/staff/${encodeURIComponent(staffId)}/profile`,
+        "PATCH",
+        changes,
+        "Couldn't save that.",
+    );
+}
+
+/**
+ * The signed-in person's own place on the diary, or null when they are not
+ * on it or it couldn't be read: what Your profile shows the photo row for.
+ */
+export async function readMyStaff(): Promise<StaffView | null> {
+    return softRead<StaffView>("/staff/mine");
+}
+
 export function setStaffServices(staffId: string, serviceIds: string[]) {
     return send<StaffView>(
         `/staff/${staffId}/services`,

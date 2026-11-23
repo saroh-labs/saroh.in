@@ -1,5 +1,6 @@
 "use client";
 
+import type { SelectedElement, StyleScope } from "@/lib/sites/element-style";
 import { inPageNavigation, mergeInPageNavigation } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import type { ComponentProps, ReactNode, RefObject, UIEvent } from "react";
@@ -117,6 +118,7 @@ export function EditorCanvas({
     previewing,
     setPreviewing,
     narrow = false,
+    roomBelow = false,
     siteId,
     pageId,
     address,
@@ -134,16 +136,26 @@ export function EditorCanvas({
     selectChrome,
     notesByKey,
     changedByKey,
+    photoPreviewByKey,
     dirty,
     onlyHeldBack,
     heldBack,
     blockTools,
+    headerTools,
     textEdit,
     conflictBy = null,
     conflictYou = false,
     saveFailed = null,
     windowBar = true,
+    element = null,
+    elementScope = "element",
+    selectElement,
 }: {
+    /** The button or photo selected on the page (DEC-253). */
+    element?: SelectedElement | null;
+    elementScope?: StyleScope;
+    /** Selecting a button or photo; absent, a click selects its section. */
+    selectElement?: (index: number, element: SelectedElement) => void;
     /** The window bar round the page; off where the canvas bar names it. */
     windowBar?: boolean;
     /** Who saved the page since this editor opened it (C12), if known. */
@@ -154,6 +166,8 @@ export function EditorCanvas({
     saveFailed?: ReactNode;
     /** A phone's toolbar on the selected block (DEC-185). */
     blockTools?: (index: number) => ReactNode;
+    /** On the selected header: its menu edited in place (H1). */
+    headerTools?: ReactNode;
     /** Typing on the page (U47d): the selected section's words' host. */
     textEdit?: ComponentProps<typeof DraftPreview>["textEdit"];
     canvasRef: RefObject<HTMLDivElement | null>;
@@ -170,6 +184,8 @@ export function EditorCanvas({
     setPreviewing: (on: boolean) => void;
     /** Below the desk width: the design's tighter padding (G4). */
     narrow?: boolean;
+    /** A phone's sheet covers the lower page: the page can scroll past its end. */
+    roomBelow?: boolean;
     /** For the blocks that read live data on the canvas (G8). */
     siteId: string;
     /** The open page, so a link to it in Preview stays here. */
@@ -191,6 +207,8 @@ export function EditorCanvas({
     notesByKey: Map<string, number>;
     /** A reader's marks: what changed since live, per section key. */
     changedByKey?: ReadonlyMap<string, string>;
+    /** A photo Ask AI drafted, by section key: shown dashed, not applied yet. */
+    photoPreviewByKey?: ReadonlyMap<string, { src: string; alt: string }>;
     /**
      * Work not yet saved — the page, the look, the name or the footer —
      * which holds a page switch back (review G-3).
@@ -248,7 +266,16 @@ export function EditorCanvas({
                 : {
                       selectedIndex,
                       blockTools,
+                      headerTools,
                       textEdit,
+                      selectedElement: element,
+                      elementScope,
+                      onSelectElement: selectElement
+                          ? (index: number, el: SelectedElement) => {
+                                setRail("sections");
+                                selectElement(index, el);
+                            }
+                          : undefined,
                       onSelect: (index: number) => {
                           setRail("sections");
                           setSelectedIndex(index);
@@ -257,6 +284,7 @@ export function EditorCanvas({
                       onSelectChrome: selectChrome,
                       notesByKey,
                       changedByKey,
+                      photoPreviewByKey,
                       onOpenNotes: (index: number) => {
                           setSelectedIndex(index);
                           setInspector("feedback");
@@ -279,7 +307,7 @@ export function EditorCanvas({
                     className="sticky top-3 z-20 flex h-0 justify-center"
                 >
                     <p className="h-fit whitespace-nowrap rounded-full border bg-card px-3 py-1.5 text-xs font-medium shadow-md">
-                        {`Trying ${trying}. Not saved until you press Enter.`}
+                        {trying}
                     </p>
                 </div>
             ) : null}
@@ -422,6 +450,10 @@ export function EditorCanvas({
                 </div>
             </div>
 
+            {/* Room for a chosen button to rise above the phone's sheet. */}
+            {roomBelow && !previewing ? (
+                <div aria-hidden data-room-below="" className="h-[30rem]" />
+            ) : null}
             {previewing ? (
                 <PreviewBar
                     notSent={notSent}

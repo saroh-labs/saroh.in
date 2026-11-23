@@ -1,7 +1,12 @@
 "use client";
 
 import { formatClock, formatClockRange } from "@/lib/format/datetime";
-import { Avatar, AvatarFallback, avatarInitials } from "@saroh/ui/avatar";
+import {
+    Avatar,
+    AvatarFallback,
+    AvatarImage,
+    avatarInitials,
+} from "@saroh/ui/avatar";
 import { cn } from "@saroh/ui/lib/utils";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
@@ -442,6 +447,7 @@ function ColumnHead({ column: c }: { column: Column }) {
             className="flex min-w-0 items-center gap-2.5 border-b border-l border-b-border border-l-border/60 px-3 py-2.5 max-[759px]:hidden"
         >
             <Avatar size="row" aria-hidden>
+                {c.photo ? <AvatarImage src={c.photo} alt="" /> : null}
                 <AvatarFallback>{avatarInitials(c.name)}</AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">

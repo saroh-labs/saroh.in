@@ -536,3 +536,108 @@ describe("a section's words (owner, 21 Nov)", () => {
         expect(heard).toHaveBeenCalledTimes(1);
     });
 });
+
+describe("a photo placed (owner, 22 Nov)", () => {
+    const PHOTO: AskAiDraftCard = {
+        draftId: "d9",
+        tool: "place_image",
+        kind: "image",
+        action: "edit",
+        status: "drafted",
+        targetId: "section:s1:p1:k1",
+        targetName: "Home · Hero",
+        fields: [
+            {
+                field: "photo",
+                label: "Photo",
+                old: null,
+                new: "https://media.test/aisle.webp",
+            },
+            {
+                field: "alt",
+                label: "Alt text",
+                old: null,
+                new: "A warehouse aisle",
+            },
+        ],
+        missing: [],
+        refusal: null,
+        note: null,
+        expiresAt: "2026-11-14T18:30:00.000Z",
+        basedOn: "Your photo and where it goes",
+    };
+
+    it("shows Now with no photo and New with a thumbnail and its alt text, then Apply", () => {
+        render(PHOTO);
+        expect(text()).toContain("New photo");
+        expect(text()).toContain("Not applied yet");
+        expect(text()).toContain("Now");
+        expect(text()).toContain("No photo");
+        expect(text()).toContain("A warehouse aisle");
+        const img = host.querySelector<HTMLImageElement>("img");
+        expect(img?.src).toBe("https://media.test/aisle.webp");
+        expect(button("Apply")).toBeTruthy();
+        expect(button("Not now")).toBeTruthy();
+        expect(text()).toContain("Based on: Your photo and where it goes");
+    });
+
+    it("draws only a web address as a picture, never anything else", () => {
+        render({
+            ...PHOTO,
+            fields: [
+                {
+                    field: "photo",
+                    label: "Photo",
+                    old: null,
+                    new: "javascript:alert(1)",
+                },
+            ],
+        });
+        expect(host.querySelector("img")).toBeNull();
+    });
+
+    it("Apply on a product photo says the shop shows it at once; Undo takes it off", async () => {
+        const product = {
+            ...PHOTO,
+            targetId: "product:pr1",
+            targetName: "Cartons",
+        };
+        actions.confirmDraft.mockResolvedValue(
+            result({ ...product, status: "confirmed" }, { outcome: "done" }),
+        );
+        render(product);
+        act(() => button("Apply")?.click());
+        await settle();
+        expect(text()).toContain("Saved · shows in your shop");
+        expect(button("Undo")).toBeTruthy();
+    });
+
+    it("a photo for a section is previewed on the open page's canvas while the card is open, and taken back after", () => {
+        const heard: unknown[] = [];
+        const on = (e: Event) => heard.push((e as CustomEvent).detail);
+        window.addEventListener("saroh:site-photo-preview", on);
+        render(PHOTO);
+        expect(heard).toEqual([
+            {
+                kind: "set",
+                siteId: "s1",
+                pageId: "p1",
+                sectionKey: "k1",
+                src: "https://media.test/aisle.webp",
+                alt: "A warehouse aisle",
+            },
+        ]);
+        act(() => root.render(<div />));
+        expect(heard.at(-1)).toEqual({ kind: "clear", sectionKey: "k1" });
+        window.removeEventListener("saroh:site-photo-preview", on);
+    });
+
+    it("a product's photo has nothing to preview on a canvas", () => {
+        const heard: unknown[] = [];
+        const on = (e: Event) => heard.push((e as CustomEvent).detail);
+        window.addEventListener("saroh:site-photo-preview", on);
+        render({ ...PHOTO, targetId: "product:pr1" });
+        expect(heard).toEqual([]);
+        window.removeEventListener("saroh:site-photo-preview", on);
+    });
+});

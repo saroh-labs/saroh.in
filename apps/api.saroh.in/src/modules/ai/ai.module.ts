@@ -8,6 +8,7 @@ import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { McpModule } from "../mcp/mcp.module";
+import { MediaStorageModule } from "../media/media-storage.module";
 import { OrdersModule } from "../orders/orders.module";
 import { AskAiAccess } from "./access/ask-ai-access";
 import { ASK_AI_AGENT } from "./agents/ask-ai.agent";
@@ -57,6 +58,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         OrdersModule,
         BookingsModule,
         BillingModule,
+        // Ask AI reads the images a person sent, and lists them back.
+        MediaStorageModule,
     ],
     controllers: [
         AskAiController,

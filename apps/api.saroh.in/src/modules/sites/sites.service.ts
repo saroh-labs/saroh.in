@@ -7,6 +7,7 @@ import {
     Optional,
     ServiceUnavailableException,
 } from "@nestjs/common";
+import { firstPhotoOf } from "@saroh/block-contract";
 import type { PageKind } from "@saroh/database";
 import {
     getSectionContract,
@@ -85,6 +86,7 @@ import {
 } from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
+import { starterSections } from "./page-starters";
 import { pageUpdatedAt, pageUpdatedSelect } from "./page-updated";
 import type { SiteChangeKind } from "./pending-changes";
 import {
@@ -112,6 +114,7 @@ import {
     releaseUnderReview,
 } from "./release-under-review";
 import { queueReviewAlert } from "./review-alert-queue";
+import { liveReviewSnapshot } from "./review-live";
 import type { ReviewRoute } from "./review-route";
 import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
@@ -196,6 +199,7 @@ import {
     templateFooterLine,
     templateFormerFooterLines,
 } from "./site-template-record";
+import { liveTeamSnapshot } from "./team-live";
 import { websiteAreaOn } from "./website-area-switch";
 
 /** A site's live posts a public read lists, newest first (02 W6). */
@@ -1148,6 +1152,36 @@ export class SitesService {
      * count would risk disagreeing with the editor's; the answer to that was to
      * have one count rather than to withhold it.
      */
+    /**
+     * Where the business's Our team section is (ER3Team T4): the first
+     * draft page holding a team-look person section, for Bookings' "Change
+     * in Website". Null when there is none.
+     */
+    async teamPage(
+        ctx: OrganizationContext,
+    ): Promise<{ siteId: string; pageId: string } | null> {
+        authorize(ctx, "site:read");
+        const found = await prisma.section.findFirst({
+            where: {
+                organizationId: ctx.organizationId,
+                type: "person",
+                content: { path: ["variant"], equals: "team" },
+                pageVersion: {
+                    status: "DRAFT",
+                    page: { site: { deletedAt: null, ...reviewerScope(ctx) } },
+                },
+            },
+            orderBy: { pageVersion: { page: { createdAt: "asc" } } },
+            select: {
+                pageVersion: {
+                    select: { page: { select: { id: true, siteId: true } } },
+                },
+            },
+        });
+        const page = found?.pageVersion.page;
+        return page ? { siteId: page.siteId, pageId: page.id } : null;
+    }
+
     async listSites(ctx: OrganizationContext) {
         authorize(ctx, "site:read");
         const sites = await prisma.site.findMany({
@@ -1604,6 +1638,18 @@ export class SitesService {
                         ...PAGE_HEAD_SELECT,
                         // The Pages tab's Updated column (#908).
                         ...pageUpdatedSelect,
+                        // And the editor's page rows' first photo.
+                        versions: {
+                            ...pageUpdatedSelect.versions,
+                            select: {
+                                updatedAt: true,
+                                sections: {
+                                    where: { hidden: false },
+                                    orderBy: { order: "asc" as const },
+                                    select: { content: true },
+                                },
+                            },
+                        },
                     },
                 },
             },
@@ -1644,6 +1690,9 @@ export class SitesService {
                     updatedAt: page.updatedAt,
                     versions,
                 }),
+                firstPhoto: firstPhotoOf(
+                    (versions[0]?.sections ?? []).map((s) => s.content),
+                ),
             })),
             // As it applies now (DEC-103): switched on under a plan without
             // the approval row, it reads as off, as publishing treats it.
@@ -3177,7 +3226,16 @@ export class SitesService {
             site.organizationId,
         );
         return {
-            snapshot,
+            // Our team's bound people, checked live (team-live.ts).
+            // Copied product reviews, kept only while still published.
+            snapshot: (await liveReviewSnapshot(
+                await liveTeamSnapshot(
+                    snapshot,
+                    site.organizationId,
+                    this.media,
+                ),
+                site.organizationId,
+            )) as typeof snapshot,
             publishedAt,
             siteId: site.id,
             organizationId: site.organizationId,
@@ -4482,23 +4540,67 @@ export class SitesService {
                 "A page needs a title and an address.",
             );
         }
+        // A new page type (A7) is the Website area's (DEC-240).
+        if (dto.starter !== undefined && !websiteAreaOn()) {
+            throw new BadRequestException(
+                "This page type isn't available yet.",
+            );
+        }
         await assertPathIsFree(siteId, dto.path, { title: dto.title });
 
         const path = dto.path;
         const title = dto.title;
+        const starter = dto.starter;
         return prisma.$transaction(async (tx) => {
             // A page now has this link: it wins over an old link's forward.
             await dropRedirectsAt(tx, siteId, path);
+            const sections = starter
+                ? await starterSections(tx, {
+                      organizationId: ctx.organizationId,
+                      siteId,
+                      title,
+                      starter,
+                  })
+                : null;
+            // A site with no pages yet: its first page is its home (owner, 22 Nov 2026).
+            const firstPage =
+                (await tx.page.count({ where: { siteId } })) === 0;
             return tx.page.create({
                 data: {
                     siteId,
                     organizationId: ctx.organizationId,
                     path,
                     title,
-                    isHome: false,
+                    isHome: firstPage,
                     ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
                     settingsEditedByUserId: ctx.userId,
                     settingsEditedAt: new Date(),
+                    // Its draft, filled from the business (A7), as a
+                    // module page's is.
+                    ...(sections
+                        ? {
+                              versions: {
+                                  create: {
+                                      organizationId: ctx.organizationId,
+                                      status: "DRAFT",
+                                      createdByUserId: ctx.userId,
+                                      sections: {
+                                          create: sections.map((s, order) => ({
+                                              organizationId:
+                                                  ctx.organizationId,
+                                              key: randomUUID(),
+                                              type: s.type,
+                                              contractVersion:
+                                                  s.contractVersion,
+                                              order,
+                                              content:
+                                                  s.content as Prisma.InputJsonValue,
+                                          })),
+                                      },
+                                  },
+                              },
+                          }
+                        : {}),
                 },
                 select: PAGE_VIEW_SELECT,
             });

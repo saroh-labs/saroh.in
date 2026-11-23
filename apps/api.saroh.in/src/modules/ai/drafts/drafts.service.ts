@@ -222,6 +222,14 @@ export class DraftsService {
                 ? { ...(raw as Record<string, unknown>) }
                 : {};
         delete given.business;
+        // Undo's own field, never the model's (place_image puts a photo back with it).
+        delete given.restore;
+        if (spec.notYoursWords && !this.registry.allows(tool, asker.ctx)) {
+            const owner = await this.access.ownerName(org);
+            return refused(
+                `Say this to the person, in their language, and nothing else: "${spec.notYoursWords}${owner ? ` Ask ${owner} to put it on.` : ""} This didn't use a question." Make no card.`,
+            );
+        }
         if (!spec.targetOf) given.request_id = DRAFTING;
         const parsed = parseInProcess(tool, given);
         const draft: NewDraft = {

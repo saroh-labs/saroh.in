@@ -1,6 +1,7 @@
 import type { RenderedTestimonials } from "@saroh/block-contract";
 import { EditableText } from "../editable-text";
 import type { LookProps } from "../look-context";
+import { ReviewStars } from "./review-stars";
 import LookTestimonials from "./testimonials-look";
 
 /**
@@ -15,6 +16,12 @@ import LookTestimonials from "./testimonials-look";
  *
  * Drawn from `--site-*` only; gate G2 fails the build otherwise.
  */
+const quote = (text: string) => (
+    <blockquote className="text-site-fg whitespace-pre-line text-lg leading-relaxed">
+        “{text}”
+    </blockquote>
+);
+
 export default function TestimonialsSection({
     content,
     look,
@@ -39,9 +46,15 @@ export default function TestimonialsSection({
                 {content.items.map((item, i) => (
                     <li key={i}>
                         <figure className="border-site-border bg-site-surface flex h-full flex-col justify-between gap-6 rounded-[var(--site-radius)] border p-6">
-                            <blockquote className="text-site-fg whitespace-pre-line text-lg leading-relaxed">
-                                “{item.quote}”
-                            </blockquote>
+                            {/* Wrapped only with stars, so an unrated quote draws as before. */}
+                            {item.rating ? (
+                                <div className="grid gap-3">
+                                    <ReviewStars rating={item.rating} />
+                                    {quote(item.quote)}
+                                </div>
+                            ) : (
+                                quote(item.quote)
+                            )}
                             <figcaption className="text-sm">
                                 <span className="text-site-fg block font-semibold">
                                     {item.name}

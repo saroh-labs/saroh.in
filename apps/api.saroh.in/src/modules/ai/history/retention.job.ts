@@ -1,13 +1,18 @@
-import { Injectable, Logger } from "@nestjs/common";
-import type { Job } from "@saroh/database";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { MediaService } from "../../media/media.service";
 import { heldOrganizationIds } from "../../organizations/legal-hold";
+import { openMessageBody } from "./sealing";
 
 /** The daily job that forgets Ask AI conversations past their 90 days. */
 export const AI_RETENTION_TYPE = "ai.retention";
 
 export const AI_RETENTION_EVERY_MS = 24 * 60 * 60 * 1000;
+
+/** An Ask AI image picked and never sent is kept this long. */
+export const UNSENT_IMAGE_MS = 24 * 60 * 60 * 1000;
 
 /** A conversation is kept this long after its last message (DEC-220). */
 export const AI_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
@@ -23,6 +28,10 @@ const BATCH = 500;
  * on legal hold keeps everything (DEC-122). Running it twice deletes
  * nothing more.
  *
+ * The images a question carried (media purpose `ask-ai-sent`, never
+ * applied) are deleted with their conversation, files and rows; one picked
+ * and never sent goes after a day.
+ *
  * Its drafts (U5, `AskAiDraft`) go with it: the foreign key cascades.
  * Reports about an answer (U8, `AiReport`) keep their own copy and are
  * deleted here 90 days after they were made, whatever their conversation.
@@ -37,6 +46,8 @@ export class AiRetentionJob {
 
     /** Rows read at a time; tests make it small. */
     batch = BATCH;
+
+    constructor(@Optional() private readonly media?: MediaService) {}
 
     readonly handle = async (_job: Job): Promise<void> => {
         const now = new Date();
@@ -81,6 +92,9 @@ export class AiRetentionJob {
             });
             if (due.length === 0) break;
             after = due[due.length - 1].id;
+            // The images its questions carried go with it (read first: the
+            // messages go with the conversation).
+            const carried = await this.imagesOf(due.map((c) => c.id));
             // The date again in the delete: a message added since the read
             // keeps its conversation.
             const done = await prisma.aiConversation.deleteMany({
@@ -90,6 +104,25 @@ export class AiRetentionJob {
                     ...notHeld,
                 },
             });
+            if (done.count > 0) {
+                const kept = new Set(
+                    (
+                        await prisma.aiConversation.findMany({
+                            where: { id: { in: due.map((c) => c.id) } },
+                            select: { id: true },
+                        })
+                    ).map((c) => c.id),
+                );
+                const gone = carried.filter((c) => !kept.has(c.id));
+                // An image a later question of a kept conversation reused stays (L3).
+                const shown = await this.shownImages(gone.map((c) => c.org));
+                deleted +=
+                    (await this.media?.deleteAskAiImages(
+                        gone
+                            .flatMap((c) => c.images)
+                            .filter((id) => !shown.has(id)),
+                    )) ?? 0;
+            }
             deleted += done.count;
             if (due.length < this.batch) break;
         }
@@ -97,7 +130,74 @@ export class AiRetentionJob {
         const reports = await prisma.aiReport.deleteMany({
             where: { createdAt: { lt: before }, ...notHeld },
         });
-        return deleted + reports.count;
+        // The images people sent with a question go with the conversation's days.
+        const unsent = new Date(now.getTime() - UNSENT_IMAGE_MS);
+        const images =
+            (await this.media?.deleteUnsentAskAiImagesBefore(unsent, held)) ??
+            0;
+        return deleted + reports.count + images;
+    }
+
+    /** Every image the questions still kept in these businesses show (sealed, so read here). */
+    private async shownImages(orgs: string[]): Promise<Set<string>> {
+        if (!orgs.length) return new Set();
+        const kept = await this.imagesWhere({
+            organizationId: { in: [...new Set(orgs)] },
+        });
+        return new Set(kept.flatMap((c) => c.images));
+    }
+
+    /** The media ids each conversation's questions carried (sealed in their messages). */
+    private imagesOf(ids: string[]) {
+        return this.imagesWhere({ conversationId: { in: ids } });
+    }
+
+    private async imagesWhere(
+        where: Prisma.AiMessageWhereInput,
+    ): Promise<{ id: string; org: string; images: string[] }[]> {
+        const rows = await prisma.aiMessage.findMany({
+            where: { ...where, role: "USER" },
+            select: {
+                id: true,
+                organizationId: true,
+                conversationId: true,
+                bodyCiphertext: true,
+                bodyIv: true,
+                bodyAuthTag: true,
+            },
+        });
+        const by = new Map<string, string[]>();
+        const orgOf = new Map<string, string>();
+        for (const m of rows) {
+            try {
+                const body = openMessageBody(
+                    {
+                        ciphertext: m.bodyCiphertext,
+                        iv: m.bodyIv,
+                        authTag: m.bodyAuthTag,
+                    },
+                    {
+                        organizationId: m.organizationId,
+                        conversationId: m.conversationId,
+                        rowId: m.id,
+                    },
+                );
+                if (body.images?.length) {
+                    orgOf.set(m.conversationId, m.organizationId);
+                    by.set(m.conversationId, [
+                        ...(by.get(m.conversationId) ?? []),
+                        ...body.images,
+                    ]);
+                }
+            } catch {
+                // A message that can't be opened has no images to find.
+            }
+        }
+        return [...by].map(([id, images]) => ({
+            id,
+            org: orgOf.get(id) ?? "",
+            images,
+        }));
     }
 
     /** Leave one run waiting at `runAt`, unless one is. Never throws. */

@@ -432,6 +432,8 @@ export interface Column {
     key: string;
     name: string;
     title: string | null;
+    /** Their profile photo's address; none draws their initials. */
+    photo?: string | null;
     /** Their hours, time off and free gaps; null when hours are unknown. */
     day: PersonDay | null;
     blocks: Block[];
@@ -495,6 +497,7 @@ export function dayColumns(
             key: person.id,
             name: person.name,
             title: person.title,
+            photo: person.photo?.url ?? null,
             day: personDay(
                 person,
                 date,

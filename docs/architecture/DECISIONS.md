@@ -3279,3 +3279,100 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Google busy times** are drawn on Day and Week, **busy only, never what the event is** (Settings promises "Saroh sees busy or free, never what an event is"). They are on by default; a Google layer under "What to show" in the "…" sheet hides them or limits them to your own. Everyone who may read bookings (a Member included) sees everyone's blocks. A "Who's connected" panel in the same sheet says who is connected, needs reconnecting or is not connected; connecting stays each person's own, in Settings. The API read is `GET organizations/:id/calendar/google/busy?from&to` (start and end per person on the diary, at most 42 days; scoped to the business; nothing while the flag or plan is off or a person's connection is paused).
 - **Words.** One payment word, "Awaiting payment". A cancelled row says "Cancelled · 20 Nov" without by whom (the read doesn't carry it), and its Money cell says what was paid online and points to the booking for the refund, or "Nothing was paid". Closed time says "Closed · Open these hours"; today with only cancelled bookings says "Nobody else today"; a custom range reads "1 Aug to 31 Oct".
 - **Not decided here.** Selecting several rows to mark Came or Didn't come in one go: the owner is still reviewing it, so it is not built.
+## DEC-258 Images in Ask AI: up to ten a message, kept with the conversation until one is applied
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, boards AIImg* on canvas 4)
+
+- A message may carry up to 10 images (JPG, PNG, WebP or GIF, at most 5 MB each, Anthropic's per-image limit), in the composer everywhere Ask AI appears: picked from the device, from Your photos, pasted or dropped. Each is prepared in the browser (`prepare-photo`, DEC-246, with no smaller copies) and uploaded through the media pipeline: server-made key, end checks, one-use link, the business's edition bucket (DEC-247).
+- **Kept with the conversation only.** An image goes up under the media purpose `ask-ai`, which Your photos does not list, with `ai:use` (not `media:write`) as its gate. It becomes one of Your photos (purpose `site-image`) only when a draft that uses it is applied. An unapplied one is deleted with the conversation's 90 days (`ai.retention`; a business on legal hold keeps them). The conversation stores media ids sealed with the message, never bytes.
+- **A message is one question** for the allowance, however many images; the 10-image cap bounds its cost. A message of images alone is allowed ("What do you see in these images?").
+- The API sends the images to Claude as image content blocks, as bytes read from the business's own storage. Only the business's own READY media of an allowed type and size is accepted (another's id is a 404, before the stream opens); a prompt estimate counts an image as about 1,600 tokens.
+- **One provider line**, in the composer's Add images menu only: "Ask AI's provider reads the images you add" (", outside India" on the India edition). Text inside an image is the picture's, never an instruction to Ask AI (house rule 7).
+- **Reading and acting.** Ask AI describes, compares, writes alt text and reads the words in images. It acts only through a draft: `place_image` puts an attached image as a section's photo, a product's first photo or a post's cover on a Now and New card with thumbnails, using Check this, Apply and Undo as today. Nothing goes live on its own; website and post changes wait for Publish, a product photo shows in the shop at once. Role and plan gates are the tool's own (`section:write`, and the product's own write check for a product). Ask AI places the merchant's images; it doesn't make or retouch them.
+- **One gate per target.** A section's photo and a post's cover are `place_image` (`section:write`, the Website module); a product's photo is `place_product_photo` (`store:write`, the Commerce module). Someone whose role can't make the change gets one message naming the owner ("Changing the website isn't part of your role. Ask Demo Owner to put it on."), no card.
+- **Undo puts the earlier photo back.** The draft keeps the earlier section image whole (or the earlier cover), sealed with the card; Undo restores it. A product's Undo takes the new first photo off, which brings the earlier one back first. The model can never set the restore field.
+- **Retention follows the conversation.** An image a question carried is purpose `ask-ai-sent` and is deleted with its conversation (`ai.retention`, its 90 days from the last message), unless applied (then it is a library photo). One picked and never sent goes after a day. A business on legal hold keeps everything.
+- **Chat images are private (security review, 23 Nov).** A chat image (`ask-ai`, `ask-ai-sent`) is never given a media-host address: the conversation read and the composer get a 15-minute signed link from the row's own edition bucket (`img-src` allows the R2 host for it, nothing else). Once applied it is a library photo and has the normal public address. **Upload limits:** no smaller copies for an Ask AI image, at most 30 not yet sent per person, 60 upload links an hour per person. **Applying needs the target's own permission, not `media:write`:** `section:write` / `store:write` already says this person may put pictures on that page or product, and the file is the asker's own from this conversation; also asking for `media:write` would stop a Member who may edit the site from using their own photo, while changing nothing they can't already do. A deleted conversation keeps an image a kept conversation still shows.
+- "Ask again" resends the question's images. The canvas shows a drafted section photo in place, dashed, "Preview · not applied yet", while its card is open.
+- Follow-up: the phone's Add images is a dropdown for now; the shadcn Drawer (handle, Cancel and Add pinned) lands with PR #1446. The viewer has no swipe yet.
+
+## DEC-248 Add a page offers Service detail, Offer and Our team; a person is on Our team only once opted in
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, editor missing features A7 and Q5)
+
+- Add a page offers three new page types beside Blank, the ready pages and A copy: **Service detail**, **Offer** and **Our team**. Each is an ordinary free-form page (`CreatePageDto.starter`), not a page kind: a site may have many, at any link. Each starts with sections filled from the business, and sample words that claim nothing.
+- Offer does not read `Discount`: a discount code is for the shop's checkout and never applies to a booking.
+- **Our team shows a person only after an opt-in, default off** (`StaffMember.showOnTeamPage`). The person switches it for themselves, or an owner or admin (`service:write`) for them; no other role can. Names and roles only; staff carry no photo.
+- The names are copied into the page when it is made. Someone who switches it off later is taken off that page by hand.
+- Behind the Website area switch (DEC-240): the page types and `PUT staff/:id/team-page` are refused with it off.
+
+## DEC-249 "From your logo" reads the logo's colours in the merchant's browser
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, B3 and Q7) · keeps DEC-241
+
+- Colours from my brand colour offers **From your logo**: the logo's two or three main colours, read in the merchant's browser from the logo the site shows. There is no server decode.
+- A logo whose host won't let it be read is picked from the device instead. It is read there and never uploaded.
+- The colour picked is a brand colour like a typed one: the palette is still made on the server and held to 4.5:1 (DEC-241).
+
+## DEC-250 Video and Instagram embeds in posts are left out
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, W2, Y1 and Q6)
+
+- The post editor's inserts (W2 desk, Y1 phone) are built without **Video** and **Instagram post**. The other inserts are in.
+- No host allow-list is chosen, so nothing embeds a third party's player or post.
+
+## DEC-251 The Ask AI items of the editor's missing features wait
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, Q1 and Q2)
+
+- Not in this round: AI1–AI10, A3 ("Not here? Describe a section"), E2 (Ask AI on an empty site) and the Ask AI rows in D3's history. They wait for master plan batch 8 (U41–U43, Check this on the server).
+- Ask AI stays a right-column tab, not a dock (21 Nov decision).
+
+## DEC-252 An owner or admin picks who appears on Our team; the page reads them live
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round 3, EBTeamPicker) · replaces DEC-248's opt-in
+
+- Who appears is chosen by an owner or admin (`service:write`) in the Our team page's People list or picker, the whole list at once (`PUT staff/team-page`). Nobody adds themselves and nobody is told; the Hours screen shows a read-only line.
+- An Our team section's people are bound to staff (`staffId`). The public read shows a bound person only while still chosen and active, under their current name, so someone taken off leaves the live site at once (page-cache cause `team`). People typed in by hand show as typed.
+- One chosen list per business.
+- The post Offer card reads `public/sites/:siteId/offers/:id`, no longer behind SHARE_POSTS.
+
+## DEC-253 One button, photo or section can be styled on its own; the site stays the default
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, component styling, iteration C, canvas 4 pages `csi` and `cs`) · replaces DEC-237's "never per single instance"; keeps the rest of DEC-237
+
+- Context: the owner could not change a button's colour or corners on one page. DEC-237 set component styles per kind of component for the whole site only.
+- Decision:
+    - **Three scopes, closest wins:** this element › this section › the whole site › the look's own. The whole site stays the default and is still Brand › Buttons and shapes.
+    - A button or photo is selected on the canvas. Its Style tab starts with **Apply to** (This button, This section, Whole site), then Colour, Style, Corners and Size, with Changed marks and **one reset** at the chosen level.
+    - Where each lives: a button's style on its own CTA (`elementStyle`, and its `style` for Filled, Outline, Soft or Link); a photo's corners on its image; a section's in `frame.styles` (`button`, `card`, `image`), beside Background and Spacing. Section › Style lists "Styled in this section" with its own Reset.
+    - Nothing is written for a level nobody changed, so live sites draw exactly as before. Changes wait for Publish and are free on every plan, as in DEC-237.
+- Consequences: an element's style is drawn inline on the element; a section's as rules under its own mark, after the site's. The editor's canvas stamps each button and photo with its place (never saved or published) so a click can select it. A card can't yet be styled on its own (no card carries an identity in the content); its section and site scopes work.
+
+## DEC-254 A custom button colour, if its words read at 4.5:1; Soft buttons and Size S, M, L
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, iteration C) · relaxes DEC-090 and DEC-241 for buttons only · keeps DEC-177
+
+- **Colour** is one of the site's palette roles (Background, Panels, Text, Brand, Lines) or, for one button or one section, a custom `#RRGGBB`. A custom colour is kept only when white words read on it at 4.5:1, or else dark words do. Otherwise the API refuses it, and the editor's warning offers the two fixes (CS4): keep the colour with dark words, or the nearest darker shade where white reads. "Use this colour" waits for one. A palette role follows the palette when it changes; a custom colour stays.
+- **New contract options**, drawn by every look: a **Soft** button (a tint of its colour with the page's words) and **Size S / M / L** (Medium is the look's own). On a phone every button keeps its 44px.
+- The whole site gains Button colour (roles only), Button style and Button size in Buttons and shapes; each look's default is how it draws today.
+- Not decided yet (asked, 22 Nov): a sixth "Brand tint" role, shades of each role, and whether "Palettes to try" offers any palette or only the look's colourways. Until then the Site colours card offers the site's colourways only (DEC-090, paid ones gated by DEC-177), and there is no Tint role and no shades.
+
+## DEC-255 Blocks read the merchant's styles; a look only sets defaults
+
+**Status: Accepted — 2026-11-22** · owner (22 Nov 2026, iteration C) · follows DEC-237
+
+- The hard-coded radii that a merchant's choice never reached now read the shared variables, with today's value as the fallback: Live's timetable day cards (20px) and phone service tiles (14px) the card corners; the price, timetable and next-free badges (9px, 4px) the tag corners; Quiet and Live team photos (round) and the phone hero photo (square) the image corners. Live's header button is drawn as a button, so it follows Buttons, not Slots and tags.
+- An untouched site draws exactly as before. No lock state is shown: nothing is locked any more.
+
+## DEC-256 Colourways plus one colour of your own; a Brand tint; shades; a warning, not a wall
+
+**Status: Accepted — 2026-11-23** · owner (23 Nov 2026, boards ERVPalette, ERVPhoneColour, ERVPreviewLabel, ERVBoardFixes) · answers DEC-254's "not decided yet" · relaxes DEC-254's refusal
+
+- **Colourways only:** the template's ready colourways, plus one colour of your own ("Your colour"). The six curated rows ("Edit each colour") stay as they are today; whether they are a free palette builder to retire is the owner's call.
+- **Brand tint** is a role beside Background, Panels, Text, Brand and Lines: a soft wash of the brand colour for a highlighted band or a button, `--site-tint` in the `--site-*` layer (a look's accent tint when it has one, else the accent mixed into the page at 12% and eased back until the page's text reads on it at 4.5:1). It follows Brand. A button can take it (`tint` in `buttonColour`).
+- **Shades:** a five-step strip, lighter to darker, under the selected role in a button's Colour row; the middle step is the role, the others are custom colours.
+- **Contrast is a warning, not a wall:** a custom colour or shade neither white nor dark words read on at 4.5:1 says so before it is saved, and the merchant confirms ("Use it anyway"). The API now refuses only a value that is not `#RRGGBB`.
+- **Phone:** Custom opens as a bottom sheet (the shared Drawer), the tapped button scrolled into view above it, Use this colour pinned on top of Cancel. While a colour is tried on the canvas, "Preview only · not saved" shows (desk: in the canvas bar; phone: under the top bar) and goes on Use, Cancel or the Site colours tab.
+- **Cards are styled per section or for the whole site only;** there is no "This card" (and no per-card storage).
+- **Page rows** in the editor show the first photo on the page (its stored smaller copy), or a plain page icon.

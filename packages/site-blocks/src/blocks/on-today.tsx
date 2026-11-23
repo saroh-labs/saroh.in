@@ -351,6 +351,7 @@ function SplitHero({
                         <p className="mt-3.5 max-w-[44ch] text-pretty text-base leading-[1.55] opacity-75">
                             <PhoneText
                                 text={content.subheading}
+                                field="subheading"
                                 phone={content.phoneLine}
                             />
                         </p>

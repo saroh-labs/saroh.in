@@ -83,6 +83,7 @@ const NOUN: Record<AskAiDraftKind, string> = {
     customer: "customer",
     blog_post: "blog post",
     section: "section",
+    image: "photo",
 };
 
 /** Moving a booking is a move; other edits are changes (boards 5 and 14). */
@@ -122,6 +123,23 @@ export function draftWords(card: AskAiDraftCard) {
             editor: null,
             handedOff: null,
             done: "Saved · goes live when you publish",
+        };
+    }
+    // A photo placed (owner, 22 Nov): Now and New with thumbnails, Apply.
+    if (card.kind === "image") {
+        return {
+            noun,
+            tag: "New photo",
+            confirm: "Apply",
+            state:
+                card.status === "refused" ? "Not applied" : "Not applied yet",
+            cancelled: "Not applied",
+            open: "Open it",
+            editor: null,
+            handedOff: null,
+            done: card.targetId?.startsWith("product:")
+                ? "Saved · shows in your shop"
+                : "Saved · goes live when you publish",
         };
     }
     // Several orders to one step (AF 8): "Change 3 orders", "Mark 3 ready".
@@ -207,6 +225,13 @@ export function recordHref(kind: AskAiDraftKind, id: string): string {
             // `<siteId>:<postId>`: the post editor sits under its website.
             const [site = "", post = ""] = id.split(":");
             return `/sites/${encodeURIComponent(site)}/posts/${encodeURIComponent(post)}`;
+        }
+        case "image": {
+            // `section:<site>:<page>:<key>`, `product:<id>` or `post:<site>:<post>`.
+            const [place = "", a = "", b = ""] = id.split(":");
+            if (place === "product") return recordHref("product", a);
+            if (place === "post") return recordHref("blog_post", `${a}:${b}`);
+            return recordHref("section", `${a}:${b}`);
         }
     }
 }

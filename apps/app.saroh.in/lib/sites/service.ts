@@ -44,13 +44,18 @@ export type {
  * knows about, and the exhaustive `Record<SectionType, …>` maps in the editor
  * start demanding their entries instead of silently accepting six.
  */
-import type { HeroPanelKind, LookId, SectionType } from "@saroh/block-contract";
+import type {
+    FirstPhoto,
+    HeroPanelKind,
+    LookId,
+    SectionType,
+} from "@saroh/block-contract";
 import type { SiteChangeKind } from "./pending";
 
 export type { SectionType };
 
 /** Button style shared by hero CTA and the standalone cta section. */
-export type CtaStyle = "primary" | "secondary" | "link";
+export type CtaStyle = "primary" | "secondary" | "soft" | "link";
 
 /** What a button does (#207). Mirrors `ctaActionSchema` in the contract. */
 export type CtaAction =
@@ -198,6 +203,8 @@ export interface TestimonialItem {
     quote: string;
     name: string;
     role?: string;
+    /** Stars out of five (1 to 5), when set. */
+    rating?: number;
 }
 
 /** `testimonials` — what customers said, under their names. */
@@ -257,6 +264,8 @@ export interface ServicesListContent {
     layout?: ListLayout;
     showDescriptions?: boolean;
     buttonLabel?: string;
+    /** "Show a Book button" (A5). Absent: shown. */
+    showBook?: boolean;
     /** The price card's lines around the service's price (template polish). */
     modeLine?: string;
     followUpLine?: string;
@@ -414,6 +423,8 @@ export interface HoursContent {
 
 /** `person` — one practitioner, typed in (U2). */
 export interface PersonContent {
+    /** The team member, when picked for Our team (round 3). */
+    staffId?: string;
     image?: ImageValue;
     /** The photo a template says belongs here (KTD-5). */
     imageBrief?: string;
@@ -438,6 +449,8 @@ export type PersonCredential = string | { title: string; detail?: string };
 
 /** Another person in the team look. */
 export interface PersonMember {
+    /** The team member, when picked for Our team (round 3). */
+    staffId?: string;
     image?: ImageValue;
     imageBrief?: string;
     name: string;
@@ -741,6 +754,8 @@ export interface SitePage {
     shareImageMediaId?: string | null;
     shareImageUrl?: string | null;
     noindex?: boolean;
+    /** The first photo on the page, for the editor's page rows (null: none). */
+    firstPhoto?: FirstPhoto | null;
 }
 
 /**
@@ -1092,6 +1107,33 @@ export async function getNewSiteDefaults(): Promise<NewSiteDefaults | null> {
             siteName: typeof data?.siteName === "string" ? data.siteName : "",
             address: typeof data?.address === "string" ? data.address : "",
         };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The page holding Our team (`GET …/sites/team-page`, ER3Team T4), or null
+ * when there is none or it can't be read: Bookings' "Change in Website"
+ * then opens the Website list.
+ */
+export async function getTeamPage(): Promise<{
+    siteId: string;
+    pageId: string;
+} | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/team-page`);
+        if (!res.ok) return null;
+        const data = (await res.json()) as {
+            siteId?: unknown;
+            pageId?: unknown;
+        } | null;
+        return typeof data?.siteId === "string" &&
+            typeof data.pageId === "string"
+            ? { siteId: data.siteId, pageId: data.pageId }
+            : null;
     } catch {
         return null;
     }
@@ -2478,8 +2520,17 @@ export async function getSiteFlags(siteId: string): Promise<SiteFlags> {
  * module page names its `kind` and may leave both to the kind's defaults
  * (a Book or Shop page's address is always its route's).
  */
+/** A new page type (A7, DEC-248): a free page filled from the business. */
+export type PageStarter = "SERVICE" | "OFFER" | "TEAM";
+
 export type CreatePageInput =
-    | { kind?: "FREE"; title: string; path: string; inMenu?: boolean }
+    | {
+          kind?: "FREE";
+          title: string;
+          path: string;
+          inMenu?: boolean;
+          starter?: PageStarter;
+      }
     | {
           kind: ModulePageKind;
           title?: string;

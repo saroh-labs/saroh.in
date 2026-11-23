@@ -75,7 +75,7 @@ const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime"]);
 export function useImageUpload(
     options: {
         /** The library bucket; site images unless said. */
-        purpose?: "site-image" | "business-logo";
+        purpose?: "site-image" | "business-logo" | "staff-photo" | "ask-ai";
         /** What to say when storage cannot serve the upload. */
         unserved?: string;
         /**
@@ -186,7 +186,7 @@ export function useImageUpload(
      */
     async function sendPhoto(
         file: File,
-        purpose: "site-image" | "business-logo",
+        purpose: "site-image" | "business-logo" | "staff-photo" | "ask-ai",
         onProgress: (pct: number) => void,
     ): Promise<{
         mediaId: string;
@@ -201,13 +201,21 @@ export function useImageUpload(
         const prepared = await preparePhoto(file).finally(() => {
             if (mounted.current) setPreparing(false);
         });
+        // A picture for Ask AI is sent on only once re-drawn without its
+        // metadata (where it was taken); a GIF has none to drop.
+        if (purpose === "ask-ai" && !prepared && file.type !== "image/gif") {
+            throw new Error(
+                "This photo couldn't be got ready on this device. Try a JPG or PNG.",
+            );
+        }
         const photo = prepared?.file ?? file;
         // Dimensions from the bytes already on the device, so the upload
         // never has to be followed by a second round trip to ask storage.
         const dims = prepared
             ? { width: prepared.width, height: prepared.height }
             : await readDimensions(file);
-        const copies = prepared?.variants ?? [];
+        // A picture only Ask AI reads has no page to be sharp on: no smaller copies.
+        const copies = purpose === "ask-ai" ? [] : (prepared?.variants ?? []);
         const ticket = await createUpload({
             contentType: photo.type,
             contentLength: photo.size,
@@ -356,7 +364,9 @@ export function useImageUpload(
         return { mediaId: ticket.data.mediaId, url: done.data.url };
     }
 
-    return { upload, busy, preparing, progress, error, setError };
+    // `sendPhoto`: for a control with several going at once (Ask AI's images),
+    // which keeps each one's progress and words itself.
+    return { upload, sendPhoto, busy, preparing, progress, error, setError };
 }
 
 /**

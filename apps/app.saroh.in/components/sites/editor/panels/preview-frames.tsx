@@ -39,7 +39,7 @@ type Mode = "all" | Size;
 
 /** The widths each frame lays the page out at (`fix/WXMPreview`). */
 export const FRAME_WIDTH: Record<Size, number> = {
-    desktop: 1280,
+    desktop: 1440,
     tablet: 768,
     phone: 390,
 };
@@ -51,6 +51,8 @@ const LABEL: Record<Size, string> = {
 };
 const GAP = 40;
 const PAD_X = 32;
+/** The scroller's border, one px each side. */
+const BORDER = 2;
 /** The board draws the page at 0.7; never larger than the page itself. */
 const MAX_SCALE = 1;
 
@@ -60,7 +62,8 @@ const MAX_SCALE = 1;
  */
 export function fitScale(widths: number[], room: number): number {
     const total = widths.reduce((a, b) => a + b, 0);
-    const free = room - PAD_X * 2 - GAP * (widths.length - 1);
+    const free =
+        room - PAD_X * 2 - GAP * (widths.length - 1) - BORDER * widths.length;
     if (total <= 0 || free <= 0) return 0.25;
     return Math.max(0.25, Math.min(MAX_SCALE, free / total));
 }
@@ -83,25 +86,15 @@ export function ScaledPage({
     title: string;
     children: ReactNode;
 }) {
-    const inner = useRef<HTMLDivElement>(null);
-    const [height, setHeight] = useState(0);
-    useEffect(() => {
-        const el = inner.current;
-        if (!el || typeof ResizeObserver === "undefined") return;
-        const watch = new ResizeObserver(() => setHeight(el.offsetHeight));
-        watch.observe(el);
-        return () => watch.disconnect();
-    }, []);
+    // `zoom`, not `transform: scale`: the page is laid out and painted at
+    // the smaller size, so text stays sharp at any scale (a scaled bitmap
+    // blurs), and the box takes the zoomed size itself, so no measuring.
     return (
         <div
             className="relative overflow-hidden"
-            style={{ width: width * scale, height: height * scale }}
+            style={{ width: width * scale }}
         >
-            <div
-                ref={inner}
-                className="absolute left-0 top-0 origin-top-left"
-                style={{ width, transform: `scale(${scale})` }}
-            >
+            <div style={{ width, zoom: scale }}>
                 <DeviceFrame title={title}>{children}</DeviceFrame>
             </div>
         </div>
@@ -192,7 +185,7 @@ export function PreviewFrames({ model, onBack }: PreviewFramesProps) {
             data-preview-frames={mode}
             className="fixed inset-0 z-40 flex flex-col bg-background"
         >
-            <header className="flex h-[60px] shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b bg-background pl-3 pr-3.5">
+            <header className="flex min-h-[60px] shrink-0 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background py-2 pl-3 pr-3.5">
                 <Button
                     type="button"
                     className="h-10 shrink-0 rounded-[9px]"
@@ -290,7 +283,7 @@ export function PreviewFrames({ model, onBack }: PreviewFramesProps) {
                             onScroll={() => onScroll(index)}
                             className="overflow-y-auto overflow-x-hidden rounded-lg border bg-card shadow-lg"
                             style={{
-                                width: FRAME_WIDTH[size] * scale + 2,
+                                width: FRAME_WIDTH[size] * scale + BORDER,
                                 height: Math.max(200, room.height - 48),
                             }}
                         >

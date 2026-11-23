@@ -342,7 +342,7 @@ function NowStrip({
             ? clockWords(item.time)
             : nextFreeWhen(item, today.date);
     const tag =
-        "bg-site-fg text-site-bg rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold tabular-nums";
+        "bg-site-fg text-site-bg rounded-[var(--site-tag-radius,9px)] px-[9px] py-1 text-[12.5px] font-bold tabular-nums";
     return (
         <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto [scrollbar-width:none] min-[700px]:flex-wrap">
             <span className="text-site-muted mr-1 shrink-0 whitespace-nowrap text-[13px] font-bold tracking-[0.02em] max-[699px]:hidden">

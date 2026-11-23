@@ -20,6 +20,7 @@ import { ChoiceGroup, RadioCards } from "@saroh/ui/choice-group";
 import { BrandInline } from "./brand-picker";
 import type { LookPreviewSource } from "./look-preview";
 import { LookPreview, lookTakenWords } from "./look-preview";
+import type { LookWords } from "./look-thumbnail";
 import { LookThumbnail } from "./look-thumbnail";
 import { PaidRefusal } from "./paid-refusal";
 
@@ -118,6 +119,8 @@ export interface LookChoices {
      * content when offered (DEC-182). Absent draws no Preview buttons.
      */
     preview?: LookPreviewSource;
+    /** The business's own name and headings, drawn on each card (`WXBBrand`). */
+    words?: LookWords;
 }
 
 /**
@@ -147,6 +150,7 @@ export function LookPicker({
     error,
     onChoose,
     preview,
+    words,
     rules = ALL_FREE,
     refused = null,
 }: LookChoices & {
@@ -292,6 +296,7 @@ export function LookPicker({
                                     style={style}
                                     options={options}
                                     image={lookThumbnail(templateId, choice)}
+                                    words={words}
                                     className={
                                         inSheet
                                             ? "h-[88px] w-full"
@@ -302,7 +307,7 @@ export function LookPicker({
                                     <span className="flex items-center gap-1.5 text-sm font-semibold">
                                         {lookName(look)}
                                         {choice === current ? (
-                                            <span className="rounded-[5px] bg-foreground px-1.5 py-px text-[0.65625rem] font-semibold text-background">
+                                            <span className="rounded-[5px] border px-1.5 py-px text-[0.65625rem] font-semibold text-muted-foreground">
                                                 Now
                                             </span>
                                         ) : null}

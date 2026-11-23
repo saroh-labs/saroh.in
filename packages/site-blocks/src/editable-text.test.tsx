@@ -110,4 +110,24 @@ describe("editable-text markers (U47d)", () => {
         expect(onText).toHaveBeenLastCalledWith("intro", "Ask us");
         expect(el.textContent).toBe("Ask us");
     });
+    it("leaves room under the words for the editor's bar, so it covers nothing below (EBSite D1)", () => {
+        const { container } = render(
+            <EditableTextContext.Provider
+                value={{ onText: vi.fn(), bar: () => <span>bar</span> }}
+            >
+                <p>
+                    <EditableText field="subheading">Words</EditableText>
+                </p>
+                <a href="/shop">Browse the catalogue</a>
+            </EditableTextContext.Provider>,
+        );
+        const el = container.querySelector<HTMLElement>(
+            "[data-edit-field=subheading]",
+        );
+        if (!el) throw new Error("No marked field");
+        expect(el.parentElement?.className).not.toContain("mb-11");
+        act(() => el.focus());
+        fireEvent.focus(el);
+        expect(el.parentElement?.className).toContain("mb-11");
+    });
 });

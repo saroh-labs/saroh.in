@@ -12,6 +12,24 @@ import { z } from "zod";
 /** The longest question the panel sends; a bound on one input, not a plan limit. */
 export const ASK_AI_QUESTION_MAX = 2000;
 
+/**
+ * Images in one message (owner, 22 Nov): up to ten, each at most 5 MB
+ * (Anthropic's per-image limit), JPG, PNG, WebP or GIF. A message is one
+ * question however many it carries. The media purpose they upload under
+ * keeps them with the conversation, out of Your photos, until one is applied.
+ */
+export const ASK_AI_IMAGES_MAX = 10;
+export const ASK_AI_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const ASK_AI_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+] as const;
+export const ASK_AI_IMAGE_PURPOSE = "ask-ai";
+/** An Ask AI image once a question has carried it: kept for its conversation's days. */
+export const ASK_AI_SENT_PURPOSE = "ask-ai-sent";
+
 /** The language a person wants answers in; MATCH answers in the question's own. */
 export const askAiLanguage = z.enum(["MATCH", "ENGLISH", "HINGLISH", "HINDI"]);
 export type AskAiLanguage = z.infer<typeof askAiLanguage>;
@@ -80,14 +98,25 @@ export const isAskAiStarter = (question: string): boolean =>
     (ASK_AI_STARTERS as readonly string[]).includes(question.trim());
 
 /** A question. No `conversationId` starts a new conversation. */
-export const askAiTurnBody = z.strictObject({
-    conversationId: z.string().min(1).max(64).optional(),
-    question: z.string().trim().min(1).max(ASK_AI_QUESTION_MAX),
-    /** Saved as the person's language before the question is asked. */
-    language: askAiLanguage.optional(),
-    /** The page it is asked about; kept on a new conversation (AF 9). */
-    about: askAiAbout.optional(),
-});
+export const askAiTurnBody = z
+    .strictObject({
+        conversationId: z.string().min(1).max(64).optional(),
+        /** May be empty when images come with it: Ask AI says what it sees. */
+        question: z.string().trim().max(ASK_AI_QUESTION_MAX),
+        /** Media ids of the images sent with it (uploaded under the Ask AI purpose, or from Your photos). */
+        images: z
+            .array(z.string().min(1).max(64))
+            .max(ASK_AI_IMAGES_MAX)
+            .optional(),
+        /** Saved as the person's language before the question is asked. */
+        language: askAiLanguage.optional(),
+        /** The page it is asked about; kept on a new conversation (AF 9). */
+        about: askAiAbout.optional(),
+    })
+    .refine((b) => b.question.length > 0 || (b.images?.length ?? 0) > 0, {
+        message: "Ask something, or add an image.",
+        path: ["question"],
+    });
 export type AskAiTurnBody = z.infer<typeof askAiTurnBody>;
 
 /** How a turn ended (the API's `AiTurnOutcome`). */
@@ -319,6 +348,16 @@ export const askAiMessage = z.object({
     role: z.enum(["USER", "ASSISTANT"]),
     outcome: askAiOutcome.nullable(),
     text: z.string(),
+    /** The images a question came with, still there (one removed is left out). */
+    images: z
+        .array(
+            z.object({
+                mediaId: z.string(),
+                url: z.string(),
+                filename: z.string(),
+            }),
+        )
+        .optional(),
     /** A draft's card, when the answer was one: `{ kind: "draft", data }`. */
     card: z.record(z.string(), z.unknown()).optional(),
     /** The answer's cards (`{ kind, data }`, each an {@link askAiInfoCard}). */

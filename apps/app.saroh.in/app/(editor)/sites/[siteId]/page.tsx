@@ -1,11 +1,10 @@
-import { Button } from "@saroh/ui/button";
-import { EmptyState, FailedState } from "@saroh/ui/data-state";
+import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
-import Link from "next/link";
 import { notFound, unstable_rethrow } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
 
+import { EmptySite } from "@/components/sites/editor/empty-site";
 import { SiteEditorHost } from "@/components/sites/editor/site-editor-host";
 import type { TemplateRowSource } from "@/components/sites/templates/template-row";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -71,28 +70,21 @@ export default async function SiteEditorPage({
 
     if (site.pages.length === 0) {
         /*
-         * Empty site, first time (`fix/WXKStates`, RULES §4): nothing to
-         * open, so the way in, not a 404. Pages is where a page is added
-         * and a look chosen; a reader is told nothing waits for them.
+         * Empty site, first time (`fix/WXKStates`, RULES §4, E1): nothing
+         * to open, so the way in, not a 404: a look's starter content or
+         * Add a page, both without leaving the editor.
          */
         return (
             <PageContainer>
-                <EmptyState
-                    title="No pages yet"
-                    description={
-                        readOnly
-                            ? "Pages show here once a teammate adds one."
-                            : "Add a page, or start from a look filled with your services, prices and hours."
+                <EmptySite
+                    siteId={siteId}
+                    readOnly={readOnly}
+                    address={
+                        siteAddressOf(site, null, RENDERER_APEX)?.host ?? null
                     }
-                    action={
-                        readOnly ? undefined : (
-                            <Button asChild>
-                                <Link href={`/sites/${siteId}/pages`}>
-                                    Add a page
-                                </Link>
-                            </Button>
-                        )
-                    }
+                    looksAvailable={site.looksAvailable === true}
+                    draftLook={site.style.look ?? null}
+                    addableKinds={readOnly ? [] : (site.addablePageKinds ?? [])}
                 />
             </PageContainer>
         );

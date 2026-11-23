@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
     ASK_AI_CARD_ITEMS,
+    ASK_AI_IMAGE_MAX_BYTES,
+    ASK_AI_IMAGES_MAX,
     askAiEvent,
     askAiInfoCard,
     askAiMessage,
@@ -112,5 +114,35 @@ describe("Ask AI's page and common questions", () => {
                 askAiTurnBody.parse({ question: "Hi", about }).about,
             ).toEqual(about);
         }
+    });
+});
+
+describe("images on a turn (owner, 22 Nov)", () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `m${i}`);
+
+    it("takes up to ten images, and refuses an eleventh", () => {
+        expect(
+            askAiTurnBody.safeParse({ question: "Hi", images: ids(10) })
+                .success,
+        ).toBe(true);
+        expect(
+            askAiTurnBody.safeParse({ question: "Hi", images: ids(11) })
+                .success,
+        ).toBe(false);
+    });
+
+    it("lets images go without words, but not nothing at all", () => {
+        expect(
+            askAiTurnBody.safeParse({ question: "  ", images: ["m1"] }).success,
+        ).toBe(true);
+        expect(askAiTurnBody.safeParse({ question: "  " }).success).toBe(false);
+        expect(
+            askAiTurnBody.safeParse({ question: "", images: [] }).success,
+        ).toBe(false);
+    });
+
+    it("says the limits the composer and the media store share", () => {
+        expect(ASK_AI_IMAGES_MAX).toBe(10);
+        expect(ASK_AI_IMAGE_MAX_BYTES).toBe(5 * 1024 * 1024);
     });
 });

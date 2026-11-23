@@ -2,6 +2,7 @@ import type { LookId, RenderedCta } from "@saroh/block-contract";
 import { sectionFrameOf } from "@saroh/block-contract";
 import Link from "next/link";
 
+import { elementProps } from "../element-theme";
 import { cn } from "../lib/utils";
 import { PhoneText } from "./phone-text";
 
@@ -86,7 +87,7 @@ export const FRONT_TYPE: Record<
 };
 
 /** How a look's button is drawn: the one filled, or a quieter one. */
-export type FrontButtonKind = "fill" | "outline" | "quiet" | "link";
+export type FrontButtonKind = "fill" | "outline" | "soft" | "quiet" | "link";
 
 const BUTTON_BASE =
     "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-site active:opacity-80 aria-disabled:pointer-events-none aria-disabled:opacity-55";
@@ -98,6 +99,7 @@ const BUTTON: Record<LookId, Record<FrontButtonKind, string>> = {
         fill: "min-h-[52px] gap-[14px] border border-site-accent bg-site-accent px-[26px] text-[15px] font-semibold tracking-[0.02em] text-site-accent-fg hover:opacity-90",
         outline:
             "border border-site-fg bg-transparent px-[18px] text-[14px] font-semibold tracking-[0.02em] text-site-fg hover:bg-site-fg/5",
+        soft: "border border-transparent bg-site-accent/15 px-[18px] text-[14px] font-semibold tracking-[0.02em] text-site-fg hover:bg-site-accent/25",
         quiet: "border border-site-rule bg-transparent px-[18px] text-[14px] font-semibold tracking-[0.02em] text-site-fg hover:border-site-fg",
         link: "min-w-11 px-0 text-[15px] font-semibold text-site-fg underline decoration-1 underline-offset-[5px] hover:decoration-2",
     },
@@ -107,6 +109,7 @@ const BUTTON: Record<LookId, Record<FrontButtonKind, string>> = {
         fill: "min-h-[52px] border border-site-accent bg-site-accent px-[30px] text-[15px] font-medium tracking-[0.02em] text-site-accent-fg hover:opacity-90",
         outline:
             "border border-site-fg bg-transparent px-5 text-[14.5px] font-medium tracking-[0.02em] text-site-fg hover:bg-site-fg/5",
+        soft: "border border-transparent bg-site-accent/15 px-5 text-[14.5px] font-medium tracking-[0.02em] text-site-fg hover:bg-site-accent/25",
         quiet: "border border-site-rule bg-transparent px-5 text-[14.5px] font-medium tracking-[0.02em] text-site-fg hover:border-site-fg",
         link: "min-w-11 px-0 text-[15px] font-medium text-site-fg underline decoration-site-rule decoration-1 underline-offset-[5px] hover:decoration-current",
     },
@@ -116,6 +119,7 @@ const BUTTON: Record<LookId, Record<FrontButtonKind, string>> = {
         fill: "min-h-[58px] bg-site-accent px-[26px] text-[17px] font-bold text-site-accent-fg hover:opacity-90",
         outline:
             "border-[1.5px] border-site-rule bg-site-surface px-4 text-[14.5px] font-bold text-site-fg hover:border-site-fg",
+        soft: "bg-site-accent/15 px-4 text-[14.5px] font-bold text-site-fg hover:bg-site-accent/25",
         quiet: "bg-site-bg px-4 text-[14.5px] font-bold text-site-fg hover:bg-site-border",
         link: "min-w-11 px-0 text-[15px] font-bold text-site-fg underline decoration-[1.5px] underline-offset-[3px]",
     },
@@ -139,6 +143,7 @@ function isExternal(href: string): boolean {
 export function ctaKind(style: RenderedCta["style"]): FrontButtonKind {
     if (style === "secondary") return "outline";
     if (style === "link") return "link";
+    if (style === "soft") return "soft";
     return "fill";
 }
 
@@ -162,11 +167,19 @@ export function FrontCta({
 }) {
     const kind = ctaKind(content.style);
     const classes = frontButton(look, kind, className);
-    const primary = kind === "fill" ? { "data-site-primary": "" } : {};
+    const primary = {
+        ...(kind === "fill" ? { "data-site-primary": "" } : {}),
+        ...elementProps("button", content),
+    };
     const href = content.href.trim();
     if (href === "") {
         return (
-            <span role="link" aria-disabled="true" className={classes}>
+            <span
+                role="link"
+                aria-disabled="true"
+                className={classes}
+                {...elementProps("button", content)}
+            >
                 <PhoneText text={content.label} phone={content.phoneLabel} />
             </span>
         );

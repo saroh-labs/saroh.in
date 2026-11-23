@@ -130,6 +130,50 @@ describe("AiSdkAdapter", () => {
         expect(sent.tools?.map((tool) => tool.name)).toEqual(["list_orders"]);
     });
 
+    it("sends a message's images to the provider as image blocks before its words", async () => {
+        const model = modelOf([
+            { type: "stream-start", warnings: [] },
+            {
+                type: "finish",
+                finishReason: { unified: "stop", raw: "end_turn" },
+                usage,
+            },
+        ]);
+        const withImages: AiStreamRequest = {
+            ...request,
+            messages: [
+                {
+                    role: "user",
+                    text: "Alt text for these",
+                    images: [
+                        {
+                            bytes: new Uint8Array([1, 2, 3]),
+                            mediaType: "image/png",
+                        },
+                        { bytes: new Uint8Array([4]), mediaType: "image/jpeg" },
+                    ],
+                },
+            ],
+        };
+        for await (const _ of new AiSdkAdapter(() => model).stream(
+            withImages,
+            new AbortController().signal,
+        )) {
+            // drained
+        }
+        const user = model.doStreamCalls[0]!.prompt.find(
+            (m) => m.role === "user",
+        );
+        const kinds = (
+            user?.content as { type: string; mediaType?: string }[]
+        ).map((p) => [p.type, p.mediaType]);
+        expect(kinds).toEqual([
+            ["file", "image/png"],
+            ["file", "image/jpeg"],
+            ["text", undefined],
+        ]);
+    });
+
     it("ends at once when the signal fires", async () => {
         const model = new MockLanguageModelV4({
             doStream: async () => ({

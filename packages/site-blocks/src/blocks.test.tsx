@@ -381,6 +381,30 @@ describe("block rendering", () => {
         expect(container.innerHTML).toMatchSnapshot();
     });
 
+    it("testimonials draw stars only when a quote has a rating", () => {
+        const { container } = render(
+            <TestimonialsSection
+                content={{
+                    ...(BLOCK_META.testimonials.fixtures
+                        .default as RenderedTestimonials),
+                    items: [
+                        { quote: "Quick.", name: "Sam", rating: 4 },
+                        { quote: "Kind.", name: "Ola" },
+                    ],
+                }}
+            />,
+        );
+        const stars = container.querySelectorAll("[data-review-stars]");
+        expect(stars).toHaveLength(1);
+        const first = stars[0];
+        expect(first.getAttribute("aria-label")).toBe("4 of 5 stars");
+        // Four filled and one outline: the count reads without colour.
+        expect(first.querySelectorAll('svg[fill="currentColor"]')).toHaveLength(
+            4,
+        );
+        expect(first.querySelectorAll('svg[fill="none"]')).toHaveLength(1);
+    });
+
     it("contact", () => {
         const { container } = render(
             <ContactSection

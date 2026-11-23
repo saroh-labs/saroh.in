@@ -494,6 +494,39 @@ describe("SitesService.replaceDraftSections sanitizes on the way in (#280)", () 
         expect(sectionCreateMany).not.toHaveBeenCalled();
     });
 
+    it("keeps a button's and a section's own styles, and refuses a colour that is not #RRGGBB (DEC-253, DEC-256)", async () => {
+        const cta = (elementStyle: Record<string, unknown>) => ({
+            type: "cta",
+            contractVersion: 2,
+            content: {
+                label: "Order now",
+                action: { kind: "url", href: "/shop" },
+                style: "soft",
+                elementStyle,
+                frame: { styles: { button: { corners: "pill", size: "l" } } },
+            },
+        });
+        await service.replaceDraftSections(ctx(), "site_1", "page_1", {
+            sections: [cta({ colour: "#A65E3F", corners: "square" })],
+        });
+        const created = sectionCreateMany.mock.calls[0][0].data as Array<{
+            content: Record<string, unknown>;
+        }>;
+        expect(created[0].content).toMatchObject({
+            style: "soft",
+            elementStyle: { colour: "#A65E3F", corners: "square" },
+            frame: { styles: { button: { corners: "pill", size: "l" } } },
+        });
+
+        sectionCreateMany.mockClear();
+        await expect(
+            service.replaceDraftSections(ctx(), "site_1", "page_1", {
+                sections: [cta({ colour: "red" })],
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(sectionCreateMany).not.toHaveBeenCalled();
+    });
+
     it("refuses a photo whose src would run script (06 L1)", async () => {
         await expect(
             service.replaceDraftSections(ctx(), "site_1", "page_1", {

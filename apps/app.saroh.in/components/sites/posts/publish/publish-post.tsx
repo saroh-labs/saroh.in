@@ -7,15 +7,17 @@ import { CopyButton } from "@saroh/ui/copy-button";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Label } from "@saroh/ui/label";
+import { Switch } from "@saroh/ui/switch";
 import { Textarea } from "@saroh/ui/textarea";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { AlertCircle, Check, MessageCircle, Share2 } from "lucide-react";
+import { AlertCircle, Check, Globe, MessageCircle, Share2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useId, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
+import { useEditorLayout } from "@/components/sites/editor/use-editor-layout";
 import { runAction } from "@/lib/api/run-action";
 import {
     requestPostApproval,
@@ -260,6 +262,10 @@ function dateOf(key: string): Date {
 
 const H3 = "text-sm font-semibold";
 
+/** When's rows: focus is the row's inset ink edge; only this sheet's radios lose their ring. */
+const WHEN_FOCUS =
+    "has-[:focus-visible]:shadow-[inset_0_0_0_1px_hsl(var(--foreground))] [&_[role=radio]:focus-visible]:ring-0 [&_[role=radio]:focus-visible]:ring-offset-0";
+
 /**
  * Publish post (U18, `blogdesk/WXWPublish`, `blogphone/WXYPublish`): the post
  * and where it lives, the changes that go live (against the live copy, no
@@ -297,6 +303,7 @@ export function PublishPostSheet({
 }) {
     const zone = useBusinessZone();
     const id = useId();
+    const phone = useEditorLayout() === "phone";
     const { data, draft, liveCopy } = model;
     const { fields } = draft;
     const slot = nextSlot(new Date(), zone);
@@ -307,6 +314,11 @@ export function PublishPostSheet({
     const [busy, setBusy] = useState(false);
     const [live, setLive] = useState(false);
     const [note, setNote] = useState("");
+    // Y2: what to open once it is live, chosen before it goes.
+    const [tell, setTell] = useState<TellChoice>({
+        social: true,
+        whatsapp: true,
+    });
     // O7: a teammate's Publish post is Send for approval (WXYApproval).
     const asking = model.approval?.mustAsk ?? false;
     const approvers = model.approval?.approvers ?? [];
@@ -332,13 +344,16 @@ export function PublishPostSheet({
                 doneOnly
                 onClose={onClose}
             >
-                <TellPeople model={model} />
+                <TellPeople model={model} only={tell} />
             </FormSheet>
         );
     }
 
     async function publishNow() {
-        if (await draft.publish()) setLive(true);
+        if (!(await draft.publish())) return;
+        // Nothing to tell anyone: the sheet's job is done.
+        if (!tell.social && !tell.whatsapp) onClose();
+        else setLive(true);
     }
 
     async function publishLater() {
@@ -431,11 +446,99 @@ export function PublishPostSheet({
         ...(reads.flags === "loading" ? [] : serverChecks(reads.flags)),
     ];
 
+    const whenSection = (
+        <section className="grid gap-2">
+            <h3 id={`${id}-when`} className={H3}>
+                When
+            </h3>
+            <RadioCards
+                labelledBy={`${id}-when`}
+                // The sheet opens with the keyboard on the chosen radio:
+                // the board's light focus (`WXYPublish`, Y2·4), an inset
+                // ink edge on the row, not the radio's 2px offset ring.
+                rowClassName={WHEN_FOCUS}
+                value={when}
+                onChange={(v) => {
+                    setWhen(v);
+                    setTimeError(null);
+                }}
+                options={
+                    asking
+                        ? [
+                              {
+                                  value: "now",
+                                  label: "As soon as it is approved",
+                              },
+                              {
+                                  value: "later",
+                                  label: "After approval, on a day I pick",
+                              },
+                          ]
+                        : [
+                              {
+                                  value: "now",
+                                  label: "Now",
+                                  note: "Visitors see it in a minute or two.",
+                              },
+                              {
+                                  value: "later",
+                                  label: "Later",
+                                  note: "Pick a day and time. The live copy stays as it is until then.",
+                              },
+                          ]
+                }
+            />
+            {when === "later" ? (
+                <div className="grid gap-2">
+                    <div className="flex flex-wrap gap-3">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor={`${id}-date`}>Day</Label>
+                            <DatePicker
+                                id={`${id}-date`}
+                                value={date}
+                                onValueChange={(d) => {
+                                    setDate(d);
+                                    setTimeError(null);
+                                }}
+                                disabledDays={{ before: dateOf(slot.date) }}
+                            />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor={`${id}-time`}>Time</Label>
+                            <TimeSelect
+                                id={`${id}-time`}
+                                value={time}
+                                onValueChange={(t) => {
+                                    setTime(t);
+                                    setTimeError(null);
+                                }}
+                            />
+                        </div>
+                    </div>
+                    {timeError ? (
+                        <p
+                            role="alert"
+                            className="text-[0.8125rem] font-semibold text-destructive"
+                        >
+                            {timeError}
+                        </p>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                        In {zoneName(zone)}, your business&apos;s time zone.
+                        Changes you make before then go live with it.
+                    </p>
+                </div>
+            ) : null}
+        </section>
+    );
+
     return (
         <FormSheet
             open
             bottomOnPhone
             title={asking ? "Send for approval" : "Publish this post"}
+            // The phone's sheet title is the board's 28px bold (Y2.3).
+            className="max-sm:[&_h2]:text-[1.75rem] max-sm:[&_h2]:font-bold max-sm:[&_h2]:leading-tight"
             description={
                 asking
                     ? "Posts on this site go live once a reviewer, an admin or the owner approves them. Any one of them is enough. Nothing changes on the site until then."
@@ -520,25 +623,32 @@ export function PublishPostSheet({
                     </div>
                 </section>
             ) : null}
-            <div className="flex items-center gap-3.5 rounded-xl border bg-card p-3">
+            {/* On a phone, one link row with a globe (`WXYPublish`): the title is the page's. */}
+            <div className="flex items-center gap-3.5 rounded-xl border bg-card p-3 max-sm:gap-2.5 max-sm:py-2.5">
                 {fields.image.trim() ? (
                     // eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL
                     <img
                         src={fields.image}
                         alt=""
-                        className="h-[54px] w-24 shrink-0 rounded-md object-cover"
+                        className="h-[54px] w-24 shrink-0 rounded-md object-cover max-sm:hidden"
+                    />
+                ) : null}
+                {shown ? (
+                    <Globe
+                        aria-hidden
+                        className="size-4 shrink-0 text-muted-foreground sm:hidden"
                     />
                 ) : null}
                 <div className="min-w-0 text-[0.8125rem] text-muted-foreground">
-                    <b className="block truncate text-sm text-foreground">
+                    <b className="block truncate text-sm text-foreground max-sm:sr-only">
                         {fields.title}
                     </b>
                     {shown ? (
-                        <span className="block truncate font-mono text-xs">
+                        <span className="block truncate font-mono text-xs max-sm:text-[0.8125rem] max-sm:text-foreground">
                             {shown}
                         </span>
                     ) : null}
-                    <span className="block">
+                    <span className="block max-sm:sr-only">
                         {draft.liveAt
                             ? `Live since ${formatDateTime(draft.liveAt, zone)}`
                             : "Not live yet"}
@@ -548,6 +658,9 @@ export function PublishPostSheet({
                     </span>
                 </div>
             </div>
+
+            {/* A phone puts When straight under the link (`WXYPublish`, Y2). */}
+            {phone ? whenSection : null}
 
             {model.scheduledAt ? (
                 <div
@@ -628,85 +741,12 @@ export function PublishPostSheet({
                 </ul>
             </section>
 
-            <section className="grid gap-2">
-                <h3 id={`${id}-when`} className={H3}>
-                    When
-                </h3>
-                <RadioCards
-                    labelledBy={`${id}-when`}
-                    value={when}
-                    onChange={(v) => {
-                        setWhen(v);
-                        setTimeError(null);
-                    }}
-                    options={
-                        asking
-                            ? [
-                                  {
-                                      value: "now",
-                                      label: "As soon as it is approved",
-                                  },
-                                  {
-                                      value: "later",
-                                      label: "After approval, on a day I pick",
-                                  },
-                              ]
-                            : [
-                                  {
-                                      value: "now",
-                                      label: "Now",
-                                      note: "Visitors see it in a minute or two.",
-                                  },
-                                  {
-                                      value: "later",
-                                      label: "Later",
-                                      note: "Pick a day and time. The live copy stays as it is until then.",
-                                  },
-                              ]
-                    }
-                />
-                {when === "later" ? (
-                    <div className="grid gap-2">
-                        <div className="flex flex-wrap gap-3">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={`${id}-date`}>Day</Label>
-                                <DatePicker
-                                    id={`${id}-date`}
-                                    value={date}
-                                    onValueChange={(d) => {
-                                        setDate(d);
-                                        setTimeError(null);
-                                    }}
-                                    disabledDays={{ before: dateOf(slot.date) }}
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={`${id}-time`}>Time</Label>
-                                <TimeSelect
-                                    id={`${id}-time`}
-                                    value={time}
-                                    onValueChange={(t) => {
-                                        setTime(t);
-                                        setTimeError(null);
-                                    }}
-                                />
-                            </div>
-                        </div>
-                        {timeError ? (
-                            <p
-                                role="alert"
-                                className="text-[0.8125rem] font-semibold text-destructive"
-                            >
-                                {timeError}
-                            </p>
-                        ) : null}
-                        <p className="text-xs text-muted-foreground">
-                            In {zoneName(zone)}, your business&apos;s time zone.
-                            Changes you make before then go live with it.
-                        </p>
-                    </div>
-                ) : null}
-            </section>
+            {phone ? null : whenSection}
+
+            {/* Last, after When (`WXWPublish`, `WXYPublish`): never under the footer's fold first. */}
+            {asking || when === "later" ? null : (
+                <TellOnceLive model={model} value={tell} onChange={setTell} />
+            )}
         </FormSheet>
     );
 }
@@ -720,7 +760,89 @@ export function PublishPostSheet({
  *
  * Exported for the phone editor's "Just published" sheet.
  */
-export function TellPeople({ model }: { model: PostEditorModel }) {
+/** Which of Tell people's ways to show once it is live (Y2). */
+export interface TellChoice {
+    social: boolean;
+    whatsapp: boolean;
+}
+
+/**
+ * "Tell people once it is live" (Y2, `WXWPublish`, `WXYPublish`): before
+ * Publish, the ways Tell people will offer, each on or off. Nothing is
+ * sent: once it is live the sheet shows the ones left on. Email waits for
+ * the newsletter (batch 4); short links and QR wait for batch 6 (C5).
+ */
+function TellOnceLive({
+    model,
+    value,
+    onChange,
+}: {
+    model: PostEditorModel;
+    value: TellChoice;
+    onChange: (next: TellChoice) => void;
+}) {
+    const id = useId();
+    const rows: { key: keyof TellChoice; title: string; note: string }[] = [
+        ...(model.data.share
+            ? [
+                  {
+                      key: "social" as const,
+                      title: "Post to Instagram and Facebook",
+                      note: "Opens Share with the cover and short description filled in.",
+                  },
+              ]
+            : []),
+        {
+            key: "whatsapp",
+            title: "WhatsApp status",
+            note: "A caption with the post's link.",
+        },
+    ];
+    return (
+        // Switches in one card, its heading inside (`WXYPublish`, Y2).
+        <section
+            data-tell-once-live=""
+            aria-labelledby={`${id}-tell`}
+            className="grid gap-1 rounded-xl border bg-card px-3.5 py-3"
+        >
+            <h3 id={`${id}-tell`} className={H3}>
+                Tell people once it is live
+            </h3>
+            <ul className="grid">
+                {rows.map((r) => (
+                    <li key={r.key} className="flex items-center gap-3 py-2">
+                        <Label
+                            data-ph-unmask=""
+                            htmlFor={`${id}-${r.key}`}
+                            className="grid min-w-0 flex-1 gap-0.5 font-normal"
+                        >
+                            <b className="text-sm font-semibold">{r.title}</b>
+                            <span className="text-[0.8125rem] text-muted-foreground">
+                                {r.note}
+                            </span>
+                        </Label>
+                        <Switch
+                            id={`${id}-${r.key}`}
+                            checked={value[r.key]}
+                            onCheckedChange={(on) =>
+                                onChange({ ...value, [r.key]: on })
+                            }
+                        />
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
+export function TellPeople({
+    model,
+    only = { social: true, whatsapp: true },
+}: {
+    model: PostEditorModel;
+    /** The ways chosen in Publish post (Y2); every way by default. */
+    only?: TellChoice;
+}) {
     const { data, draft } = model;
     const { fields } = draft;
     const url = postUrl(model);
@@ -761,7 +883,7 @@ export function TellPeople({ model }: { model: PostEditorModel }) {
                 </div>
             ) : null}
             <h3 className={H3}>Tell people</h3>
-            {data.share ? (
+            {data.share && only.social ? (
                 <div className={row}>
                     <Share2 aria-hidden className="size-[18px] shrink-0" />
                     <span className="min-w-0 flex-1 text-[0.8125rem] text-muted-foreground">
@@ -786,7 +908,7 @@ export function TellPeople({ model }: { model: PostEditorModel }) {
                     />
                 </div>
             ) : null}
-            {caption ? (
+            {caption && only.whatsapp ? (
                 <div className={row}>
                     <MessageCircle
                         aria-hidden

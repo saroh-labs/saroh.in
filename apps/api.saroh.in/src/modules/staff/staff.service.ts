@@ -4,8 +4,10 @@ import {
     ForbiddenException,
     Injectable,
     NotFoundException,
+    Optional,
+    ServiceUnavailableException,
 } from "@nestjs/common";
-import type { Prisma } from "@saroh/database";
+import type { MediaBucket, Prisma } from "@saroh/database";
 import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -28,6 +30,10 @@ import { ownDiaryOf } from "../bookings/own-diary";
 import type { PersonRules } from "../bookings/person-rules";
 import { personRulesOf } from "../bookings/person-rules";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
+import { MediaService } from "../media/media.service";
+import { noticeOf } from "../notifications/notice-target";
+import { allows } from "../organizations/organization-policy";
+import { enqueueBusinessSitesRevalidation } from "../sites/page-cache-revalidate";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
 import type {
@@ -38,6 +44,7 @@ import type {
     StaffHoursDto,
     UpdateBookingRulesDto,
     UpdateStaffDto,
+    UpdateStaffProfileDto,
 } from "./dto";
 import {
     firstOverlap,
@@ -56,6 +63,8 @@ import { recordBusinessRulesInTx } from "./rules-history";
 import { diarySeatDelta } from "./staff-seats";
 
 const DAY = 86_400_000;
+/** What a profile photo may be (the share-image rule: no SVG, no GIF). */
+const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 /** How far back a person's read carries time off and extra hours. */
 const HISTORY_DAYS = 31;
 
@@ -66,12 +75,20 @@ export interface StaffView {
     name: string;
     title: string | null;
     status: string;
+    /** Picked by an owner or admin for Our team (round 3). */
+    showOnTeamPage: boolean;
+    /** Their own photo (a library image), or null: initials show instead. */
+    photo: { id: string; url: string } | null;
+    /** A few words in their own voice, or null. */
+    about: string | null;
     /** The team member they are, when they have an account. */
     membership: {
         id: string;
         userId: string;
         name: string | null;
         email: string;
+        /** Their role's key ("OWNER", "ADMIN", …), for Our team's picker. */
+        role: string;
     } | null;
     serviceIds: string[];
     hours: { dayOfWeek: number; startMinute: number; endMinute: number }[];
@@ -120,10 +137,14 @@ export interface StaffList {
 
 const staffInclude = (since: Date) =>
     ({
+        photoMedia: {
+            select: { id: true, key: true, bucket: true, status: true },
+        },
         membership: {
             select: {
                 id: true,
                 userId: true,
+                role: true,
                 user: { select: { name: true, email: true } },
             },
         },
@@ -159,22 +180,35 @@ type StaffRow = Prisma.StaffMemberGetPayload<{
     include: ReturnType<typeof staffInclude>;
 }>;
 
+/** A library image's public address, or null while it can't be served. */
+type UrlOf = (media: { key: string; bucket: MediaBucket }) => string | null;
+
 function toView(
     row: StaffRow,
     paused: ReadonlySet<string> = new Set(),
+    urlOf: UrlOf = () => null,
 ): StaffView {
+    const photoUrl =
+        row.photoMedia?.status === "READY" ? urlOf(row.photoMedia) : null;
     return {
         ...(paused.has(row.id) ? { paused: true as const } : {}),
         id: row.id,
         name: row.name,
         title: row.title,
         status: row.status,
+        showOnTeamPage: row.showOnTeamPage,
+        photo:
+            row.photoMedia && photoUrl
+                ? { id: row.photoMedia.id, url: photoUrl }
+                : null,
+        about: row.about,
         membership: row.membership
             ? {
                   id: row.membership.id,
                   userId: row.membership.userId,
                   name: row.membership.user.name,
                   email: row.membership.user.email,
+                  role: row.membership.role,
               }
             : null,
         serviceIds: row.services.map((s) => s.serviceId),
@@ -214,6 +248,10 @@ function refuse(message: string, field: string): never {
  */
 @Injectable()
 export class StaffService {
+    constructor(@Optional() private readonly media?: MediaService) {}
+
+    private readonly urlOf: UrlOf = (m) => this.media?.urlOf(m) ?? null;
+
     // ── People ─────────────────────────────────────────────────────────────
 
     async list(ctx: OrganizationContext, now = new Date()): Promise<StaffList> {
@@ -240,7 +278,7 @@ export class StaffService {
         ]);
         return {
             timezone,
-            staff: rows.map((row) => toView(row, paused)),
+            staff: rows.map((row) => toView(row, paused, this.urlOf)),
             closures,
             openingHours: opening?.windows ?? null,
         };
@@ -408,6 +446,18 @@ export class StaffService {
                 await planMeter.roomInTx(tx, ctx.organizationId, "members", {
                     adding: diarySeatDelta(person, after),
                 });
+                // On Our team, a new name or leaving shows on the live
+                // pages at once (team-live.ts), so they redraw.
+                if (
+                    person.showOnTeamPage &&
+                    (dto.name !== undefined || dto.status !== undefined)
+                ) {
+                    await enqueueBusinessSitesRevalidation(
+                        tx,
+                        ctx.organizationId,
+                        "team",
+                    );
+                }
                 return tx.staffMember.update({
                     where: { id: person.id },
                     data: {
@@ -434,6 +484,173 @@ export class StaffService {
             }),
         );
         return this.read(ctx, person.id);
+    }
+
+    /**
+     * The caller's own place on the diary, or null when they are not on it:
+     * what Your profile reads to show their photo (23 Nov 2026). Any
+     * member may read their own.
+     */
+    async mine(
+        ctx: OrganizationContext,
+        now = new Date(),
+    ): Promise<StaffView | null> {
+        const since = new Date(now.getTime() - HISTORY_DAYS * DAY);
+        const row = await prisma.staffMember.findFirst({
+            where: {
+                organizationId: ctx.organizationId,
+                membership: { userId: ctx.userId },
+            },
+            include: staffInclude(since),
+        });
+        return row ? toView(row, new Set(), this.urlOf) : null;
+    }
+
+    /**
+     * Someone's photo and "About them" (23 Nov 2026): set by the person
+     * themselves, or for them by an owner or admin (`service:write`); nobody
+     * else. The photo is one of this business's READY library images (JPG,
+     * PNG or WebP). When someone else sets or changes it, the person is told
+     * in their own alerts, one line, and can change it themselves. A person
+     * on Our team redraws on the live pages at once.
+     */
+    async updateProfile(
+        ctx: OrganizationContext,
+        staffId: string,
+        dto: UpdateStaffProfileDto,
+    ): Promise<StaffView> {
+        const person = await prisma.staffMember.findFirst({
+            where: { id: staffId, organizationId: ctx.organizationId },
+            select: {
+                id: true,
+                showOnTeamPage: true,
+                photoMediaId: true,
+                membership: { select: { userId: true } },
+            },
+        });
+        if (!person) throw new NotFoundException("Staff member not found");
+        const own = person.membership?.userId === ctx.userId;
+        if (!own && !allows(ctx, "service:write")) {
+            throw new ForbiddenException(
+                "Only an owner, an admin or the person themselves can change this photo or text.",
+            );
+        }
+        if (typeof dto.photoMediaId === "string") {
+            if (!this.media) {
+                throw new ServiceUnavailableException(
+                    "Photos can't be chosen right now. Try again in a moment.",
+                );
+            }
+            const media = await this.media.readyObject(
+                ctx.organizationId,
+                dto.photoMediaId,
+            );
+            if (!PHOTO_TYPES.has(media.contentType)) {
+                throw new BadRequestException({
+                    message: "That is not a photo. Choose a JPG, PNG or WebP.",
+                    field: "photoMediaId",
+                });
+            }
+        }
+        const told =
+            typeof dto.photoMediaId === "string" &&
+            dto.photoMediaId !== person.photoMediaId &&
+            !own &&
+            person.membership?.userId;
+        const actor = told
+            ? await prisma.user.findUnique({
+                  where: { id: ctx.userId },
+                  select: { name: true },
+              })
+            : null;
+        await prisma.$transaction(async (tx) => {
+            await tx.staffMember.update({
+                where: { id: person.id },
+                data: {
+                    ...(dto.photoMediaId !== undefined
+                        ? { photoMediaId: dto.photoMediaId }
+                        : {}),
+                    ...(dto.about !== undefined
+                        ? { about: blankToNull(dto.about) }
+                        : {}),
+                },
+                select: { id: true },
+            });
+            if (told) {
+                await tx.notification.create({
+                    data: {
+                        organizationId: ctx.organizationId,
+                        userId: told,
+                        ...noticeOf("staff.photo", {}),
+                        title: "Your profile photo was changed",
+                        body: `${actor?.name?.trim() ? actor.name.trim() : "An owner or admin"} set your photo. Change or remove it in Your profile.`,
+                    },
+                    select: { id: true },
+                });
+            }
+            if (person.showOnTeamPage) {
+                await enqueueBusinessSitesRevalidation(
+                    tx,
+                    ctx.organizationId,
+                    "team",
+                );
+            }
+        });
+        return this.read(ctx, person.id);
+    }
+
+    /**
+     * Who appears on Our team (round 3, EBTeamPicker, replaces DEC-248's
+     * opt-in): an owner or admin (`service:write`) picks the people, the
+     * whole list at once; nobody adds themselves and nobody is told. The
+     * chosen set is read live by every Our team section (`sites/team-live.ts`),
+     * so the business's live pages are told to redraw.
+     */
+    async setTeamPage(
+        ctx: OrganizationContext,
+        staffIds: string[],
+    ): Promise<{ staffIds: string[] }> {
+        if (!allows(ctx, "service:write")) {
+            throw new ForbiddenException(
+                "Only an owner or admin can choose who appears on Our team.",
+            );
+        }
+        const ids = [...new Set(staffIds)];
+        return prisma.$transaction(async (tx) => {
+            const found = await tx.staffMember.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    id: { in: ids },
+                    status: "ACTIVE",
+                },
+                select: { id: true },
+            });
+            if (found.length !== ids.length) {
+                throw new NotFoundException("Staff member not found");
+            }
+            await tx.staffMember.updateMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    id: { in: ids },
+                    showOnTeamPage: false,
+                },
+                data: { showOnTeamPage: true },
+            });
+            await tx.staffMember.updateMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    id: { notIn: ids },
+                    showOnTeamPage: true,
+                },
+                data: { showOnTeamPage: false },
+            });
+            await enqueueBusinessSitesRevalidation(
+                tx,
+                ctx.organizationId,
+                "team",
+            );
+            return { staffIds: ids };
+        });
     }
 
     /**
@@ -785,7 +1002,7 @@ export class StaffService {
             include: staffInclude(since),
         });
         if (!row) throw new NotFoundException("Staff member not found");
-        return toView(row);
+        return toView(row, new Set(), this.urlOf);
     }
 
     private async requireStaff(ctx: OrganizationContext, staffId: string) {
@@ -796,6 +1013,7 @@ export class StaffService {
                 name: true,
                 status: true,
                 membershipId: true,
+                showOnTeamPage: true,
             },
         });
         if (!person) throw new NotFoundException("Staff member not found");

@@ -68,7 +68,7 @@ async function business(): Promise<Business> {
 /** A conversation with one sealed question and its usage row. */
 async function conversation(
     ctx: OrganizationContext,
-    opts: { text?: string; lastMessageAt?: Date } = {},
+    opts: { text?: string; lastMessageAt?: Date; images?: string[] } = {},
 ) {
     const id = randomUUID();
     const messageId = randomUUID();
@@ -94,7 +94,10 @@ async function conversation(
         },
     });
     const body = sealMessageBody(
-        { text: opts.text ?? "Kal kitne bookings hain?" },
+        {
+            text: opts.text ?? "Kal kitne bookings hain?",
+            ...(opts.images ? { images: opts.images } : {}),
+        },
         { ...where, rowId: messageId },
     );
     await prisma.aiMessage.create({
@@ -261,6 +264,28 @@ describe("Ask AI retention", () => {
                 where: { id: { in: [recent.id, keptByHold.id] } },
             }),
         ).toBe(2);
+    });
+});
+
+describe("Ask AI retention and images", () => {
+    it("an image a kept conversation still shows is not deleted with an expired one (L3)", async () => {
+        const b = await business();
+        const old = new Date(Date.now() - AI_RETENTION_MS - DAY);
+        await conversation(b.owner, {
+            lastMessageAt: old,
+            images: ["shared", "only-old"],
+        });
+        const recent = await conversation(b.owner, { images: ["shared"] });
+        const deleteAskAiImages = jest.fn().mockResolvedValue(0);
+        const job = new AiRetentionJob({
+            deleteAskAiImages,
+            deleteUnsentAskAiImagesBefore: jest.fn().mockResolvedValue(0),
+        } as never);
+        await job.sweep(new Date());
+        expect(deleteAskAiImages).toHaveBeenCalledWith(["only-old"]);
+        expect(
+            await prisma.aiConversation.count({ where: { id: recent.id } }),
+        ).toBe(1);
     });
 });
 

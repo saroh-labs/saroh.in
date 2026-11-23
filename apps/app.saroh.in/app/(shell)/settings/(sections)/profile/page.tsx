@@ -11,6 +11,7 @@ import { listMembers } from "@/lib/organizations/members";
 import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { readMyStaff } from "@/lib/staff/service";
 import { usageSharingOrNull } from "@/lib/usage-sharing/service";
 import { replaySwitchedOn, sharesUsageNow } from "@/lib/usage-sharing/sharing";
 
@@ -42,10 +43,12 @@ export default async function ProfilePage() {
         replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
         analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
     });
-    const [alerts, org, usageSharing] = await Promise.all([
+    const [alerts, org, usageSharing, myStaff] = await Promise.all([
         getAlertPreferences(),
         resolveActiveOrganization(),
         recordingOn ? usageSharingOrNull() : null,
+        // Your place on the diary, for your photo (null when not on it).
+        readMyStaff(),
     ]);
     // An owner always reads the roster. Anyone else only with the
     // permission: a refused read would turn this page into a denial.
@@ -61,6 +64,15 @@ export default async function ProfilePage() {
                 email={user.email}
                 accountUrl={accountSettingsUrl}
                 alerts={alerts}
+                mine={
+                    myStaff
+                        ? {
+                              staffId: myStaff.id,
+                              photo: myStaff.photo?.url ?? null,
+                              about: myStaff.about ?? null,
+                          }
+                        : null
+                }
                 leave={
                     org
                         ? {

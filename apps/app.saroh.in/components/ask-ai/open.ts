@@ -38,3 +38,27 @@ export function saySiteDraftChanged(siteId: string) {
         new CustomEvent(SITE_DRAFT_CHANGED, { detail: siteId }),
     );
 }
+
+/**
+ * A photo Ask AI drafted for a section, shown on the open page's canvas
+ * before it is applied (owner, 22 Nov; board AIImgApply A): a dashed
+ * outline, "Preview · not applied yet", the photo in place. A card says it
+ * while it is open and takes it back (`clear`) when it is applied, undone,
+ * dismissed or gone.
+ */
+export const SITE_PHOTO_PREVIEW = "saroh:site-photo-preview";
+
+export type SitePhotoPreview =
+    | {
+          kind: "set";
+          siteId: string;
+          pageId: string;
+          sectionKey: string;
+          src: string;
+          alt: string;
+      }
+    | { kind: "clear"; sectionKey: string };
+
+export function saySitePhotoPreview(detail: SitePhotoPreview) {
+    window.dispatchEvent(new CustomEvent(SITE_PHOTO_PREVIEW, { detail }));
+}

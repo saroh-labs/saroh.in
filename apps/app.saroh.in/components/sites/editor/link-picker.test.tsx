@@ -129,7 +129,8 @@ const button = (name: string) => {
 /** The radio whose row holds these words. */
 const radio = (words: string) => {
     const hit = Array.from(document.querySelectorAll("[role=radio]")).find(
-        (r) => r.closest("label")?.textContent.includes(words),
+        // A RadioCards row's label, or a tile's own words (D2).
+        (r) => (r.closest("label") ?? r).textContent.includes(words),
     );
     if (!hit) throw new Error(`No choice ${words}`);
     return hit;
@@ -148,7 +149,7 @@ describe("the link picker", () => {
             ),
         );
         expect(document.body.textContent).toContain("Link “a trial” to");
-        click(radio("Outside link"));
+        click(radio("Any web address"));
         const address =
             document.querySelector<HTMLInputElement>("input[type=url]");
         if (!address) throw new Error("No web address");

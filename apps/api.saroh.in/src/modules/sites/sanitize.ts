@@ -38,11 +38,12 @@ const COLOUR = [
  * A card from the business inside a post (U15b): `<div data-embed="service"
  * data-id="…"></div>`. It stores which one and nothing else; the post's page
  * reads the name, price and time from Services or Products when it is
- * viewed, so the post never shows an old price. The editor
+ * viewed, so the post never shows an old price. `book` is a Book now
+ * button for a service, `offer` a live discount (W2). The editor
  * (`rich-text/embeds/business-embed.ts`) and the renderer
  * (`saroh.app/lib/post-embeds.ts`) read exactly this shape.
  */
-export const EMBED_KINDS = ["service", "product"] as const;
+export const EMBED_KINDS = ["service", "product", "book", "offer"] as const;
 /** An id as the database mints them, the same rule the product grid reads. */
 const EMBED_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -52,7 +53,7 @@ function embedDiv(
     attribs: sanitizeHtml.Attributes,
 ): sanitizeHtml.Tag {
     if (!("data-embed" in attribs) && !("data-id" in attribs)) {
-        return { tagName, attribs };
+        return { tagName, attribs: postBlockAttrs(attribs) };
     }
     const { "data-embed": kind, "data-id": id, ...rest } = attribs;
     const ok =
@@ -63,6 +64,31 @@ function embedDiv(
     return ok
         ? { tagName, attribs: { "data-embed": kind, "data-id": id } }
         : { tagName, attribs: rest };
+}
+
+/**
+ * A post's own blocks (W2) keep one fixed value each, so nothing else can
+ * ride on them: a highlight box `data-box="note"`, a gallery
+ * `data-gallery="photos"` and the contents list `data-contents="headings"`
+ * (filled by the page from the post's headings). A present attribute takes
+ * its one value; an empty one is never written, as sanitize-html would
+ * write it bare and the editor with `=""`.
+ */
+function postBlockAttrs(
+    attribs: sanitizeHtml.Attributes,
+): sanitizeHtml.Attributes {
+    const {
+        "data-box": box,
+        "data-gallery": _gallery,
+        "data-contents": _contents,
+        ...rest
+    } = attribs;
+    return {
+        ...rest,
+        ...(box === "note" ? { "data-box": "note" } : {}),
+        ...("data-gallery" in attribs ? { "data-gallery": "photos" } : {}),
+        ...("data-contents" in attribs ? { "data-contents": "headings" } : {}),
+    };
 }
 
 const OPTIONS: sanitizeHtml.IOptions = {
@@ -116,7 +142,15 @@ const OPTIONS: sanitizeHtml.IOptions = {
         a: ["href", "title", "target", "rel"],
         img: ["src", "alt", "title", "width", "height"],
         mark: ["data-color"],
-        div: ["data-embed", "data-id"],
+        div: [
+            "data-embed",
+            "data-id",
+            "data-box",
+            "data-gallery",
+            "data-contents",
+        ],
+        // A post's button (W2): `<p data-button="link"><a href>Words</a></p>`.
+        p: ["data-button"],
         th: ["colspan", "rowspan"],
         td: ["colspan", "rowspan"],
         "*": ["style"],
@@ -149,6 +183,16 @@ const OPTIONS: sanitizeHtml.IOptions = {
     allowedSchemesByTag: { img: ["http", "https", "data"] },
     transformTags: {
         div: embedDiv,
+        p: (tagName, attribs) => {
+            const { "data-button": _button, ...rest } = attribs;
+            return {
+                tagName,
+                attribs:
+                    "data-button" in attribs
+                        ? { ...rest, "data-button": "link" }
+                        : rest,
+            };
+        },
         /*
          * A link that opens a new tab always gets `rel="noopener noreferrer"`
          * (#280), so the page it opens cannot reach back through

@@ -12,6 +12,8 @@ import { NORTHWIND_ORG } from "../playwright.config";
  * the api's `WEBSITE_AREA`: the page at rest, a section with its four
  * tabs and its canvas toolbar, and the header on every page.
  *
+ * Also the header's own panel (H1–H3) and the hover hint (D8).
+ *
  * Read-only: it selects, switches tabs and closes. Nothing is pressed that
  * changes the draft, so it shares Northwind with every other spec.
  */
@@ -83,6 +85,15 @@ for (const size of SIZES) {
             await expect(inspector).toContainText("Hide on phone");
             await tab(/^Feedback/).click();
 
+            // Hovering another section says what a click does (D8).
+            const other = page.locator("[data-block-index]").nth(1);
+            if (await other.count()) {
+                await other.hover();
+                await expect(
+                    other.locator("[data-click-hint]").first(),
+                ).toBeVisible();
+            }
+
             // The canvas toolbar holds the section's actions.
             const tools = page.locator("[data-section-toolbar]");
             for (const name of [
@@ -108,6 +119,18 @@ for (const size of SIZES) {
                 .first()
                 .click();
             await expect(inspector).toContainText(/On every page · \d+ pages?/);
+            // Its own panel (H1–H3): the menu here, the four tabs, no Move.
+            await expect(inspector).toContainText(
+                "Renaming here never renames the page",
+            );
+            await expect(
+                inspector.getByRole("button", { name: "Move up" }),
+            ).toHaveCount(0);
+            await tab("Visibility").click();
+            await expect(inspector).toContainText(
+                "can't be hidden, moved or removed",
+            );
+            await tab("Content").click();
             const banner = page.locator("[data-everywhere-banner]");
             await expect(banner).toContainText("Changes here show on all");
             await banner

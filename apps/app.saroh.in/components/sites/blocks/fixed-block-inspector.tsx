@@ -8,6 +8,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useId } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
@@ -103,12 +104,21 @@ export function FixedBlockInspector({
     siteId,
     text,
     bare = false,
+    menu,
+    moves = true,
 }: {
     part: "header" | "footer";
     siteId: string;
     text: FixedBlockText;
     /** In the new inspector (U47): its own header names it, no padding. */
     bare?: boolean;
+    /**
+     * The menu edited here (H1, the Website area's Header panel), in place
+     * of the way to Website settings. Absent, the menu stays there.
+     */
+    menu?: ReactNode;
+    /** The disabled Move and Remove with their reason; the new panel has none (H3). */
+    moves?: boolean;
 }) {
     const Icon = part === "header" ? PanelTop : PanelBottom;
     const readOnly = !text.canUpdate;
@@ -171,17 +181,19 @@ export function FixedBlockInspector({
                         note="In the header of every page, and in search results unless you set a search title."
                         error={readOnly ? null : text.nameError}
                     />
-                    {/*
-                     * The menu is not edited here (#206): it keeps its home in
-                     * Website settings, and the way there stays.
-                     */}
-                    <div className="grid gap-2 border-t pt-3">
-                        <p className="text-[0.8125rem] leading-relaxed">
-                            The menu lists the pages you add to it. It&apos;s
-                            changed in Website settings.
-                        </p>
-                        {settings}
-                    </div>
+                    {menu ?? (
+                        /*
+                         * The menu is not edited here (#206): it keeps its home in
+                         * Website settings, and the way there stays.
+                         */
+                        <div className="grid gap-2 border-t pt-3">
+                            <p className="text-[0.8125rem] leading-relaxed">
+                                The menu lists the pages you add to it.
+                                It&apos;s changed in Website settings.
+                            </p>
+                            {settings}
+                        </div>
+                    )}
                 </>
             ) : text.footerRich ? (
                 <div className="grid gap-2">
@@ -214,39 +226,44 @@ export function FixedBlockInspector({
                 </>
             )}
 
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t pt-3">
-                <IconButton
-                    label="Move up"
-                    icon={<span>↑</span>}
-                    variant="outline"
-                    disabled
-                    aria-describedby="fixed-lock-reason"
-                />
-                <IconButton
-                    label="Move down"
-                    icon={<span>↓</span>}
-                    variant="outline"
-                    disabled
-                    aria-describedby="fixed-lock-reason"
-                />
-                <p
-                    id="fixed-lock-reason"
-                    className="flex min-w-0 flex-1 items-center gap-1.5 text-xs leading-relaxed text-muted-foreground"
-                >
-                    <Lock aria-hidden="true" className="size-3.5 shrink-0" />
-                    {FIXED_LOCK}
-                </p>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="ml-auto"
-                    disabled
-                    aria-describedby="fixed-lock-reason"
-                >
-                    Remove
-                </Button>
-            </div>
+            {moves ? (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t pt-3">
+                    <IconButton
+                        label="Move up"
+                        icon={<span>↑</span>}
+                        variant="outline"
+                        disabled
+                        aria-describedby="fixed-lock-reason"
+                    />
+                    <IconButton
+                        label="Move down"
+                        icon={<span>↓</span>}
+                        variant="outline"
+                        disabled
+                        aria-describedby="fixed-lock-reason"
+                    />
+                    <p
+                        id="fixed-lock-reason"
+                        className="flex min-w-0 flex-1 items-center gap-1.5 text-xs leading-relaxed text-muted-foreground"
+                    >
+                        <Lock
+                            aria-hidden="true"
+                            className="size-3.5 shrink-0"
+                        />
+                        {FIXED_LOCK}
+                    </p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto"
+                        disabled
+                        aria-describedby="fixed-lock-reason"
+                    >
+                        Remove
+                    </Button>
+                </div>
+            ) : null}
         </div>
     );
 }

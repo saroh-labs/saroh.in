@@ -117,6 +117,10 @@ const NOT_FORMS: Record<string, string> = {
         "Ask AI's panel, full-screen on a phone: a conversation, not a form",
     "components/ask-ai/ask-ai-panel.tsx":
         "a picker: the phone's Reply language, kept as it is chosen",
+    "components/ask-ai/attach.tsx":
+        "From your photos: pick several library images to attach, not a form",
+    "components/ask-ai/question-images.tsx":
+        "the viewer for a message's images: a look at the picture, not a form",
     "components/ask-ai/report-sheet.tsx":
         "Report this answer: a desk popover or a phone sheet over the panel, as board 21 draws it",
     // Notices and flows with their own states.

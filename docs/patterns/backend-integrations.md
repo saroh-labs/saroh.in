@@ -861,6 +861,15 @@ health page says so; a deployed API must not run that way.
   (`/_img/<w>/g/<key>`, from `NEXT_PUBLIC_SITE_MEDIA_URL_GLOBAL`) and
   fetches only from that bucket's address.
 
+- **Ask AI's images are a chat purpose (DEC-258).** Uploads under purpose
+  `ask-ai` (the asker's `ai:use`, JPG, PNG, WebP or GIF, at most 5 MB, no
+  smaller copies) are not listed in Your photos; applying one to the site,
+  a product or a post (`place_image`) makes it a library photo
+  (`adoptAskAiImage`). Unapplied ones go with the conversation's 90 days.
+  The API reads their bytes from storage (`readAskAiImage`) for the
+  provider, never over HTTP, and only after the turn is admitted. They are
+  private: a person's browser gets a 15-minute signed GET link (`viewUrlFor`),
+  never `getPublicUrl`, until the image is applied.
 - **Public by address, never listable.** Everything in these buckets is meant
   to be seen (logos, site and product images). Keys are server-built and carry
   a random UUID, so a file can't be guessed. **Nothing private goes in them**

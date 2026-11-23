@@ -23,6 +23,10 @@ export const RAW_ALLOWED = {
     // button: a suggestion row, and the page label's clear and undo (AF boards)
     "components/ask-ai/about-label.tsx": ["button"],
     "components/ask-ai/suggestions.tsx": ["button"],
+    // button: a thumbnail's remove, and a Your photos tile pressed to choose it; input: the file pickers behind Add images (owner, 22 Nov)
+    "components/ask-ai/attach.tsx": ["button", "input"],
+    // button: a sent image's tile, pressed to open it; the viewer's previous and next
+    "components/ask-ai/question-images.tsx": ["button"],
     // button: a template's row in its preview's list, pressed to show it (DEC-216)
     "components/sites/templates/template-preview.tsx": ["button"],
     // button: a connection, key or address row that is one button, opening its sheet (U14)
@@ -142,6 +146,8 @@ export const RAW_ALLOWED = {
     "components/commerce/product-sections/shop-switch.tsx": ["button"],
     // button: a row or card that is one button
     "components/commerce/product-settings/option-sheet.tsx": ["button"],
+    // Our team's People list: each row's drag handle, as option-sheet's.
+    "components/sites/editor/inspector/team-people.tsx": ["button"],
     // button: a chip that adds a token to the pattern
     "components/commerce/product-settings/sku-tab.tsx": ["button"],
     // button: a chip
@@ -211,6 +217,8 @@ export const RAW_ALLOWED = {
     "components/shared/fields/gst-rate-picker.tsx": ["button"],
     // input: a file picker
     "components/shared/fields/logo-upload.tsx": ["input"],
+    // input: a file picker (a team member's photo)
+    "components/staff/profile-photo.tsx": ["input"],
     // button: a control styled by its screen's own helper
     "components/shared/shell/tab-bar.tsx": ["button"],
     // button: a chip
@@ -229,6 +237,16 @@ export const RAW_ALLOWED = {
     "components/sites/editor/editor-rail.tsx": ["button"],
     // button: a Brand tab colour row, one line that opens its swatches (DEC-184)
     "components/sites/looks/colour-picker.tsx": ["button"],
+    // button: Custom's swatch, a site colour row, a Recent swatch and the
+    // contrast guard's two fixes; input: the hue strip (DEC-254, CSI-C, CS4)
+    // button: one step of the shade strip, a colour swatch (ERVPalette)
+    "components/sites/editor/inspector/shade-strip.tsx": ["button"],
+    "components/sites/editor/inspector/button-colour-picker.tsx": [
+        "button",
+        "input",
+    ],
+    // button: a palette row tried live on the page (CSI-C)
+    "components/sites/looks/site-colours-card.tsx": ["button"],
     // button: Brand's "Customise components" row, two lines that open the list (DEC-237)
     "components/sites/looks/component-styles.tsx": ["button"],
     // button, input: today's Brand panel, parked behind the Website area switch (owner, 20 Nov)

@@ -17,6 +17,13 @@ import {
     VIDEO_UPLOAD_PURPOSE,
 } from "@saroh/object-storage";
 
+import {
+    ASK_AI_IMAGE_MAX_BYTES,
+    ASK_AI_IMAGE_PURPOSE,
+    ASK_AI_IMAGE_TYPES,
+    ASK_AI_SENT_PURPOSE,
+} from "@saroh/api-contract";
+
 import { LOGO_CONTENT_TYPES } from "../organizations/business-logo";
 
 /**
@@ -46,6 +53,10 @@ export const NOT_AN_IMAGE_MESSAGE =
  * words Settings → Business already uses before an upload starts.
  */
 export const NOT_A_LOGO_MESSAGE = "That file isn't a PNG, JPG or WebP image.";
+/** What a person reads when an Ask AI image is not one Ask AI can read. */
+export const ASK_AI_NOT_IMAGE_MESSAGE =
+    "Choose a JPG, PNG, WebP or GIF. Ask AI can't read other files.";
+export const ASK_AI_TOO_BIG_MESSAGE = "Each image can be up to 5 MB.";
 /** What a merchant reads when nothing reached storage. */
 export const NOTHING_UPLOADED_MESSAGE =
     "That upload didn't go through. Upload the file again.";
@@ -148,6 +159,28 @@ export function assertUploadType(input: CreateUploadInput): void {
         }
         if (input.contentLength > DEFAULT_MAX_VIDEO_UPLOAD_BYTES) {
             throw new BadRequestException(VIDEO_TOO_BIG_MESSAGE);
+        }
+        return;
+    }
+    // Only the server moves an image to "sent", when a question carries it.
+    if (input.purpose === ASK_AI_SENT_PURPOSE) {
+        throw new BadRequestException(NOT_AN_IMAGE_MESSAGE);
+    }
+    // An image for Ask AI: what the provider reads, at its per-image size.
+    if (input.purpose === ASK_AI_IMAGE_PURPOSE) {
+        // Smaller copies are for the library's pages; a chat image has none.
+        if (input.variants?.length) {
+            throw new BadRequestException(NOT_AN_IMAGE_MESSAGE);
+        }
+        if (
+            !(ASK_AI_IMAGE_TYPES as readonly string[]).includes(
+                input.contentType,
+            )
+        ) {
+            throw new BadRequestException(ASK_AI_NOT_IMAGE_MESSAGE);
+        }
+        if (input.contentLength > ASK_AI_IMAGE_MAX_BYTES) {
+            throw new BadRequestException(ASK_AI_TOO_BIG_MESSAGE);
         }
         return;
     }

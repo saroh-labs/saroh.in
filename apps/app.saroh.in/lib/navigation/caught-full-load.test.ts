@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { armFullLoadCatch, resetRouterAfterCatch } from "./caught-full-load";
+import {
+    answers,
+    armFullLoadCatch,
+    resetRouterAfterCatch,
+} from "./caught-full-load";
 
 /** A `navigate` event as the Navigation API fires it for a full load. */
 function navigate(
@@ -35,6 +39,9 @@ describe("armFullLoadCatch", () => {
         vi.runAllTimers();
         vi.useRealTimers();
         expect(caught).toHaveBeenCalledTimes(1);
+        expect(caught).toHaveBeenCalledWith(
+            expect.objectContaining({ search: "?page=p2" }),
+        );
         // Disarmed by the catch: the next one goes through.
         expect(navigate("/sites/s1?page=p2").defaultPrevented).toBe(false);
     });
@@ -69,5 +76,23 @@ describe("armFullLoadCatch", () => {
         });
         resetRouterAfterCatch();
         expect(shown).toHaveBeenCalledWith(true);
+    });
+
+    it("tells a real failure from a load that would work (bug 2, 22 Nov)", async () => {
+        const url = new URL("/sites/s1/write/new", window.location.origin);
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+        expect(await answers(url)).toBe(true);
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValue({ ok: false, type: "opaqueredirect" }),
+        );
+        expect(await answers(url)).toBe(true);
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockResolvedValue({ ok: false, type: "basic" }),
+        );
+        expect(await answers(url)).toBe(false);
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError()));
+        expect(await answers(url)).toBe(false);
     });
 });

@@ -193,6 +193,16 @@ describe("the canvas in Preview", () => {
         expect(host.textContent).toContain("flour.saroh.app/");
     });
 
+    it("names what a click does on an unselected block, never on the selected one (D8)", () => {
+        render({ previewing: false });
+        const hints = host.querySelectorAll(
+            "[data-block-index] [data-click-hint]",
+        );
+        // Two sections, the first selected: only the second says it.
+        expect(hints).toHaveLength(1);
+        expect(hints.item(0).textContent).toBe("· click to edit");
+    });
+
     it("says what Preview is, and Back to editing leaves it", () => {
         const { setPreviewing } = render();
         expect($("[role=status]")?.textContent).toBe(
@@ -394,5 +404,32 @@ describe("one renderer", () => {
             "@saroh/site-blocks",
             "@saroh/site-blocks",
         ]);
+    });
+});
+
+describe("a photo Ask AI drafted for a section (owner, 22 Nov)", () => {
+    it("is drawn in place, dashed, as not applied yet, on that section only", () => {
+        render({
+            previewing: false,
+            photoPreviewByKey: new Map([
+                ["s1", { src: "https://m.test/aisle.webp", alt: "Aisle" }],
+            ]),
+        });
+        const marks = host.querySelectorAll("[data-photo-preview]");
+        expect(marks).toHaveLength(1);
+        expect(marks.item(0).textContent).toBe("Preview · not applied yet");
+        expect(
+            marks
+                .item(0)
+                .closest("[data-block-index]")
+                ?.getAttribute("data-block-index"),
+        ).toBe("0");
+        expect(host.innerHTML).toContain("aisle.webp");
+    });
+
+    it("nothing is previewed unless a card says so", () => {
+        render({ previewing: false });
+        expect(host.querySelector("[data-photo-preview]")).toBeNull();
+        expect(host.innerHTML).not.toContain("aisle.webp");
     });
 });

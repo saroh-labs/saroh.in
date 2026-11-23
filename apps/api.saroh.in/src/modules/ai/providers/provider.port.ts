@@ -45,8 +45,14 @@ export interface AiToolResult {
     isError?: boolean;
 }
 
+/** An image the person sent, as the provider reads it (bytes, never a link). */
+export interface AiImage {
+    bytes: Uint8Array;
+    mediaType: string;
+}
+
 export type AiMessage =
-    | { role: "user"; text: string }
+    | { role: "user"; text: string; images?: AiImage[] }
     | { role: "assistant"; text?: string; toolCalls?: AiToolCall[] }
     | { role: "tool"; results: AiToolResult[] };
 

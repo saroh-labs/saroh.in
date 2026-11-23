@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -44,7 +44,9 @@ export function DeviceFrame({
      */
     const [doc, setDoc] = useState<Document | null>(null);
     const [height, setHeight] = useState(0);
+    const frameRef = useRef<HTMLIFrameElement | null>(null);
     const attach = (frame: HTMLIFrameElement | null) => {
+        frameRef.current = frame;
         const next = frame?.contentDocument ?? null;
         if (next !== doc) setDoc(next);
     };
@@ -53,7 +55,8 @@ export function DeviceFrame({
         const view = doc?.defaultView;
         if (!doc || !view) return;
 
-        const mirrorHead = () => copyStyles(doc);
+        const copies = new Map<Element, Element>();
+        const mirrorHead = () => copyStyles(doc, copies);
         const mirrorClasses = () => copyRootClasses(doc);
         mirrorHead();
         mirrorClasses();
@@ -78,7 +81,18 @@ export function DeviceFrame({
         };
         view.addEventListener("keydown", forwardKey);
 
-        const measure = () => setHeight(doc.body.scrollHeight);
+        // `vh` blocks (a hero at 88vh) follow the frame's own height, so
+        // measuring at the current height feeds back and grows without end.
+        // Measure at the device's screen height instead: the same answer
+        // every time, so the height settles.
+        const measure = () => {
+            const frame = frameRef.current;
+            if (!frame) return;
+            frame.style.height = `${screenHeight(frame.clientWidth)}px`;
+            const h = doc.documentElement.scrollHeight;
+            frame.style.height = `${h}px`;
+            setHeight(h);
+        };
         const sizeWatch = new ResizeObserver(measure);
         sizeWatch.observe(doc.body);
 
@@ -104,18 +118,32 @@ export function DeviceFrame({
     );
 }
 
-/** The editor's stylesheets, copied into the frame (again, replacing). */
-function copyStyles(target: Document) {
-    target.head
-        .querySelectorAll("[data-editor-mirrored]")
-        .forEach((node) => node.remove());
-    document.head
-        .querySelectorAll('style, link[rel="stylesheet"]')
-        .forEach((node) => {
-            const copy = node.cloneNode(true) as HTMLElement;
-            copy.setAttribute("data-editor-mirrored", "");
-            target.head.appendChild(copy);
-        });
+/** The screen height `vh` reads in a frame this wide: desktop, tablet, phone. */
+function screenHeight(width: number) {
+    return width >= 1024 ? 900 : width >= 600 ? 1024 : 844;
+}
+
+/**
+ * The editor's stylesheets, mirrored into the frame: only what is new is
+ * added and only what is gone is removed, so the page is never re-styled
+ * (or a `<link>` sheet re-fetched) for a change elsewhere in `<head>`.
+ */
+function copyStyles(target: Document, copies: Map<Element, Element>) {
+    const now = new Set(
+        document.head.querySelectorAll('style, link[rel="stylesheet"]'),
+    );
+    copies.forEach((copy, source) => {
+        if (now.has(source)) return;
+        copy.remove();
+        copies.delete(source);
+    });
+    now.forEach((node) => {
+        if (copies.has(node)) return;
+        const copy = node.cloneNode(true) as HTMLElement;
+        copy.setAttribute("data-editor-mirrored", "");
+        target.head.appendChild(copy);
+        copies.set(node, copy);
+    });
 }
 
 /** The fonts' variables and the theme, which live on `<html>` and `<body>`. */

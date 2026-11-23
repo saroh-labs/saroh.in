@@ -90,6 +90,16 @@ export class SitesController {
         return this.sites.newSiteDefaults(ctx);
     }
 
+    /**
+     * The page holding Our team, or null (ER3Team T4). Declared before
+     * `:siteId` so "team-page" is never captured as an id.
+     */
+    @Get("team-page")
+    @UseGuards(WebsiteAreaSwitchGuard)
+    teamPage(@OrgContext() ctx: OrganizationContext) {
+        return this.sites.teamPage(ctx);
+    }
+
     /** List the org's non-deleted sites. */
     @Get()
     list(@OrgContext() ctx: OrganizationContext) {

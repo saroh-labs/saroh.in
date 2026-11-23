@@ -413,7 +413,7 @@ function NextFreeRail({ days, byDay, show, paidWith }: Omit<DayProps, "look">) {
                         key={`${s.serviceId}:${s.startAt}`}
                         data-timetable-row=""
                         data-timetable-full={full ? "" : undefined}
-                        className="bg-site-surface grid w-[212px] shrink-0 snap-start content-start gap-2 rounded-[20px] p-4 min-[1000px]:w-auto min-[1000px]:min-w-[188px] min-[1000px]:flex-1 min-[1000px]:basis-0"
+                        className="bg-site-surface grid w-[212px] shrink-0 snap-start content-start gap-2 rounded-[var(--site-card-radius,20px)] p-4 min-[1000px]:w-auto min-[1000px]:min-w-[188px] min-[1000px]:flex-1 min-[1000px]:basis-0"
                     >
                         <span className={FRONT_TYPE.live.eyebrow}>
                             {railDay(s.date, days[0])}
@@ -434,7 +434,7 @@ function NextFreeRail({ days, byDay, show, paidWith }: Omit<DayProps, "look">) {
                             {words.places ? (
                                 <span
                                     className={cn(
-                                        "inline-flex rounded-[9px] px-[9px] py-1 text-[12.5px] font-bold",
+                                        "inline-flex rounded-[var(--site-tag-radius,9px)] px-[9px] py-1 text-[12.5px] font-bold",
                                         full
                                             ? "bg-site-bg text-site-fg"
                                             : "bg-site-fg text-site-bg",

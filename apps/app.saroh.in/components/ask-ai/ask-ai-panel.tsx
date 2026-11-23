@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { businessPage } from "@/lib/ask-ai/page-hints";
 import { AboutLabel } from "./about-label";
+import { useDropImages } from "./attach";
 import { Composer } from "./composer";
 import { MoreMenu } from "./more-menu";
 import {
@@ -109,7 +110,7 @@ export function AskAiPanel({
             ai.setDraft(q);
             focusBox();
         },
-        onAgain: (q) => void ai.ask(q),
+        onAgain: (q, images) => void ai.ask(q, false, images),
         onBook: ai.book,
     };
 
@@ -117,6 +118,8 @@ export function AskAiPanel({
         state?.reason === "locked" || state?.reason === "no-permission";
     const tools = !!state && !locked;
     const paused = atLimit(state?.usage ?? null) || lastRefusal === "allowance";
+    // Images dropped anywhere on the conversation or the box (owner, 22 Nov).
+    const drop = useDropImages(ai.attach.addFiles, !tools || paused);
     const switchedOff = lastRefusal === "business-off";
     const meter = meterOf(paused ? null : (state?.usage ?? null), zone);
 
@@ -492,6 +495,7 @@ export function AskAiPanel({
         <>
             {page ? (tools ? pageHeader : null) : header}
             <div
+                {...drop.props}
                 className={cn(
                     "flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain [&>*]:shrink-0 [&>.contents>*]:shrink-0",
                     page ? "px-6 pb-3 pt-6" : "pb-3 pt-[18px]",
@@ -527,6 +531,7 @@ export function AskAiPanel({
                 </p>
             ) : composer ? (
                 <div
+                    {...drop.props}
                     className={cn(
                         "flex shrink-0 flex-col gap-2 pt-2.5",
                         page
@@ -535,11 +540,21 @@ export function AskAiPanel({
                         !page && phone && "pb-[env(safe-area-inset-bottom)]",
                     )}
                 >
+                    {drop.over ? (
+                        <Notice tone="neutral" role="status">
+                            <span data-ph-unmask="">
+                                Drop images to add them. Up to 10 in one
+                                message, JPG, PNG, WebP or GIF, 5 MB each.
+                            </span>
+                        </Notice>
+                    ) : null}
                     <Composer
                         boxRef={boxRef}
                         value={ai.draft}
                         onChange={ai.setDraft}
-                        onSend={() => void ai.ask(ai.draft)}
+                        attach={ai.attach}
+                        phone={phone}
+                        onSend={() => void ai.ask(ai.draft, true)}
                         onStop={ai.stop}
                         running={running}
                         paused={paused}

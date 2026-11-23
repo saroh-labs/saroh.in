@@ -9,6 +9,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
+            updateMany: jest.fn(),
         },
         staffService: { createMany: jest.fn(), deleteMany: jest.fn() },
         staffHours: {
@@ -44,6 +45,8 @@ jest.mock("@saroh/database", () => {
             // Whose diary a Calendar only person is (#868).
             findUnique: jest.fn(),
         },
+        notification: { create: jest.fn() },
+        user: { findUnique: jest.fn() },
         // The business's own roles: the Calendar only role a first diary
         // person makes (#868).
         organizationRole: { findMany: jest.fn(), upsert: jest.fn() },
@@ -76,6 +79,24 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { StaffService } from "./staff.service";
 
+const photoService = (
+    contentType = "image/webp",
+    url: string | null = "https://m.example/a.webp",
+) => {
+    const readyObject = jest.fn().mockResolvedValue({
+        id: "media_1",
+        url,
+        contentType,
+    });
+    return {
+        readyObject,
+        svc: new StaffService({
+            readyObject,
+            urlOf: () => url,
+        } as never),
+    };
+};
+
 type Mocked = Record<string, jest.Mock>;
 const db = prisma as unknown as Record<string, Mocked>;
 
@@ -103,6 +124,9 @@ const ROW = {
     hours: [{ dayOfWeek: 1, startMinute: 360, endMinute: 720 }],
     extraHours: [],
     timeOff: [],
+    showOnTeamPage: false,
+    photoMedia: null,
+    about: null,
 };
 
 /** The refusal body a BadRequest/Conflict carries. */
@@ -800,5 +824,146 @@ describe("StaffService — booking rules", () => {
                 update: { freeCancelHours: 12, latestBookingMinutes: null },
             }),
         );
+    });
+});
+
+describe("StaffService — who appears on Our team (round 3)", () => {
+    it("is off until an owner or admin picks them", async () => {
+        const list = await service.list(member);
+        expect(list.staff[0]?.showOnTeamPage).toBe(false);
+    });
+
+    it("lets an owner or admin set the whole list, in this business only", async () => {
+        db.staffMember!.findMany!.mockResolvedValueOnce([{ id: "staff_1" }]);
+        await expect(
+            service.setTeamPage(ctx(), ["staff_1", "staff_1"]),
+        ).resolves.toEqual({ staffIds: ["staff_1"] });
+        expect(db.staffMember!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    id: { in: ["staff_1"] },
+                }),
+            }),
+        );
+        expect(db.staffMember!.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ id: { in: ["staff_1"] } }),
+                data: { showOnTeamPage: true },
+            }),
+        );
+        expect(db.staffMember!.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    id: { notIn: ["staff_1"] },
+                }),
+                data: { showOnTeamPage: false },
+            }),
+        );
+    });
+
+    it("refuses someone not in the business, and writes nothing", async () => {
+        db.staffMember!.findMany!.mockResolvedValueOnce([]);
+        await expect(
+            service.setTeamPage(ctx(), ["staff_other"]),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(db.staffMember!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses anyone but an owner or admin, the person themselves too", async () => {
+        await expect(
+            service.setTeamPage(member, ["staff_1"]),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(db.staffMember!.updateMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("StaffService — a person's photo and About them", () => {
+    const onDiary = (userId: string) => ({
+        ...ROW,
+        photoMediaId: null,
+        membership: {
+            id: "mem_1",
+            userId,
+            role: "MEMBER",
+            user: { name: "A", email: "a@example.com" },
+        },
+    });
+
+    it("reads no photo and no words by default", async () => {
+        const list = await service.list(member);
+        expect(list.staff[0]).toMatchObject({ photo: null, about: null });
+    });
+
+    it("lets the person set their own, and tells nobody", async () => {
+        db.staffMember!.findFirst!.mockResolvedValue(onDiary("user_1"));
+        const { svc } = photoService();
+        await svc.updateProfile(member, "staff_1", {
+            photoMediaId: "media_1",
+            about: "Ten years on the dock.",
+        });
+        expect(db.staffMember!.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: {
+                    photoMediaId: "media_1",
+                    about: "Ten years on the dock.",
+                },
+            }),
+        );
+        expect(db.notification!.create).not.toHaveBeenCalled();
+    });
+
+    it("lets an owner or admin set it, and tells the person in one line", async () => {
+        db.staffMember!.findFirst!.mockResolvedValue(onDiary("user_9"));
+        db.user!.findUnique!.mockResolvedValueOnce({ name: "Kiran" });
+        const { svc } = photoService();
+        await svc.updateProfile(ctx(), "staff_1", { photoMediaId: "media_1" });
+        expect(db.notification!.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    organizationId: "org_1",
+                    userId: "user_9",
+                    type: "staff.photo",
+                    body: expect.stringContaining("Kiran set your photo"),
+                }),
+            }),
+        );
+    });
+
+    it("does not tell anyone when an owner changes only the words or removes the photo", async () => {
+        db.staffMember!.findFirst!.mockResolvedValue(onDiary("user_9"));
+        await service.updateProfile(ctx(), "staff_1", { about: "Hello" });
+        await service.updateProfile(ctx(), "staff_1", { photoMediaId: null });
+        expect(db.notification!.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses someone else's profile to anyone but an owner or admin", async () => {
+        db.staffMember!.findFirst!.mockResolvedValue(onDiary("user_9"));
+        await expect(
+            service.updateProfile(member, "staff_1", { about: "x" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(db.staffMember!.update).not.toHaveBeenCalled();
+    });
+
+    it("refuses a photo that is not in this business's library, or not a photo", async () => {
+        db.staffMember!.findFirst!.mockResolvedValue(onDiary("user_1"));
+        const gone = photoService();
+        gone.readyObject.mockRejectedValueOnce(new NotFoundException());
+        await expect(
+            gone.svc.updateProfile(member, "staff_1", { photoMediaId: "m" }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        const gif = photoService("image/svg+xml");
+        await expect(
+            gif.svc.updateProfile(member, "staff_1", { photoMediaId: "m" }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(db.staffMember!.update).not.toHaveBeenCalled();
+    });
+
+    it("404s a person who is not in the business", async () => {
+        db.staffMember!.findFirst!.mockResolvedValueOnce(null);
+        await expect(
+            service.updateProfile(ctx(), "other", { about: "x" }),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 });

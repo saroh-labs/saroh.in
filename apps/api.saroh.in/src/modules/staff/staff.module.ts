@@ -2,6 +2,7 @@ import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
+import { MediaStorageModule } from "../media/media-storage.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import {
     ClosuresController,
@@ -22,7 +23,12 @@ import { StaffService } from "./staff.service";
  * lives in the bookings module; this module only writes them.
  */
 @Module({
-    imports: [forwardRef(() => OrganizationsModule), CapabilitiesModule],
+    imports: [
+        forwardRef(() => OrganizationsModule),
+        CapabilitiesModule,
+        // A team member's profile photo is a library image.
+        MediaStorageModule,
+    ],
     controllers: [
         StaffController,
         StaffRulesController,

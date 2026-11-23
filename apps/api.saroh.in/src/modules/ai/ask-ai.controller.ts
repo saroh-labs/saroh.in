@@ -42,8 +42,8 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { ZodContractPipe } from "../../common/pipes/zod-contract.pipe";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ACCESS_SESSION_HEADER } from "../admin/organization-access-session.guard";
+import type { AskAiConversationView } from "./ask-ai.service";
 import { AskAiService, sseFrame } from "./ask-ai.service";
-import type { AiConversationView } from "./conversations.service";
 
 /** A comment line every so often, so no proxy on the way closes a quiet stream. */
 export const KEEPALIVE_MS = 15_000;
@@ -160,7 +160,7 @@ export class AskAiController {
         @OrgContext() ctx: OrganizationContext,
         @Headers(ACCESS_SESSION_HEADER) session: string | undefined,
         @Param("conversationId") conversationId: string,
-    ): Promise<AiConversationView> {
+    ): Promise<AskAiConversationView> {
         refuseStaff(session);
         return this.askAi.get(ctx, conversationId);
     }

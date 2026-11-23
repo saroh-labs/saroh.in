@@ -58,6 +58,8 @@ interface SheetContentProps
      * quick look puts it beside the status, where the design has it.
      */
     closeButton?: boolean;
+    /** The overlay's own classes: `bg-transparent` leaves the page undimmed. */
+    overlayClassName?: string;
 }
 
 const SheetContent = React.forwardRef<
@@ -70,13 +72,14 @@ const SheetContent = React.forwardRef<
             className,
             children,
             closeButton = true,
+            overlayClassName,
             onInteractOutside,
             ...props
         },
         ref,
     ) => (
         <SheetPortal>
-            <SheetOverlay />
+            <SheetOverlay className={overlayClassName} />
             <SheetPrimitive.Content
                 ref={ref}
                 className={cn(sheetVariants({ side }), className)}

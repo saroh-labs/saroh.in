@@ -8,11 +8,23 @@ import {
 } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { CheckRow } from "@saroh/ui/check-row";
-import { RadioCards } from "@saroh/ui/choice-group";
+import { ChoiceGroup, RadioCards } from "@saroh/ui/choice-group";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { useId, useState } from "react";
+import { cn } from "@saroh/ui/lib/utils";
+import type { LucideIcon } from "lucide-react";
+import {
+    CalendarCheck,
+    Check,
+    ExternalLink,
+    FileText,
+    Hash,
+    Home,
+    MessageCircle,
+    Phone,
+} from "lucide-react";
+import { createContext, useId, useState } from "react";
 
 import type { ServiceOption } from "@/components/sites/section-fields";
 import type { Section, SitePage } from "@/lib/sites/service";
@@ -27,6 +39,20 @@ export interface LinkPlace {
     label: string;
     href: string;
 }
+
+/** Where a link may go, for the link picker on rich text. */
+export interface TextLinks {
+    places: readonly LinkPlace[];
+    services?: readonly ServiceOption[];
+    businessPhone?: string | null;
+}
+
+/**
+ * The site editor's places to link to (D2): a rich-text field's Link opens
+ * the picker under it. Outside the editor (posts, the footer) there is
+ * none, and Link stays an address box.
+ */
+export const TextLinksContext = createContext<TextLinks | null>(null);
 
 /** A link as the picker hands it back. */
 export interface LinkChoice {
@@ -110,21 +136,44 @@ export function linkPlaces(
     ];
 }
 
-const KINDS: { value: LinkKind; label: string; note?: string }[] = [
-    { value: "page", label: "A page on this site" },
+const KINDS: {
+    value: LinkKind;
+    label: string;
+    note: string;
+    icon: LucideIcon;
+}[] = [
+    {
+        value: "page",
+        label: "Page",
+        note: "A page on this site",
+        icon: FileText,
+    },
     {
         value: "service",
-        label: "A service",
+        label: "Service",
         note: "Opens it on your booking page",
+        icon: CalendarCheck,
     },
     {
         value: "whatsapp",
         label: "WhatsApp",
         note: "Opens a chat with the number",
+        icon: MessageCircle,
     },
-    { value: "call", label: "Phone call", note: "Calls the number" },
-    { value: "url", label: "Outside link", note: "Any web address" },
+    { value: "call", label: "Call", note: "Calls the number", icon: Phone },
+    {
+        value: "url",
+        label: "Outside",
+        note: "Any web address",
+        icon: ExternalLink,
+    },
 ];
+
+/** A row's icon: home for "/", # for a section, a page for the rest. */
+function placeIcon(href: string): LucideIcon {
+    if (href === "/") return Home;
+    return href.includes("#") ? Hash : FileText;
+}
 
 /**
  * The link picker (U47d): what the chosen words link to. A page of this
@@ -183,16 +232,34 @@ export function LinkPicker({
             >
                 {`Link “${words}” to`}
             </p>
-            <RadioCards
+            {/* The kinds as icon tiles in a row (D2, `fix/WXKText`). */}
+            <ChoiceGroup
                 labelledBy={`${id}-title`}
-                options={KINDS.map((k) => ({
+                className="grid grid-cols-5 gap-1"
+                choices={KINDS.map((k) => ({
                     value: k.value,
-                    label: k.label,
-                    note: k.note,
+                    label: (
+                        <>
+                            <k.icon aria-hidden className="size-4" />
+                            <span className="sr-only">{k.note}: </span>
+                            {k.label}
+                        </>
+                    ),
                 }))}
                 value={kind}
                 onChange={setKind}
+                itemClassName={(on) =>
+                    cn(
+                        "flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-0.5 text-[0.75rem] font-medium",
+                        on
+                            ? "border-foreground ring-1 ring-foreground"
+                            : "border-border text-muted-foreground hover:bg-muted",
+                    )
+                }
             />
+            <p className="-mt-1 text-xs text-muted-foreground">
+                {KINDS.find((k) => k.value === kind)?.note}
+            </p>
             {kind === "page" ? (
                 <div className="grid gap-2">
                     <Input
@@ -201,15 +268,46 @@ export function LinkPicker({
                         value={find}
                         onChange={(e) => setFind(e.target.value)}
                     />
-                    <RadioCards
+                    {/* Each with its icon and its path in mono under it (D2). */}
+                    <ChoiceGroup
                         label="Pages and sections"
-                        options={shown.map((p) => ({
-                            value: p.href,
-                            label: p.label,
-                            aside: p.href,
-                        }))}
+                        className="grid max-h-56 gap-0.5 overflow-y-auto"
+                        choices={shown.map((p) => {
+                            const Icon = placeIcon(p.href);
+                            return {
+                                value: p.href,
+                                label: (
+                                    <>
+                                        <Icon
+                                            aria-hidden
+                                            className="size-4 shrink-0 text-muted-foreground"
+                                        />
+                                        <span className="grid min-w-0 flex-1 text-left">
+                                            <span className="truncate font-medium">
+                                                {p.label}
+                                            </span>
+                                            <span className="truncate font-mono text-xs text-muted-foreground">
+                                                {p.href}
+                                            </span>
+                                        </span>
+                                        {value === p.href ? (
+                                            <Check
+                                                aria-hidden
+                                                className="size-4 shrink-0"
+                                            />
+                                        ) : null}
+                                    </>
+                                ),
+                            };
+                        })}
                         value={value || null}
                         onChange={set}
+                        itemClassName={(on) =>
+                            cn(
+                                "flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 py-1 text-sm",
+                                on ? "bg-accent" : "hover:bg-muted",
+                            )
+                        }
                     />
                 </div>
             ) : kind === "service" ? (

@@ -23,6 +23,7 @@ import type { TargetState } from "./draft-targets";
 import { DRAFT_SPECS, postPreview } from "./draft-targets";
 import {
     changedSince,
+    DraftsService,
     endOfBusinessDay,
     fieldsOf,
     filled,
@@ -341,5 +342,182 @@ describe("edit_section's Undo (owner, 21 Nov)", () => {
         expect(DRAFT_SPECS.edit_section.doneWords).toBe(
             "Saved · goes live when you publish",
         );
+    });
+});
+
+describe("place_image's draft (owner, 22 Nov): an image on a section or a post", () => {
+    const spec = DRAFT_SPECS.place_image;
+    const product = DRAFT_SPECS.place_product_photo;
+
+    it("names its place by what it is placed on", () => {
+        expect(
+            spec.targetOf?.({
+                target: "section",
+                site_id: "s1",
+                page_id: "p1",
+                section_key: "k1",
+            }),
+        ).toBe("section:s1:p1:k1");
+        expect(
+            spec.targetOf?.({
+                target: "post_cover",
+                site_id: "s1",
+                post_id: "po1",
+            }),
+        ).toBe("post:s1:po1");
+        expect(product.targetOf?.({ product_id: "pr1" })).toBe("product:pr1");
+        expect(spec.kind).toBe("image");
+        expect(product.kind).toBe("image");
+    });
+
+    it("is undone by taking the image off where there was none", () => {
+        const none = state({ photo: null });
+        const placed = state({ photo: "https://m.test/new.png" });
+        expect(spec.undo?.("section:s1:p1:k1", none, placed)).toEqual({
+            tool: "place_image",
+            input: {
+                target: "section",
+                site_id: "s1",
+                page_id: "p1",
+                section_key: "k1",
+                clear: true,
+            },
+        });
+        expect(spec.undo?.("post:s1:po1", none, placed)).toEqual({
+            tool: "place_image",
+            input: {
+                target: "post_cover",
+                site_id: "s1",
+                post_id: "po1",
+                clear: true,
+            },
+        });
+        expect(product.undo?.("product:pr1", none, placed)).toEqual({
+            tool: "place_product_photo",
+            input: { product_id: "pr1", clear: true },
+        });
+    });
+
+    it("puts the earlier photo back, whole, from what the draft kept", () => {
+        const image = {
+            src: "https://m.test/old.png",
+            alt: "Old",
+            width: 800,
+            focus: { x: 0.5, y: 0.5 },
+        };
+        const had = state(
+            { photo: image.src, alt: "Old" },
+            { restore: { image } },
+        );
+        const placed = state({ photo: "https://m.test/new.png" });
+        expect(spec.undo?.("section:s1:p1:k1", had, placed)).toEqual({
+            tool: "place_image",
+            input: {
+                target: "section",
+                site_id: "s1",
+                page_id: "p1",
+                section_key: "k1",
+                restore: image,
+            },
+        });
+        expect(
+            spec.undo?.(
+                "post:s1:po1",
+                state(
+                    { photo: "https://m.test/c.png" },
+                    { restore: { image: { src: "https://m.test/c.png" } } },
+                ),
+                placed,
+            ),
+        ).toMatchObject({
+            input: { restore: { src: "https://m.test/c.png" } },
+        });
+    });
+
+    it("a product's Undo takes the first off, which brings the earlier photo back", () => {
+        const had = state({ photo: "https://m.test/old.png" });
+        expect(
+            product.undo?.(
+                "product:pr1",
+                had,
+                state({ photo: "https://m.test/new.png" }),
+            ),
+        ).toEqual({
+            tool: "place_product_photo",
+            input: { product_id: "pr1", clear: true },
+        });
+    });
+
+    it("says, for a role that can't change it, what isn't theirs", () => {
+        expect(spec.notYoursWords).toBe(
+            "Changing the website isn't part of your role.",
+        );
+        expect(product.notYoursWords).toBe(
+            "Changing products isn't part of your role.",
+        );
+    });
+
+    it("shows the old photo and the new one as old → new on the card", () => {
+        const fields = fieldsOf(
+            state({ photo: null, alt: null }),
+            state({ photo: "https://m.test/new.png", alt: "Aisle" }),
+        );
+        expect(fields).toEqual([
+            {
+                field: "photo",
+                label: "Photo",
+                old: null,
+                new: "https://m.test/new.png",
+            },
+            { field: "alt", label: "Alt text", old: null, new: "Aisle" },
+        ]);
+    });
+});
+
+describe("no role to apply an image (board AIImgStates 7)", () => {
+    function service(allowed: boolean) {
+        const registry = { allows: jest.fn(() => allowed) };
+        const access = { ownerName: jest.fn().mockResolvedValue("Demo Owner") };
+        const drafts = new DraftsService(
+            registry as never,
+            {} as never,
+            access as never,
+            {} as never,
+            {} as never,
+            {} as never,
+        );
+        return { drafts, registry };
+    }
+    const asker = {
+        ctx: { organizationId: "org_1", userId: "u1", role: "MEMBER" },
+    } as never;
+    const turn = { conversationId: "c1", turnId: "t1" };
+
+    it.each([
+        ["place_image", "Changing the website isn't part of your role."],
+        ["place_product_photo", "Changing products isn't part of your role."],
+    ])("%s: no card, one message naming who can", async (name, words) => {
+        const { drafts } = service(false);
+        const run = await drafts.draft(
+            asker,
+            { name } as never,
+            { target: "post_cover" },
+            turn,
+        );
+        expect(run.card).toBeUndefined();
+        expect(run.output).toContain(
+            `"${words} Ask Demo Owner to put it on. This didn't use a question."`,
+        );
+    });
+
+    it("the model can't set Undo's own restore field", async () => {
+        const { drafts } = service(false);
+        const run = await drafts.draft(
+            asker,
+            { name: "place_image" } as never,
+            { restore: { src: "https://evil.test/x.png" } },
+            turn,
+        );
+        expect(run.output).not.toContain("evil.test");
     });
 });

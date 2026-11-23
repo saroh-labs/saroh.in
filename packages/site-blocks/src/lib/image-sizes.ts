@@ -36,6 +36,8 @@ export const IMAGE_PURPOSES = [
     "site-image",
     "product-image",
     "business-logo",
+    // A team member's profile photo, drawn on Our team (23 Nov 2026).
+    "staff-photo",
 ] as const;
 
 export type ImagePurpose = (typeof IMAGE_PURPOSES)[number];

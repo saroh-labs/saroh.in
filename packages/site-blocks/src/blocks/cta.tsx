@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { RenderedCta, RenderedCtaSection } from "@saroh/block-contract";
+import { elementProps } from "../element-theme";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
 import { ctaBandWords } from "./cta-words";
@@ -86,6 +87,12 @@ export function ctaClasses(
                     ring,
                     "border-site-bg text-site-bg hover:bg-site-bg/15 border px-5 py-2.5 active:opacity-80",
                 );
+            case "soft":
+                return cn(
+                    base,
+                    ring,
+                    "bg-site-bg/15 text-site-bg hover:bg-site-bg/25 px-5 py-2.5 active:opacity-80",
+                );
             case "link":
                 return cn(
                     base,
@@ -109,6 +116,12 @@ export function ctaClasses(
                     base,
                     ring,
                     "border-site-cta-fg text-site-cta-fg hover:bg-site-cta-fg/15 border px-5 py-2.5 active:opacity-80",
+                );
+            case "soft":
+                return cn(
+                    base,
+                    ring,
+                    "bg-site-cta-fg/15 text-site-cta-fg hover:bg-site-cta-fg/25 px-5 py-2.5 active:opacity-80",
                 );
             case "link":
                 return cn(
@@ -134,6 +147,12 @@ export function ctaClasses(
                     ring,
                     "border-site-hero-fg text-site-hero-fg hover:bg-site-hero-fg/10 border px-5 py-2.5 active:opacity-80",
                 );
+            case "soft":
+                return cn(
+                    base,
+                    ring,
+                    "bg-site-accent/15 text-site-hero-fg hover:bg-site-accent/25 px-5 py-2.5 active:opacity-80",
+                );
             case "link":
                 return cn(
                     base,
@@ -156,6 +175,12 @@ export function ctaClasses(
                 base,
                 ring,
                 "border-site-border text-site-fg hover:bg-site-border/40 active:bg-site-border/70 border px-5 py-2.5",
+            );
+        case "soft":
+            return cn(
+                base,
+                ring,
+                "bg-site-accent/15 text-site-fg hover:bg-site-accent/25 px-5 py-2.5 active:opacity-80",
             );
         case "link":
             return cn(
@@ -199,7 +224,10 @@ export function CtaButton({
     primary?: boolean;
 }) {
     const className = ctaClasses(content.style, surface);
-    const mark = primary ? { "data-site-primary": "" } : {};
+    const mark = {
+        ...(primary ? { "data-site-primary": "" } : {}),
+        ...elementProps("button", content),
+    };
     if (content.href.trim() === "") {
         // A v2 button whose page was hidden or removed after it was set. The
         // flag engine told the merchant before publish; here the label draws
@@ -207,7 +235,12 @@ export function CtaButton({
         // says it is unavailable and looks it, rather than a button that
         // seems to work and does nothing under the finger.
         return (
-            <span role="link" aria-disabled="true" className={className}>
+            <span
+                role="link"
+                aria-disabled="true"
+                className={className}
+                {...elementProps("button", content)}
+            >
                 <PhoneText text={content.label} phone={content.phoneLabel} />
             </span>
         );
@@ -287,8 +320,7 @@ export default function CtaSection({
                         // main action (U6); a quieter style is not.
                         primary={
                             look !== undefined &&
-                            content.style !== "secondary" &&
-                            content.style !== "link"
+                            (content.style ?? "primary") === "primary"
                         }
                     />
                 </div>

@@ -336,6 +336,10 @@ const NEVER: Record<string, string> = {
     // when its module is off.
     "share-posts/public-share.controller.ts":
         "a published site's share picture — each kind's own read checks its module",
+    // W2: a post's Offer card on a published site. The site's own page, not
+    // a share picture, so it shows on every site; an ended offer is a 404.
+    "share-posts/public-site-offer.controller.ts":
+        "a published site's Offer card in a post — an ended or another business's offer is a 404",
     // U23: "Tell me when it's back" and its stop page on a published site.
     "stock/stock-watch.controller.ts":
         "a published site's back-in-stock sign-up and stop page — Commerce checked by the service",

@@ -150,6 +150,10 @@ export function useEditorSheets(
             selection.selectChrome(part);
             showInspector();
         },
+        selectElement(index, element) {
+            selection.selectElement(index, element);
+            showInspector();
+        },
         setInspector(next) {
             selection.setInspector(next);
             showInspector();

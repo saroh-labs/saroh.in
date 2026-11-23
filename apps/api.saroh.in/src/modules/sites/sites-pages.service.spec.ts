@@ -12,6 +12,8 @@ jest.mock("@saroh/database", () => {
             create: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
+            // Pages the site already has: one by default, so a new page isn't home.
+            count: jest.fn().mockResolvedValue(1),
         },
         // Old page links that forward (KTD-3).
         siteRedirect: {
@@ -19,6 +21,8 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
             create: jest.fn(),
         },
+        // Where Our team is (ER3Team T4).
+        section: { findFirst: jest.fn() },
         // Who deleted a page (change units, U7).
         $executeRaw: jest.fn().mockResolvedValue(1),
         // A page write and its forwards run in one transaction.
@@ -31,6 +35,7 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import { roleDenial } from "../organizations/organization-policy";
 import { SitesService } from "./sites.service";
 
@@ -82,7 +87,70 @@ async function refusal(promise: Promise<unknown>) {
     };
 }
 
+describe("SitesService.createPage with a page type (A7, DEC-248)", () => {
+    const original = env.WEBSITE_AREA;
+    afterEach(() => {
+        env.WEBSITE_AREA = original;
+    });
+
+    it("is refused with the Website area off, writing nothing", async () => {
+        env.WEBSITE_AREA = "off";
+        await expect(
+            service.createPage(ctx(), "site_1", {
+                title: "Our team",
+                path: "/team",
+                starter: "TEAM",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(pageCreate).not.toHaveBeenCalled();
+    });
+
+    it("makes the page with its draft sections with the area on", async () => {
+        env.WEBSITE_AREA = "on";
+        pageFindFirst.mockResolvedValue(null);
+        (prisma as unknown as Record<string, unknown>).staffMember = {
+            findMany: jest.fn().mockResolvedValue([]),
+        };
+        pageCreate.mockResolvedValue({ id: "page_3", path: "/team" });
+        await service.createPage(ctx(), "site_1", {
+            title: "Our team",
+            path: "/team",
+            starter: "TEAM",
+        });
+        const data = pageCreate.mock.calls[0][0].data as {
+            versions: {
+                create: {
+                    status: string;
+                    sections: { create: { type: string }[] };
+                };
+            };
+        };
+        expect(data.versions.create.status).toBe("DRAFT");
+        expect(data.versions.create.sections.create.map((s) => s.type)).toEqual(
+            ["hero"],
+        );
+    });
+});
+
 describe("SitesService.createPage", () => {
+    it("makes a site's first page its home (owner, 22 Nov 2026)", async () => {
+        pageFindFirst.mockResolvedValue(null);
+        (prisma.page.count as jest.Mock).mockResolvedValueOnce(0);
+        pageCreate.mockResolvedValue({
+            id: "p1",
+            path: "/welcome",
+            isHome: true,
+        });
+        await service.createPage(ctx(), "site_1", {
+            title: "Welcome",
+            path: "/welcome",
+        });
+        const data = pageCreate.mock.calls.at(-1)?.[0].data as {
+            isHome: boolean;
+        };
+        expect(data.isHome).toBe(true);
+    });
+
     it("creates a non-home page scoped to the org when the path is free", async () => {
         pageFindFirst.mockResolvedValue(null); // no clash
         pageCreate.mockResolvedValue({
@@ -911,5 +979,33 @@ describe("SitesService.buildSnapshot: old links and a page's own head", () => {
             shareImageUrl: "https://cdn.example.com/bridal.jpg",
             noindex: true,
         });
+    });
+});
+
+describe("teamPage (ER3Team T4)", () => {
+    const sectionFindFirst = prisma.section.findFirst as jest.Mock;
+
+    it("names the draft page holding the team look, in this business", async () => {
+        sectionFindFirst.mockResolvedValue({
+            pageVersion: { page: { id: "page_team", siteId: "site_1" } },
+        });
+        await expect(service.teamPage(ctx())).resolves.toEqual({
+            siteId: "site_1",
+            pageId: "page_team",
+        });
+        expect(sectionFindFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    type: "person",
+                    content: { path: ["variant"], equals: "team" },
+                }),
+            }),
+        );
+    });
+
+    it("is null with no Our team section", async () => {
+        sectionFindFirst.mockResolvedValue(null);
+        await expect(service.teamPage(ctx())).resolves.toBeNull();
     });
 });
