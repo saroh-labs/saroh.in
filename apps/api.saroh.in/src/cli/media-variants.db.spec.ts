@@ -37,7 +37,18 @@ async function seed(
 ) {
     const ext = contentType.split("/")[1]!.replace("+xml", "");
     const key = `org/${orgId}/${purpose}/${name}.${ext}`;
-    if (bytes) storage.putBytes(key, bytes);
+    if (bytes) {
+        // The memory store takes bytes only for a key it minted an upload for.
+        await storage.createSignedUploadUrl({
+            organizationId: orgId,
+            contentType,
+            contentLength: bytes.length,
+            filename: `${name}.${ext}`,
+            purpose,
+            key,
+        });
+        storage.putBytes(key, bytes);
+    }
     const row = await prisma.media.create({
         data: {
             organizationId: orgId,
