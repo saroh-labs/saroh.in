@@ -175,6 +175,9 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
                 // (see signableHeaders below).
                 ContentType: parsed.contentType,
                 ContentLength: parsed.contentLength,
+                // One-use URL (F3): R2 refuses a PUT to a key that exists
+                // (412), so a confirmed file can't be replaced by reusing it.
+                IfNoneMatch: "*",
             });
 
             // The SDK leaves Content-Type out of a presigned PUT's signature
@@ -184,7 +187,7 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
             // other type (and none at all). Content-Length is signed already.
             const url = await presign(client, command, {
                 expiresIn: uploadExpiry,
-                signableHeaders: new Set(["content-type"]),
+                signableHeaders: new Set(["content-type", "if-none-match"]),
             });
 
             return {
@@ -194,6 +197,7 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
                 headers: {
                     "Content-Type": parsed.contentType,
                     "Content-Length": String(parsed.contentLength),
+                    "If-None-Match": "*",
                 },
                 expiresAt: new Date(
                     Date.now() + uploadExpiry * 1000,

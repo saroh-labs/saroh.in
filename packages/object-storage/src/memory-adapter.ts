@@ -52,7 +52,8 @@ export interface MemoryStorage extends ObjectStorage {
     reset(): void;
     /**
      * Stand in for the client's PUT: record the bytes of a minted key, so
-     * {@link ObjectStorage.readObjectStart} can read them back.
+     * {@link ObjectStorage.readObjectStart} can read them back. A second
+     * PUT to the same key throws with `status: 412`, as R2 answers it.
      */
     putBytes(key: string, bytes: Uint8Array): void;
 }
@@ -122,6 +123,7 @@ export function createMemoryStorage(
                 headers: {
                     "Content-Type": parsed.contentType,
                     "Content-Length": String(parsed.contentLength),
+                    "If-None-Match": "*",
                 },
                 expiresAt: new Date(
                     Date.now() + uploadExpiry * 1000,
@@ -207,6 +209,13 @@ export function createMemoryStorage(
         putBytes(key: string, bytes: Uint8Array): void {
             if (!store.has(key)) {
                 throw new Error(`No upload was minted for ${key}`);
+            }
+            // Like R2's signed `If-None-Match: *`: a key is written once (F3).
+            if (bytesByKey.has(key)) {
+                throw Object.assign(
+                    new Error(`412 Precondition Failed: ${key} exists`),
+                    { status: 412 },
+                );
             }
             bytesByKey.set(key, bytes);
         },

@@ -554,8 +554,12 @@ function readDimensions(
     });
 }
 
-/** PUT to the presigned URL, reporting progress as it goes. */
-function putWithProgress(
+/**
+ * PUT to the presigned URL, reporting progress as it goes. Every header the
+ * ticket signed goes with it, `If-None-Match: *` too: the URL writes once,
+ * and a second PUT is a 412 shown as a failed upload (F3).
+ */
+export function putWithProgress(
     url: string,
     headers: Record<string, string>,
     file: Blob,

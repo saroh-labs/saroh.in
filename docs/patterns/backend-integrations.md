@@ -888,9 +888,19 @@ health page says so; a deployed API must not run that way.
 - **A presigned upload fixes its type and size.** The adapter signs
   `content-type` and `content-length`, so R2 refuses any other. When a test
   fakes the presigner, keep one that signs for real and reads the URL.
-- **CORS allows only the uploader's origin**, PUT, `Content-Type`. Images are
-  shown with plain `<img>` and fetched server-side by Next, so no GET rule.
-  An app that starts uploading gets its origin added then.
+- **A presigned upload writes once (F3).** It also signs `if-none-match`
+  (`IfNoneMatch: "*"`), which R2 checks atomically: a PUT to a key that
+  exists gets 412, so a confirmed file (or any `@<width>.webp` copy) can't
+  be replaced by reusing its URL. The client sends the ticket's `headers`
+  verbatim; a 412 shows as a failed upload. The in-memory adapter's
+  `putBytes` throws `status: 412` the same way. `storeUploadBytes` (MCP
+  `upload_image`) writes only a row still `PENDING`.
+- **CORS allows only the uploader's origin**, PUT, `Content-Type` and
+  `If-None-Match` (browsers preflight both): `saroh-media` from
+  `https://app.saroh.in`, `saroh-media-dev` from `https://app.saroh.io`,
+  `saroh-global-media` from `https://app.saroh.tech`. Images are shown with
+  plain `<img>` and fetched server-side by Next, so no GET rule. An app that
+  starts uploading gets its origin added then.
 - `r2.dev` access stays off; the custom domain is the only public way in.
 - **Same parent domain, for now (5 Oct 2026).** Media is served from
   `media.saroh.in` rather than a separate domain (the way Google uses

@@ -935,3 +935,45 @@ describe("MediaService — two buckets, never mixed", () => {
         },
     );
 });
+
+describe("MediaService.storeUploadBytes — only a pending upload (F4)", () => {
+    beforeEach(() => jest.clearAllMocks());
+    const row = (status: string) => ({
+        id: "media_1",
+        organizationId: "org_1",
+        key: SIGNED.key,
+        bucket: "MAIN",
+        contentType: "image/png",
+        sizeBytes: 3,
+        status,
+    });
+
+    it("puts the bytes of a PENDING row", async () => {
+        const putObject = jest.fn().mockResolvedValue(undefined);
+        const service = new MediaService(
+            mediaStorages(fakeStorage({ putObject }), null),
+        );
+        findUnique.mockResolvedValue(row("PENDING"));
+        await service.storeUploadBytes(ctx(), "media_1", new Uint8Array(3));
+        expect(putObject).toHaveBeenCalledWith(
+            SIGNED.key,
+            expect.any(Uint8Array),
+            { contentType: "image/png", contentLength: 3 },
+        );
+    });
+
+    it.each(["READY", "FAILED"])(
+        "refuses a %s row and writes nothing",
+        async (status) => {
+            const putObject = jest.fn();
+            const service = new MediaService(
+                mediaStorages(fakeStorage({ putObject }), null),
+            );
+            findUnique.mockResolvedValue(row(status));
+            await expect(
+                service.storeUploadBytes(ctx(), "media_1", new Uint8Array(3)),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(putObject).not.toHaveBeenCalled();
+        },
+    );
+});

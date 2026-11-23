@@ -675,7 +675,8 @@ export class MediaService {
     /**
      * Put an upload's bytes from the server, for an image the API fetched
      * itself (MCP `upload_image`): into the bucket its row was signed for.
-     * Then {@link completeUpload} checks them as any other.
+     * Then {@link completeUpload} checks them as any other. Refuses a row
+     * that is no longer PENDING.
      */
     async storeUploadBytes(
         ctx: OrganizationContext,
@@ -684,6 +685,11 @@ export class MediaService {
     ): Promise<void> {
         authorize(ctx, "media:write");
         const media = await this.requireOwned(ctx, mediaId);
+        // Only an upload still waiting for its bytes: a confirmed file is
+        // never replaced after its checks (F4).
+        if (media.status !== "PENDING") {
+            throw new ConflictException("This upload is already finished.");
+        }
         await this.storages.of(media.bucket).putObject(media.key, body, {
             contentType: media.contentType,
             contentLength: media.sizeBytes,
