@@ -71,6 +71,17 @@ test.describe("Round 3 pickers at 1440", () => {
             !(await openEditor(page)),
             "The Website area is off: today's chrome",
         );
+        // The picker lists the team, which the staff read serves only while
+        // Bookings is on and someone is active (staff routes need
+        // APPOINTMENTS). Said, not hidden, when this run has nobody to pick.
+        const team = await northwind(page.request)
+            .get<{ staff: { status: string }[] }>("/staff")
+            .then((r) => r.staff.filter((p) => p.status === "ACTIVE").length)
+            .catch(() => 0);
+        test.skip(
+            team === 0,
+            "Northwind has nobody to pick in this run (no active staff, or Bookings off)",
+        );
         await page
             .locator("[data-editor-trail]")
             .getByRole("button", { name: /^Add/ })
