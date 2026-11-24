@@ -52,8 +52,12 @@ const AUTH_ROOT_BAN_PATHS = ["@saroh/auth", "@saroh/auth/server"];
 const TOAST_BAN_MESSAGE =
     "Import { showSuccess, showError, showWarning, showInfo } from '@saroh/ui/toast' instead of sonner's `toast`. One seam keeps theming, error-tracker routing and a future library swap to a single file — see packages/ui/src/components/ui/toast.tsx.";
 
-/** Shared option object for both the TypeScript and JSX rule blocks. */
-const restrictedImportOptions = {
+/**
+ * Shared option object for both the TypeScript and JSX rule blocks. Exported
+ * so an app that adds its own bans extends it: a second block setting the
+ * same rule replaces this one for its files.
+ */
+export const restrictedImportOptions = {
     paths: [
         ...AUTH_ROOT_BAN_PATHS.map((name) => ({
             name,

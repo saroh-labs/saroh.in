@@ -1001,6 +1001,9 @@ bg_step choices pnpm run check:choices
 bg_step history-state pnpm run check:history-state
 bg_step e2e-signed-in-request pnpm run check:e2e-signed-in-request
 bg_step client-calls pnpm run check:client-calls
+bg_step query-keys pnpm run check:query-keys
+bg_step rq-routes pnpm run check:rq-routes
+bg_step rq-refresh pnpm run check:rq-refresh
 bg_step db-teardown pnpm run check:db-teardown
 bg_step icon-button-tips pnpm run check:icon-button-tips
 bg_step tag-strip pnpm run check:tag-strip
