@@ -2,9 +2,12 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import {
+    runOne,
+    useQuickEdits,
+} from "@/components/commerce/quick-edits/quick-edits";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { patchProduct } from "@/lib/products/actions";
@@ -27,32 +30,27 @@ export function ArchivedBanner({
     archivedAt: string | null;
     canWrite: boolean;
 }) {
-    const router = useRouter();
+    const quick = useQuickEdits();
     const [pending, start] = useTransition();
+    // Shown at once, the page read again after (DEC-259); refused, put back.
+    const send = (status: "DRAFT" | "ARCHIVED") =>
+        runOne(quick, productId, { status }, (org) =>
+            patchProduct(storeId, productId, { status }, org),
+        );
 
     function restore() {
         start(async () => {
-            const res = await runAction(() =>
-                patchProduct(storeId, productId, {
-                    status: "DRAFT",
-                }),
-            );
+            const res = await runAction(() => send("DRAFT"));
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
-            router.refresh();
             showUndo("Back to a draft. Publish it when it is ready.", () =>
                 start(async () => {
-                    const undo = await runAction(() =>
-                        patchProduct(storeId, productId, {
-                            status: "ARCHIVED",
-                        }),
-                    );
+                    const undo = await runAction(() => send("ARCHIVED"));
                     if (!undo) return;
                     if (!undo.ok) showError(undo.error);
-                    router.refresh();
                 }),
             );
         });

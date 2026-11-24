@@ -45,6 +45,16 @@ describe("apiRead", () => {
         });
     });
 
+    it("fills a [segment] of the path from its param, and sends it nowhere else", async () => {
+        fetchMock.mockResolvedValue(json(200, {}));
+        await apiRead(
+            "/api/probe/[id]",
+            { id: "a/b c", q: "tea" },
+            { orgId: "org_a" },
+        );
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/probe/a%2Fb%20c?q=tea");
+    });
+
     it("a redirect (the sign-in gate) or a 401 is signed out", async () => {
         const redirect = Object.defineProperty(
             new Response(null, { status: 200 }),

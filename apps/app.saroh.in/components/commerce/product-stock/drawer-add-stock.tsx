@@ -4,9 +4,12 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import {
+    runOne,
+    useQuickEdits,
+} from "@/components/commerce/quick-edits/quick-edits";
 import { runAction } from "@/lib/api/run-action";
 import { addQuickStock } from "@/lib/products/list-actions";
 import { readAdd } from "@/lib/products/quick-look";
@@ -33,7 +36,7 @@ export function DrawerAddStock({
     /** Named when the product sells at more than one storefront. */
     storeName: string | null;
 }) {
-    const router = useRouter();
+    const quick = useQuickEdits();
     const id = useId();
     const [draft, setDraft] = useState("");
     const [problem, setProblem] = useState<string | null>(null);
@@ -48,15 +51,26 @@ export function DrawerAddStock({
             return;
         }
         setProblem(null);
+        // Shown at once and read again after by the page's quick edits
+        // (DEC-259); refused, put back.
         const res = await runAction(
             () =>
-                addQuickStock({
-                    storeId,
+                runOne(
+                    quick,
                     productId,
-                    variantId,
-                    units,
-                    idempotencyKey: key,
-                }),
+                    { stockAdd: { storeId, units } },
+                    (org) =>
+                        addQuickStock(
+                            {
+                                storeId,
+                                productId,
+                                variantId,
+                                units,
+                                idempotencyKey: key,
+                            },
+                            org,
+                        ),
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -68,7 +82,6 @@ export function DrawerAddStock({
         setKey(crypto.randomUUID());
         const what = storeName ? `${title} at ${storeName}` : title;
         showSuccess(addedWords(units, what, res.data.shelf.canSell));
-        router.refresh();
     }
 
     return (

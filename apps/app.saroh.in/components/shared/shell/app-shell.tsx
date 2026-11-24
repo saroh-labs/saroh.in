@@ -49,7 +49,7 @@ import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
-import { getStockTracking } from "@/lib/stock/service";
+import { stockTrackingOnce } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
 import { usageSharingOrNull } from "@/lib/usage-sharing/service";
 import { Button } from "@saroh/ui/button";
@@ -188,7 +188,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
          * (or a role that can't read stock, which the row's own action
          * already withholds): the nav fails open.
          */
-        getStockTracking().catch(() => null),
+        stockTrackingOnce(),
         /*
          * What the plan locks (U14), for the rail's locks. An aid: null
          * when it can't be read or the role may not (the page and the

@@ -1,4 +1,5 @@
 import { unstable_rethrow } from "next/navigation";
+import { cache } from "react";
 
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
@@ -354,6 +355,14 @@ export async function getStockTracking(): Promise<{
         `${base}/stock/tracking`,
     );
 }
+
+/**
+ * The switch, once per render: the shell and a page both ask (null when it
+ * can't be read).
+ */
+export const stockTrackingOnce = cache(() =>
+    getStockTracking().catch(() => null),
+);
 
 /**
  * Turn Track stock on or off for every product. Owner/Admin only

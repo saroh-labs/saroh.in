@@ -20,12 +20,22 @@ export async function apiRead<T>(
     params: object,
     { orgId, signal }: { orgId: string; signal?: AbortSignal },
 ): Promise<T> {
+    const rest: Record<string, Param> = {
+        ...(params as Record<string, Param>),
+    };
+    // A `[name]` segment (`/api/products/[productId]`) is filled from its
+    // param, which then isn't sent again in the query.
+    const url = path.replace(/\[(\w+)\]/g, (_, name: string) => {
+        const v = rest[name];
+        delete rest[name];
+        return encodeURIComponent(String(v ?? ""));
+    });
     const search = new URLSearchParams();
-    for (const [k, v] of Object.entries(params) as [string, Param][]) {
+    for (const [k, v] of Object.entries(rest)) {
         if (v !== undefined && v !== null) search.set(k, String(v));
     }
     const qs = search.toString();
-    const res = await fetch(qs ? `${path}?${qs}` : path, {
+    const res = await fetch(qs ? `${url}?${qs}` : url, {
         method: "GET",
         headers: { [ORG_HEADER]: orgId },
         credentials: "same-origin",

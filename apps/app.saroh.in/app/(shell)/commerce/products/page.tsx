@@ -1,5 +1,6 @@
 import { rememberedPageSize } from "@/lib/paging/remembered";
 import { PartialRead } from "@saroh/ui/failed-read";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 
 import { PausedNote } from "@/components/billing/paused-banner";
@@ -7,7 +8,7 @@ import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { CollectionsPanel } from "@/components/commerce/collections/collections-panel";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { CatalogueScreen } from "@/components/stores/catalogue/catalogue-screen";
+import { CatalogueContainer } from "@/components/stores/catalogue/catalogue-container";
 import type { ProductsTab } from "@/components/stores/catalogue/products-tabs";
 import { ProductsTabs } from "@/components/stores/catalogue/products-tabs";
 import { ReviewsView } from "@/components/stores/reviews/reviews-view";
@@ -27,6 +28,7 @@ import {
     canReadOrders,
     canStockProducts,
     canWriteProducts,
+    productsListServer,
 } from "@/lib/products/access";
 import { choicesFrom } from "@/lib/products/filter-choices";
 import {
@@ -34,12 +36,15 @@ import {
     listHref,
     readListQuery,
 } from "@/lib/products/list-query";
+import { productsListRead } from "@/lib/products/queries";
 import type { CataloguePage } from "@/lib/products/service";
 import { listCataloguePage, listCategories } from "@/lib/products/service";
 import { listOptionNames } from "@/lib/products/settings";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
-import { getStockTracking } from "@/lib/stock/service";
+import { stockTrackingOnce } from "@/lib/stock/service";
 import { readSiteSelling } from "@/lib/stores/location-selling";
 import { listBusinessStores } from "@/lib/stores/service";
 import { listStorefronts } from "@/lib/stores/storefronts";
@@ -55,6 +60,10 @@ import { isSince, sinceParam } from "@/lib/views/since";
  * address the page is as long as this browser last chose. The catalogue read failing fails the page (its
  * error boundary) — never an empty catalogue. Reviews failing leaves the
  * list and says their count is unknown.
+ *
+ * On React Query (DEC-259): the gates and side reads are decided here, the
+ * list's page is prefetched (`/api/products`, `lib/products/access.ts`) and
+ * hydrated, and `CatalogueContainer` reads every later one in place.
  */
 export const metadata = { title: "Products" };
 
@@ -74,8 +83,7 @@ export default async function CataloguePage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [ownStores, storefronts, params, organization] = await Promise.all([
-        listBusinessStores(),
+    const [storefronts, params, organization] = await Promise.all([
         listStorefronts().catch(() => null),
         searchParams,
         resolveActiveOrganization(),
@@ -83,11 +91,13 @@ export default async function CataloguePage({
     // The business's locations, as anyone who may read them sees them
     // (UX-027). The catalogue is the business's, read org-scoped; the
     // stores a person is on (`GET /stores`) left staff who aren't on one
-    // with "No location yet" while Stock showed its products.
-    const stores =
+    // with "No location yet" while Stock showed its products. Those are
+    // asked for only when the business's own can't be read.
+    const stores = (
         storefronts && storefronts.length > 0
-            ? storefronts.map(({ id, name }) => ({ id, name }))
-            : ownStores.map(({ id, name }) => ({ id, name }));
+            ? storefronts
+            : await listBusinessStores()
+    ).map(({ id, name }) => ({ id, name }));
     // From what the API resolved this person may do; the role's name only as
     // the fallback for a response that predates permissions.
     const may = (action: string) =>
@@ -100,12 +110,15 @@ export default async function CataloguePage({
     const canWriteReviews = may("product-review:write") && may("order:read");
     const onReviews = params.tab === "reviews" && canReadReviews;
 
-    const query = readListQuery(params, await rememberedPageSize("catalogue"));
+    const remembered = await rememberedPageSize("catalogue");
+    const query = readListQuery(params, remembered);
     // A storefront that isn't this business's (or closed) is no filter.
     if (query.storefront && !stores.some((s) => s.id === query.storefront)) {
         query.storefront = null;
     }
 
+    const client = getServerQueryClient();
+    const filter = catalogueFilter(query);
     const [
         page,
         reviews,
@@ -116,14 +129,29 @@ export default async function CataloguePage({
         paused,
         selling,
     ] = await Promise.all([
-        stores.length > 0
-            ? listCataloguePage(
-                  // The Reviews view still counts the chips: one row will do.
-                  onReviews ? { limit: 1 } : catalogueFilter(query),
-              ).then((p) => p ?? NO_PAGE)
-            : NO_PAGE,
+        stores.length === 0
+            ? NO_PAGE
+            : onReviews
+              ? // The Reviews view still counts the chips: one row will do.
+                listCataloguePage({ limit: 1 }).then((p) => p ?? NO_PAGE)
+              : // The list's page, handed to the browser's query. A read
+                // that fails is the container's to say (the error boundary).
+                organization
+                ? prefetchRead(
+                      client,
+                      productsListServer,
+                      organization.id,
+                      filter,
+                  ).then(
+                      () =>
+                          client.getQueryData(
+                              productsListRead.options(organization.id, filter)
+                                  .queryKey,
+                          ) ?? null,
+                  )
+                : null,
         canReadReviews ? listReviews().catch(() => null) : Promise.resolve([]),
-        getStockTracking().catch(() => null),
+        stockTrackingOnce(),
         // The Filter's choices and the Collections chip's cards (#524).
         // Either failing leaves its part out, said, never the list.
         listCategories().catch(() => null),
@@ -140,7 +168,7 @@ export default async function CataloguePage({
     // A page past the end (the list has since got shorter, or the address
     // was typed): start again at the first page rather than show an empty
     // one.
-    if (!onReviews && query.page > 1 && page.items.length === 0) {
+    if (!onReviews && query.page > 1 && page?.items.length === 0) {
         redirect(listHref(query, { page: 1 }));
     }
     // Named only while the list is narrowed to one (Settings › Options' count).
@@ -154,13 +182,15 @@ export default async function CataloguePage({
         : query.view === "collections" || query.view === "inventory"
           ? query.view
           : "all";
+    // Reviews' own tabs; the list's are drawn from its query.
+    const counts = (page ?? NO_PAGE).counts;
     const tabs = (
         <ProductsTabs
             active={active}
             counts={{
-                all: page.counts.all,
-                collections: page.counts.collections,
-                inventory: page.counts.inventory,
+                all: counts.all,
+                collections: counts.collections,
+                inventory: counts.inventory,
                 reviews: reviews ? reviews.length : null,
             }}
             hrefs={{
@@ -239,71 +269,77 @@ export default async function CataloguePage({
 
     return (
         <PageContainer width="full">
-            <CatalogueScreen
-                query={query}
-                page={page}
-                stores={stores}
-                tabs={tabs}
-                notice={
-                    <>
-                        {notice}
-                        {pausedCut ? (
-                            <PausedNote className="mb-3">
-                                {pausedListWords(
-                                    "product",
-                                    paused?.products.count ?? 0,
-                                )}
-                            </PausedNote>
-                        ) : null}
-                        {/* With products paused (#800) the note above says
+            <HydrationBoundary state={dehydrate(client)}>
+                <CatalogueContainer
+                    defaultSize={remembered}
+                    reviewsCount={reviews ? reviews.length : null}
+                    showInventory={tracking?.tracked !== false}
+                    showReviews={canReadReviews}
+                    stores={stores}
+                    notice={
+                        <>
+                            {notice}
+                            {pausedCut ? (
+                                <PausedNote className="mb-3">
+                                    {pausedListWords(
+                                        "product",
+                                        paused?.products.count ?? 0,
+                                    )}
+                                </PausedNote>
+                            ) : null}
+                            {/* With products paused (#800) the note above says
                             the limit and links to Plan and billing: the
                             "reached your limit" card would say it again. */}
-                        {pausedCut ? null : (
-                            <PlanLimitNotice moduleId="products" />
-                        )}
-                    </>
-                }
-                ratings={ratings}
-                choices={choices}
-                canWrite={canWrite}
-                meter={canWrite ? planMeter(access, "products") : null}
-                // The banner below the tabs says the limit from 80%, or the
-                // paused note does (#800); the header then doesn't say it
-                // again (#874). New product stays off at the limit.
-                limitBannerShown={
-                    rowNotice(access, "products").on || pausedCut !== null
-                }
-                pausedCut={pausedCut}
-                sellsOnline={
-                    selling.known
-                        ? Boolean(
-                              selling.site?.sellsFrom && selling.site.origin,
-                          )
-                        : null
-                }
-                canStock={canStockProducts(organization)}
-                canOrders={canReadOrders(organization)}
-                collectionCount={collections ? collections.length : null}
-                collectionsPanel={
-                    active === "collections" ? (
-                        <CollectionsPanel
-                            collections={collections}
-                            categories={categories ?? []}
-                            canWrite={canWrite}
-                            activeId={query.collection}
-                            hrefs={Object.fromEntries(
-                                (collections ?? []).map((c) => [
-                                    c.id,
-                                    listHref(query, { collection: c.id }),
-                                ]),
+                            {pausedCut ? null : (
+                                <PlanLimitNotice moduleId="products" />
                             )}
-                            clearHref={listHref(query, { collection: null })}
-                            openNew={params.new === "collection"}
-                            closeNewHref={listHref(query)}
-                        />
-                    ) : null
-                }
-            />
+                        </>
+                    }
+                    ratings={ratings}
+                    choices={choices}
+                    canWrite={canWrite}
+                    meter={canWrite ? planMeter(access, "products") : null}
+                    // The banner below the tabs says the limit from 80%, or the
+                    // paused note does (#800); the header then doesn't say it
+                    // again (#874). New product stays off at the limit.
+                    limitBannerShown={
+                        rowNotice(access, "products").on || pausedCut !== null
+                    }
+                    pausedCut={pausedCut}
+                    sellsOnline={
+                        selling.known
+                            ? Boolean(
+                                  selling.site?.sellsFrom &&
+                                  selling.site.origin,
+                              )
+                            : null
+                    }
+                    canStock={canStockProducts(organization)}
+                    canOrders={canReadOrders(organization)}
+                    collectionCount={collections ? collections.length : null}
+                    collectionsPanel={
+                        active === "collections" ? (
+                            <CollectionsPanel
+                                collections={collections}
+                                categories={categories ?? []}
+                                canWrite={canWrite}
+                                activeId={query.collection}
+                                hrefs={Object.fromEntries(
+                                    (collections ?? []).map((c) => [
+                                        c.id,
+                                        listHref(query, { collection: c.id }),
+                                    ]),
+                                )}
+                                clearHref={listHref(query, {
+                                    collection: null,
+                                })}
+                                openNew={params.new === "collection"}
+                                closeNewHref={listHref(query)}
+                            />
+                        ) : null
+                    }
+                />
+            </HydrationBoundary>
         </PageContainer>
     );
 }

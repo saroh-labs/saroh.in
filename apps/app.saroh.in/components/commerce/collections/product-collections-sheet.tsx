@@ -62,9 +62,11 @@ export function ProductCollectionsSheet({
             return;
         }
         onOpenChange(false);
+        // rq-refresh-ok: a product's Collections tab moves in U24.
         router.refresh();
         showUndo("Collections saved.", async () => {
             const undo = await saveProductCollections(productId, previous);
+            // rq-refresh-ok: a product's Collections tab moves in U24.
             router.refresh();
             return undo;
         });

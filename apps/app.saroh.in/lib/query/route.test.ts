@@ -218,6 +218,26 @@ describe("readRoute", () => {
         expect(service).not.toHaveBeenCalled();
     });
 
+    it("a dynamic segment is a param from the path; named again in the query, a 400", async () => {
+        const one = defineRead<Row[]>()({
+            key: (orgId, p) => domainKey("probe", orgId, "one", p),
+            route: { path: "/api/probe/[id]", params: { id: searchText } },
+        });
+        const seen = vi.fn((p: { id?: string }) =>
+            Promise.resolve(p.id === "r1" ? [] : null),
+        );
+        const ONE = readRoute({ read: one, service: seen });
+        const at = (id: string, params: Record<string, string> = {}) =>
+            ONE(readRequest(`/api/probe/${id}`, { orgId: "org_a", params }), {
+                params: Promise.resolve({ id }),
+            });
+        expect((await at("r1")).status).toBe(200);
+        expect(seen).toHaveBeenLastCalledWith({ id: "r1" });
+        expect((await at("r2")).status).toBe(404);
+        expect((await at("r1", { id: "r2" })).status).toBe(400);
+        expect(seen).toHaveBeenCalledTimes(2);
+    });
+
     it("refuses another site: Sec-Fetch-Site or a foreign Origin", async () => {
         for (const headers of [
             { "sec-fetch-site": "cross-site" } as Record<string, string>,

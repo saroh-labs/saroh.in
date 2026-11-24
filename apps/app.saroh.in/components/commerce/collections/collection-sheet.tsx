@@ -160,6 +160,7 @@ export function CollectionSheet({
         showSuccess(message);
         onOpenChange(false);
         onSaved?.();
+        // rq-refresh-ok: Collections are server-drawn until U24.
         router.refresh();
     }
 
@@ -189,6 +190,7 @@ export function CollectionSheet({
             if ("partly" in res && res.partly) {
                 // Its name, line or category saved; the list didn't.
                 showError("The rest saved, but not its products.", res.error);
+                // rq-refresh-ok: Collections are server-drawn until U24.
                 router.refresh();
             } else if (!field) {
                 showError("The collection wasn't saved.", res.error);

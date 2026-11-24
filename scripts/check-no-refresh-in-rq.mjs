@@ -43,7 +43,14 @@ export function matchRoute(glob, path) {
     const got = trim(path);
     return (
         want.length === got.length &&
-        want.every((part, i) => part === got[i] || /^\[[^/\]]+\]$/.test(part))
+        // A folder's route: `[id]` is a dynamic folder, never a static
+        // sibling (`/commerce/products/settings` isn't `[productId]`).
+        want.every(
+            (part, i) =>
+                part === got[i] ||
+                (/^\[[^/\]]+\]$/.test(part) &&
+                    /^\[[^/\]]+\]$/.test(got[i] ?? "")),
+        )
     );
 }
 

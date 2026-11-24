@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { useQuickEdits } from "@/components/commerce/quick-edits/quick-edits";
 import { productEditHref } from "@/lib/products/links";
 import { MRP_LABEL } from "@/lib/products/mrp-label";
 import type { ProductOverview } from "@/lib/products/overview-rules";
@@ -140,7 +141,7 @@ export function StockSheet({
     first?: readonly string[];
 }) {
     const { product } = overview;
-    const router = useRouter();
+    const quick = useQuickEdits();
     // The keyboard starts in the first on-hand box: a merchant who came to
     // type a count isn't renaming a variant (audit, 16 Oct 2026). The rows
     // mark their counts `data-autofocus`, which the frame focuses first.
@@ -205,16 +206,22 @@ export function StockSheet({
         }
         setSaving(true);
         try {
-            const { stopped, failed, done } = await saveStockSheet(
-                product,
-                storeId,
-                plan,
+            // Through the page's quick edits (DEC-259): a price shows at
+            // once, and the page reads itself again once something landed.
+            const price = plan.product?.price;
+            const [{ r }] = await quick.run(
+                [product.id],
+                price ? { price } : {},
+                async () => {
+                    const r = await saveStockSheet(product, storeId, plan);
+                    return [{ ok: r.stopped === null, r }];
+                },
             );
+            const { stopped, failed, done } = r;
             if (stopped !== null) {
                 showError("Nothing was saved.", stopped);
                 return;
             }
-            router.refresh();
             if (failed.length > 0) {
                 // Keep what landed, so trying again sends only the rest.
                 const next = foldSaved(was, draft, plan, done);

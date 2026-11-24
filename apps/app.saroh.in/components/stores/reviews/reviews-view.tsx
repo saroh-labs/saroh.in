@@ -251,6 +251,7 @@ function ReviewSheet({
             }
             showSuccess(review.reply ? "Reply saved." : "Reply posted.");
             onClose();
+            // rq-refresh-ok: Reviews on Products is server-drawn until U24.
             router.refresh();
         });
     };
@@ -266,6 +267,7 @@ function ReviewSheet({
                 return;
             }
             onClose();
+            // rq-refresh-ok: Reviews on Products is server-drawn until U24.
             router.refresh();
             if (next) {
                 showUndo(
@@ -276,6 +278,7 @@ function ReviewSheet({
                             { quiet: true },
                         );
                         if (!back) return { ok: false, error: UNREACHED };
+                        // rq-refresh-ok: Reviews on Products is server-drawn until U24.
                         router.refresh();
                         return back;
                     },
