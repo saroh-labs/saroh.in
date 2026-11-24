@@ -12,9 +12,33 @@ describe("broadcast", () => {
     it("another tab hears switch and signout", async () => {
         const heard: string[] = [];
         const stop = listen((kind) => heard.push(kind));
+        const other = new BroadcastChannel("saroh-query");
+        const sent: unknown[] = [];
+        other.onmessage = (e) => sent.push(e.data);
         announce("switch");
         announce("signout");
+        // What another tab receives carries a sender id; replay it as theirs.
+        await vi.waitFor(() => expect(sent).toHaveLength(2));
+        for (const m of sent) {
+            other.postMessage({ ...(m as object), from: "other-tab" });
+        }
         await vi.waitFor(() => expect(heard).toEqual(["switch", "signout"]));
+        other.close();
+        stop();
+    });
+
+    it("a tab never hears its own message", async () => {
+        const heard: string[] = [];
+        const stop = listen((kind) => heard.push(kind));
+        const other = new BroadcastChannel("saroh-query");
+        const sent: unknown[] = [];
+        other.onmessage = (e) => sent.push(e.data);
+        announce("switch");
+        // The message went out (another tab gets it), and this tab let it by.
+        await vi.waitFor(() => expect(sent).toHaveLength(1));
+        await new Promise((r) => setTimeout(r, 20));
+        expect(heard).toEqual([]);
+        other.close();
         stop();
     });
 
@@ -24,7 +48,7 @@ describe("broadcast", () => {
         const other = new BroadcastChannel("saroh-query");
         other.postMessage({ kind: "nonsense" });
         other.postMessage("switch");
-        announce("switch");
+        other.postMessage({ kind: "switch", from: "other-tab" });
         await vi.waitFor(() => expect(heard).toEqual(["switch"]));
         other.close();
         stop();

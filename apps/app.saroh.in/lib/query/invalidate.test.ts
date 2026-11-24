@@ -1,6 +1,7 @@
 /**
- * A switch or a sign-out drops the tab's cache and tells the other tabs;
- * a change to the business list marks it stale (DEC-259). The server never
+ * A switch keeps every business's cache and tells the other tabs; a
+ * sign-out drops it all; a business gone from the list is dropped; a change
+ * to the business list marks it stale (DEC-259). The server never
  * touches a browser cache.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +11,7 @@ import {
     afterSignOut,
     afterSwitch,
     clearAll,
+    dropLeftBusinesses,
     invalidateOrganizations,
 } from "@/lib/query/invalidate";
 import { domainKey, ORGANIZATIONS_KEY } from "@/lib/query/keys";
@@ -36,9 +38,9 @@ describe("clearing", () => {
         expect(announce).not.toHaveBeenCalled();
     });
 
-    it("a switch clears and tells the other tabs", () => {
+    it("a switch keeps every business's cache and tells the other tabs", () => {
         afterSwitch();
-        expect(held()).toBe(0);
+        expect(held()).toBe(2);
         expect(announce).toHaveBeenCalledWith("switch");
     });
 
@@ -53,6 +55,23 @@ describe("clearing", () => {
         expect(() => clearAll()).not.toThrow();
         vi.stubGlobal("window", {});
         expect(held()).toBe(2);
+    });
+});
+
+describe("dropLeftBusinesses", () => {
+    it("drops a business no longer on the list, keeps the rest and the list", () => {
+        const qc = getBrowserQueryClient();
+        qc.setQueryData(domainKey("orders", "o2", "list"), [2]);
+        qc.setQueryData(domainKey("bookings", "o2", "day", "x"), [3]);
+        dropLeftBusinesses(qc, [{ id: "o1" }]);
+        expect(qc.getQueryData(domainKey("orders", "o1", "list"))).toEqual([1]);
+        expect(qc.getQueryData(domainKey("orders", "o2", "list"))).toBe(
+            undefined,
+        );
+        expect(qc.getQueryData(domainKey("bookings", "o2", "day", "x"))).toBe(
+            undefined,
+        );
+        expect(qc.getQueryData(ORGANIZATIONS_KEY)).toEqual([{ id: "o1" }]);
     });
 });
 

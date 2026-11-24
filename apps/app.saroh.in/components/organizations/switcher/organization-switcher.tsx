@@ -6,7 +6,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { showError } from "@saroh/ui/toast";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -62,8 +61,10 @@ function BusinessTile({
  * Businesses you own are listed apart from the ones you were invited to,
  * because leaving the second kind is a different act from closing the first.
  * Selecting one persists the `active_org` cookie through a membership-guarded
- * server action and refreshes, so every server component re-reads under the
- * new tenant.
+ * server action. Setting a cookie makes Next render the page again in the
+ * action's own response, so every server component re-reads under the new
+ * tenant with no `router.refresh()` after it: that was a second render of
+ * the whole page (24 Nov 2026).
  */
 export function OrganizationSwitcher({
     organizations,
@@ -72,7 +73,6 @@ export function OrganizationSwitcher({
     organizations: Organization[];
     activeOrgId: string;
 }) {
-    const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -96,10 +96,9 @@ export function OrganizationSwitcher({
             }
             setOpen(false);
             setQuery("");
-            // Before the refresh: no tab may show this business's cache
-            // under the next one (DEC-259).
+            // The other tabs draw themselves under the new business. The
+            // cache stays: its keys carry the business (DEC-259).
             afterSwitch();
-            router.refresh();
         });
     }
 

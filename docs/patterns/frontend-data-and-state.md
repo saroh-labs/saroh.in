@@ -88,15 +88,28 @@ There is no global client store. React Query holds server state only, in
   makes it dynamic, and `force-dynamic` turns off Next's fetch memo, so two
   readers of one URL in a render (the shell and a module gate) both reach
   the API. Read routes keep it.
-- **Business switch and sign-out** call `clear()` and announce it on a
-  `BroadcastChannel`, so every tab drops the cache.
+- **A business switch keeps the cache** (owner, 25 Nov 2026): every key is
+  `[domain, orgId, ...]`, so businesses sit side by side and a switch back
+  draws from cache at once, reading again behind it (`gcTime` 30 min). The
+  switch's Server Action sets the cookie, which makes Next render the page
+  in the action's own response: no `router.refresh()` after it, that was a
+  second render. It announces `switch` on a `BroadcastChannel`; the other
+  tabs `router.refresh()`. A tab never hears its own message (each carries
+  the tab's id; BroadcastChannel only skips the sending object).
+- **Sign-out is the only `clear()`**, announced the same way; the other tabs
+  clear and reload.
+- **A business gone from the list** (removed or left elsewhere): when a
+  fresh `['organizations']` replaces the held one, that business's keys are
+  removed (`dropLeftBusinesses`). Membership is still the API's to check on
+  every read, and a route answers 409 when the key's business isn't the
+  open one.
 - **`staleTime: 0`** for every domain until the epic's close-out; `retry: false`,
   no refetch on window focus or reconnect (live refresh owns those).
 - **The business list is the exception** (owner, 24 Nov 2026):
   `['organizations']`, the person's and not a business's, is held for the
   whole visit (`staleTime` and `gcTime` `Infinity`), seeded from the shell's
   server read and marked stale only by its writers (create, rename, leave,
-  an invitation taken: `invalidateOrganizations()`) or another tab. A 409
+  an invitation taken: `invalidateOrganizations()`). A 409
   `org_mismatch` or a non-role 403 on a read marks it stale and draws the
   page again once. On the server a render asks the API for the list once:
   `getActiveOrgId` and `organizationsOnce` share `memberOrganizations`; read
