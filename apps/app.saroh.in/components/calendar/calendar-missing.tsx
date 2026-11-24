@@ -3,6 +3,7 @@
 import { PartialRead } from "@saroh/ui/failed-read";
 
 import type { CalendarMonth } from "@/lib/calendar/types";
+import { useCalendarReadAgain } from "@/lib/calendar/use-calendar";
 
 const listed = (labels: string[]) =>
     labels.length < 2
@@ -22,6 +23,8 @@ export function CalendarMissing({
     /** "month" or "week": what the rest is still here for. */
     span: string;
 }) {
+    // The calendar's own read again, on React Query (DEC-259).
+    const readAgain = useCalendarReadAgain();
     const missing = data.unavailable.map((u) => u.label);
     if (missing.length === 0) return null;
     const money = data.takings !== undefined;
@@ -30,6 +33,7 @@ export function CalendarMissing({
     return (
         <PartialRead
             things={listed(missing)}
+            onRetry={readAgain}
             so={`Everything else in this ${span} is here.${
                 noMoney ? " Money is left out while part of it is missing." : ""
             }`}

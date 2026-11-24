@@ -13,6 +13,6 @@
  * Read as text by the checks and the lint: keep both lists plain string
  * literals.
  */
-export const RQ_ROUTES: readonly string[] = ["/"];
+export const RQ_ROUTES: readonly string[] = ["/", "/calendar"];
 
-export const RQ_DOMAINS: readonly string[] = ["home"];
+export const RQ_DOMAINS: readonly string[] = ["home", "calendar"];

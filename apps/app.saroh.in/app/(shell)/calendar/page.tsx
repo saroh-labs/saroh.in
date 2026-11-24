@@ -1,42 +1,36 @@
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 
-import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
-import { BusinessCalendar } from "@/components/calendar/business-calendar";
-import { BusinessWeek } from "@/components/calendar/business-week";
+import { CalendarContainer } from "@/components/calendar/calendar-container";
 import {
     CalendarLocked,
     CalendarNothing,
 } from "@/components/calendar/calendar-nothing";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { ScreenPending } from "@/components/shared/page/screen-pending";
-import { calendarMonthPage, calendarWeekPage } from "@/lib/ask-ai/page-hints";
-import {
-    calendarLocked,
-    calendarRange,
-    clampMonth,
-} from "@/lib/calendar/range";
-import {
-    getCalendarMonth,
-    getCalendarWeek,
-    monthNow,
-    todayIn,
-} from "@/lib/calendar/service";
-import { clampWeekDay, isDay, weekHref } from "@/lib/calendar/week";
+import { calendarCan, calendarServer, lockedFor } from "@/lib/calendar/access";
+import type { CalendarAsk, CalendarNow } from "@/lib/calendar/queries";
+import { calendarAt, calendarRead, openHref } from "@/lib/calendar/queries";
+import { monthNow, todayIn } from "@/lib/calendar/service";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
-import { orderPowers } from "@/lib/orders/access";
-import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { ReadFailed } from "@/lib/query/client";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Business calendar" };
 
-const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+/** On React Query: never cached, read per request (DEC-259). */
+export const dynamic = "force-dynamic";
 
 /** Before the first read names the business's zone, the one it falls back to. */
 const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
 
-// The week's, which also says who may open hours on a closed day (U14).
-type Can = React.ComponentProps<typeof BusinessWeek>["can"];
+const nowIn = (zone: string, joinedAt?: string | null): CalendarNow => ({
+    today: todayIn(zone),
+    thisMonth: monthNow(zone),
+    joinedAt,
+});
 
 /**
  * Home › Calendar (U17, the "Saroh Business Calendar" design): one month of
@@ -55,185 +49,101 @@ type Can = React.ComponentProps<typeof BusinessWeek>["can"];
  * `?view=week` opens the Week (E25) holding `?day=`, or this week: Monday
  * to Sunday in one read, pulled inside the range the same way.
  *
+ * On React Query (DEC-259): the gates are awaited here, the first month or
+ * week is prefetched and hydrated, and the container reads every later one
+ * from the address in place (`calendar-container.tsx`).
+ *
  * A role that reads none of the layers is told so before anything is read,
  * and again if the API refuses it (E20's 403).
  */
 export default async function CalendarPage({
     searchParams,
 }: {
-    searchParams: Promise<{
-        month?: string;
-        day?: string;
-        team?: string;
-        view?: string;
-    }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [{ month: asked, day, team, view }, organization] = await Promise.all(
-        [searchParams, resolveActiveOrganization()],
-    );
-    if (calendarLocked(organization?.actions)) return <CalendarLocked />;
-
-    const may = permitsFor(organization);
-    const can: Can = {
-        // New order: `order:create` (B16).
-        order: orderPowers(organization).create,
-        book: may("booking:write"),
-        // A named problem's fix (E22): offered only to whoever may make it.
-        remind: may("invoice:write"),
-        retry: may("subscription:write"),
-        // Any amount at all (DEC-098): the permission, never the role.
-        money: may("payment:read"),
-        // "Open hours on this day" on a closed day (bookings U14).
-        hours: may("hours:write"),
+    const [params, organization] = await Promise.all([
+        searchParams,
+        resolveActiveOrganization(),
+    ]);
+    // A repeated param is no pick, as the browser's `get` would take the first.
+    const one = (v: string | string[] | undefined) =>
+        typeof v === "string" ? v : undefined;
+    const ask: CalendarAsk = {
+        view: one(params.view),
+        month: one(params.month),
+        day: one(params.day),
+        team: one(params.team),
     };
-    // The team filter's person (E24); one the filter doesn't list opens on
-    // Everyone.
-    const person = typeof team === "string" ? team : undefined;
+    if (lockedFor(organization)) return <CalendarLocked />;
+    if (!organization) return nothing();
+    const orgId = organization.id;
+    const can = calendarCan(organization);
 
-    if (view === "week") {
-        return (
-            <CalendarWeek
-                day={isDay(day) ? day : null}
-                team={person}
-                can={can}
-            />
-        );
-    }
+    const client = getServerQueryClient();
+    const readAt = async (now: CalendarNow) => {
+        const { span } = calendarAt(ask, now);
+        await prefetchRead(client, calendarServer, orgId, span);
+        return {
+            span,
+            read: client.getQueryData(
+                calendarRead.options(orgId, span).queryKey,
+            ),
+        };
+    };
 
-    const chosen =
-        typeof asked === "string" && MONTH.test(asked) ? asked : null;
-
-    let read = await getCalendarMonth(chosen ?? monthNow(FALLBACK_ZONE));
-    if (
-        read?.kind === "month" &&
-        !chosen &&
-        read.data.month !== monthNow(read.data.timezone)
-    ) {
-        read = await getCalendarMonth(monthNow(read.data.timezone));
-    }
-    if (read?.kind === "locked") return <CalendarLocked />;
-    // Out of reach (E20): the API names the month to open — the joined one,
-    // or the last that can be planned — so open it rather than fail.
-    if (read?.kind === "open") {
-        redirect(
-            read.month === monthNow(FALLBACK_ZONE)
-                ? "/calendar"
-                : `/calendar?month=${read.month}`,
-        );
-    }
-    const data = read?.kind === "month" ? read.data : null;
-
-    if (data && chosen) {
-        const thisMonth = monthNow(data.timezone);
-        const reached = clampMonth(
-            chosen,
-            calendarRange(data.joinedAt, thisMonth),
-        );
-        if (reached !== chosen) {
-            redirect(
-                reached === thisMonth
-                    ? "/calendar"
-                    : `/calendar?month=${reached}`,
-            );
+    const guess = nowIn(FALLBACK_ZONE);
+    let { span, read } = await readAt(guess);
+    // Today in the business's own zone, when the guess named another month
+    // (or day, for a week) and the address didn't pick one.
+    if (read?.kind === "month") {
+        const real = nowIn(read.data.timezone);
+        const unpicked = !calendarAt(ask, guess).picked;
+        const off =
+            ask.view === "week"
+                ? real.today !== guess.today
+                : real.thisMonth !== guess.thisMonth;
+        if (unpicked && off) {
+            client.removeQueries({ queryKey: calendarRead.key(orgId, span) });
+            ({ span, read } = await readAt(real));
         }
     }
 
+    if (!read) {
+        const error = client.getQueryState(
+            calendarRead.key(orgId, span),
+        )?.error;
+        // No business found is the nothing state; any other failure the
+        // segment's failed state, as before.
+        if (error instanceof ReadFailed && error.status === 404)
+            return nothing();
+        throw error ?? new Error("The calendar couldn't be read");
+    }
+    if (read.kind === "locked") return <CalendarLocked />;
+    const view = ask.view === "week" ? "week" : "month";
+    // Out of reach (E20): the API names the month to open — the joined one,
+    // or the last that can be planned — so open it rather than fail.
+    if (read.kind === "open") {
+        redirect(openHref(view, read.month, guess, ask.team));
+    }
+
+    const now = nowIn(read.data.timezone, read.data.joinedAt);
+    const { moved } = calendarAt(ask, now);
+    if (moved) redirect(moved);
+
     return (
         <PageContainer width="full">
-            {data ? (
-                <AskAiPageIs
-                    page={calendarMonthPage(data.month, todayIn(data.timezone))}
-                />
-            ) : null}
-            {data ? (
-                <ScreenPending>
-                    <BusinessCalendar
-                        // A new month starts with its own day picked and every
-                        // layer on.
-                        key={data.month}
-                        data={data}
-                        today={todayIn(data.timezone)}
-                        thisMonth={monthNow(data.timezone)}
-                        can={can}
-                        // A key crossed into this month on this day (E28).
-                        day={typeof day === "string" ? day : undefined}
-                        team={person}
-                    />
-                </ScreenPending>
-            ) : (
-                <CalendarNothing />
-            )}
+            <HydrationBoundary state={dehydrate(client)}>
+                <CalendarContainer now={now} can={can} />
+            </HydrationBoundary>
         </PageContainer>
     );
 }
 
-/**
- * The Week (E25): the week holding `day`, or this week in the business's
- * zone. As with a month, the first read names the zone, and a week out of
- * reach opens the nearest one the calendar reaches.
- */
-async function CalendarWeek({
-    day,
-    team,
-    can,
-}: {
-    day: string | null;
-    team: string | undefined;
-    can: Can;
-}) {
-    const open = (to: string) =>
-        // `today: ""` keeps the day in the address whatever it is.
-        redirect(weekHref({ day: to, today: "", team }));
-
-    let read = await getCalendarWeek(day ?? todayIn(FALLBACK_ZONE));
-    if (
-        read?.kind === "month" &&
-        !day &&
-        todayIn(read.data.timezone) !== todayIn(FALLBACK_ZONE)
-    ) {
-        read = await getCalendarWeek(todayIn(read.data.timezone));
-    }
-    if (read?.kind === "locked") return <CalendarLocked />;
-    // Wholly out of reach (E20): the API names the month to open. Its 1st
-    // is read, and pulled inside the joined day below if need be.
-    if (read?.kind === "open") open(`${read.month}-01`);
-    const data = read?.kind === "month" ? read.data : null;
-    if (!data) {
-        return (
-            <PageContainer width="full">
-                <CalendarNothing />
-            </PageContainer>
-        );
-    }
-
-    const today = todayIn(data.timezone);
-    const thisMonth = monthNow(data.timezone);
-    if (day) {
-        const reached = clampWeekDay(
-            day,
-            calendarRange(data.joinedAt, thisMonth),
-        );
-        if (reached !== day) open(reached);
-    }
-
+function nothing() {
     return (
         <PageContainer width="full">
-            {/* What Ask AI offers on this week, counted from it (AF 2). */}
-            <AskAiPageIs page={calendarWeekPage(data, today)} />
-            <ScreenPending>
-                <BusinessWeek
-                    // A new week starts with its own day picked and every layer
-                    // on.
-                    key={data.days[0]?.date ?? today}
-                    data={data}
-                    today={today}
-                    thisMonth={thisMonth}
-                    can={can}
-                    day={day ?? undefined}
-                    team={team}
-                />
-            </ScreenPending>
+            <CalendarNothing />
         </PageContainer>
     );
 }
