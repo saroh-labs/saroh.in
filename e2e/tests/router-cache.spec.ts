@@ -1,4 +1,4 @@
-// @covers app:/open app:/ app:/calendar app:/customers accounts:/login pkg:auth api:organizations api:contacts api:customer-workspace
+// @covers app:/open app:/ app:/calendar app:/contacts/[contactId] accounts:/login pkg:auth api:organizations api:contacts api:customer-workspace
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -92,7 +92,10 @@ test.describe("the router's copy of a page", () => {
             .toBe(false);
         await page.waitForLoadState("load");
 
-        await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
+        // Sign-in may still be redirecting: a goto it interrupts is aborted.
+        await page
+            .goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`)
+            .catch(() => page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`));
         await expect(rail(page)).toBeVisible();
         await railTo(page, "/calendar");
 
@@ -116,7 +119,7 @@ test.describe("the router's copy of a page", () => {
             lastName: s,
             email: `cache-${s}@example.test`,
         });
-        await page.goto(`/customers/${who.id}?tab=notes`);
+        await page.goto(`/contacts/${who.id}?tab=notes`);
         const text = `E2E cache note ${s}`;
 
         await page.getByRole("button", { name: "Add note" }).click();
@@ -128,7 +131,7 @@ test.describe("the router's copy of a page", () => {
 
         await railTo(page, "/calendar");
         await page.goBack();
-        await expect(page).toHaveURL(new RegExp(`/customers/${who.id}`));
+        await expect(page).toHaveURL(new RegExp(`/contacts/${who.id}`));
         await expect(note).toBeVisible();
     });
 });
