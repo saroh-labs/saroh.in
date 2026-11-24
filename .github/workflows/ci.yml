@@ -282,6 +282,16 @@ jobs:
       - name: Client calls from the server
         run: pnpm run check:client-calls
 
+      # React Query's boundary (DEC-259): keys from domainKey in a queries
+      # file, fetchers that send the key's org, read routes built only with
+      # readRoute, and no router.refresh() on a React Query route.
+      - name: Query keys
+        run: pnpm run check:query-keys
+      - name: Read routes
+        run: pnpm run check:rq-routes
+      - name: No refresh on React Query routes
+        run: pnpm run check:rq-refresh
+
       # An IconButton is its own tooltip: no <Tip> drawing a second one.
       - name: Icon button tooltips
         run: pnpm run check:icon-button-tips
