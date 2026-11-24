@@ -18,6 +18,7 @@ import { EDITION } from "@/lib/edition";
 import type { RateItem } from "@/lib/gst-rates/missing";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
 import { pickActive } from "@/lib/organizations/choose";
+import type { Organization } from "@/lib/organizations/service";
 
 import { env } from "@/env";
 
@@ -73,13 +74,16 @@ export type CrmResult<T> =
       };
 
 /**
- * Member organization ids for the session, newest-first as the API returns
- * them. Uses a bare `fetch` — NOT `apiFetch` — because `apiFetch` resolves the
- * active org through this function, and going through it would recurse.
- * Request-cached, so the reconciliation below costs one call per render pass.
+ * The caller's businesses as the API lists them, this deployment's edition
+ * only, or null when the list can't be read. ONE call per request: the
+ * active business below and the chrome's list (`organizationsOnce`) both
+ * read it from here. A bare `fetch`, not `apiFetch`: `apiFetch` resolves
+ * the active business through this, and going through it would recurse.
+ * Only for a render; a Server Action that has just changed the list reads
+ * it fresh (`listOrganizations`).
  */
-const memberOrgIds = cache(
-    async (): Promise<{ id: string; paused?: boolean }[] | null> => {
+export const memberOrganizations = cache(
+    async (): Promise<Organization[] | null> => {
         const cookie = (await headers()).get("cookie") ?? "";
         const res = await fetch(`${API_URL}/organizations`, {
             headers: { "content-type": "application/json", cookie },
@@ -87,14 +91,12 @@ const memberOrgIds = cache(
         });
         if (!res.ok) return null;
         const orgs = (await res.json().catch(() => null)) as
-            { id: string; paused?: boolean; edition?: string }[] | null;
-        // This deployment's businesses only, as the chrome's list is
-        // (`listOrganizations`): otherwise a person in both editions, with no
-        // business chosen, saw one business's name over another's data.
+            Organization[] | null;
+        // This deployment's businesses only (DEC-204): otherwise a person
+        // in both editions, with no business chosen, saw one business's
+        // name over another's data.
         return Array.isArray(orgs)
-            ? orgs
-                  .filter((o) => (o.edition ?? "INDIA") === EDITION)
-                  .map((o) => ({ id: o.id, paused: o.paused === true }))
+            ? orgs.filter((o) => (o.edition ?? "INDIA") === EDITION)
             : null;
     },
 );
@@ -115,7 +117,7 @@ const memberOrgIds = cache(
  */
 export const getActiveOrgId = cache(async (): Promise<string | null> => {
     const cookieId = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
-    const orgs = await memberOrgIds();
+    const orgs = await memberOrganizations();
     if (orgs === null) return cookieId;
     // A business whose door is paused for them (#800) is passed over while
     // another opens, the chrome's own rule (`pickActive`).

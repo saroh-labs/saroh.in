@@ -20,7 +20,7 @@ import {
 } from "@/lib/organizations/left-business";
 import {
     getOrganization,
-    listOrganizations,
+    organizationsOnce,
 } from "@/lib/organizations/service";
 import { stepFromQuery } from "@/lib/organizations/setup-steps";
 import { galleryTemplateOf, tradeOfTemplate } from "@/lib/organizations/trade";
@@ -96,7 +96,7 @@ export default async function OnboardingPage({
     await requireSession();
     const [session, organizations, query, billingProfiles] = await Promise.all([
         getServerSession(await headers()),
-        listOrganizations(),
+        organizationsOnce(),
         searchParams,
         // Who Saroh bills (DEC-167, R7): asked when they have any.
         listMyBillingProfiles(),

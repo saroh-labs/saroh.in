@@ -4,7 +4,7 @@ import { EDITION } from "@/lib/edition";
 import { cache } from "react";
 
 import { toFailure } from "@/lib/api/failure";
-import { apiFetch, getActiveOrgId } from "@/lib/api/http";
+import { apiFetch, getActiveOrgId, memberOrganizations } from "@/lib/api/http";
 import { businessZone } from "@/lib/format/business-zone";
 import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 
@@ -222,12 +222,18 @@ export interface AddressAvailability {
 export async function listOrganizations(): Promise<Organization[]> {
     const res = await apiFetch("/organizations");
     if (!res.ok) return [];
-    const orgs = (await res.json()) as Organization[];
     // Only this edition's businesses (DEC-204): the API refuses the others
-    // here. The role's words on screen, not its stored name (DEC-069, L10).
-    return orgs
-        .filter((o) => (o.edition ?? "INDIA") === EDITION)
-        .map((o) => ({ ...o, roleLabel: shownRoleLabel(o.roleLabel) }));
+    // here.
+    return shown(
+        ((await res.json()) as Organization[]).filter(
+            (o) => (o.edition ?? "INDIA") === EDITION,
+        ),
+    );
+}
+
+/** The role's words on screen, not its stored name (DEC-069, L10). */
+function shown(orgs: Organization[]): Organization[] {
+    return orgs.map((o) => ({ ...o, roleLabel: shownRoleLabel(o.roleLabel) }));
 }
 
 /**
@@ -242,7 +248,7 @@ export async function listOrganizations(): Promise<Organization[]> {
 export async function resolveActiveOrganization(
     organizations?: Organization[],
 ): Promise<Organization | null> {
-    const orgs = organizations ?? (await listOrganizations());
+    const orgs = organizations ?? (await organizationsOnce());
     if (orgs.length === 0) return null;
     // One whose door is paused for them is passed over while another opens
     // (#800); with every one paused the shell says so.
@@ -257,7 +263,11 @@ export async function resolveActiveOrganization(
  * Action that has just changed the list reads it fresh
  * (`listOrganizations`).
  */
-export const organizationsOnce = cache(() => listOrganizations());
+export const organizationsOnce = cache(async (): Promise<Organization[]> =>
+    // The same call the active business is resolved from (`getActiveOrgId`),
+    // so a render asks the API for the list once.
+    shown((await memberOrganizations()) ?? []),
+);
 export const activeOrganizationOnce = cache(async () =>
     resolveActiveOrganization(await organizationsOnce()),
 );

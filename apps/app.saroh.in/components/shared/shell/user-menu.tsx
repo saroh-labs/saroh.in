@@ -31,6 +31,7 @@ import { useTranslations } from "use-intl";
 import { accountsLoginUrl, billingProfilesUrl } from "@/lib/accounts";
 import { helpHomeUrl } from "@/lib/help/links";
 import type { AccountManager } from "@/lib/organizations/service";
+import { afterSignOut } from "@/lib/query/invalidate";
 
 /**
  * All three, including System. Appearance lives only here since the top
@@ -205,6 +206,7 @@ export function UserMenu({
                     className="wk-press"
                     onSelect={() => {
                         void authClient.signOut().then(() => {
+                            afterSignOut();
                             window.location.href = accountsLoginUrl;
                         });
                     }}

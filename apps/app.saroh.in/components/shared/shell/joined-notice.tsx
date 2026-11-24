@@ -9,6 +9,7 @@ import {
     decodeJoined,
     JOINED_COOKIE,
 } from "@/lib/organizations/joined";
+import { invalidateOrganizations } from "@/lib/query/invalidate";
 
 /** The line, held outside React's state: it arrives after the page draws. */
 function lineStore() {
@@ -49,7 +50,11 @@ export function JoinedNotice() {
         const found = decodeJoined(cookieValue(document.cookie, JOINED_COOKIE));
         // Taken away whatever it held, so it is said once or not at all.
         document.cookie = `${JOINED_COOKIE}=; Max-Age=0; path=/`;
-        if (found) store.set(found);
+        if (found) {
+            // A business joined: the list has one more (DEC-259).
+            invalidateOrganizations();
+            store.set(found);
+        }
     }, [store]);
 
     if (!line) return null;

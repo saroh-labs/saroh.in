@@ -25,6 +25,7 @@ import {
     planLockedModuleKeys,
 } from "@/components/shared/navigation/nav-locks";
 import { PageContainer } from "@/components/shared/page/page-container";
+import { QueryProvider } from "@/components/shared/query/query-provider";
 import { BusinessTradeProvider } from "@/components/sites/templates/business-trade";
 import { WebsiteAreaProvider } from "@/components/sites/website-area";
 import { accountsUrl } from "@/lib/accounts";
@@ -37,6 +38,7 @@ import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import { closingOrNull } from "@/lib/organizations/closing-service";
+import type { Organization } from "@/lib/organizations/service";
 import {
     accountManagerOrNull,
     activeOrganizationOnce,
@@ -270,6 +272,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <ShellFrame
             canChangePlan={mayChangePlan(activeOrg)}
             websiteArea={websiteArea}
+            orgId={activeOrg?.id ?? ""}
+            organizations={organizations}
         >
             {/*
              * Without this, reaching the page content by keyboard means tabbing
@@ -473,17 +477,25 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 function ShellFrame({
     canChangePlan,
     websiteArea = false,
+    orgId,
+    organizations,
     children,
 }: {
     canChangePlan: boolean;
     websiteArea?: boolean;
+    orgId: string;
+    organizations: Organization[];
     children: React.ReactNode;
 }) {
     return (
-        <PlanAccessProvider canChangePlan={canChangePlan}>
-            <WebsiteAreaProvider on={websiteArea}>
-                <div className="flex min-h-screen flex-col">{children}</div>
-            </WebsiteAreaProvider>
-        </PlanAccessProvider>
+        // React Query, once for the app (DEC-259), with the list this
+        // render already read.
+        <QueryProvider orgId={orgId} organizations={organizations}>
+            <PlanAccessProvider canChangePlan={canChangePlan}>
+                <WebsiteAreaProvider on={websiteArea}>
+                    <div className="flex min-h-screen flex-col">{children}</div>
+                </WebsiteAreaProvider>
+            </PlanAccessProvider>
+        </QueryProvider>
     );
 }

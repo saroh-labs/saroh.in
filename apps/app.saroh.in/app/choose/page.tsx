@@ -18,7 +18,7 @@ import type {
     Organization,
     OrganizationRole,
 } from "@/lib/organizations/service";
-import { listOrganizations } from "@/lib/organizations/service";
+import { organizationsOnce } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { Notice } from "@saroh/ui/notice";
 
@@ -65,7 +65,7 @@ export default async function ChoosePage({
 }) {
     await requireSession();
     const [organizations, query] = await Promise.all([
-        listOrganizations(),
+        organizationsOnce(),
         searchParams,
     ]);
     const notice = chooseNotice(query.notice);

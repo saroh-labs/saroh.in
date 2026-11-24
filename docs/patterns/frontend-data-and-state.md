@@ -64,6 +64,16 @@ There is no global client store. React Query holds server state only, in
   `BroadcastChannel`, so every tab drops the cache.
 - **`staleTime: 0`** for every domain until the epic's close-out; `retry: false`,
   no refetch on window focus or reconnect (live refresh owns those).
+- **The business list is the exception** (owner, 24 Nov 2026):
+  `['organizations']`, the person's and not a business's, is held for the
+  whole visit (`staleTime` and `gcTime` `Infinity`), seeded from the shell's
+  server read and marked stale only by its writers (create, rename, leave,
+  an invitation taken: `invalidateOrganizations()`) or another tab. A 409
+  `org_mismatch` or a non-role 403 on a read marks it stale and draws the
+  page again once. On the server a render asks the API for the list once:
+  `getActiveOrgId` and `organizationsOnce` share `memberOrganizations`; read
+  the list through `organizationsOnce` (or `resolveActiveOrganization()`),
+  never `listOrganizations`, which is for a Server Action that changed it.
 - **Never cached:** billing secrets, API keys, tokens, provider credentials. The
   dehydrate allowlist is explicit.
 

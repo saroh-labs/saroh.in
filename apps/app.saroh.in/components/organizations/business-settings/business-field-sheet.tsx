@@ -32,6 +32,7 @@ import type {
     OrganizationSettingsInput,
 } from "@/lib/organizations/settings-service";
 import { offeredZone } from "@/lib/organizations/time-zones";
+import { invalidateOrganizations } from "@/lib/query/invalidate";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import type { FormValues } from "./business-form";
 import {
@@ -183,6 +184,8 @@ export function BusinessFieldSheet({
             } else showError(result.error);
             return;
         }
+        // Its name and details are in the business list too.
+        invalidateOrganizations();
         onSaved(result.data, sent);
         onClose();
     }

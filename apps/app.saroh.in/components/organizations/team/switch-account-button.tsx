@@ -5,6 +5,8 @@ import { Button } from "@saroh/ui/button";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 
+import { afterSignOut } from "@/lib/query/invalidate";
+
 /**
  * "Sign out and use {email}": for someone who opened an invitation while
  * signed in as another person. Signing out alone would drop them on a bare
@@ -36,6 +38,7 @@ export function SwitchAccountButton({
             showError("Couldn't sign you out. Try again.");
             return;
         }
+        afterSignOut();
         window.location.href =
             next ??
             `${signInUrl}?redirect=${encodeURIComponent(window.location.href)}`;
