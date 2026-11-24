@@ -3,8 +3,10 @@ import type { Edition } from "@saroh/edition";
 import { EDITION } from "@/lib/edition";
 import { cache } from "react";
 
+import { ApiError } from "@/lib/api/errors";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId, memberOrganizations } from "@/lib/api/http";
+import { scopedOrg } from "@/lib/api/read-scope";
 import { businessZone } from "@/lib/format/business-zone";
 import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 
@@ -243,16 +245,39 @@ function shown(orgs: Organization[]): Organization[] {
  * belongs to no organization — the zero-org funnel case.
  *
  * Pass `organizations` when the caller has already fetched the list to avoid a
- * second identical round-trip (#102); otherwise it is fetched here.
+ * second identical round-trip (#102); otherwise it is fetched here, except
+ * in a read route or a save whose business is settled, which reads only its
+ * own row (`settledMembership`).
  */
 export async function resolveActiveOrganization(
     organizations?: Organization[],
 ): Promise<Organization | null> {
+    const settled = organizations ? undefined : scopedOrg();
+    if (settled) return settledMembership(settled);
     const orgs = organizations ?? (await organizationsOnce());
     if (orgs.length === 0) return null;
     // One whose door is paused for them is passed over while another opens
     // (#800); with every one paused the shell says so.
     return pickActive(orgs, await getActiveOrgId());
+}
+
+/**
+ * The person's own row of the business list for the business a read route
+ * or a save has settled (`scopedOrg`), from `GET /organizations/:id/me`:
+ * the same role, permissions and words, without reading every business
+ * they belong to (DEC-259). Once per request (`readOnce`). A refusal (no
+ * longer a member, or a paused seat) or a failure throws, so the read
+ * route answers 403 or 503 rather than a role's no.
+ */
+async function settledMembership(orgId: string): Promise<Organization | null> {
+    const path = `/organizations/${encodeURIComponent(orgId)}/me`;
+    const res = await apiFetch(path);
+    if (!res.ok) throw new ApiError(res.status, `GET ${path}`);
+    const org = (await res.json()) as Organization;
+    // This deployment's businesses only (DEC-204), as the list.
+    return (org.edition ?? "INDIA") === EDITION
+        ? { ...org, roleLabel: shownRoleLabel(org.roleLabel) }
+        : null;
 }
 
 /**
@@ -268,9 +293,7 @@ export const organizationsOnce = cache(async (): Promise<Organization[]> =>
     // so a render asks the API for the list once.
     shown((await memberOrganizations()) ?? []),
 );
-export const activeOrganizationOnce = cache(async () =>
-    resolveActiveOrganization(await organizationsOnce()),
-);
+export const activeOrganizationOnce = cache(() => resolveActiveOrganization());
 
 /**
  * The active business's time zone, for a server component that writes a
