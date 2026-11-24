@@ -87,14 +87,26 @@ describe("QueryProvider", () => {
         expect(qc().getQueryCache().getAll()).toHaveLength(0);
     });
 
-    it("another tab's sign-out clears this one", async () => {
-        draw([org("o1", "Northwind")]);
-        qc().setQueryData(domainKey("orders", "o1", "list"), [1]);
-        announce("signout");
-        await vi.waitFor(() =>
-            expect(qc().getQueryCache().getAll()).toHaveLength(0),
-        );
-        expect(refresh).not.toHaveBeenCalled();
+    it("another tab's sign-out clears this one and reloads it", async () => {
+        const real = window.location;
+        const reload = vi.fn();
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: { ...real, reload },
+        });
+        try {
+            draw([org("o1", "Northwind")]);
+            qc().setQueryData(domainKey("orders", "o1", "list"), [1]);
+            announce("signout");
+            await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+            expect(qc().getQueryCache().getAll()).toHaveLength(0);
+            expect(refresh).not.toHaveBeenCalled();
+        } finally {
+            Object.defineProperty(window, "location", {
+                configurable: true,
+                value: real,
+            });
+        }
     });
 
     it("useOrgId outside the provider throws", () => {

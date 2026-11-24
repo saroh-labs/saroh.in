@@ -46,7 +46,10 @@ export function QueryProvider({
         });
         const stop = listen((kind) => {
             client.clear();
-            if (kind === "switch") router.refresh();
+            // Signed out elsewhere: reload so this tab's page is gone too
+            // (the middleware then sends it to sign-in).
+            if (kind === "signout") window.location.reload();
+            else router.refresh();
         });
         return () => {
             stop();
