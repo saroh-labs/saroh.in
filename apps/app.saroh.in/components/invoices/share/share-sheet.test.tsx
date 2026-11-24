@@ -57,6 +57,11 @@ vi.mock("@/components/gst-rates/use-gst-rate-step", () => ({
 vi.mock("@/components/qr/link-qr/qr-button", () => ({ QrButton: () => null }));
 const router = { refresh: vi.fn(), push: vi.fn(), replace: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+// Invoices are read again through their queries (DEC-259), never the page.
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/invoices/use-invoices", () => ({
+    useInvoiceSave: () => ({ orgId: "org_a", saved }),
+}));
 const toast = {
     showError: vi.fn(),
     showSuccess: vi.fn(),
@@ -271,10 +276,14 @@ describe("WhatsApp", () => {
 
         await press("Open WhatsApp");
         expect(openSpy).toHaveBeenCalledWith("about:blank", "_blank");
-        expect(actions.shareInvoice).toHaveBeenCalledWith("inv_106", {
-            channel: "WHATSAPP",
-            kind: "REMINDER",
-        });
+        expect(actions.shareInvoice).toHaveBeenCalledWith(
+            "inv_106",
+            {
+                channel: "WHATSAPP",
+                kind: "REMINDER",
+            },
+            "org_a",
+        );
         expect(tab.location.href.startsWith("https://wa.me/91")).toBe(true);
         expect(tab.location.href).toContain(encodeURIComponent(MESSAGE));
         expect(tab.opener).toBeNull();
@@ -293,10 +302,14 @@ describe("WhatsApp", () => {
             "Here is your invoice RC/26-27/0106 for ₹8,400",
         );
         await press("Open WhatsApp");
-        expect(actions.shareInvoice).toHaveBeenCalledWith("inv_106", {
-            channel: "WHATSAPP",
-            kind: "NEW",
-        });
+        expect(actions.shareInvoice).toHaveBeenCalledWith(
+            "inv_106",
+            {
+                channel: "WHATSAPP",
+                kind: "NEW",
+            },
+            "org_a",
+        );
     });
 
     it("with no number, waits until one is typed, then opens a chat with it", async () => {
@@ -481,10 +494,14 @@ describe("Link", () => {
         await draw();
         await openTab("Link");
         await press("Copy link");
-        expect(actions.shareInvoice).toHaveBeenCalledWith("inv_106", {
-            channel: "LINK",
-            kind: "REMINDER",
-        });
+        expect(actions.shareInvoice).toHaveBeenCalledWith(
+            "inv_106",
+            {
+                channel: "LINK",
+                kind: "REMINDER",
+            },
+            "org_a",
+        );
         expect(copied).toEqual(["https://rye.saroh.app/i/7Kq2"]);
         expect(button("Copied")).toBeTruthy();
         expect(sheet().querySelector("[data-link-box]")?.textContent).toContain(
@@ -520,10 +537,14 @@ describe("PDF", () => {
         await draw();
         await openTab("PDF");
         await press("Print");
-        expect(actions.shareInvoice).toHaveBeenCalledWith("inv_106", {
-            channel: "PRINT",
-            kind: "REMINDER",
-        });
+        expect(actions.shareInvoice).toHaveBeenCalledWith(
+            "inv_106",
+            {
+                channel: "PRINT",
+                kind: "REMINDER",
+            },
+            "org_a",
+        );
         expect(onPrint).toHaveBeenCalled();
     });
 });

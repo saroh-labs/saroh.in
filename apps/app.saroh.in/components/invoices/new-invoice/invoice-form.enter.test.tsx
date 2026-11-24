@@ -19,6 +19,11 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn(), replace: vi.fn() }),
     useSearchParams: () => new URLSearchParams(window.location.search),
 }));
+// Invoices are read again through their queries (DEC-259), never the page.
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/invoices/use-invoices", () => ({
+    useInvoiceSave: () => ({ orgId: "org_a", saved }),
+}));
 // On the paper (U15), the business\'s settings save in place.
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: vi.fn(),
@@ -205,7 +210,7 @@ describe("Enter in the invoice form", () => {
         render(DRAFT);
         act(() => named("Issue it").click());
         await settle();
-        expect(actions.issueInvoice).toHaveBeenCalledWith("inv_1");
+        expect(actions.issueInvoice).toHaveBeenCalledWith("inv_1", "org_a");
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "INV-0007 issued. Its lines are locked.",
         );

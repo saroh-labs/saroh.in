@@ -9,6 +9,7 @@ import {
 import { useCallback } from "react";
 
 import { homeKeys } from "@/lib/home/queries";
+import { invoicesKeys } from "@/lib/invoices/queries";
 import { productsKeys } from "@/lib/products/queries";
 import { useOrgId } from "@/lib/query/org";
 
@@ -61,8 +62,8 @@ export function useTickets(ask: TicketsAsk) {
  * After an order write landed: the list and the order on screen are read
  * again (the one that is mounted; resolves once it is back, so a busy state
  * lasts until the screen has changed), and what else it moves is marked
- * stale, read on its next visit: the filter bar's counts, Home and Products
- * (stock). Invoices join when they move to React Query (U12). Never throws:
+ * stale, read on its next visit: the filter bar's counts, Home, Products
+ * (stock) and Invoices (an order's paper and money). Never throws:
  * a read that fails is the screen's failed state.
  */
 export function ordersSaved(qc: QueryClient, orgId: string): Promise<void> {
@@ -73,6 +74,7 @@ export function ordersSaved(qc: QueryClient, orgId: string): Promise<void> {
         qc.invalidateQueries({ queryKey: ordersKeys(orgId), ...later }),
         qc.invalidateQueries({ queryKey: homeKeys(orgId), ...later }),
         qc.invalidateQueries({ queryKey: productsKeys(orgId), ...later }),
+        qc.invalidateQueries({ queryKey: invoicesKeys(orgId), ...later }),
     ]).then(
         () => undefined,
         () => undefined,

@@ -48,6 +48,11 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/billing/invoices",
     unstable_rethrow: () => undefined,
 }));
+// Invoices are read again through their queries (DEC-259), never the page.
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/invoices/use-invoices", () => ({
+    useInvoiceSave: () => ({ orgId: "org_a", saved }),
+}));
 vi.mock("@saroh/ui/toast", () => ({
     ...calls.toast,
     settleUndo: (run: () => unknown) => run(),
@@ -447,9 +452,12 @@ describe("step 2's read: only the newest pick lands (review #12)", () => {
         act(() => button("Send 2 emails").click());
         await settle();
         await holdEnds();
-        expect(calls.sendReminders).toHaveBeenCalledWith({
-            invoiceIds: ["0135", "0136"],
-        });
+        expect(calls.sendReminders).toHaveBeenCalledWith(
+            {
+                invoiceIds: ["0135", "0136"],
+            },
+            "org_a",
+        );
     });
 
     it("a read from before a close and reopen answers to nobody", async () => {
@@ -519,9 +527,12 @@ describe("step 3: send", () => {
 
         await holdEnds();
         expect(calls.sendReminders).toHaveBeenCalledTimes(1);
-        expect(calls.sendReminders).toHaveBeenCalledWith({
-            invoiceIds: ["0135"],
-        });
+        expect(calls.sendReminders).toHaveBeenCalledWith(
+            {
+                invoiceIds: ["0135"],
+            },
+            "org_a",
+        );
         expect(text()).toContain("1 email sent");
         expect(text()).toContain("Nikhil · each logged on its invoice");
         expect(calls.forgetLink).toHaveBeenCalledWith("0135");
@@ -533,6 +544,7 @@ describe("step 3: send", () => {
             "0106",
             "REMINDER",
             null,
+            "org_a",
         );
 
         expect(step()).toBe("done");

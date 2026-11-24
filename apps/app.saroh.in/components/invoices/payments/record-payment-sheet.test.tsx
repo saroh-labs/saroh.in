@@ -40,6 +40,11 @@ const { actions, toast, router, wa } = vi.hoisted(() => ({
 vi.mock("@/lib/invoices/actions", () => actions);
 vi.mock("@saroh/ui/toast", () => toast);
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+// Invoices are read again through their queries (DEC-259), never the page.
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/invoices/use-invoices", () => ({
+    useInvoiceSave: () => ({ orgId: "org_a", saved }),
+}));
 vi.mock("@/components/invoices/share/whatsapp-share", () => wa);
 // A picked day, typed: the calendar popover is the date picker's own test.
 vi.mock("@saroh/ui/date-picker", () => ({
@@ -135,6 +140,7 @@ beforeEach(() => {
     ]) {
         fn.mockReset();
     }
+    saved.mockClear();
     toast.showUndo.mockReturnValue("toast");
     wa.offerWhatsAppReceipt.mockReturnValue(vi.fn());
     wa.openWhatsAppShare.mockResolvedValue(true);
@@ -290,6 +296,7 @@ describe("Record payment", () => {
         expect(actions.recordPayment).toHaveBeenCalledWith(
             "inv_106",
             expect.objectContaining({ method: "CASH", amount: "4000.00" }),
+            "org_a",
         );
         const sent = actions.recordPayment.mock.calls[0]?.[1] as {
             receivedAt?: string;
@@ -301,6 +308,8 @@ describe("Record payment", () => {
         // Email is connected: the receipt goes by itself, and is said.
         expect(u.description).toBe("Receipt emailed to vivek@example.com");
         expect(wa.offerWhatsAppReceipt).not.toHaveBeenCalled();
+        // Invoices read once for the payment (list, strip, invoice open).
+        expect(saved).toHaveBeenCalledTimes(1);
 
         actions.removePayment.mockResolvedValue({
             ok: true,
@@ -313,8 +322,9 @@ describe("Record payment", () => {
             "inv_106",
             "pay_new",
             UNDONE_REASON,
+            "org_a",
         );
-        expect(router.refresh).toHaveBeenCalled();
+        expect(saved).toHaveBeenCalledTimes(2);
     });
 
     it("records all of it and says it is paid in full", async () => {
@@ -326,6 +336,7 @@ describe("Record payment", () => {
         expect(actions.recordPayment).toHaveBeenCalledWith(
             "inv_106",
             expect.objectContaining({ method: "UPI", amount: "8400.00" }),
+            "org_a",
         );
         expect(lastUndo().words).toBe(
             "₹8,400 recorded on RC/26-27/0106. Paid in full.",
@@ -373,6 +384,7 @@ describe("Record payment", () => {
                 chequeNumber: "004512",
                 chequeBank: "HDFC Bank",
             }),
+            "org_a",
         );
         const u = lastUndo();
         expect(u.words).toBe(
@@ -419,6 +431,8 @@ describe("Record payment", () => {
         );
         expect(onOpenChange).not.toHaveBeenCalledWith(false);
         expect(toast.showUndo).not.toHaveBeenCalled();
+        // A refused write reads nothing again.
+        expect(saved).not.toHaveBeenCalled();
     });
 
     it("sends one key per opening: a retry keeps it, a new opening makes a new one (#6)", async () => {
@@ -507,6 +521,7 @@ describe("Record payment", () => {
             "Vivek Nair",
             10_000,
             undefined,
+            "org_a",
         );
         const u = lastUndo();
         expect(u.description).toBeUndefined();
@@ -649,6 +664,7 @@ describe("A cheque waiting for the bank", () => {
             "inv_106",
             "pay_chq",
             expect.any(String),
+            "org_a",
         );
         expect(onClose).toHaveBeenCalled();
         const said = toast.showSuccess.mock.calls.at(-1) as unknown as [
@@ -659,7 +675,12 @@ describe("A cheque waiting for the bank", () => {
         expect(said[0]).toBe("Cheque 004512 is in the bank.");
         expect(said[2]?.label).toBe("Share receipt on WhatsApp");
         said[2]?.onClick();
-        expect(wa.openWhatsAppShare).toHaveBeenCalledWith("inv_106", "RECEIPT");
+        expect(wa.openWhatsAppShare).toHaveBeenCalledWith(
+            "inv_106",
+            "RECEIPT",
+            undefined,
+            "org_a",
+        );
     });
 
     it("in the bank with email: the receipt goes by email, nothing to share", async () => {
@@ -714,11 +735,13 @@ describe("A cheque waiting for the bank", () => {
             "inv_106",
             "pay_chq",
             { reason: "insufficient funds" },
+            "org_a",
         );
         expect(wa.openWhatsAppShare).toHaveBeenCalledWith(
             "inv_106",
             "REMINDER",
             opened,
+            "org_a",
         );
         open.mockRestore();
     });

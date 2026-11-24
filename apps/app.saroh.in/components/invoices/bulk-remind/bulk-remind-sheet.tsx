@@ -31,6 +31,7 @@ import {
 } from "@/lib/invoices/remind-many";
 import type { Invoice } from "@/lib/invoices/service";
 import { previewMessage } from "@/lib/invoices/share";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import type { WaysRead } from "./bulk-remind-steps";
 import {
@@ -109,6 +110,7 @@ export function BulkRemindSheet({
     const { send: hold, undo } = useHold();
     // Step 2's read: only the newest pick's preview lands (review #12).
     const latest = useLatestCall();
+    const { orgId, saved } = useInvoiceSave();
 
     // Each opening starts again at step 1, unless Undo brought it back.
     const [wasOpen, setWasOpen] = useState(open);
@@ -211,7 +213,7 @@ export function BulkRemindSheet({
                 const ids = going.map((r) => r.invoiceId);
                 let answered = 0;
                 for (const invoiceIds of chunks(ids)) {
-                    const res = await sendReminders({ invoiceIds });
+                    const res = await sendReminders({ invoiceIds }, orgId);
                     if (!res.ok) {
                         if (parts.length === 0) {
                             return { ok: false, error: res.error };
@@ -221,6 +223,8 @@ export function BulkRemindSheet({
                     parts.push(res.data);
                     answered += invoiceIds.length;
                 }
+                // Read once after the batch, as the list was before.
+                void saved();
                 const joined = joinResults(parts);
                 for (const row of joined.invoices) {
                     if (row.outcome === "EMAILED") {
@@ -267,7 +271,12 @@ export function BulkRemindSheet({
                 : window.open("about:blank", "_blank");
         setBusy(true);
         try {
-            const ok = await openWhatsAppShare(next.invoiceId, "REMINDER", tab);
+            const ok = await openWhatsAppShare(
+                next.invoiceId,
+                "REMINDER",
+                tab,
+                orgId,
+            );
             if (ok) {
                 walk(next.invoiceId, "shared");
                 forgetLink(next.invoiceId);

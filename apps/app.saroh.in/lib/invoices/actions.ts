@@ -13,13 +13,30 @@ import type {
 } from "./service";
 import * as api from "./service";
 
-/** Thin: the API decides who may and what an invoice may become. */
+/**
+ * Thin: the API decides who may and what an invoice may become.
+ *
+ * Each write takes the tab's business last (`orgId`, from
+ * `useInvoiceSave`) on Invoices' React Query screens: it then goes through
+ * `writeAsOrg`, which refuses a moved tab and revalidates nothing, since
+ * the screen reads its own queries again (DEC-259). Without it (a
+ * customer's page or Home's older callers) it revalidates as before.
+ */
+
+type Path = [path: string, type?: "layout" | "page"];
+
+function revalidate(paths: Path[]) {
+    // rq-revalidate-ok: reached only by a write without orgId, from a server-rendered screen.
+    for (const [path, type] of paths) revalidatePath(path, type);
+}
 
 function refresh(id?: string) {
-    revalidatePath("/billing/invoices");
-    if (id) revalidatePath(`/billing/invoices/${id}`);
-    // Subscriptions show what their invoices still owe.
-    revalidatePath("/billing/subscriptions");
+    revalidate([
+        ["/billing/invoices"],
+        ...(id ? [[`/billing/invoices/${id}`] as Path] : []),
+        // Subscriptions show what their invoices still owe.
+        ["/billing/subscriptions"],
+    ]);
 }
 
 /**
@@ -28,14 +45,30 @@ function refresh(id?: string) {
  */
 function refreshMoney(id: string) {
     refresh(id);
-    revalidatePath("/");
-    revalidatePath("/contacts", "layout");
+    revalidate([["/"], ["/contacts", "layout"]]);
 }
 
-export async function createInvoice(input: InvoiceInput) {
-    const res = await api.createInvoice(input);
-    if (res.ok) refresh();
+/**
+ * The write as the tab's business when a React Query screen names it
+ * (nothing revalidated), else as before: `after` once it landed.
+ */
+async function save<R extends { ok: boolean }>(
+    orgId: string | undefined,
+    write: () => Promise<R>,
+    after?: () => void,
+) {
+    if (orgId) return writeAsOrg(orgId, write);
+    const res = await write();
+    if (res.ok) after?.();
     return res;
+}
+
+export async function createInvoice(input: InvoiceInput, orgId?: string) {
+    return save(
+        orgId,
+        () => api.createInvoice(input),
+        () => refresh(),
+    );
 }
 
 /**
@@ -45,20 +78,26 @@ export async function createInvoice(input: InvoiceInput) {
  * address (`/<id>/edit`) that is another page than the one drawn (`/new`):
  * the editor was thrown away and drawn again on its second save, closing
  * a phone's Style sheet under the finger, with whatever else was open or
- * focused (20 Oct). The first save (`createInvoice`) still revalidates, on
- * `/new`, where the page read again is the one drawn. A screen opened
+ * focused (20 Oct). From Invoices' screens no save revalidates (`orgId`):
+ * the editor holds its own draft and only marks Invoices stale. A screen opened
  * afterwards reads the draft from the API (no fetch is cached,
  * `lib/api/http.ts`); one brought back by the browser's Back can show it
  * as it was until it is read again.
  */
-export async function updateInvoice(id: string, input: InvoiceInput) {
-    return api.updateInvoice(id, input);
+export async function updateInvoice(
+    id: string,
+    input: InvoiceInput,
+    orgId?: string,
+) {
+    return save(orgId, () => api.updateInvoice(id, input));
 }
 
-export async function deleteInvoice(id: string) {
-    const res = await api.deleteInvoice(id);
-    if (res.ok) refresh();
-    return res;
+export async function deleteInvoice(id: string, orgId?: string) {
+    return save(
+        orgId,
+        () => api.deleteInvoice(id),
+        () => refresh(),
+    );
 }
 
 /**
@@ -68,6 +107,18 @@ export async function deleteInvoice(id: string) {
  * here, so an edit made since the page was drawn is what the rates join.
  */
 export async function setInvoiceLineRates(
+    id: string,
+    rates: Record<number, string>,
+    orgId?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    return save(
+        orgId,
+        () => setLineRates(id, rates),
+        () => refresh(id),
+    );
+}
+
+async function setLineRates(
     id: string,
     rates: Record<number, string>,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -86,36 +137,48 @@ export async function setInvoiceLineRates(
         lines: linesWithRates(invoice.lines, rates),
     });
     if (!res.ok) return { ok: false, error: res.error };
-    refresh(id);
     return { ok: true };
 }
 
-export async function issueInvoice(id: string) {
-    const res = await api.issueInvoice(id);
-    if (res.ok) refresh(id);
-    return res;
+export async function issueInvoice(id: string, orgId?: string) {
+    return save(
+        orgId,
+        () => api.issueInvoice(id),
+        () => refresh(id),
+    );
 }
 
-export async function voidInvoice(id: string, reason: string) {
-    const res = await api.voidInvoice(id, reason);
-    if (res.ok) refresh(id);
-    return res;
+export async function voidInvoice(id: string, reason: string, orgId?: string) {
+    return save(
+        orgId,
+        () => api.voidInvoice(id, reason),
+        () => refresh(id),
+    );
 }
 
 export async function creditInvoice(
     id: string,
     reason: string,
     expect?: CreditExpect,
+    orgId?: string,
 ) {
-    const res = await api.creditInvoice(id, reason, expect);
-    if (res.ok) refresh(id);
-    return res;
+    return save(
+        orgId,
+        () => api.creditInvoice(id, reason, expect),
+        () => refresh(id),
+    );
 }
 
-export async function reissueInvoice(id: string, reason: string) {
-    const res = await api.reissueInvoice(id, reason);
-    if (res.ok) refresh(id);
-    return res;
+export async function reissueInvoice(
+    id: string,
+    reason: string,
+    orgId?: string,
+) {
+    return save(
+        orgId,
+        () => api.reissueInvoice(id, reason),
+        () => refresh(id),
+    );
 }
 
 /** The sheet's preview of the credit note: a read, nothing revalidated. */
@@ -128,17 +191,22 @@ export async function creditAndRewriteInvoice(
     id: string,
     reason: string,
     expect?: CreditExpect,
+    orgId?: string,
 ) {
-    const res = await api.creditAndRewriteInvoice(id, reason, expect);
-    if (res.ok) refresh(id);
-    return res;
+    return save(
+        orgId,
+        () => api.creditAndRewriteInvoice(id, reason, expect),
+        () => refresh(id),
+    );
 }
 
 /** Write a void invoice again: a draft with its lines. */
-export async function writeInvoiceAgain(id: string) {
-    const res = await api.writeInvoiceAgain(id);
-    if (res.ok) refresh(id);
-    return res;
+export async function writeInvoiceAgain(id: string, orgId?: string) {
+    return save(
+        orgId,
+        () => api.writeInvoiceAgain(id),
+        () => refresh(id),
+    );
 }
 
 /**
@@ -164,10 +232,16 @@ export async function readInvoice(id: string) {
 }
 
 /** Record money taken by hand: all that is left, part of it, or a cheque. */
-export async function recordPayment(id: string, input: PaymentInput) {
-    const res = await api.recordPayment(id, input);
-    if (res.ok) refreshMoney(id);
-    return res;
+export async function recordPayment(
+    id: string,
+    input: PaymentInput,
+    orgId?: string,
+) {
+    return save(
+        orgId,
+        () => api.recordPayment(id, input),
+        () => refreshMoney(id),
+    );
 }
 
 /** Remove a payment recorded by mistake (DEC-173); kept in the history. */
@@ -175,10 +249,13 @@ export async function removePayment(
     id: string,
     paymentId: string,
     reason?: string,
+    orgId?: string,
 ) {
-    const res = await api.removePayment(id, paymentId, reason);
-    if (res.ok) refreshMoney(id);
-    return res;
+    return save(
+        orgId,
+        () => api.removePayment(id, paymentId, reason),
+        () => refreshMoney(id),
+    );
 }
 
 /** A waiting cheque is in the bank. */
@@ -186,10 +263,13 @@ export async function chequeCleared(
     id: string,
     paymentId: string,
     clearedAt?: string,
+    orgId?: string,
 ) {
-    const res = await api.chequeCleared(id, paymentId, clearedAt);
-    if (res.ok) refreshMoney(id);
-    return res;
+    return save(
+        orgId,
+        () => api.chequeCleared(id, paymentId, clearedAt),
+        () => refreshMoney(id),
+    );
 }
 
 /** A waiting cheque bounced: what it paid is owed again. */
@@ -197,43 +277,54 @@ export async function chequeBounced(
     id: string,
     paymentId: string,
     input: { bouncedAt?: string; reason?: string } = {},
+    orgId?: string,
 ) {
-    const res = await api.chequeBounced(id, paymentId, input);
-    if (res.ok) refreshMoney(id);
-    return res;
+    return save(
+        orgId,
+        () => api.chequeBounced(id, paymentId, input),
+        () => refreshMoney(id),
+    );
 }
 
 /** Share it by hand: WhatsApp, a link, the PDF, print, or a receipt by email. */
-export async function shareInvoice(id: string, ask: ShareAsk) {
-    const res = await api.shareInvoice(id, ask);
-    if (res.ok) refresh(id);
-    return res;
+export async function shareInvoice(id: string, ask: ShareAsk, orgId?: string) {
+    return save(
+        orgId,
+        () => api.shareInvoice(id, ask),
+        () => refresh(id),
+    );
 }
 
-export async function createPayLink(id: string) {
-    const res = await api.createPayLink(id);
-    if (res.ok) refresh(id);
-    return res;
+export async function createPayLink(id: string, orgId?: string) {
+    return save(
+        orgId,
+        () => api.createPayLink(id),
+        () => refresh(id),
+    );
 }
 
-export async function createViewLink(id: string) {
-    const res = await api.createViewLink(id);
-    if (res.ok) refresh(id);
-    return res;
+export async function createViewLink(id: string, orgId?: string) {
+    return save(
+        orgId,
+        () => api.createViewLink(id),
+        () => refresh(id),
+    );
 }
 
-export async function sendInvoice(id: string) {
-    const res = await api.sendInvoice(id);
-    if (res.ok) refresh(id);
-    return res;
+export async function sendInvoice(id: string, orgId?: string) {
+    return save(
+        orgId,
+        () => api.sendInvoice(id),
+        () => refresh(id),
+    );
 }
 
 export async function remindInvoice(id: string, orgId?: string) {
-    // From Home on React Query (DEC-259): Home reads itself again.
-    if (orgId) return writeAsOrg(orgId, () => api.remindInvoice(id));
-    const res = await api.remindInvoice(id);
-    if (res.ok) refresh(id);
-    return res;
+    return save(
+        orgId,
+        () => api.remindInvoice(id),
+        () => refresh(id),
+    );
 }
 
 /** Remind all's list (Home plan U8): a read, through an action for the sheet. */
@@ -243,12 +334,12 @@ export async function previewReminders(ask: ReminderAsk) {
 
 /** Remind all: Home and the invoices read again, with the reminders sent. */
 export async function sendReminders(ask: ReminderAsk, orgId?: string) {
-    // From Home on React Query (DEC-259): Home reads itself again.
-    if (orgId) return writeAsOrg(orgId, () => api.sendReminders(ask));
-    const res = await api.sendReminders(ask);
-    if (res.ok) {
-        refresh();
-        revalidatePath("/");
-    }
-    return res;
+    return save(
+        orgId,
+        () => api.sendReminders(ask),
+        () => {
+            refresh();
+            revalidate([["/"]]);
+        },
+    );
 }

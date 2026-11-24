@@ -53,6 +53,7 @@ export function useMissingRatesSheet(missing: MissingRates | null): {
                 setOpen(false);
                 if (saved === null) return;
                 showSuccess(savedMessage(saved));
+                // rq-refresh-ok: what is missing is the page's own server prop (Invoices too), not a query.
                 router.refresh();
             }}
         />

@@ -4,9 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
 
 import {
     InvoiceDetailsView,
@@ -16,28 +14,22 @@ import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { QuickLook } from "@/components/shared/forms/quick-look";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatMoneyMajor } from "@/lib/format/money";
-import type { InvoiceDetails } from "@/lib/invoices/details";
-import { loadInvoiceDetails } from "@/lib/invoices/details-actions";
 import { neighbours, nextLabel } from "@/lib/invoices/details-view";
 import { invoiceHref } from "@/lib/invoices/links";
 import type { Invoice } from "@/lib/invoices/service";
 import type { InvoiceTab } from "@/lib/invoices/status";
 import { billedTo, headerPill } from "@/lib/invoices/status";
+import { useInvoice, useInvoiceSave } from "@/lib/invoices/use-invoices";
 import { invoiceZone } from "@/lib/invoices/zone";
 import { FailedRead } from "@saroh/ui/failed-read";
-
-type Read =
-    | { state: "loading" }
-    | { state: "failed"; error: string }
-    | { state: "ready"; details: InvoiceDetails };
 
 /**
  * An invoice's details in a side sheet, opened from its row on the list
  * (DEC-173, U9 #1121, INVListAC): the same view as the invoice's page, 512px
  * from the right on a desk and the whole screen on a phone, with its
  * actions at the foot within a thumb's reach. Every action finishes here:
- * each opens over the sheet, and after a write the sheet reads the invoice
- * again in place while the list behind it catches up.
+ * each opens over the sheet, and after a write the sheet, the list behind
+ * it and the strip are read again in place (`useInvoiceSave`).
  *
  * Previous and Next walk the rows of the list as it is filtered ("Next
  * overdue" on Overdue) without closing. "Open full page" is the invoice's
@@ -61,45 +53,19 @@ export function InvoiceDetailsSheet({
     onMove: (invoice: Invoice) => void;
     onClose: () => void;
 }) {
-    const router = useRouter();
-    const [read, setRead] = useState<Read>({ state: "loading" });
-    const [attempt, setAttempt] = useState(0);
+    const { saved } = useInvoiceSave();
+    // The invoice's own read, shared with its page (`/api/invoices/[id]`).
+    const read = useInvoice(invoiceId ? { invoiceId } : null);
+    const details = read.data;
 
-    // Another invoice starts a new read.
-    const [was, setWas] = useState(invoiceId);
-    if (invoiceId !== was) {
-        setWas(invoiceId);
-        setRead({ state: "loading" });
-    }
-
-    useEffect(() => {
-        if (!invoiceId) return;
-        let live = true;
-        void loadInvoiceDetails(invoiceId).then((res) => {
-            if (!live) return;
-            setRead(
-                res.ok
-                    ? { state: "ready", details: res.data }
-                    : { state: "failed", error: res.error },
-            );
-        });
-        return () => {
-            live = false;
-        };
-    }, [invoiceId, attempt]);
-
-    /** After a write: this sheet reads it again, the list behind it too. */
-    function changed() {
-        setAttempt((n) => n + 1);
-        router.refresh();
-    }
+    /** After a write: this sheet, the list behind it and the strip read again. */
+    const changed = () => void saved();
 
     const { previous, next } = neighbours(rows, invoiceId);
-    const shown = read.state === "ready" ? read.details.invoice : row;
+    const shown = details?.invoice ?? row;
     const title = shown?.number ?? (shown ? "Draft" : "Invoice");
     const pill = shown ? headerPill(shown) : null;
-    const zone =
-        read.state === "ready" ? invoiceZone(read.details.business) : undefined;
+    const zone = details ? invoiceZone(details.business) : undefined;
 
     /** The foot: Share and More (once read), then Previous and Next. */
     const walk = (menus: ReactNode) => (
@@ -166,26 +132,23 @@ export function InvoiceDetailsSheet({
                     : "An invoice's details."
             }
         >
-            {read.state === "ready" ? (
+            {details ? (
                 <InvoiceDetailsView
                     // A new invoice starts its own state: no link or dialog
                     // of the last one carries over.
-                    key={read.details.invoice.id}
-                    details={read.details}
+                    key={details.invoice.id}
+                    details={details}
                     layout="sheet"
                     onChanged={changed}
                     onGone={onClose}
                     foot={walk}
                 />
-            ) : read.state === "failed" ? (
+            ) : read.isError && !read.isFetching ? (
                 <>
                     <FailedRead
                         size="panel"
                         things="this invoice"
-                        onRetry={() => {
-                            setRead({ state: "loading" });
-                            setAttempt((n) => n + 1);
-                        }}
+                        onRetry={() => void read.refetch()}
                     />
                     <SheetFoot>{walk(null)}</SheetFoot>
                 </>

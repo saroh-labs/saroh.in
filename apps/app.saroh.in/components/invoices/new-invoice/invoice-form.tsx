@@ -38,6 +38,7 @@ import { lostChanges, lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 import { PaperEditor } from "@/components/invoices/paper-editor/paper-editor";
 import { SeeAsCustomer } from "@/components/invoices/paper-editor/see-as-customer";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import { saveOrganizationSettingsInPlace } from "@/lib/organizations/settings-actions";
 import { CustomerBlock, NoContactsYet } from "./customer-block";
 import { DueStrip } from "./due-strip";
@@ -118,6 +119,7 @@ export function InvoiceForm({
     header?: { breadcrumb: ReactNode[]; title: string };
 }) {
     const router = useRouter();
+    const { orgId } = useInvoiceSave();
     const details = useBusinessDetailsStep({
         then: "issue it",
         continueLabel: "Save and issue",
@@ -267,6 +269,7 @@ export function InvoiceForm({
                 run: details.run,
                 withLink,
                 push: (to) => router.push(to),
+                orgId,
             });
         } finally {
             setIntent(null);

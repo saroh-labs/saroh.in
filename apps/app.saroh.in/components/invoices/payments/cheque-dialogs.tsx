@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { chequeBounced, chequeCleared } from "@/lib/invoices/actions";
 import type { Invoice, InvoicePayment } from "@/lib/invoices/service";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import { SHARE_RECEIPT_ON_WHATSAPP } from "@/lib/invoices/words";
 import { CheckRow } from "@saroh/ui/check-row";
 import { FormDialog } from "@saroh/ui/form-dialog";
@@ -52,6 +53,7 @@ export function ChequeClearedDialog({
     onChanged: (fresh: Invoice) => void;
 }) {
     const [on, setOn] = useState<Date | undefined>(new Date());
+    const { orgId } = useInvoiceSave();
     const [busy, setBusy] = useState(false);
     const [was, setWas] = useState(payment?.id ?? null);
     if ((payment?.id ?? null) !== was) {
@@ -64,7 +66,7 @@ export function ChequeClearedDialog({
     async function clear() {
         if (!p) return;
         const res = await runAction(
-            () => chequeCleared(invoice.id, p.id, on?.toISOString()),
+            () => chequeCleared(invoice.id, p.id, on?.toISOString(), orgId),
             { setBusy },
         );
         if (!res) return;
@@ -84,7 +86,13 @@ export function ChequeClearedDialog({
             "The invoice reads Paid.",
             {
                 label: SHARE_RECEIPT_ON_WHATSAPP,
-                onClick: () => void openWhatsAppShare(invoice.id, "RECEIPT"),
+                onClick: () =>
+                    void openWhatsAppShare(
+                        invoice.id,
+                        "RECEIPT",
+                        undefined,
+                        orgId,
+                    ),
             },
         );
     }
@@ -154,6 +162,7 @@ export function ChequeBouncedDialog({
 }) {
     const [reason, setReason] = useState("");
     const [tell, setTell] = useState(false);
+    const { orgId } = useInvoiceSave();
     const [busy, setBusy] = useState(false);
     const [was, setWas] = useState(payment?.id ?? null);
     if ((payment?.id ?? null) !== was) {
@@ -177,9 +186,12 @@ export function ChequeBouncedDialog({
         const tab = tell ? window.open("", "_blank") : null;
         const res = await runAction(
             () =>
-                chequeBounced(invoice.id, p.id, {
-                    ...(reason.trim() ? { reason: reason.trim() } : {}),
-                }),
+                chequeBounced(
+                    invoice.id,
+                    p.id,
+                    { ...(reason.trim() ? { reason: reason.trim() } : {}) },
+                    orgId,
+                ),
             { setBusy },
         );
         if (!res) {
@@ -194,7 +206,7 @@ export function ChequeBouncedDialog({
         onClose();
         onChanged(res.data);
         showSuccess(`${chequeName(p)} bounced.`, `${money} is owed again.`);
-        if (tell) void openWhatsAppShare(invoice.id, "REMINDER", tab);
+        if (tell) void openWhatsAppShare(invoice.id, "REMINDER", tab, orgId);
     }
 
     return (

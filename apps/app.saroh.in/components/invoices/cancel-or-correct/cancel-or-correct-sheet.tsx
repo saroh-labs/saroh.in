@@ -25,6 +25,7 @@ import type {
     InvoiceStanding,
 } from "@/lib/invoices/service";
 import { billedTo } from "@/lib/invoices/status";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import {
     CANCEL_OR_CORRECT,
     PAID_IN_PART_NO_CANCEL,
@@ -155,7 +156,7 @@ const CHOICES: Record<
  * Self-contained, so the details sheet (U9) and the page both open it.
  * With `onDone`, the caller decides what happens after: without it a
  * draft opens in the editor, as Void and write again always did, and
- * anything else refreshes in place.
+ * anything else is read again in place (`useInvoiceSave`).
  */
 export function CancelOrCorrectSheet({
     open,
@@ -172,6 +173,7 @@ export function CancelOrCorrectSheet({
     onDone?: (outcome: CancelOutcome) => void;
 }) {
     const router = useRouter();
+    const { orgId, saved } = useInvoiceSave();
     const ids = { choice: useId(), why: useId() };
     const whyRef = useRef<HTMLInputElement>(null);
     const options = CHOICES[registered ? "registered" : "unregistered"];
@@ -239,7 +241,7 @@ export function CancelOrCorrectSheet({
             router.push(`/billing/invoices/${outcome.draftId}/edit`);
             return;
         }
-        router.refresh();
+        void saved();
     }
 
     async function submit() {
@@ -253,7 +255,7 @@ export function CancelOrCorrectSheet({
         switch (choice) {
             case "credit": {
                 const res = await runAction(
-                    () => creditInvoice(invoice.id, why, invoice.expect),
+                    () => creditInvoice(invoice.id, why, invoice.expect, orgId),
                     { setBusy },
                 );
                 if (!res) return;
@@ -270,6 +272,7 @@ export function CancelOrCorrectSheet({
                             invoice.id,
                             why,
                             invoice.expect,
+                            orgId,
                         ),
                     { setBusy },
                 );
@@ -282,7 +285,7 @@ export function CancelOrCorrectSheet({
             }
             case "void": {
                 const res = await runAction(
-                    () => voidInvoice(invoice.id, why),
+                    () => voidInvoice(invoice.id, why, orgId),
                     { setBusy },
                 );
                 if (!res) return;
@@ -292,7 +295,7 @@ export function CancelOrCorrectSheet({
             }
             case "reissue": {
                 const res = await runAction(
-                    () => reissueInvoice(invoice.id, why),
+                    () => reissueInvoice(invoice.id, why, orgId),
                     { setBusy },
                 );
                 if (!res) return;

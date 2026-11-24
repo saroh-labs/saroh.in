@@ -1,29 +1,23 @@
-import { InvoicesScreen } from "@/components/invoices/list/invoices-screen";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+
+import { InvoicesContainer } from "@/components/invoices/list/invoices-container";
 import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
-import { listQueryFrom, readsOnServer } from "@/lib/invoices/list-view";
+import {
+    invoicesListServer,
+    invoicesSummaryServer,
+} from "@/lib/invoices/access-server";
 import { paymentsModuleOn } from "@/lib/invoices/payments-on";
-import {
-    listInvoicesIn,
-    scopeFromQuery,
-    scopeWithName,
-} from "@/lib/invoices/scope";
-import {
-    listInvoices,
-    listInvoicesBy,
-    listInvoicesPaidSince,
-    readInvoiceSummary,
-} from "@/lib/invoices/service";
-import { chipFromQuery } from "@/lib/invoices/sources";
+import { invoicesAsk } from "@/lib/invoices/queries";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { invoiceZone } from "@/lib/invoices/zone";
 import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
-import { dateRangeAsk } from "@/lib/views/date-range";
-import { sinceParam } from "@/lib/views/since";
 
 export const metadata = { title: "Invoices" };
 
@@ -42,6 +36,12 @@ export const metadata = { title: "Invoices" };
  *
  * A role without the read gets the design's locked card before anything
  * is read (D18), rather than the generic denial a 403 brings.
+ *
+ * On React Query (DEC-259): the gate and the business's facts (GST standing,
+ * zone, rates missing, Payments on) are the page's; the list as the address
+ * asks (`/api/invoices`) and the strip (`/api/invoices/summary`) are
+ * prefetched together and hydrated, and `InvoicesContainer` reads every
+ * later one in place.
  */
 export default async function InvoicesPage({
     searchParams,
@@ -72,70 +72,50 @@ export default async function InvoicesPage({
             <PaymentsLocked {...paymentsLockedCopy(organization, "invoices")} />
         );
     }
-    const query = listQueryFrom(params);
-    const paidSince = sinceParam({ since: params.since });
-    const only = scopeFromQuery(params);
-    const narrowedRead = readsOnServer(query)
-        ? listInvoicesBy({
-              q: query.q,
-              view: query.cheques ? "cheques" : undefined,
-              paidFrom: query.paidFrom ?? undefined,
-              ...dateRangeAsk(query),
-              ...(only?.kind === "pack" ? { packId: only.id } : {}),
-              ...(only?.kind === "course" ? { courseId: only.id } : {}),
-          })
-        : null;
-    const [
-        { rows: invoices, truncated },
-        business,
-        paid,
-        scope,
-        missingRates,
-        summary,
-        paymentsOn,
-    ] = await Promise.all([
-        narrowedRead ?? (only ? listInvoicesIn(only) : listInvoices()),
+    const client = getServerQueryClient();
+    const [business, missingRates, paymentsOn] = await Promise.all([
         getInvoiceBusiness(),
-        // Asked of the API (H-7): an old invoice paid today is past the
-        // newest page `listInvoices` reads.
-        paidSince ? listInvoicesPaidSince(paidSince) : null,
-        only ? scopeWithName(only) : null,
         // What is on sale with no GST rate; null says nothing of it.
         readMissingRates(),
-        // The money strip; null when it couldn't be read.
-        readInvoiceSummary(),
         paymentsModuleOn(),
+        // The list and the strip, handed to the browser's queries. A failed
+        // read is the container's to say: the list's is the page failing
+        // (`error.tsx`), the strip's its own "Couldn't load totals".
+        organization
+            ? prefetchRead(
+                  client,
+                  invoicesListServer,
+                  organization.id,
+                  invoicesAsk(params),
+              )
+            : null,
+        organization
+            ? prefetchRead(client, invoicesSummaryServer, organization.id, {})
+            : null,
     ]);
     const canWrite = permits(organization, "invoice:write");
 
     return (
         <PageContainer width="full">
-            <InvoicesScreen
-                invoices={invoices}
-                truncated={truncated}
-                canWrite={canWrite}
-                tax={
-                    business
-                        ? {
-                              registered: business.registered,
-                              gstin: business.gstin,
-                          }
-                        : null
-                }
-                query={query}
-                initialChip={chipFromQuery(params.source)}
-                scope={scope}
-                // From Home's "Last 24 hours" (F6): the invoices paid since.
-                paidSince={paidSince}
-                paidSinceInvoices={paid}
-                // Dates as the paper prints them: the business's zone (#836).
-                timeZone={invoiceZone(business)}
-                missingRates={missingRates}
-                summary={summary}
-                paymentsOn={paymentsOn}
-                // Signs a reminder's preview in Remind many (U12).
-                businessName={organization?.name ?? "This business"}
-            />
+            <HydrationBoundary state={dehydrate(client)}>
+                <InvoicesContainer
+                    canWrite={canWrite}
+                    tax={
+                        business
+                            ? {
+                                  registered: business.registered,
+                                  gstin: business.gstin,
+                              }
+                            : null
+                    }
+                    // Dates as the paper prints them: the business's zone (#836).
+                    timeZone={invoiceZone(business)}
+                    missingRates={missingRates}
+                    paymentsOn={paymentsOn}
+                    // Signs a reminder's preview in Remind many (U12).
+                    businessName={organization?.name ?? "This business"}
+                />
+            </HydrationBoundary>
         </PageContainer>
     );
 }

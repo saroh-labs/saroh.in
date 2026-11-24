@@ -85,9 +85,10 @@ function hydrated() {
     server.setQueryData(ordersOptionsRead.options(ORG, {}).queryKey, OPTIONS);
     const client = makeTestClient();
     hydrate(client, dehydrate(server));
-    // Home and Products, seen earlier in this tab.
+    // Home, Products and Invoices, seen earlier in this tab.
     client.setQueryData(domainKey("home", ORG, "home"), {});
     client.setQueryData(domainKey("products", ORG, "list", {}), {});
+    client.setQueryData(domainKey("invoices", ORG, "list", {}), {});
     return client;
 }
 
@@ -168,6 +169,7 @@ describe("a step from the list", () => {
         expect(stale(ordersOptionsRead.options(ORG, {}).queryKey)).toBe(true);
         expect(stale(domainKey("home", ORG, "home"))).toBe(true);
         expect(stale(domainKey("products", ORG, "list", {}))).toBe(true);
+        expect(stale(domainKey("invoices", ORG, "list", {}))).toBe(true);
         unmount();
     });
 

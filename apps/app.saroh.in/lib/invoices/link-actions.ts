@@ -15,12 +15,17 @@ import type { ShareAsk } from "./service";
  * new one and end the one before. So a payment link made here is remembered to
  * show again, and anything else that replaces it forgets it — otherwise
  * "Show link again" would show a dead link. Call these, never the actions
- * behind them, from a screen.
+ * behind them, from a screen. `orgId`: the tab's business, on Invoices'
+ * React Query screens (`useInvoiceSave`).
  */
 
 /** A new payment link, remembered. `updatedAt`: the invoice's, as known now. */
-export async function newPayLink(id: string, updatedAt?: string | null) {
-    const res = await createPayLink(id);
+export async function newPayLink(
+    id: string,
+    updatedAt?: string | null,
+    orgId?: string,
+) {
+    const res = await createPayLink(id, orgId);
     if (res.ok) {
         rememberLink(id, res.data.url, updatedAt, res.data.payLinkMadeAt);
     }
@@ -28,8 +33,8 @@ export async function newPayLink(id: string, updatedAt?: string | null) {
 }
 
 /** A link to view it (#833): it replaces the payment link this tab made. */
-export async function newViewLink(id: string) {
-    const res = await createViewLink(id);
+export async function newViewLink(id: string, orgId?: string) {
+    const res = await createViewLink(id, orgId);
     if (res.ok) forgetLink(id);
     return res;
 }
@@ -39,15 +44,15 @@ export async function newViewLink(id: string) {
  * here; a thread-only send doesn't, but forgetting is the safe side: the
  * screen then offers a new link rather than a dead one.
  */
-export async function sendWithLink(id: string) {
-    const res = await sendInvoice(id);
+export async function sendWithLink(id: string, orgId?: string) {
+    const res = await sendInvoice(id, orgId);
     if (res.ok) forgetLink(id);
     return res;
 }
 
 /** A reminder, the same way. */
 export async function remindWithLink(id: string, orgId?: string) {
-    const res = await (orgId ? remindInvoice(id, orgId) : remindInvoice(id));
+    const res = await remindInvoice(id, orgId);
     if (res.ok) forgetLink(id);
     return res;
 }
@@ -63,8 +68,9 @@ export async function shareWithLink(
     id: string,
     ask: ShareAsk,
     updatedAt?: string | null,
+    orgId?: string,
 ) {
-    const res = await shareInvoice(id, ask);
+    const res = await shareInvoice(id, ask, orgId);
     if (res.ok && res.data.url) {
         if (res.data.payOnline) {
             rememberLink(id, res.data.url, updatedAt);

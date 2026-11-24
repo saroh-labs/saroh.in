@@ -42,6 +42,7 @@ import { paymentTargetOf } from "@/lib/invoices/record-payment";
 import { canSend, paysOnline } from "@/lib/invoices/send";
 import type { InvoicePayment } from "@/lib/invoices/service";
 import { billedTo } from "@/lib/invoices/status";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import { invoiceZone } from "@/lib/invoices/zone";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog, sayRefusal } from "@saroh/ui/confirm-dialog";
@@ -100,6 +101,7 @@ export function useDetailsActions({
         who,
         total: formatMoneyMajor(i.total, i.currency),
     };
+    const { orgId } = useInvoiceSave();
     const [open, setOpen] = useState<Open>(null);
     const [payment, setPayment] = useState<{
         dialog: PaymentDialog;
@@ -168,7 +170,7 @@ export function useDetailsActions({
 
     async function makeLink(): Promise<ConfirmResult> {
         const res = await runAction(
-            () => detailsStep.run(() => newPayLink(i.id, i.updatedAt)),
+            () => detailsStep.run(() => newPayLink(i.id, i.updatedAt, orgId)),
             { setBusy },
         );
         if (!res) return;
@@ -184,7 +186,7 @@ export function useDetailsActions({
 
     async function makeViewLink(): Promise<ConfirmResult> {
         const res = await runAction(
-            () => detailsStep.run(() => newViewLink(i.id)),
+            () => detailsStep.run(() => newViewLink(i.id, orgId)),
             { setBusy },
         );
         if (!res) return;
@@ -225,7 +227,13 @@ export function useDetailsActions({
         if (receiptGoing.current) return;
         receiptGoing.current = true;
         const res = await runAction(
-            () => shareWithLink(i.id, { channel: "EMAIL", kind: "RECEIPT" }),
+            () =>
+                shareWithLink(
+                    i.id,
+                    { channel: "EMAIL", kind: "RECEIPT" },
+                    undefined,
+                    orgId,
+                ),
             {
                 setBusy: (on) => {
                     receiptGoing.current = on;

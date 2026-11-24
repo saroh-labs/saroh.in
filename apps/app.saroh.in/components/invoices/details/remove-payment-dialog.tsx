@@ -20,6 +20,7 @@ import type {
     InvoicePaymentMethod,
 } from "@/lib/invoices/service";
 import { leftCents } from "@/lib/invoices/status";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import { paymentWay, toCollect } from "@/lib/invoices/words";
 import { FormDialog } from "@saroh/ui/form-dialog";
 
@@ -47,6 +48,7 @@ export function RemovePaymentDialog({
     onChanged: (fresh?: Invoice) => void;
 }) {
     const [reason, setReason] = useState("");
+    const { orgId } = useInvoiceSave();
     const [busy, setBusy] = useState(false);
     // A fresh why for each payment it opens on.
     const [was, setWas] = useState(payment?.id ?? null);
@@ -61,7 +63,13 @@ export function RemovePaymentDialog({
     async function remove() {
         if (!p) return;
         const res = await runAction(
-            () => removePayment(invoice.id, p.id, reason.trim() || undefined),
+            () =>
+                removePayment(
+                    invoice.id,
+                    p.id,
+                    reason.trim() || undefined,
+                    orgId,
+                ),
             { setBusy },
         );
         if (!res) return;
@@ -75,7 +83,7 @@ export function RemovePaymentDialog({
         showUndo(
             `Payment of ${money} removed.`,
             async () => {
-                const back = await putBack(invoice.id, p);
+                const back = await putBack(invoice.id, p, orgId);
                 onChanged();
                 return back;
             },
@@ -118,17 +126,22 @@ export function RemovePaymentDialog({
 export async function putBack(
     invoiceId: string,
     p: InvoicePayment,
+    orgId?: string,
 ): Promise<{ ok: boolean; error?: string }> {
-    const res = await recordPayment(invoiceId, {
-        // Only a payment recorded by hand can be removed, so never ONLINE.
-        method: p.method as InvoicePaymentMethod,
-        amount: p.amount,
-        receivedAt: p.receivedAt,
-        ...(p.reference ? { reference: p.reference } : {}),
-        ...(p.note ? { note: p.note } : {}),
-        ...(p.cheque?.number ? { chequeNumber: p.cheque.number } : {}),
-        ...(p.cheque?.bank ? { chequeBank: p.cheque.bank } : {}),
-    });
+    const res = await recordPayment(
+        invoiceId,
+        {
+            // Only a payment recorded by hand can be removed, so never ONLINE.
+            method: p.method as InvoicePaymentMethod,
+            amount: p.amount,
+            receivedAt: p.receivedAt,
+            ...(p.reference ? { reference: p.reference } : {}),
+            ...(p.note ? { note: p.note } : {}),
+            ...(p.cheque?.number ? { chequeNumber: p.cheque.number } : {}),
+            ...(p.cheque?.bank ? { chequeBank: p.cheque.bank } : {}),
+        },
+        orgId,
+    );
     if (!res.ok) return { ok: false, error: res.error };
     const again = res.data.recorded?.paymentId;
     if (!again) return { ok: true };
