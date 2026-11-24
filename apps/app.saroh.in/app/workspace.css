@@ -22,9 +22,10 @@
    ========================================================================== */
 
 /* ─── Route entrance ─────────────────────────────────────────────────────────
-   Driven by `(shell)/template.tsx`, which Next remounts on every navigation,
-   so it is the shortest entrance in the product: routine navigation must never
-   turn into waiting. */
+   Put on by `(shell)/template.tsx` only on a move to another section: not on
+   the first page, Back or Forward, or a move within a section (`fadesIn`,
+   route-fade.ts). Still the shortest entrance in the product: routine
+   navigation must never turn into waiting. */
 
 .wk-route {
     animation: wk-rise var(--duration-base) var(--ease-out);
