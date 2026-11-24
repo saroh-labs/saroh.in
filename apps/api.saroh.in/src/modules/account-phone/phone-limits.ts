@@ -32,6 +32,13 @@ export const STARTS_PER_PHONE_PER_DAY = 10;
 export const STARTS_PER_USER_PER_DAY = 5;
 /** Starts from one address in an hour. */
 export const STARTS_PER_ADDRESS_PER_HOUR = 20;
+/**
+ * Starts that failed on Saroh's side, per number, person or address, in
+ * {@link OUR_FAILURES_WINDOW_SECONDS}: they spend no ordinary limit, so
+ * this is the backstop (owner, 24 Nov: block after 10, wait an hour or two).
+ */
+export const OUR_FAILURES_PER_WINDOW = 10;
+export const OUR_FAILURES_WINDOW_SECONDS = 2 * HOUR;
 /** Failed verifies for one number in a day. */
 export const FAILS_PER_PHONE_PER_DAY = 10;
 /** Failed verifies from one address in a day. */
@@ -48,6 +55,9 @@ export const OUR_FAILURE = "ours_";
 const notOurFailure: Prisma.AccountPhoneEventWhereInput = {
     OR: [{ reason: null }, { reason: { not: { startsWith: OUR_FAILURE } } }],
 };
+const ourFailure: Prisma.AccountPhoneEventWhereInput = {
+    reason: { startsWith: OUR_FAILURE },
+};
 
 export type LimitReason =
     | "phone_cooldown"
@@ -55,6 +65,7 @@ export type LimitReason =
     | "phone_daily"
     | "user_daily"
     | "address_hourly"
+    | "our_failures"
     | "phone_failures"
     | "address_failures";
 
@@ -78,7 +89,16 @@ export interface LimitKeys {
 
 function startRules({ phoneHash, ipHash, userId }: LimitKeys): Rule[] {
     const kind: AccountPhoneEventKind = "START";
+    const ours = (where: Prisma.AccountPhoneEventWhereInput): Rule => ({
+        reason: "our_failures",
+        max: OUR_FAILURES_PER_WINDOW,
+        windowSeconds: OUR_FAILURES_WINDOW_SECONDS,
+        where: { kind, ...where, ...ourFailure },
+    });
     return [
+        ours({ phoneHash }),
+        ...(userId ? [ours({ userId })] : []),
+        ...(ipHash ? [ours({ ipHash })] : []),
         {
             reason: "phone_cooldown",
             max: 1,

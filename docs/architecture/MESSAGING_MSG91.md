@@ -216,7 +216,9 @@ again.
 A send the provider refuses, or the ceiling stops, counts toward none of
 the person's start limits: the released start's reason begins `ours_`
 (`account-phone/phone-limits.ts`). Not on WhatsApp is the number's, not
-ours, and still counts. An account-level refusal (`accountLevel` in
+ours, and still counts. As a backstop, 10 of our failures for one number,
+person or address within 2 hours block further starts until the window
+turns (owner, 24 Nov). An account-level refusal (`accountLevel` in
 `messaging/whatsapp-signin-health.ts`: the token, a permission such as
 Meta's code 10, payment, registration, the template) pauses WhatsApp codes
 for every number for 5 minutes: each start is told to use SMS before
