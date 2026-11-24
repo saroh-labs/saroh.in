@@ -1,13 +1,13 @@
 "use client";
 
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { moveStage, undoStage } from "@/lib/orders/actions";
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage } from "@/lib/orders/read";
+import { useOrderSave } from "@/lib/orders/use-orders";
 
 /**
  * Take an order's next step from the Orders list — its row menu or its quick
@@ -17,10 +17,12 @@ import type { KitchenStage } from "@/lib/orders/read";
  * API keeps the step undoable (`UNDO_WINDOW_MS`, ten seconds). The undo
  * rule stands: once the customer has been told of a step (A14), the API
  * refuses its undo and says so, and a move it answers `undoable: false` for
- * draws no Undo at all. Nothing is sent to the customer from here.
+ * draws no Undo at all. Nothing is sent to the customer from here. A step
+ * that landed reads the list again (`useOrderSave`); a refused one reads
+ * nothing.
  */
 export function useOrderStep(onDone?: () => void) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const [busy, startTransition] = useTransition();
 
     const take = (order: {
@@ -31,12 +33,11 @@ export function useOrderStep(onDone?: () => void) {
     }) =>
         startTransition(async () => {
             const res = await runAction(() =>
-                moveStage(order.id, { to: order.to }),
+                moveStage(order.id, { to: order.to }, orgId),
             );
-            if (!res) return router.refresh();
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
-                router.refresh();
                 return;
             }
             const from = order.stage as KitchenStage;
@@ -50,7 +51,7 @@ export function useOrderStep(onDone?: () => void) {
                     () =>
                         startTransition(async () => {
                             const back = await runAction(() =>
-                                undoStage(order.id, data.eventId),
+                                undoStage(order.id, data.eventId, orgId),
                             );
                             if (!back) return;
                             if (!back.ok) {
@@ -59,14 +60,14 @@ export function useOrderStep(onDone?: () => void) {
                                 showInfo(
                                     `#${order.orderId} is back to ${STAGE_LABEL[from].toLowerCase()}.`,
                                 );
+                                await saved();
                             }
-                            router.refresh();
                             onDone?.();
                         }),
                     { duration: HOLD_MS },
                 );
             }
-            router.refresh();
+            await saved();
             onDone?.();
         });
 

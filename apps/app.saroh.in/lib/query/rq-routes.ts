@@ -19,6 +19,9 @@ export const RQ_ROUTES: readonly string[] = [
     "/bookings/all",
     "/commerce/products",
     "/commerce/products/[productId]",
+    "/commerce/orders",
+    "/commerce/orders/[orderId]",
+    "/commerce/orders/tickets",
 ];
 
 export const RQ_DOMAINS: readonly string[] = [
@@ -26,4 +29,5 @@ export const RQ_DOMAINS: readonly string[] = [
     "calendar",
     "bookings",
     "products",
+    "orders",
 ];

@@ -26,7 +26,6 @@ import {
     Undo2,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { usePayLink } from "@/components/commerce/order-payment/pay-link";
@@ -36,6 +35,7 @@ import { cancelOrder } from "@/lib/orders/actions";
 import type { OrderRow } from "@/lib/orders/business-service";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
 import { orderPageHref, payLinkAction, rowMenu } from "@/lib/orders/row-menu";
+import { useOrderSave } from "@/lib/orders/use-orders";
 
 import { IconButton } from "@saroh/ui/icon-button";
 import { useOrderStep } from "./use-order-step";
@@ -70,7 +70,7 @@ export function OrderRowMenu({
     row: OrderRow;
     can: OrderAbilities;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const items = rowMenu(row, can);
     const step = useOrderStep();
     const ref = `#${row.orderId}`;
@@ -94,10 +94,11 @@ export function OrderRowMenu({
                 "Nothing was paid on it. Its stock goes back on the shelves.",
             // The one cancel (B9): nothing was paid, so nothing goes back;
             // a treatment's visits are cancelled with it.
-            run: () => cancelOrder(row.id, { reason: null, idempotencyKey }),
+            run: () =>
+                cancelOrder(row.id, { reason: null, idempotencyKey }, orgId),
             sent: `${ref} cancelled. Its stock is back on the shelves.`,
             failed: `${ref} wasn't cancelled.`,
-            onSent: () => router.refresh(),
+            onSent: () => void saved(),
         });
     };
 

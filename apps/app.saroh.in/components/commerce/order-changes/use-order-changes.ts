@@ -1,7 +1,6 @@
 "use client";
 
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { formatMoney } from "@/lib/format/money";
@@ -9,6 +8,7 @@ import { cancelOrder, changeFulfilment } from "@/lib/orders/actions";
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import { HOLD_MS } from "@/lib/orders/lifecycle";
 import type { OrderRead } from "@/lib/orders/read";
+import { useOrderSave } from "@/lib/orders/use-orders";
 
 import type {
     Panel,
@@ -21,7 +21,7 @@ import type { CancelChoice } from "./cancel-panel";
  * Order Detail's two changes after it was placed (round-2 B9): how it is
  * fulfilled, saved at once, and a cancel, held ten seconds like a refund
  * (it is one) before it is recorded. Each write is a Server Action; the
- * page re-reads the order after it.
+ * order is read again after one that landed (`useOrderSave`).
  */
 export function useOrderChanges({
     order,
@@ -41,7 +41,7 @@ export function useOrderChanges({
     /** More is owed after a change: make the payment link for it (B11). */
     onOwed?: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const [busy, startTransition] = useTransition();
     const money = (cents: number) => formatMoney(Math.abs(cents), currency);
     const told = (yes: boolean) =>
@@ -52,10 +52,14 @@ export function useOrderChanges({
     const saveFulfilment = (input: ChangeFulfilmentInput, label: string) => {
         startTransition(async () => {
             const res = await runAction(() =>
-                changeFulfilment(order.id, {
-                    ...input,
-                    idempotencyKey: crypto.randomUUID(),
-                }),
+                changeFulfilment(
+                    order.id,
+                    {
+                        ...input,
+                        idempotencyKey: crypto.randomUUID(),
+                    },
+                    orgId,
+                ),
             );
             if (!res) return;
             if (!res.ok) {
@@ -95,7 +99,7 @@ export function useOrderChanges({
             } else {
                 showSuccess(now, told(d.told));
             }
-            router.refresh();
+            await saved();
         });
     };
 
@@ -131,21 +135,24 @@ export function useOrderChanges({
                 new Promise<void>((resolve) => {
                     startTransition(async () => {
                         const res = await runAction(() =>
-                            cancelOrder(order.id, {
-                                reason: choice.reason,
-                                idempotencyKey: key,
-                                tell: choice.tell,
-                            }),
+                            cancelOrder(
+                                order.id,
+                                {
+                                    reason: choice.reason,
+                                    idempotencyKey: key,
+                                    tell: choice.tell,
+                                },
+                                orgId,
+                            ),
                         );
                         resolve();
                         if (!res) {
                             // The reply may have been lost after it went.
-                            router.refresh();
+                            await saved();
                             return;
                         }
                         if (!res.ok) {
                             showError(res.error);
-                            router.refresh();
                             return;
                         }
                         const d = res.data;
@@ -172,7 +179,7 @@ export function useOrderChanges({
                                 told(d.told),
                             );
                         }
-                        router.refresh();
+                        await saved();
                     });
                 }),
         });

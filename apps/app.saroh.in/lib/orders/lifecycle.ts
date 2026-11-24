@@ -1,3 +1,5 @@
+import { joinDeliveryPlace } from "@saroh/block-contract";
+
 import { count } from "@/lib/format/plural";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { StepTone } from "@/lib/orders/list-row";
@@ -5,6 +7,7 @@ import { rowProgress } from "@/lib/orders/list-row";
 import type {
     AllergenRef,
     AllergyNote,
+    DeliveryAddress,
     FulfilmentStep,
     FulfilmentType,
     KitchenStage,
@@ -14,6 +17,10 @@ import type {
 } from "@/lib/orders/read";
 import { REFUND_REASONS } from "@/lib/orders/refund-choice";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
+
+/** Past the city: India's state, or a Global delivery's "Texas, United States". */
+export const deliveryPlace = (a: Pick<DeliveryAddress, "state" | "country">) =>
+    joinDeliveryPlace(a.state, a.country) || null;
 
 /**
  * The order lifecycle as the API enforces it (`order-state.ts`), so the

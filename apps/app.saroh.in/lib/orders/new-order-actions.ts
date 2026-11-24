@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import type { NewOrderInput } from "./new-order-service";
 import {
     createNewOrder,
@@ -19,7 +21,14 @@ export async function newOrderLines(storeId: string, productIds: string[]) {
     return readNewOrderLines(storeId, productIds).catch(() => null);
 }
 
-/** Make the order; a payment link, if asked for, comes back this once. */
-export async function makeNewOrder(storeId: string, input: NewOrderInput) {
-    return createNewOrder(storeId, input);
+/**
+ * Make the order; a payment link, if asked for, comes back this once. As
+ * the tab's business (`writeAsOrg`, DEC-259): the list reads itself again.
+ */
+export async function makeNewOrder(
+    storeId: string,
+    input: NewOrderInput,
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => createNewOrder(storeId, input));
 }

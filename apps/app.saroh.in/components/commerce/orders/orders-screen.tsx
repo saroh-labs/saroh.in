@@ -4,8 +4,7 @@ import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { countLabel } from "@saroh/ui/page-header";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
-import { useRouter } from "next/navigation";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 
 import {
     ListPaging,
@@ -70,6 +69,10 @@ import { useOrderSelection } from "./use-order-selection";
  * With `order:stage`, rows can be selected and moved a step together, or
  * their tickets printed (B6, `bulk-bar.tsx`). Loading, failed, locked and
  * every empty list are in `orders-states.tsx` (B7).
+ *
+ * On React Query (DEC-259, `orders-container.tsx`): a tab, filter or search
+ * changes the address in place and the container reads that page, the last
+ * rows greyed (`pending`) until it lands.
  */
 export function OrdersScreen({
     query,
@@ -83,7 +86,13 @@ export function OrdersScreen({
     share = null,
     can = NO_ABILITIES,
     newOrder = null,
+    pending = false,
+    onRetry,
 }: {
+    /** The page asked for is on its way: the last rows stay, greyed. */
+    pending?: boolean;
+    /** Read the page again (Needs attention couldn't be read for it). */
+    onRetry: () => void;
     /** The page's notices, drawn under its header. */
     notices?: React.ReactNode;
     query: OrdersQuery;
@@ -154,8 +163,6 @@ export function OrdersScreen({
         places?: readonly OrderPlace[];
     } | null;
 }) {
-    const router = useRouter();
-    const [navigating, startNavigation] = useTransition();
     // A phone's quick view rises from the bottom (B5).
     const narrow = useNarrow();
     const many = stores.length > 1;
@@ -185,12 +192,11 @@ export function OrdersScreen({
     );
     const selectable = can.stage;
 
+    // In place: the address is the list's key (no server render).
     const go = useCallback(
         (patch: Partial<OrdersQuery>) =>
-            startNavigation(() =>
-                router.replace(ordersHref(query, patch), { scroll: false }),
-            ),
-        [query, router],
+            window.history.replaceState(null, "", ordersHref(query, patch)),
+        [query],
     );
 
     const total = page.counts[query.tab];
@@ -268,7 +274,7 @@ export function OrdersScreen({
                 attention toggle, Clear filters, and the range. */}
             <ListToolbar
                 search={
-                    <SearchField query={query} go={go} searching={navigating} />
+                    <SearchField query={query} go={go} searching={pending} />
                 }
                 // The three most used: the status, the date, the location.
                 filters={
@@ -369,11 +375,9 @@ export function OrdersScreen({
                 </div>
             ) : null}
 
-            <PendingRegion pending={navigating} className="pt-3.5">
+            <PendingRegion pending={pending} className="pt-3.5">
                 {attentionUnread ? (
-                    <OrdersAttentionPartial
-                        onRetry={() => startNavigation(() => router.refresh())}
-                    />
+                    <OrdersAttentionPartial onRetry={onRetry} />
                 ) : null}
                 {rows.length === 0 ? (
                     <OrdersEmpty
@@ -464,9 +468,7 @@ export function OrdersScreen({
                         // Opened by ?new=1: closing it leaves the list's
                         // own address, so a reload doesn't open it again.
                         if (!open && newOrder.openOnArrival) {
-                            router.replace(ordersHref(query, {}), {
-                                scroll: false,
-                            });
+                            go({});
                         }
                     }}
                     stores={orderStores}

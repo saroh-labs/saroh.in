@@ -16,12 +16,11 @@ import { customerHref } from "@/lib/customers/links";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { attentionLines } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
-import { goesToAddress } from "@/lib/orders/lifecycle";
+import { deliveryPlace, goesToAddress } from "@/lib/orders/lifecycle";
 import { loadOrderQuickView } from "@/lib/orders/list-actions";
 import { rowCustomer } from "@/lib/orders/list-row";
 import { kitchenPayment } from "@/lib/orders/pay-on-handover";
 import type { OrderRead } from "@/lib/orders/read";
-import { deliveryPlace } from "@/lib/orders/read";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import {
     orderPageHref,

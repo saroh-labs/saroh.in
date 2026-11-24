@@ -9,7 +9,6 @@ import {
     showUndo,
     showWarning,
 } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
@@ -37,6 +36,7 @@ import type {
 } from "@/lib/orders/kitchen-service";
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage, OrderRead } from "@/lib/orders/read";
+import { useOrderSave } from "@/lib/orders/use-orders";
 
 import type { Panel } from "@/components/commerce/order-changes/panel";
 import type { RefundChoice } from "@/components/commerce/order-changes/refund-panel";
@@ -67,7 +67,8 @@ export type { Panel };
  * Undo toast, the ten-second holds for Ready and refunds (recorded when they
  * run out, on "now", or when the page is left), refunds by line with one
  * idempotency key per hold, and edits before preparing. Each write is a
- * Server Action; the page re-reads the order after it.
+ * Server Action as the tab's business; the order is read again after one
+ * that landed (`useOrderSave`), never after a refusal.
  */
 export function useKitchen({
     order,
@@ -82,7 +83,7 @@ export function useKitchen({
     refundTo: string;
     setPanel: (p: Panel) => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const [hold, setHold] = useState<PendingHold | null>(null);
     const [busy, startTransition] = useTransition();
     const holdRef = useRef<PendingHold | null>(null);
@@ -109,12 +110,14 @@ export function useKitchen({
         [],
     );
 
-    const refresh = useCallback(() => router.refresh(), [router]);
+    const refresh = useCallback(() => void saved(), [saved]);
 
     const undo = useCallback(
         (eventId: string, back: KitchenStage) => {
             startTransition(async () => {
-                const res = await runAction(() => undoStage(order.id, eventId));
+                const res = await runAction(() =>
+                    undoStage(order.id, eventId, orgId),
+                );
                 if (!res) return;
                 if (!res.ok) {
                     showError(res.error);
@@ -124,13 +127,15 @@ export function useKitchen({
                 refresh();
             });
         },
-        [order.id, refresh],
+        [order.id, orgId, refresh],
     );
 
     const undoReady = useCallback(
         (eventId: string, back: KitchenStage) => {
             startTransition(async () => {
-                const res = await runAction(() => undoStage(order.id, eventId));
+                const res = await runAction(() =>
+                    undoStage(order.id, eventId, orgId),
+                );
                 if (!res) return;
                 if (!res.ok) {
                     showError(res.error);
@@ -147,7 +152,7 @@ export function useKitchen({
                 refresh();
             });
         },
-        [order.id, order.customerNotice, first, refresh],
+        [order.id, order.customerNotice, first, orgId, refresh],
     );
 
     const move = (
@@ -159,7 +164,7 @@ export function useKitchen({
             startTransition(async () => {
                 const from = order.stage;
                 const res = await runAction(() =>
-                    moveStage(order.id, { to, ...extra }),
+                    moveStage(order.id, { to, ...extra }, orgId),
                 );
                 resolve();
                 if (!res) {
@@ -169,7 +174,6 @@ export function useKitchen({
                 }
                 if (!res.ok) {
                     showError(res.error);
-                    refresh();
                     return;
                 }
                 setPanel(null);
@@ -264,13 +268,17 @@ export function useKitchen({
                 new Promise<void>((resolve) => {
                     startTransition(async () => {
                         const res = await runAction(() =>
-                            refundLines(order.id, {
-                                lines: choice.lines,
-                                putBack: choice.putBack,
-                                reason: choice.reason,
-                                goodwill: choice.goodwill,
-                                idempotencyKey: key,
-                            }),
+                            refundLines(
+                                order.id,
+                                {
+                                    lines: choice.lines,
+                                    putBack: choice.putBack,
+                                    reason: choice.reason,
+                                    goodwill: choice.goodwill,
+                                    idempotencyKey: key,
+                                },
+                                orgId,
+                            ),
                         );
                         resolve();
                         if (!res) {
@@ -280,7 +288,6 @@ export function useKitchen({
                         }
                         if (!res.ok) {
                             showError(res.error);
-                            refresh();
                             return;
                         }
                         const sent = formatMoney(
@@ -323,12 +330,11 @@ export function useKitchen({
     const retryRefund = (refundId: string) => {
         startTransition(async () => {
             const res = await runAction(() =>
-                retryRefundAction(order.id, refundId),
+                retryRefundAction(order.id, refundId, orgId),
             );
             if (!res) return refresh();
             if (!res.ok) {
                 showError(res.error);
-                refresh();
                 return;
             }
             if (res.data.beingConfirmed) {
@@ -370,7 +376,7 @@ export function useKitchen({
         }
         startTransition(async () => {
             const res = await runAction(() =>
-                saveCourierAction(order.id, fields),
+                saveCourierAction(order.id, fields, orgId),
             );
             if (!res) return;
             if (!res.ok) {
@@ -403,7 +409,7 @@ export function useKitchen({
     const saveEdit = (input: EditOrderInput) => {
         startTransition(async () => {
             const res = await runAction(() =>
-                rates.run(() => editBeforePreparing(order.id, input)),
+                rates.run(() => editBeforePreparing(order.id, input, orgId)),
             );
             // Unreached, or the rate wasn't chosen: nothing was changed.
             if (!res) return;
@@ -466,12 +472,11 @@ export function useKitchen({
     const recordPayment = (kind: CounterPayment) => {
         startTransition(async () => {
             const res = await runAction(() =>
-                recordPaymentAction(order.id, kind),
+                recordPaymentAction(order.id, kind, orgId),
             );
             if (!res) return refresh();
             if (!res.ok) {
                 showError(res.error);
-                refresh();
                 return;
             }
             const how =

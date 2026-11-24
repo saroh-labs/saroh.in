@@ -39,8 +39,8 @@ export interface ServerRead<P, T> {
 /** The page's own gate, asked again here: false is a 403. */
 export type Access = (orgId: string) => Promise<boolean>;
 
-/** The longest query string a read takes. */
-const MAX_QUERY = 1024;
+/** The longest query string a read takes: Print tickets' 50 order ids fit. */
+const MAX_QUERY = 2048;
 
 /** A list read's page size: capped. */
 export const pageSize = z.coerce.number().int().min(1).max(100).optional();

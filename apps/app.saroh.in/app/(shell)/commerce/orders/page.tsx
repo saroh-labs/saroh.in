@@ -1,11 +1,11 @@
 import { rememberedPageSize } from "@/lib/paging/remembered";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
-import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
+import { OrdersContainer } from "@/components/commerce/orders/orders-container";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
-import { Moment } from "@/components/shared/notices/moment";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { createBlock, takesOnlinePayment } from "@/lib/billing/access";
 import { arrivalContactId } from "@/lib/customers/prefill";
@@ -18,19 +18,22 @@ import {
     ordersLockedCopy,
 } from "@/lib/orders/access";
 import {
-    getOrderFilterOptions,
-    listOrderRows,
-} from "@/lib/orders/business-service";
+    ordersListServer,
+    ordersOptionsServer,
+} from "@/lib/orders/access-server";
+import type { OrderListPage } from "@/lib/orders/business-service";
 import {
-    orderListParams,
     ordersEmptyCopy,
     ordersHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
+import { ordersAsk, ordersListRead } from "@/lib/orders/queries";
 import { sellsProducts } from "@/lib/orders/sells-products";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
@@ -54,6 +57,11 @@ import { listBusinessStores } from "@/lib/stores/service";
  * Someone holding neither `order:read` nor `order:stage` gets the locked card
  * before anything is read (B7). The list read failing is the page failing
  * (`error.tsx`, "Couldn't load orders") — never an empty list.
+ *
+ * On React Query (DEC-259): the gates and what New order offers are decided
+ * here; the page of the list and what its filter bar offers are prefetched
+ * together (`lib/orders/access-server.ts`) and hydrated, and
+ * `OrdersContainer` reads every later one in place.
  */
 export const metadata = { title: "Orders" };
 
@@ -79,7 +87,10 @@ export default async function OrdersPage({
         );
     }
 
-    const query = readOrdersQuery(params, await rememberedPageSize("orders"));
+    const remembered = await rememberedPageSize("orders");
+    const query = readOrdersQuery(params, remembered);
+    const client = getServerQueryClient();
+    const ask = ordersAsk(query);
     const storesRead = listBusinessStores();
     // What a row's menu and quick view may offer (B5), as Order Detail
     // asks it. A payment link needs a provider that opens the checkout window
@@ -121,125 +132,115 @@ export default async function OrdersPage({
         forContact && powers.create && may("contact:read")
             ? readCustomerPick(forContact)
             : Promise.resolve(null);
-    const [
-        page,
-        stores,
-        openByStore,
-        filterOptions,
-        canPayOnline,
-        sellsSomething,
-        initialPick,
-        places,
-    ] = await Promise.all([
-        listOrderRows(orderListParams(query)),
-        storesRead,
-        // Counted beside the page, not after it.
-        storesRead.then((all) =>
-            all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
-        ),
-        // What the filter bar offers (B4); null leaves its menus out.
-        getOrderFilterOptions(query.product ?? undefined),
-        payOnline,
-        sells,
-        pick,
-        placesRead,
-    ]);
+    const [page, stores, , canPayOnline, sellsSomething, initialPick, places] =
+        await Promise.all([
+            // The list's page, handed to the browser's query. A read that
+            // fails is the container's to say (the error boundary).
+            organization
+                ? prefetchRead(
+                      client,
+                      ordersListServer,
+                      organization.id,
+                      ask,
+                  ).then(() =>
+                      client.getQueryData<OrderListPage>(
+                          ordersListRead.options(organization.id, ask).queryKey,
+                      ),
+                  )
+                : undefined,
+            storesRead,
+            // What the filter bar offers (B4) and the open counts, beside
+            // the page, not after it; null leaves their menus out.
+            organization
+                ? prefetchRead(client, ordersOptionsServer, organization.id, {
+                      product: query.product ?? undefined,
+                  })
+                : undefined,
+            payOnline,
+            sells,
+            pick,
+            placesRead,
+        ]);
     // A page past the end (the list has since got shorter, or the address
     // was typed): start again at the first page rather than show an empty
     // one.
-    if (query.page > 1 && page.rows.length === 0) {
+    if (query.page > 1 && page?.rows.length === 0) {
         redirect(ordersHref(query, { page: 1 }));
     }
     // The business's first, 10th or 100th order (wave G), said once: only
     // on the whole list's first page, where the count is every order.
     const unnarrowed = ordersEmptyCopy(query, null).kind === "first-run";
-    const moment = await ordersListMoment(page, {
-        plain: unnarrowed && !query.storefront && query.page === 1,
-        viewer: organization,
-    });
+    const moment = page
+        ? await ordersListMoment(page, {
+              plain: unnarrowed && !query.storefront && query.page === 1,
+              viewer: organization,
+          })
+        : null;
     // No orders yet: share the online shop while it is live, else the
     // website (B7's first run; DEC-069, L8), on the business's own origin.
     // Only then is the web address read, and a read that fails (or a role
     // it isn't shown to) just leaves the button out.
     const share =
-        page.rows.length === 0 && unnarrowed
+        page?.rows.length === 0 && unnarrowed
             ? shareLink(await readWebAddressLinks(), ORDERS_FIRST_RUN)
             : null;
 
     return (
         <PageContainer width="full">
-            <OrdersScreen
-                // Under the page's header, never above its title.
-                notices={
-                    <>
-                        {/* B17: storefronts still on the 2-hour Pick-up
+            <HydrationBoundary state={dehydrate(client)}>
+                <OrdersContainer
+                    defaultSize={remembered}
+                    // Under the page's header, never above its title.
+                    notices={
+                        <>
+                            {/* B17: storefronts still on the 2-hour Pick-up
                             default. */}
-                        <LateRuleNotice />
-                        <PlanLimitNotice moduleId="orders" className="mb-4" />
-                        {moment ? (
-                            <Moment moment={moment} className="mb-4" />
-                        ) : null}
-                    </>
-                }
-                query={query}
-                page={page}
-                // Oldest first, as `listBusinessStores` reads them, so New
-                // order starts at the business's first storefront (the shop
-                // the design's counter sheet opens on), not the one made last.
-                stores={stores.map((s) => ({ id: s.id, name: s.name }))}
-                openByStore={openByStore}
-                businessName={businessName}
-                // A Member reaches the list through `order:stage` alone
-                // (DEC-024) and gets the kitchen's view of it.
-                kitchen={!access.money}
-                filterOptions={filterOptions}
-                share={share}
-                newOrder={
-                    sellsSomething
-                        ? {
-                              // The old New order page and the calendar's
-                              // "New order" land here with ?new=1.
-                              openOnArrival: params.new === "1",
-                              canSearch: may("contact:read"),
-                              online,
-                              // The month's orders used up: said before the
-                              // sheet is filled, not after (UX-036).
-                              blocked: createBlock(billing, "orders"),
-                              // From a person's page (#247): them, chosen.
-                              initialPick,
-                              places,
-                          }
-                        : null
-                }
-                can={{
-                    // Without resolved actions a Member still stages (DEC-024).
-                    stage: powers.stage,
-                    create: powers.create,
-                    payLink: linkable,
-                    refund: powers.refund,
-                    export: powers.export,
-                    payOnline: canPayOnline,
-                }}
-            />
+                            <LateRuleNotice />
+                            <PlanLimitNotice
+                                moduleId="orders"
+                                className="mb-4"
+                            />
+                        </>
+                    }
+                    moment={moment}
+                    firstHref={ordersHref(query)}
+                    // Oldest first, as `listBusinessStores` reads them, so New
+                    // order starts at the business's first storefront (the shop
+                    // the design's counter sheet opens on), not the one made last.
+                    stores={stores.map((s) => ({ id: s.id, name: s.name }))}
+                    businessName={businessName}
+                    // A Member reaches the list through `order:stage` alone
+                    // (DEC-024) and gets the kitchen's view of it.
+                    kitchen={!access.money}
+                    share={share}
+                    newOrder={
+                        sellsSomething
+                            ? {
+                                  // The old New order page and the calendar's
+                                  // "New order" land here with ?new=1.
+                                  openOnArrival: params.new === "1",
+                                  canSearch: may("contact:read"),
+                                  online,
+                                  // The month's orders used up: said before the
+                                  // sheet is filled, not after (UX-036).
+                                  blocked: createBlock(billing, "orders"),
+                                  // From a person's page (#247): them, chosen.
+                                  initialPick,
+                                  places,
+                              }
+                            : null
+                    }
+                    can={{
+                        // Without resolved actions a Member still stages (DEC-024).
+                        stage: powers.stage,
+                        create: powers.create,
+                        payLink: linkable,
+                        refund: powers.refund,
+                        export: powers.export,
+                        payOnline: canPayOnline,
+                    }}
+                />
+            </HydrationBoundary>
         </PageContainer>
     );
-}
-
-/**
- * How many orders are open at each storefront, for the storefront menu —
- * the API's Open count under that storefront. Null if any couldn't be
- * counted: the menu then shows no counts rather than a wrong 0.
- */
-async function openOrdersByStore(
-    storeIds: string[],
-): Promise<Record<string, number> | null> {
-    const counted = await Promise.allSettled(
-        storeIds.map((storeId) => listOrderRows({ storeId, tab: "open" })),
-    );
-    const out: Record<string, number> = {};
-    for (const [i, result] of Array.from(counted.entries())) {
-        if (result.status !== "fulfilled") return null;
-        out[storeIds[i]] = result.value.counts.open;
-    }
-    return out;
 }

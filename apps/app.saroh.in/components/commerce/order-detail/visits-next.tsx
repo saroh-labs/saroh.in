@@ -2,12 +2,12 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { NewBookingDialog } from "@/components/bookings/new-booking/new-booking-dialog";
 import { markVisitAttended } from "@/lib/orders/actions";
 import type { OrderVisits } from "@/lib/orders/read";
+import { useOrderSave } from "@/lib/orders/use-orders";
 import {
     attendedToast,
     visitsNextLabel,
@@ -82,7 +82,7 @@ function NextButton({
     canMark: boolean;
     canBook: boolean;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const [busy, startTransition] = useTransition();
     const label = visitsNextLabel(visits);
     const attend = visits.next.attend;
@@ -92,15 +92,15 @@ function NextButton({
         const mark = () =>
             startTransition(async () => {
                 const res = await runAction(() =>
-                    markVisitAttended(orderId, attend),
+                    markVisitAttended(orderId, attend, orgId),
                 );
                 if (!res) return;
                 if (!res.ok) {
                     showError(res.error);
                 } else {
                     showSuccess(attendedToast(attend, res.data.done));
+                    await saved();
                 }
-                router.refresh();
             });
         return (
             <Button type="button" busy={busy} onClick={mark}>
@@ -111,6 +111,7 @@ function NextButton({
     if (book !== null && canBook) {
         return (
             <NewBookingDialog
+                onBooked={() => void saved()}
                 services={[
                     {
                         id: visits.service.id,

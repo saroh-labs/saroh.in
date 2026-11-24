@@ -8,7 +8,6 @@ import {
 } from "@saroh/ui/dropdown-menu";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { MoreHorizontal } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import type { PaymentMethod } from "@/lib/invoices/service";
@@ -20,6 +19,7 @@ import {
     PAYMENT_TRANSITIONS,
 } from "@/lib/orders/lifecycle";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
+import { useOrderSave } from "@/lib/orders/use-orders";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
@@ -88,7 +88,7 @@ export function OrderActions({
     /** The order's currency, for the amount box. */
     currency?: string;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const setPending = onPendingChange;
     const rates = useGstRateStep({
         then: "record this payment",
@@ -129,6 +129,7 @@ export function OrderActions({
                               : {}),
                       }
                     : { status: "CANCELLED" },
+                orgId,
             ),
         );
         // The rate wasn't chosen: nothing was recorded, and the dialog
@@ -149,7 +150,7 @@ export function OrderActions({
                   ? handRefundDone(orderRef, part, format)
                   : `${orderRef} marked ${PAYMENT_LABEL[p.to].toLowerCase()}.`,
         );
-        router.refresh();
+        await saved();
         return { ok: true };
     }
 

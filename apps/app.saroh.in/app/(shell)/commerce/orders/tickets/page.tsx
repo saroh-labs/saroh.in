@@ -1,10 +1,13 @@
-import { OrderTickets } from "@/components/commerce/orders/order-tickets";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
+import { TicketsContainer } from "@/components/commerce/orders/tickets-container";
 import { orderLockedText, ordersAccess } from "@/lib/orders/access";
-import { readOrderQuickView } from "@/lib/orders/kitchen-service";
-import type { OrderRead } from "@/lib/orders/read";
-import { readTicketIds, ticketOrder } from "@/lib/orders/tickets";
+import { ticketsServer } from "@/lib/orders/access-server";
+import { readTicketIds } from "@/lib/orders/tickets";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Print tickets" };
@@ -19,6 +22,9 @@ export const metadata = { title: "Print tickets" };
  * can't be read costs only its own ticket — the page says how many, and
  * the rest still print. Someone holding neither `order:read` nor
  * `order:stage` gets the locked card before anything is read.
+ *
+ * On React Query (DEC-259): the tickets' read (`/api/orders/tickets`) is
+ * prefetched and hydrated; `TicketsContainer` draws them.
  */
 export default async function TicketsPage({
     searchParams,
@@ -34,20 +40,16 @@ export default async function TicketsPage({
         return <OrderLocked text={orderLockedText(organization)} />;
     }
 
-    const ids = readTicketIds(params);
-    const reads = await Promise.all(
-        ids.map((id) =>
-            readOrderQuickView(id).catch(() => ({ ok: false as const })),
-        ),
-    );
-    const found: OrderRead[] = reads.flatMap((r) => (r.ok ? [r.order] : []));
-    const orders = ticketOrder(found);
+    // The ids the page reads, as the route takes them.
+    const ask = { ids: readTicketIds(params).join(",") };
+    const client = getServerQueryClient();
+    if (organization) {
+        await prefetchRead(client, ticketsServer, organization.id, ask);
+    }
 
     return (
-        <OrderTickets
-            orders={orders}
-            noTicket={found.length - orders.length}
-            failed={ids.length - found.length}
-        />
+        <HydrationBoundary state={dehydrate(client)}>
+            <TicketsContainer ask={ask} />
+        </HydrationBoundary>
     );
 }

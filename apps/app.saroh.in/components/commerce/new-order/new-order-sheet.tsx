@@ -4,7 +4,6 @@ import { chipClass } from "@saroh/ui/chip";
 import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
@@ -15,6 +14,7 @@ import { pickName } from "@/lib/customers/picker";
 import { orderHref } from "@/lib/orders/links";
 import { centsOf, createLabel, partyOf, payNote } from "@/lib/orders/new-order";
 import { makeNewOrder } from "@/lib/orders/new-order-actions";
+import { useOrderSave } from "@/lib/orders/use-orders";
 import {
     FormSheet,
     FormSheetBody,
@@ -123,7 +123,7 @@ function NewOrderBody({
     initialPick: CustomerPick | null;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const o = useNewOrder({
         initialStoreId,
         canLink,
@@ -177,7 +177,9 @@ function NewOrderBody({
         const res = await runAction(
             () =>
                 rates.run(() =>
-                    details.run(() => makeNewOrder(o.storeId, request(o))),
+                    details.run(() =>
+                        makeNewOrder(o.storeId, request(o), orgId),
+                    ),
                 ),
             { setBusy: setSaving },
         );
@@ -188,7 +190,7 @@ function NewOrderBody({
             setFailed({ key: sent, message: res.error });
             return;
         }
-        router.refresh();
+        void saved();
         if (res.data.payLink) {
             setMade({ id: res.data.id, url: res.data.payLink.url });
             return;

@@ -1,7 +1,6 @@
 "use server";
 
 import { writeAsOrg } from "@/lib/api/assert-active-org";
-import { revalidatePath } from "next/cache";
 
 import type { CourierFields } from "./courier";
 import type {
@@ -29,48 +28,52 @@ import { updateOrder as updateOrderApi } from "./service";
 /**
  * Server Actions for orders — forward the cookie to api (write =
  * owner/EDITOR+). Taking an order is New order's (`new-order-actions.ts`).
+ *
+ * Each takes the tab's business last (`orgId`, from `useOrderSave`) and
+ * writes through `writeAsOrg`, which refuses a moved tab and revalidates
+ * nothing: the Orders screens and Home are on React Query and read their
+ * queries again (DEC-259).
  */
+
+/** The write, as the tab's business when the screen names it. */
+function as<R>(orgId: string | undefined, write: () => Promise<R>) {
+    return orgId ? writeAsOrg(orgId, write) : write();
+}
 
 export async function updateOrder(
     storeId: string,
     orderId: string,
     input: UpdateOrderInput,
+    orgId?: string,
 ): Promise<OrderResult> {
-    const res = await updateOrderApi(storeId, orderId, input);
-    // Record as paid / refunded / cancelled: the order page and the list
-    // read again in the same round trip, so the money panel isn't left
-    // saying "Still due" until a reload (UX-063).
-    if (res.ok) {
-        revalidatePath(`/commerce/orders/${orderId}`);
-        revalidatePath("/commerce/orders");
-    }
-    return res;
-}
-
-/** Same as updateOrder, for the kitchen's own writes. */
-function refreshOrder(orderId: string) {
-    revalidatePath(`/commerce/orders/${orderId}`);
+    return as(orgId, () => updateOrderApi(storeId, orderId, input));
 }
 
 /* One order's kitchen flow (ADR-008) — org-scoped; the API authorizes each. */
 
-/** `orgId`: from a React Query screen (Home), `writeAsOrg` (DEC-259). */
 export async function moveStage(
     orderId: string,
     input: MoveStageInput,
     orgId?: string,
 ) {
-    if (orgId) return writeAsOrg(orgId, () => moveOrderStage(orderId, input));
-    return moveOrderStage(orderId, input);
+    return as(orgId, () => moveOrderStage(orderId, input));
 }
 
-export async function saveCourier(orderId: string, input: CourierFields) {
-    return saveOrderCourier(orderId, input);
+export async function saveCourier(
+    orderId: string,
+    input: CourierFields,
+    orgId?: string,
+) {
+    return as(orgId, () => saveOrderCourier(orderId, input));
 }
 
 /** "Mark visit N attended" on a treatment's order (B14). */
-export async function markVisitAttended(orderId: string, visitNumber: number) {
-    return markOrderVisitAttended(orderId, visitNumber);
+export async function markVisitAttended(
+    orderId: string,
+    visitNumber: number,
+    orgId?: string,
+) {
+    return as(orgId, () => markOrderVisitAttended(orderId, visitNumber));
 }
 
 export async function undoStage(
@@ -78,21 +81,23 @@ export async function undoStage(
     eventId: string,
     orgId?: string,
 ) {
-    if (orgId) return writeAsOrg(orgId, () => undoOrderStage(orderId, eventId));
-    return undoOrderStage(orderId, eventId);
+    return as(orgId, () => undoOrderStage(orderId, eventId));
 }
 
 export async function editBeforePreparing(
     orderId: string,
     input: EditOrderInput,
+    orgId?: string,
 ) {
-    return editOrderBeforePreparing(orderId, input);
+    return as(orgId, () => editOrderBeforePreparing(orderId, input));
 }
 
-export async function recordPayment(orderId: string, kind: CounterPayment) {
-    const res = await recordOrderPayment(orderId, kind);
-    if (res.ok) refreshOrder(orderId);
-    return res;
+export async function recordPayment(
+    orderId: string,
+    kind: CounterPayment,
+    orgId?: string,
+) {
+    return as(orgId, () => recordOrderPayment(orderId, kind));
 }
 
 export async function refundLines(
@@ -104,31 +109,38 @@ export async function refundLines(
         goodwill?: string | null;
         idempotencyKey: string;
     },
+    orgId?: string,
 ) {
-    return refundOrderLines(orderId, input);
+    return as(orgId, () => refundOrderLines(orderId, input));
 }
 
-export async function retryRefund(orderId: string, refundId: string) {
-    return retryOrderRefund(orderId, refundId);
+export async function retryRefund(
+    orderId: string,
+    refundId: string,
+    orgId?: string,
+) {
+    return as(orgId, () => retryOrderRefund(orderId, refundId));
 }
 
 /** Make the order's payment link, or replace it (B11). */
-export async function makeOrderPayLink(orderId: string) {
-    return createOrderPayLink(orderId);
+export async function makeOrderPayLink(orderId: string, orgId?: string) {
+    return as(orgId, () => createOrderPayLink(orderId));
 }
 
 /** "Change how it's fulfilled…" (B9). */
 export async function changeFulfilment(
     orderId: string,
     input: ChangeFulfilmentInput,
+    orgId?: string,
 ) {
-    return changeOrderFulfilment(orderId, input);
+    return as(orgId, () => changeOrderFulfilment(orderId, input));
 }
 
 /** "Cancel order…" — a refund in full, kept as cancelled (B9). */
 export async function cancelOrder(
     orderId: string,
     input: { reason: string | null; idempotencyKey: string; tell?: boolean },
+    orgId?: string,
 ) {
-    return cancelOrderInFull(orderId, input);
+    return as(orgId, () => cancelOrderInFull(orderId, input));
 }

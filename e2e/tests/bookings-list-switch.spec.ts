@@ -32,10 +32,11 @@ test.describe("Calendar | List", () => {
             switcher.getByRole("link", { name: "Calendar" }),
         ).toHaveAttribute("aria-current", "page");
         if (onPhone()) {
-            // Full width, 44px options.
-            const box = await switcher
-                .getByRole("link", { name: "List" })
-                .boundingBox();
+            // Full width, 44px options. Measured once it's drawn: a box
+            // read before then is undefined.
+            const list = switcher.getByRole("link", { name: "List" });
+            await expect(list).toBeVisible();
+            const box = await list.boundingBox();
             expect(box?.height).toBeGreaterThanOrEqual(44);
         }
         await switcher.getByRole("link", { name: "List" }).click();
