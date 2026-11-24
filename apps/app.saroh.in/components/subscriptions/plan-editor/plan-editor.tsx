@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useMemo, useState } from "react";
 
 import { EditorShell } from "@/components/editor-shell/editor-shell";
@@ -155,9 +155,9 @@ export function PlanEditor({
             readOnlyText={readOnlyText}
             breadcrumb={[
                 "Payments",
-                <Link data-ph-unmask="" key="plans" href={PLANS_HREF}>
+                <IntentLink data-ph-unmask="" key="plans" href={PLANS_HREF}>
                     Plans
-                </Link>,
+                </IntentLink>,
                 first ? planTitle(first.values, true) : "New plan",
             ]}
             titleOf={(v, r) => planTitle(v, r !== null)}

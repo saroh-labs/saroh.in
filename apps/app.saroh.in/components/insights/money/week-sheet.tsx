@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { ArrowRight } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { QuickLook } from "@/components/shared/forms/quick-look";
@@ -55,7 +55,7 @@ export function WeekSheet({
             description={`${words.big}. ${words.note}`}
             footer={
                 <Button asChild variant="outline" className="coarse:min-h-11">
-                    <Link href={all}>Open these orders</Link>
+                    <IntentLink href={all}>Open these orders</IntentLink>
                 </Button>
             }
         >
@@ -71,10 +71,10 @@ export function WeekSheet({
                     <WeekOrders key={week.start} week={week} all={all} />
                 )}
                 {bills > 0 ? (
-                    <Link href={PAID_INVOICES_HREF} className={MORE_LINK}>
+                    <IntentLink href={PAID_INVOICES_HREF} className={MORE_LINK}>
                         And {count(bills, "paid invoice")}
                         <ArrowRight aria-hidden className="size-3.5" />
-                    </Link>
+                    </IntentLink>
                 ) : null}
             </div>
         </QuickLook>
@@ -138,7 +138,7 @@ function WeekOrders({ week, all }: { week: MoneyWeekRead; all: string }) {
                         key={row.id}
                         className="flex items-center gap-2.5 border-t border-border py-2.5"
                     >
-                        <Link
+                        <IntentLink
                             href={`/commerce/orders/${row.id}`}
                             className="grid min-w-0 flex-1 gap-0.5 rounded-sm text-[13.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
@@ -148,7 +148,7 @@ function WeekOrders({ week, all }: { week: MoneyWeekRead; all: string }) {
                             <small className="truncate text-xs text-muted-foreground">
                                 {row.line}
                             </small>
-                        </Link>
+                        </IntentLink>
                         {row.amount ? (
                             <span className="shrink-0 font-semibold tabular-nums">
                                 {row.amount}
@@ -158,10 +158,10 @@ function WeekOrders({ week, all }: { week: MoneyWeekRead; all: string }) {
                 ))}
             </ul>
             {total > rows.length ? (
-                <Link href={all} className={MORE_LINK}>
+                <IntentLink href={all} className={MORE_LINK}>
                     {count(total - rows.length, "more order", "more orders")}
                     <ArrowRight aria-hidden className="size-3.5" />
-                </Link>
+                </IntentLink>
             ) : null}
         </>
     );

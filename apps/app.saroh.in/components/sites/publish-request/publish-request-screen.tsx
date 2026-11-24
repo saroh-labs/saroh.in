@@ -1,10 +1,10 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { Eye } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { usePhone } from "@/components/bookings/calendar/header/use-phone";
@@ -88,7 +88,9 @@ export function PublishRequestScreen({
                     variant="outline"
                     className="justify-self-start"
                 >
-                    <Link href={`${siteHref}/review`}>See the review</Link>
+                    <IntentLink href={`${siteHref}/review`}>
+                        See the review
+                    </IntentLink>
                 </Button>
             </section>
         );
@@ -112,7 +114,7 @@ export function PublishRequestScreen({
                     variant="outline"
                     className="justify-self-start"
                 >
-                    <Link href={siteHref}>Back to the website</Link>
+                    <IntentLink href={siteHref}>Back to the website</IntentLink>
                 </Button>
             </section>
         );

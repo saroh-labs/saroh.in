@@ -2,7 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useRouter } from "next/navigation";
 
 import type { ReviewPanelAbilities } from "@/components/sites/review/review-panel";
@@ -95,7 +95,7 @@ export function ReleaseReviewView({
                                         : "ghost"
                                 }
                             >
-                                <Link
+                                <IntentLink
                                     href={hrefFor(p.path)}
                                     aria-current={
                                         p.path === activePath
@@ -104,7 +104,7 @@ export function ReleaseReviewView({
                                     }
                                 >
                                     {p.title}
-                                </Link>
+                                </IntentLink>
                             </Button>
                         ))}
                     </nav>

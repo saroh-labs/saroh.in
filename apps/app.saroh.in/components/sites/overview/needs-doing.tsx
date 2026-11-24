@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ListTable } from "@saroh/ui/list-table";
-import Link from "next/link";
 
 import type { SiteOverview } from "@/lib/sites/service";
 
@@ -80,9 +80,11 @@ export function NeedsDoing({
                                         variant="outline"
                                         className="shrink-0 coarse:h-11"
                                     >
-                                        <Link href={fixHref(siteId, item)}>
+                                        <IntentLink
+                                            href={fixHref(siteId, item)}
+                                        >
                                             {item.action}
-                                        </Link>
+                                        </IntentLink>
                                     </Button>
                                 ) : null}
                             </li>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { ClassPacksTabs } from "@/components/class-packs/list/class-packs-tabs";
 import { PageLoading } from "@/components/shared/page/page-loading";
@@ -9,9 +9,9 @@ export default function Loading() {
             shape="list"
             width="full"
             breadcrumb={[
-                <Link data-ph-unmask="" key="0" href="/bookings">
+                <IntentLink data-ph-unmask="" key="0" href="/bookings">
                     Bookings
-                </Link>,
+                </IntentLink>,
                 "Class packs",
             ]}
             title="Class packs"

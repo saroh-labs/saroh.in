@@ -2,6 +2,7 @@
 
 import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Brush,
@@ -12,7 +13,6 @@ import {
     Layers,
     Sparkles,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
@@ -52,13 +52,13 @@ export function PhonePageBar({
             data-editor-bar=""
             className="relative z-10 flex h-14 shrink-0 items-center gap-0.5 border-b bg-background pl-0.5 pr-1.5"
         >
-            <Link
+            <IntentLink
                 href={`/sites/${model.siteId}/overview`}
                 aria-label="Back to Website"
                 className={ICON_LINK}
             >
                 <ChevronLeft aria-hidden className="size-5" />
-            </Link>
+            </IntentLink>
             <button
                 type="button"
                 aria-haspopup="dialog"

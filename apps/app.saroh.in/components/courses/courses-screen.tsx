@@ -3,9 +3,9 @@
 import { formatMoneyMajor } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { GraduationCap } from "lucide-react";
-import Link from "next/link";
 
 import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -140,7 +140,9 @@ export function CoursesScreen({
                 actions={
                     canWrite ? (
                         <Button asChild>
-                            <Link href="/courses/new">New course</Link>
+                            <IntentLink href="/courses/new">
+                                New course
+                            </IntentLink>
                         </Button>
                     ) : undefined
                 }
@@ -168,7 +170,9 @@ export function CoursesScreen({
                     note: "A course is a run of dated sessions with seats and a price, like a six-week class.",
                     action: canWrite ? (
                         <Button asChild>
-                            <Link href="/courses/new">New course</Link>
+                            <IntentLink href="/courses/new">
+                                New course
+                            </IntentLink>
                         </Button>
                     ) : undefined,
                 }}

@@ -11,10 +11,10 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { CalendarClock, History } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -201,12 +201,12 @@ export function SiteVersions({
                                             )}
                                         >
                                             {line.releaseId ? (
-                                                <Link
+                                                <IntentLink
                                                     href={`/sites/${siteId}/releases/${line.releaseId}`}
                                                     className="underline-offset-2 hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline"
                                                 >
                                                     {line.text}
-                                                </Link>
+                                                </IntentLink>
                                             ) : (
                                                 line.text
                                             )}
@@ -220,11 +220,11 @@ export function SiteVersions({
                                  * Restore. */}
                                 <div className="flex items-center gap-2">
                                     <Button size="sm" variant="ghost" asChild>
-                                        <Link
+                                        <IntentLink
                                             href={`/sites/${siteId}/versions/${p.id}`}
                                         >
                                             Preview
-                                        </Link>
+                                        </IntentLink>
                                     </Button>
                                     {p.isCurrent ||
                                     !canRestore ? null : confirming === p.id ? (
@@ -379,11 +379,11 @@ function ScheduledList({
                                 </div>
                             </div>
                             <Button size="sm" variant="ghost" asChild>
-                                <Link
+                                <IntentLink
                                     href={`/sites/${siteId}/releases/${release.id}`}
                                 >
                                     View
-                                </Link>
+                                </IntentLink>
                             </Button>
                         </CardContent>
                     </Card>

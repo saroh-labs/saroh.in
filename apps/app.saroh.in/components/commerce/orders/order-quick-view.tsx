@@ -3,10 +3,10 @@
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PartialRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { BusinessDate } from "@/components/shared/dates/business-zone";
@@ -160,10 +160,10 @@ export function OrderQuickView({
                         variant="outline"
                         className="mr-auto cursor-pointer gap-[7px] active:scale-[0.98]"
                     >
-                        <Link href={orderPageHref(row.store.id, row.id)}>
+                        <IntentLink href={orderPageHref(row.store.id, row.id)}>
                             Open full page
                             <ChevronRight aria-hidden className="size-[13px]" />
-                        </Link>
+                        </IntentLink>
                     </Button>
                     {order && next ? (
                         next.via === "page" ? (
@@ -171,7 +171,7 @@ export function OrderQuickView({
                                 asChild
                                 className="cursor-pointer active:scale-[0.98]"
                             >
-                                <Link
+                                <IntentLink
                                     href={orderPageHref(
                                         row.store.id,
                                         row.id,
@@ -179,7 +179,7 @@ export function OrderQuickView({
                                     )}
                                 >
                                     {next.label}…
-                                </Link>
+                                </IntentLink>
                             </Button>
                         ) : (
                             <Button
@@ -393,9 +393,12 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                 </dt>
                 <dd className="min-w-0">
                     {c && customerLink ? (
-                        <Link href={customerLink} className={CUSTOMER_LINK}>
+                        <IntentLink
+                            href={customerLink}
+                            className={CUSTOMER_LINK}
+                        >
                             {c.name ?? c.email ?? "Customer"}
-                        </Link>
+                        </IntentLink>
                     ) : walkIn ? (
                         <span>Walk-in · {walkIn.name}</span>
                     ) : (

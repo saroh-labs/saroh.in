@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import type { ComponentProps } from "react";
 
 import type { PromptKey } from "@/lib/billing/upgrade-prompts";
@@ -18,10 +18,10 @@ export function UpgradePromptLink({
     prompt,
     onClick,
     ...props
-}: ComponentProps<typeof Link> & { prompt: PromptKey }) {
+}: ComponentProps<typeof IntentLink> & { prompt: PromptKey }) {
     useUpgradePromptShown(prompt);
     return (
-        <Link
+        <IntentLink
             {...props}
             onClick={(event) => {
                 promptPressed(prompt);

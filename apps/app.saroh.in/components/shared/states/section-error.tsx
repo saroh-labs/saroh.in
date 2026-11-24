@@ -2,10 +2,10 @@
 
 import { Button } from "@saroh/ui/button";
 import { FailedState, SignedOutState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { reportError } from "@saroh/ui/lib/report-error";
 import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { useEffect, useSyncExternalStore } from "react";
 
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -136,7 +136,7 @@ export function SectionError({
                 reference={error.digest}
                 action={
                     <Button asChild variant="ghost" className="wk-press">
-                        <Link href={backHref}>{backTo(place)}</Link>
+                        <IntentLink href={backHref}>{backTo(place)}</IntentLink>
                     </Button>
                 }
             />

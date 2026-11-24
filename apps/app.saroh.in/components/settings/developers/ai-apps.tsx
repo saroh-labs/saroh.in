@@ -9,12 +9,12 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { listTable, ListTable, ListTableHead } from "@saroh/ui/list-table";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, ChevronRight, ExternalLink, Lock, X } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -764,13 +764,13 @@ function Changes({
                     <span data-ph-unmask="" className="font-semibold">
                         What it changed
                     </span>
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         href="/settings/activity"
                         className="ml-auto font-semibold underline decoration-border-strong underline-offset-[3px]"
                     >
                         See all in Activity
-                    </Link>
+                    </IntentLink>
                 </div>
                 {page === "loading" ? (
                     <p

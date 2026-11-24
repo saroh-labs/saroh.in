@@ -1,9 +1,9 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, ChevronRight, FileText, Plus, Settings2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
@@ -232,7 +232,7 @@ export function PagesPanel({
              */}
             {readOnly ? (
                 <div className="border-t p-[5px]">
-                    <Link
+                    <IntentLink
                         href={`/sites/${siteId}/posts`}
                         onClick={onClose}
                         className={cn(
@@ -246,7 +246,7 @@ export function PagesPanel({
                             aria-hidden
                             className="size-3.5 shrink-0 text-muted-foreground"
                         />
-                    </Link>
+                    </IntentLink>
                 </div>
             ) : (
                 <div className="border-t p-[5px]">

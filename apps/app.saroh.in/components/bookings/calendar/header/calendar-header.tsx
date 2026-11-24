@@ -1,5 +1,6 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     ChevronDown,
@@ -8,7 +9,6 @@ import {
     Globe,
     MoreHorizontal,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -257,7 +257,7 @@ export function CalendarHeader({
                     <BookingsModeSwitch current="calendar" />
                 </div>
             ) : null}
-            <Link
+            <IntentLink
                 href={hrefFor(layout, today)}
                 onNavigate={screenLink(hrefFor(layout, today))}
                 scroll={false}
@@ -266,8 +266,8 @@ export function CalendarHeader({
                 className="order-1 inline-flex h-[38px] shrink-0 items-center rounded-[8px] border border-border bg-card px-3 text-[13.5px] font-semibold text-foreground transition-colors duration-fast hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11 max-[759px]:order-3 max-[759px]:h-11 max-[759px]:rounded-full"
             >
                 Today
-            </Link>
-            <Link
+            </IntentLink>
+            <IntentLink
                 href={hrefFor(layout, addDays(date, -step))}
                 onNavigate={screenLink(hrefFor(layout, addDays(date, -step)))}
                 scroll={false}
@@ -275,8 +275,8 @@ export function CalendarHeader({
                 className={cn(STEP, PHONE_STEP, "order-1")}
             >
                 <ChevronLeft aria-hidden className="size-4" />
-            </Link>
-            <Link
+            </IntentLink>
+            <IntentLink
                 href={hrefFor(layout, addDays(date, step))}
                 onNavigate={screenLink(hrefFor(layout, addDays(date, step)))}
                 scroll={false}
@@ -288,7 +288,7 @@ export function CalendarHeader({
                 )}
             >
                 <ChevronRight aria-hidden className="size-4" />
-            </Link>
+            </IntentLink>
 
             <h1 className="order-2 m-0 flex min-w-0 max-[759px]:flex-1">
                 <DateSheet

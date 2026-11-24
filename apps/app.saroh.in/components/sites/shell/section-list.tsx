@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { SectionList } from "@saroh/ui/section-list";
 import {
@@ -10,7 +11,6 @@ import {
     ChevronRight,
     LayoutGrid,
 } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
@@ -53,14 +53,14 @@ export function SiteSectionList({
             aria-label="Website"
             className="hidden min-w-0 flex-col gap-0.5 border-r border-border px-2.5 py-3.5 min-[760px]:flex"
         >
-            <Link
+            <IntentLink
                 href={overviewHref(siteId)}
                 aria-current={here.section === "overview" ? "page" : undefined}
                 className={cn(ROW, here.section === "overview" ? ON : OFF)}
             >
                 <LayoutGrid aria-hidden className="size-4 shrink-0" />
                 Overview
-            </Link>
+            </IntentLink>
             {groups.map((group) => {
                 const Icon = GROUP_ICONS[group.id];
                 const isOpen = open(group.id);
@@ -93,7 +93,7 @@ export function SiteSectionList({
                                     const on = s.id === here.section;
                                     return (
                                         <li key={s.id}>
-                                            <Link
+                                            <IntentLink
                                                 href={s.href}
                                                 aria-current={
                                                     on ? "page" : undefined
@@ -113,7 +113,7 @@ export function SiteSectionList({
                                                         className="size-3.5 shrink-0"
                                                     />
                                                 ) : null}
-                                            </Link>
+                                            </IntentLink>
                                         </li>
                                     );
                                 })}
@@ -145,13 +145,13 @@ export function SitePhoneNav({
     const group = groups.find((g) => g.id === here.group);
     return (
         <div className="flex min-w-0 flex-col gap-2 min-[760px]:hidden">
-            <Link
+            <IntentLink
                 href={overviewHref(siteId)}
                 className="-ml-1 inline-flex min-h-11 items-center gap-1 self-start rounded-md px-1 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <ChevronLeft aria-hidden className="size-4" />
                 Site home
-            </Link>
+            </IntentLink>
             {group && group.sections.length > 1 ? (
                 <SectionList
                     label={group.label}

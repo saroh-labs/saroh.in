@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
@@ -180,13 +180,13 @@ export function InvoiceDetailsSheet({
                 </>
             )}
             {invoiceId ? (
-                <Link
+                <IntentLink
                     data-ph-unmask=""
                     href={invoiceHref(invoiceId)}
                     className="-order-1 justify-self-end text-[12.5px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground coarse:py-2 print:hidden"
                 >
                     Open full page
-                </Link>
+                </IntentLink>
             ) : null}
         </QuickLook>
     );

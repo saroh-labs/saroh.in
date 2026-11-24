@@ -4,10 +4,10 @@ import type { AskAiDraftCard, AskAiDraftResult } from "@saroh/api-contract";
 import { Button } from "@saroh/ui/button";
 import { CheckRow } from "@saroh/ui/check-row";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { Check, Info, PenLine, TriangleAlert, Undo2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -244,11 +244,11 @@ export function DraftCard({
                             size="sm"
                             className={big}
                         >
-                            <Link href={recordHref(openKind, openId)}>
+                            <IntentLink href={recordHref(openKind, openId)}>
                                 {create
                                     ? (words.editor ?? "Open it")
                                     : words.open}
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : null}
                     {canUndo ? (
@@ -792,16 +792,18 @@ function RefusedWays({
         }
         return plansShown() ? (
             <Button asChild className={big}>
-                <Link href={upgradeHref()}>See plans</Link>
+                <IntentLink href={upgradeHref()}>See plans</IntentLink>
             </Button>
         ) : null;
     }
     if (reason === "duplicate" && card.refusal?.existingId) {
         return (
             <Button asChild variant="outline" className={big}>
-                <Link href={recordHref(card.kind, card.refusal.existingId)}>
+                <IntentLink
+                    href={recordHref(card.kind, card.refusal.existingId)}
+                >
                     Open the one you have
-                </Link>
+                </IntentLink>
             </Button>
         );
     }
@@ -825,9 +827,9 @@ function RefusedWays({
                 </Button>
                 {card.targetId ? (
                     <Button asChild variant="outline" className={big}>
-                        <Link href={recordHref(card.kind, card.targetId)}>
+                        <IntentLink href={recordHref(card.kind, card.targetId)}>
                             {openLabel}
-                        </Link>
+                        </IntentLink>
                     </Button>
                 ) : null}
             </>

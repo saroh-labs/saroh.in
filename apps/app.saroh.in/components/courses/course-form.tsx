@@ -15,6 +15,7 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { MoneyInput } from "@saroh/ui/money-input";
@@ -22,7 +23,6 @@ import { Textarea } from "@saroh/ui/textarea";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 import type { Resolver } from "react-hook-form";
@@ -446,11 +446,11 @@ export function CourseForm({
                         </>
                     )}
                     <Button type="button" variant="ghost" asChild>
-                        <Link
+                        <IntentLink
                             href={course ? `/courses/${course.id}` : "/courses"}
                         >
                             Cancel
-                        </Link>
+                        </IntentLink>
                     </Button>
                 </div>
                 {!course && sessions.length === 0 ? (

@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import * as React from "react";
 import { cn } from "../../lib/utils";
 import type { ButtonProps } from "./button";
 import { buttonVariants } from "./button";
+import { IntentLink } from "./intent-link";
 import { Tip } from "./tooltip";
 
 /*
@@ -87,9 +87,9 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
                         {glyph}
                     </a>
                 ) : (
-                    <Link href={href} aria-label={label} className={cls}>
+                    <IntentLink href={href} aria-label={label} className={cls}>
                         {glyph}
-                    </Link>
+                    </IntentLink>
                 )
             ) : (
                 <button

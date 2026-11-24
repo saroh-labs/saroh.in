@@ -2,12 +2,12 @@
 
 import { Button } from "@saroh/ui/button";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { qrFileName, qrSvg } from "@saroh/ui/lib/qr-art";
 import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
 import type { QrArtLogo } from "@saroh/ui/qr-art";
 import { QrArt } from "@saroh/ui/qr-art";
 import { showError } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { makeQrPanelCode, openQrPanel } from "@/lib/qr/actions";
@@ -186,9 +186,13 @@ function Saved({
         </p>
     ) : null;
     const more = (
-        <Link data-ph-unmask="" href={QR_SHARE_HREF} className={linkClass}>
+        <IntentLink
+            data-ph-unmask=""
+            href={QR_SHARE_HREF}
+            className={linkClass}
+        >
             More options
-        </Link>
+        </IntentLink>
     );
 
     const { code } = read;

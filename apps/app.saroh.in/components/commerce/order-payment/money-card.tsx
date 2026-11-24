@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ArrowRight } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { PROFILE } from "@/lib/edition";
@@ -325,7 +325,7 @@ function InvoiceLink({
     sub: string | null;
 }) {
     return (
-        <Link
+        <IntentLink
             href={`/billing/invoices/${encodeURIComponent(id)}`}
             className={cn(
                 FOCUS,
@@ -339,6 +339,6 @@ function InvoiceLink({
                 ) : null}
             </span>
             <ArrowRight aria-hidden className="size-3.5 shrink-0" />
-        </Link>
+        </IntentLink>
     );
 }

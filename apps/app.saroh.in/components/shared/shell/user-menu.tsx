@@ -16,6 +16,7 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import {
     CircleHelp,
     LogOut,
@@ -25,7 +26,6 @@ import {
     UserRound,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import Link from "next/link";
 import { useTranslations } from "use-intl";
 
 import { accountsLoginUrl, billingProfilesUrl } from "@/lib/accounts";
@@ -129,10 +129,10 @@ export function UserMenu({
                 <DropdownMenuItem asChild>
                     {/* Your login and alerts; identity edits link on from
                         there to accounts.saroh.in. */}
-                    <Link href="/settings/profile">
+                    <IntentLink href="/settings/profile">
                         <UserRound />
                         <span className="flex-1">{t("profile")}</span>
-                    </Link>
+                    </IntentLink>
                 </DropdownMenuItem>
                 {ownsABusiness ? (
                     <DropdownMenuItem asChild className="font-semibold">

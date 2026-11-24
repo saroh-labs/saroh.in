@@ -6,9 +6,9 @@ import {
 } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useState } from "react";
 
 import { ListPaging } from "@/components/shared/lists/list-toolbar";
@@ -202,9 +202,9 @@ function CheckActions({
 }) {
     const orders = (
         <Button size="sm" asChild variant="outline">
-            <Link href={productHref(c.storeId, c.productId, "orders")}>
+            <IntentLink href={productHref(c.storeId, c.productId, "orders")}>
                 See the orders
-            </Link>
+            </IntentLink>
         </Button>
     );
     const checked = (primary: boolean) =>
@@ -226,7 +226,7 @@ function CheckActions({
                     {orders}
                     {canResolve ? (
                         <Button size="sm" asChild>
-                            <Link
+                            <IntentLink
                                 href={productHref(
                                     c.storeId,
                                     c.productId,
@@ -234,7 +234,7 @@ function CheckActions({
                                 )}
                             >
                                 Change stock
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : null}
                 </>
@@ -267,11 +267,11 @@ function CheckActions({
                             asChild
                             variant="outline"
                         >
-                            <Link
+                            <IntentLink
                                 href={`/commerce/orders/${encodeURIComponent(c.order.id)}`}
                             >
                                 {`Open order #${c.order.number}`}
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : null}
                 </>

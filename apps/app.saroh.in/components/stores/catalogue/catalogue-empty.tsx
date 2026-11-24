@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Layers, Package, Search, Store } from "lucide-react";
-import Link from "next/link";
 
 import { newProductHref } from "@/lib/products/links";
 import type { EmptyCopy, ListQuery } from "@/lib/products/list-query";
@@ -24,7 +24,9 @@ export function NoStorefront({ canWrite }: { canWrite: boolean }) {
             action={
                 canWrite ? (
                     <Button asChild>
-                        <Link href={newStorefrontHref}>New location</Link>
+                        <IntentLink href={newStorefrontHref}>
+                            New location
+                        </IntentLink>
                     </Button>
                 ) : undefined
             }
@@ -74,19 +76,21 @@ export function emptyState(
             // Both ways in (HPProductsEmptyDesk): one at a time, or a list.
             <span className="flex flex-wrap justify-center gap-2">
                 <Button asChild>
-                    <Link href={newProductHref(storeId)}>New product</Link>
+                    <IntentLink href={newProductHref(storeId)}>
+                        New product
+                    </IntentLink>
                 </Button>
                 <Button asChild variant="outline">
-                    <Link href={importProductsHref(storeId)}>
+                    <IntentLink href={importProductsHref(storeId)}>
                         Import from a spreadsheet
-                    </Link>
+                    </IntentLink>
                 </Button>
             </span>
         ) : empty.action === "new-collection" && canWrite ? (
             <Button asChild>
-                <Link href={newCollectionHref(query)} scroll={false}>
+                <IntentLink href={newCollectionHref(query)} scroll={false}>
                     New collection
-                </Link>
+                </IntentLink>
             </Button>
         ) : undefined;
     return {

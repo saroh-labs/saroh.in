@@ -9,6 +9,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import {
@@ -19,7 +20,6 @@ import {
     PenLine,
     Plus,
 } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
@@ -357,7 +357,7 @@ function TabActions({
                     />
                 )}
                 <Button asChild>
-                    <Link href={`${base}/posts/new`}>New post</Link>
+                    <IntentLink href={`${base}/posts/new`}>New post</IntentLink>
                 </Button>
             </>
         );
@@ -366,10 +366,10 @@ function TabActions({
     // make is on screen — so the Pages tab's action is to go there.
     return (
         <Button asChild>
-            <Link href={base}>
+            <IntentLink href={base}>
                 <PenLine className="mr-1.5 size-4" />
                 Open editor
-            </Link>
+            </IntentLink>
         </Button>
     );
 }
@@ -415,7 +415,7 @@ function SitePicker({
                             asChild
                             className={cn(on && "bg-foreground/[0.03]")}
                         >
-                            <Link
+                            <IntentLink
                                 href={hrefFor(s.id)}
                                 aria-current={on ? "page" : undefined}
                             >
@@ -431,7 +431,7 @@ function SitePicker({
                                     </span>
                                 </span>
                                 {on ? <Check aria-hidden /> : null}
-                            </Link>
+                            </IntentLink>
                         </DropdownMenuItem>
                     );
                 })}
@@ -439,12 +439,12 @@ function SitePicker({
                     <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>
-                            <Link href="/sites/new">
+                            <IntentLink href="/sites/new">
                                 <Plus aria-hidden />
                                 <span className="text-[12.5px] font-medium">
                                     New site
                                 </span>
-                            </Link>
+                            </IntentLink>
                         </DropdownMenuItem>
                     </>
                 ) : null}

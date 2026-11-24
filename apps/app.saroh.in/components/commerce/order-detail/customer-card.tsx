@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { cardAttention } from "@/lib/orders/attention";
@@ -75,7 +75,7 @@ export function CustomerCard({
                     {initials(name)}
                 </span>
                 <div className="min-w-0">
-                    <Link
+                    <IntentLink
                         href={href}
                         className={cn(
                             FOCUS,
@@ -83,7 +83,7 @@ export function CustomerCard({
                         )}
                     >
                         {name}
-                    </Link>
+                    </IntentLink>
                     <div className="text-[12px] text-muted-foreground">
                         {customer.orderCount > 1 && customer.firstOrderAt ? (
                             <>

@@ -2,10 +2,10 @@
 
 import type { ButtonProps } from "@saroh/ui/button";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Pencil, Plus } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
@@ -314,13 +314,13 @@ export function StockSheet({
                         Save first, then add a {optionNoun(word)} in the editor.
                     </p>
                 ) : (
-                    <Link
+                    <IntentLink
                         href={productEditHref(storeId, product.id, "variants")}
                         className="mt-2.5 inline-flex h-8 items-center gap-1 rounded-lg border border-dashed border-border-strong px-3 text-[12.5px] font-semibold text-neutral-700 hover:bg-muted coarse:min-h-11 dark:text-muted-foreground"
                     >
                         <Plus aria-hidden className="size-3.5" />
                         Add a {optionNoun(word)}
-                    </Link>
+                    </IntentLink>
                 )
             ) : null}
             {may.canWrite && product.variants.length > 0 ? (

@@ -3,8 +3,8 @@
 import { count } from "@/lib/format/plural";
 import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { BusinessDate } from "@/components/shared/dates/business-zone";
 import {
@@ -109,7 +109,7 @@ function Row({
     const sub = lastSub(row, many);
     const orders = row.orders;
     return (
-        <Link
+        <IntentLink
             href={personHref(row.contactId)}
             className={cn(
                 "grid grid-cols-1 items-center gap-x-3 gap-y-1 text-[13px] text-foreground",
@@ -198,7 +198,7 @@ function Row({
                     </AbsentOr>
                 </span>
             ) : null}
-        </Link>
+        </IntentLink>
     );
 }
 

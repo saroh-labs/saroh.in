@@ -1,7 +1,7 @@
 import { count } from "@/lib/format/plural";
 import { PartialRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import type { OrderReadLine } from "@/lib/orders/read";
 import { productHref } from "@/lib/products/links";
@@ -74,7 +74,7 @@ export function OrderItems({
                             <div className="min-w-0 flex-1">
                                 <div>
                                     {l.name ? (
-                                        <Link
+                                        <IntentLink
                                             href={lineHref(storeId, l)}
                                             className={cn(
                                                 FOCUS,
@@ -82,7 +82,7 @@ export function OrderItems({
                                             )}
                                         >
                                             {l.name}
-                                        </Link>
+                                        </IntentLink>
                                     ) : (
                                         <span
                                             data-ph-unmask=""

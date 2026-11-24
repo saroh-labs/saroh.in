@@ -1,7 +1,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import type { ReactNode } from "react";
 
 import { BusinessDate } from "@/components/shared/dates/business-zone";
@@ -44,9 +44,13 @@ export function OrderHeading({
             className="mb-0"
             breadcrumb={[
                 "Sell",
-                <Link data-ph-unmask="" key="orders" href="/commerce/orders">
+                <IntentLink
+                    data-ph-unmask=""
+                    key="orders"
+                    href="/commerce/orders"
+                >
                     Orders
-                </Link>,
+                </IntentLink>,
                 number,
             ]}
             title={number}

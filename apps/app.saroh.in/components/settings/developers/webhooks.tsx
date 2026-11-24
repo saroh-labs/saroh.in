@@ -13,12 +13,12 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
 import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { listTable, ListTable, ListTableHead } from "@saroh/ui/list-table";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronRight, Plus, Send } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -136,13 +136,13 @@ export function Webhooks({
                 <p className="min-w-0 flex-1 basis-[280px] text-[13.5px] text-foreground/80">
                     Saroh tells your systems the moment something happens. The
                     address your payment provider sends updates to is in{" "}
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         href="/settings/integrations"
                         className="font-semibold underline underline-offset-[3px]"
                     >
                         Settings › Integrations
-                    </Link>
+                    </IntentLink>
                     .
                 </p>
                 <span className="text-[12.5px] text-muted-foreground">

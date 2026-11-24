@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
-import Link from "next/link";
 
 import {
     openRequestsText,
@@ -21,7 +21,7 @@ export function OpenRequestsBanner({ count }: { count: number | null }) {
             align="center"
             action={
                 <Button variant="outline" size="sm" asChild>
-                    <Link href={requestsHref()}>Review</Link>
+                    <IntentLink href={requestsHref()}>Review</IntentLink>
                 </Button>
             }
         >

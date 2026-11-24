@@ -1,8 +1,8 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PartialRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Home } from "lucide-react";
-import Link from "next/link";
 
 import { upgradeHref } from "@/lib/billing/access";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
@@ -200,9 +200,9 @@ function FirstRun({
                 description={`Pick what Saroh does for ${businessName}. Each one adds its own rows to the sidebar, and nothing is lost if you turn it off again.`}
                 action={
                     <Button asChild variant="brand">
-                        <Link href="/onboarding/modules">
+                        <IntentLink href="/onboarding/modules">
                             Choose what it does
-                        </Link>
+                        </IntentLink>
                     </Button>
                 }
             />
@@ -250,9 +250,9 @@ function FirstRun({
                 description={`Pick what Saroh does for ${businessName}. Each one adds its own rows to the sidebar, and nothing is lost if you turn it off again.`}
                 action={
                     <Button asChild variant="brand">
-                        <Link href="/settings/modules">
+                        <IntentLink href="/settings/modules">
                             Choose what it does
-                        </Link>
+                        </IntentLink>
                     </Button>
                 }
             />

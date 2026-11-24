@@ -1,5 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { LimitReachedCard } from "@/components/billing/plan-way";
 import type { PlanMeter } from "@/lib/billing/meter";
@@ -18,7 +18,9 @@ export function ProductLimitReached({ meter }: { meter: PlanMeter }) {
             href={meter.href}
             secondary={
                 <Button asChild variant="outline" className="wk-press">
-                    <Link href="/commerce/products">Back to Products</Link>
+                    <IntentLink href="/commerce/products">
+                        Back to Products
+                    </IntentLink>
                 </Button>
             }
         />

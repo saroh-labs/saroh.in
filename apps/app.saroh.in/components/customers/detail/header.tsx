@@ -7,10 +7,10 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Globe, MoreHorizontal } from "lucide-react";
-import Link from "next/link";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { MoreItem } from "@/lib/customer-workspace/more-menu";
@@ -85,23 +85,23 @@ export function Header({
                     sells
                         ? [
                               "Sell",
-                              <Link
+                              <IntentLink
                                   data-ph-unmask=""
                                   key="list"
                                   href="/commerce/customers"
                               >
                                   Customers
-                              </Link>,
+                              </IntentLink>,
                               name,
                           ]
                         : [
-                              <Link
+                              <IntentLink
                                   data-ph-unmask=""
                                   key="list"
                                   href="/contacts"
                               >
                                   Contacts
-                              </Link>,
+                              </IntentLink>,
                               name,
                           ]
                 }
@@ -190,7 +190,7 @@ export function Header({
                     <>
                         {starts.map((s) => (
                             <Button key={s.href} variant="outline" asChild>
-                                <Link href={s.href}>{s.label}</Link>
+                                <IntentLink href={s.href}>{s.label}</IntentLink>
                             </Button>
                         ))}
                         <Tip label={canEdit ? undefined : EDIT_OFF}>

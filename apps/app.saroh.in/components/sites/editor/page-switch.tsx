@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { Globe } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -151,9 +151,11 @@ export function PageRegion({
                                 Try again
                             </Button>
                             <Button asChild size="lg" variant="outline">
-                                <Link href={`/sites/${ctx.siteId}/overview`}>
+                                <IntentLink
+                                    href={`/sites/${ctx.siteId}/overview`}
+                                >
                                     Back to Website
-                                </Link>
+                                </IntentLink>
                             </Button>
                         </div>
                     }

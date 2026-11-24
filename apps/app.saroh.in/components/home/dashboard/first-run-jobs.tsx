@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useState } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
@@ -67,7 +67,7 @@ export function FirstRunJobs({
                     // link to where it is done, not a pick.
                     if (job.href) {
                         return (
-                            <Link
+                            <IntentLink
                                 key={job.key}
                                 href={job.href}
                                 className={CARD}
@@ -84,7 +84,7 @@ export function FirstRunJobs({
                                 >
                                     Nothing to turn on
                                 </span>
-                            </Link>
+                            </IntentLink>
                         );
                     }
                     const { pulls } = job;

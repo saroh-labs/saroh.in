@@ -1,9 +1,9 @@
 import { newStorefrontHref } from "@/lib/stores/links";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronRight, Store as StoreIcon } from "lucide-react";
-import Link from "next/link";
 
 import { FailedRead } from "@saroh/ui/failed-read";
 
@@ -56,13 +56,13 @@ export function StorefrontChooser<S extends ChooserStore>({
                 holdsData={false}
                 breadcrumb={[
                     "Sell",
-                    <Link
+                    <IntentLink
                         key="section"
                         href={sectionHref}
                         className="hover:text-foreground"
                     >
                         {section}
-                    </Link>,
+                    </IntentLink>,
                     crumb,
                 ]}
                 title={title}
@@ -82,9 +82,9 @@ export function StorefrontChooser<S extends ChooserStore>({
                     action={
                         canCreate ? (
                             <Button asChild>
-                                <Link href={newStorefrontHref}>
+                                <IntentLink href={newStorefrontHref}>
                                     New location
-                                </Link>
+                                </IntentLink>
                             </Button>
                         ) : undefined
                     }
@@ -104,7 +104,7 @@ export function StorefrontChooser<S extends ChooserStore>({
                                     key={s.id}
                                     className="border-b border-border last:border-b-0"
                                 >
-                                    <Link
+                                    <IntentLink
                                         href={hrefFor(s.id)}
                                         className="flex items-center gap-3 bg-card px-[18px] py-[14px] transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                                     >
@@ -122,7 +122,7 @@ export function StorefrontChooser<S extends ChooserStore>({
                                             aria-hidden
                                             className="size-4 text-muted-foreground"
                                         />
-                                    </Link>
+                                    </IntentLink>
                                 </li>
                             );
                         })}

@@ -2,12 +2,12 @@
 
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ProgressBar, doneOf } from "@saroh/ui/progress-bar";
 import { TextLink, textLinkClass } from "@saroh/ui/text-link";
 import { showUndo } from "@saroh/ui/toast";
 import { Check, ChevronRight, X } from "lucide-react";
-import Link from "next/link";
 import type { ComponentPropsWithRef } from "react";
 import { useId, useState } from "react";
 
@@ -174,7 +174,7 @@ function NextAction({ row }: { row: ChecklistRow }) {
     if (action.href) {
         return (
             <Button asChild className="w-full">
-                <Link href={action.href}>{action.label}</Link>
+                <IntentLink href={action.href}>{action.label}</IntentLink>
             </Button>
         );
     }

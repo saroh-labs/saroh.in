@@ -10,6 +10,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { dismissToasts, showSuccess, showUndo } from "@saroh/ui/toast";
@@ -20,7 +21,6 @@ import {
     Repeat,
     RotateCcw,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
@@ -361,7 +361,9 @@ export function PlansTab({
                     action={
                         canWrite && !locked ? (
                             <Button asChild>
-                                <Link href={NEW_PLAN_HREF}>New plan</Link>
+                                <IntentLink href={NEW_PLAN_HREF}>
+                                    New plan
+                                </IntentLink>
                             </Button>
                         ) : undefined
                     }
@@ -440,10 +442,10 @@ function PlanRowMenu({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem asChild>
-                    <Link href={editHref(row.id)}>
+                    <IntentLink href={editHref(row.id)}>
                         <Pencil aria-hidden />
                         Edit
-                    </Link>
+                    </IntentLink>
                 </DropdownMenuItem>
                 {row.canArchive && (sellsAgain || !row.archived) ? (
                     <DropdownMenuItem disabled={busy} onSelect={onArchive}>

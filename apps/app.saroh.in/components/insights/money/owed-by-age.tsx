@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Skeleton } from "@saroh/ui/skeleton";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { QuickLook } from "@/components/shared/forms/quick-look";
@@ -137,7 +137,7 @@ function OwedSheet({
             description={`${bigLine(row)}, ${row.bills}.`}
             footer={
                 <Button asChild variant="outline" className="coarse:min-h-11">
-                    <Link href={row.href}>Open unpaid bills</Link>
+                    <IntentLink href={row.href}>Open unpaid bills</IntentLink>
                 </Button>
             }
         >
@@ -258,7 +258,7 @@ function OwedBill({
 
     return (
         <li className="flex flex-wrap items-center gap-2.5 border-t border-border py-2.5">
-            <Link
+            <IntentLink
                 href={`/billing/invoices/${bill.id}`}
                 className="grid min-w-0 flex-1 gap-0.5 rounded-sm text-[13.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -266,7 +266,7 @@ function OwedBill({
                 <small className="text-xs text-muted-foreground">
                     {bill.line}
                 </small>
-            </Link>
+            </IntentLink>
             <span className="shrink-0 font-semibold tabular-nums">
                 {formatMoney(bill.leftMinor, bill.currency)}
             </span>

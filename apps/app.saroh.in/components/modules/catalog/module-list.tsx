@@ -2,10 +2,10 @@
 
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showUndo } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { PlanWay } from "@/components/billing/plan-way";
@@ -373,9 +373,11 @@ function ModuleRow({
                                     // Turn off to press, only the way to clear it.
                                     refusalAction && refusal.actionHref ? (
                                         <Button asChild size="sm">
-                                            <Link href={refusal.actionHref}>
+                                            <IntentLink
+                                                href={refusal.actionHref}
+                                            >
                                                 {refusalAction}
-                                            </Link>
+                                            </IntentLink>
                                         </Button>
                                     ) : null
                                 ) : (
@@ -420,7 +422,9 @@ function ModuleRow({
                         </span>
                         <PlanWay>
                             <Button asChild variant="outline" size="sm">
-                                <Link href={planLock.href}>{planLock.cta}</Link>
+                                <IntentLink href={planLock.href}>
+                                    {planLock.cta}
+                                </IntentLink>
                             </Button>
                         </PlanWay>
                     </div>
@@ -433,7 +437,9 @@ function ModuleRow({
                         </span>
                         {stepAction && step.actionHref && module.canManage ? (
                             <Button asChild variant="outline" size="sm">
-                                <Link href={step.actionHref}>{stepAction}</Link>
+                                <IntentLink href={step.actionHref}>
+                                    {stepAction}
+                                </IntentLink>
                             </Button>
                         ) : null}
                     </div>

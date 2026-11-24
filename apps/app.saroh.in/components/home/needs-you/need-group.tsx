@@ -2,6 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -15,7 +16,6 @@ import {
     Star,
     Warehouse,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId } from "react";
 
@@ -81,7 +81,7 @@ export function NeedGroup({
                 >
                     <Icon className="size-[18px]" />
                 </span>
-                <Link
+                <IntentLink
                     href={href}
                     className="grid min-w-0 flex-[1_1_240px] gap-0.5 rounded text-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
                 >
@@ -93,7 +93,7 @@ export function NeedGroup({
                             {line.sub}
                         </span>
                     ) : null}
-                </Link>
+                </IntentLink>
                 <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
                     {line.tag ? (
                         <Badge variant={TONE_BADGE[line.tag.tone]} size="sm">

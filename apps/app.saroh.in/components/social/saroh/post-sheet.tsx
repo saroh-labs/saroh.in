@@ -3,13 +3,13 @@
 import { Button } from "@saroh/ui/button";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { TextLink } from "@saroh/ui/text-link";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ExternalLink } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -447,14 +447,14 @@ function Reason({
             <p className="text-pretty text-[13px] text-foreground">{line}</p>
             {!canPost ? null : (fix === "reconnect" || fix === "connect") &&
               !connected ? (
-                <Link
+                <IntentLink
                     href="/social?tab=channels"
                     className="inline-flex min-h-11 w-fit items-center text-[13px] font-semibold underline decoration-border-strong underline-offset-4"
                 >
                     {fix === "connect"
                         ? SOCIAL_WORDS.connect(delivery.kind)
                         : SOCIAL_WORDS.reconnect}
-                </Link>
+                </IntentLink>
             ) : fix === "time" ? (
                 <TextLink onClick={onTime} className="w-fit font-semibold">
                     {SOCIAL_WORDS.pickNewTime}

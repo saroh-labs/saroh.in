@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -56,9 +56,13 @@ export default async function NewPlanPage() {
                 <PageHeader
                     breadcrumb={[
                         "Payments",
-                        <Link data-ph-unmask="" key="plans" href={PLANS_HREF}>
+                        <IntentLink
+                            data-ph-unmask=""
+                            key="plans"
+                            href={PLANS_HREF}
+                        >
                             Plans
-                        </Link>,
+                        </IntentLink>,
                         "New plan",
                     ]}
                     title="New plan"
@@ -72,7 +76,7 @@ export default async function NewPlanPage() {
                         href={locked.href}
                     />
                     <Button asChild variant="outline">
-                        <Link href={PLANS_HREF}>Back to plans</Link>
+                        <IntentLink href={PLANS_HREF}>Back to plans</IntentLink>
                     </Button>
                 </div>
             </PageContainer>

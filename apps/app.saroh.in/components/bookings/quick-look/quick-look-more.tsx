@@ -2,6 +2,7 @@
 
 import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     ArrowRight,
@@ -18,7 +19,6 @@ import {
     UserRoundCog,
     XCircle,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactElement, ReactNode } from "react";
 import { useState } from "react";
 
@@ -140,13 +140,13 @@ export function QuickLookMore({
                     return (
                         <li key={row.key}>
                             {row.href ? (
-                                <Link
+                                <IntentLink
                                     href={row.href}
                                     className={look}
                                     onClick={() => setOpen(false)}
                                 >
                                     {inner}
-                                </Link>
+                                </IntentLink>
                             ) : (
                                 <button
                                     type="button"

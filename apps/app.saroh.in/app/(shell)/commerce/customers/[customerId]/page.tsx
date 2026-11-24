@@ -1,6 +1,6 @@
 import { badgeVariants } from "@saroh/ui/badge";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -91,14 +91,14 @@ export default async function CustomerPage({
                     className="mb-0"
                     breadcrumb={[
                         "Sell",
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             key="customers"
                             href="/commerce/customers"
                             className="hover:text-foreground"
                         >
                             Customers
-                        </Link>,
+                        </IntentLink>,
                         name,
                     ]}
                     title={name}
@@ -168,7 +168,7 @@ export default async function CustomerPage({
                                                 key={o.id}
                                                 className="border-b border-foreground/10 last:border-b-0"
                                             >
-                                                <Link
+                                                <IntentLink
                                                     href={`/commerce/orders/${o.id}?storefront=${o.store.id}`}
                                                     className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                                                 >
@@ -199,7 +199,7 @@ export default async function CustomerPage({
                                                             o.currency,
                                                         )}
                                                     </span>
-                                                </Link>
+                                                </IntentLink>
                                             </li>
                                         );
                                     })}
@@ -214,7 +214,7 @@ export default async function CustomerPage({
                                             key={p.store.id}
                                             className="border-b border-foreground/10 last:border-b-0"
                                         >
-                                            <Link
+                                            <IntentLink
                                                 href={customerHref(
                                                     p.store.id,
                                                     p.customer.id,
@@ -229,7 +229,7 @@ export default async function CustomerPage({
                                                         ? "1 order"
                                                         : `${p.customer.orderCount} orders`}
                                                 </span>
-                                            </Link>
+                                            </IntentLink>
                                         </li>
                                     ))}
                                 </ul>

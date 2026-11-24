@@ -2,10 +2,10 @@
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type { CatalogueRow } from "@/lib/products/catalogue";
@@ -163,13 +163,13 @@ export function StockBlock({
                             {" "}
                             If an order will be late, open it to tell the
                             customer.{" "}
-                            <Link
+                            <IntentLink
                                 data-ph-unmask=""
                                 href={waitingOrdersHref(row.id, storeId)}
                                 className="font-semibold underline underline-offset-2"
                             >
                                 Open orders with it
-                            </Link>
+                            </IntentLink>
                         </>
                     ) : null}
                 </Notice>

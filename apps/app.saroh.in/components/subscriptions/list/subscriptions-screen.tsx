@@ -2,11 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { TabStrip } from "@saroh/ui/tabs";
 import { Repeat } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -222,7 +222,9 @@ export function SubscriptionsScreen({
                             ) : null}
                             {onPlans && canAddPlan ? (
                                 <Button asChild>
-                                    <Link href={NEW_PLAN_HREF}>New plan</Link>
+                                    <IntentLink href={NEW_PLAN_HREF}>
+                                        New plan
+                                    </IntentLink>
                                 </Button>
                             ) : null}
                         </>

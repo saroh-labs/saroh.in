@@ -5,8 +5,8 @@ import {
     listTable,
 } from "@/components/shared/lists/list-toolbar";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import type { CSSProperties } from "react";
 
 import { productHref } from "@/lib/products/links";
@@ -106,7 +106,7 @@ export function LevelsTable({
                                     "items-center gap-3 max-[759px]:gap-1",
                                 )}
                             >
-                                <Link
+                                <IntentLink
                                     href={productHref(
                                         null,
                                         row.productId,
@@ -120,7 +120,7 @@ export function LevelsTable({
                                     <span className="text-[11.5px] text-muted-foreground [overflow-wrap:anywhere] min-[760px]:truncate">
                                         {sub || " "}
                                     </span>
-                                </Link>
+                                </IntentLink>
                                 {row.cells.map((cell, i) => (
                                     <Cell
                                         key={cell.storeId}

@@ -1,6 +1,6 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ArrowRight } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { Answer } from "@/lib/insights/overview-words";
@@ -88,13 +88,13 @@ export function AnswerLink({
     children: ReactNode;
 }) {
     return (
-        <Link
+        <IntentLink
             href={href}
             scroll={false}
             className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap rounded-sm text-[13px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
         >
             {children}
             <ArrowRight aria-hidden className="size-3.5" />
-        </Link>
+        </IntentLink>
     );
 }

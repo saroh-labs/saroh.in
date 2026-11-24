@@ -1,8 +1,8 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { listTable } from "@/components/shared/lists/list-toolbar";
@@ -469,7 +469,7 @@ export function StockCards({
                                                 </span>
                                                 {` · ${shelf.onHand} on hand · `}
                                                 {shelf.promised > 0 ? (
-                                                    <Link
+                                                    <IntentLink
                                                         href={ordersHref}
                                                         scroll={false}
                                                         aria-label={`${shelf.promised} promised to open ${shelf.name} orders, open them`}
@@ -477,7 +477,7 @@ export function StockCards({
                                                     >
                                                         {shelf.promised}{" "}
                                                         promised
-                                                    </Link>
+                                                    </IntentLink>
                                                 ) : (
                                                     "0 promised"
                                                 )}

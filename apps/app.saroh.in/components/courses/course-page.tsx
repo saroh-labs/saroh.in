@@ -6,11 +6,11 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -139,14 +139,14 @@ export function CoursePage({
                 className="mb-0"
                 breadcrumb={[
                     "Bookings",
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="courses"
                         href="/courses"
                         className="hover:text-foreground"
                     >
                         Courses
-                    </Link>,
+                    </IntentLink>,
                     course.name,
                 ]}
                 title={course.name}
@@ -167,13 +167,15 @@ export function CoursePage({
                         ) : null}
                         {canWrite ? (
                             <Button variant="outline" asChild>
-                                <Link href={`/courses/${course.id}/edit`}>
+                                <IntentLink href={`/courses/${course.id}/edit`}>
                                     Edit course
-                                </Link>
+                                </IntentLink>
                             </Button>
                         ) : null}
                         <Button variant="outline" asChild>
-                            <Link href="/courses">Back to courses</Link>
+                            <IntentLink href="/courses">
+                                Back to courses
+                            </IntentLink>
                         </Button>
                     </>
                 }
@@ -537,22 +539,22 @@ function RosterRow({
                 {initials(e.contact.name)}
             </span>
             <span className="min-w-0 flex-1">
-                <Link
+                <IntentLink
                     href={personHref(e.contact.id)}
                     className="-my-1 block truncate py-1 text-sm font-medium underline-offset-4 hover:underline"
                 >
                     {e.contact.name}
-                </Link>
+                </IntentLink>
                 <span className="block text-pretty text-[12px] text-muted-foreground">
                     {e.invoice ? (
                         <>
                             {STANDING_WORD[e.invoice.standing]} ·{" "}
-                            <Link
+                            <IntentLink
                                 href={`/billing/invoices/${e.invoice.id}`}
                                 className="font-mono underline-offset-4 hover:underline"
                             >
                                 {e.invoice.number ?? "draft"}
-                            </Link>
+                            </IntentLink>
                         </>
                     ) : (
                         `${money} · no invoice`

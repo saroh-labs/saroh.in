@@ -9,9 +9,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Check, ChevronDown, LayoutGrid, Plus } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { StateBadge } from "@/components/sites/header/website-header";
@@ -109,7 +109,7 @@ export function SiteSwitcher({
                             asChild
                             className={cn("gap-2.5", on && "bg-muted")}
                         >
-                            <Link
+                            <IntentLink
                                 href={
                                     on
                                         ? pathname
@@ -140,24 +140,24 @@ export function SiteSwitcher({
                                 </span>
                                 <StateBadge state={s.status} />
                                 {on ? <Check aria-hidden /> : null}
-                            </Link>
+                            </IntentLink>
                         </DropdownMenuItem>
                     );
                 })}
                 <DropdownMenuSeparator />
                 {mayCreate && mayAddWebsite(sites.length) ? (
                     <DropdownMenuItem asChild>
-                        <Link href="/sites/new">
+                        <IntentLink href="/sites/new">
                             <Plus aria-hidden />
                             New site
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuItem asChild>
-                    <Link href="/sites">
+                    <IntentLink href="/sites">
                         <LayoutGrid aria-hidden />
                         All sites
-                    </Link>
+                    </IntentLink>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

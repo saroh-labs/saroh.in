@@ -1,7 +1,7 @@
 import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { listTable } from "@/components/shared/lists/list-toolbar";
 import { storefrontHref } from "@/lib/stores/links";
@@ -50,7 +50,7 @@ export function StorefrontList({
                     const on = s.id === selectedId;
                     return (
                         <li key={s.id}>
-                            <Link
+                            <IntentLink
                                 href={storefrontHref(s.id)}
                                 scroll={false}
                                 aria-current={on ? "page" : undefined}
@@ -89,7 +89,7 @@ export function StorefrontList({
                                             : KIND_LABEL[s.kind]}
                                     </Badge>
                                 )}
-                            </Link>
+                            </IntentLink>
                         </li>
                     );
                 })}

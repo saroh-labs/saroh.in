@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { accountsLoginUrl } from "@/lib/accounts";
 import type { InvitationProblem } from "@/lib/invitations/outcome";
@@ -42,7 +42,7 @@ export function InvitationProblemView({
 }) {
     const home = (
         <Button asChild variant="outline" className="wk-press">
-            <Link href="/">Go to Home</Link>
+            <IntentLink href="/">Go to Home</IntentLink>
         </Button>
     );
 

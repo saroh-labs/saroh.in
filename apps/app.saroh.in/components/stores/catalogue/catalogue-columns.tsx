@@ -9,6 +9,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Archive,
@@ -19,7 +20,6 @@ import {
     Pencil,
     Trash2,
 } from "lucide-react";
-import Link from "next/link";
 import { Fragment } from "react";
 
 import type { DataColumn } from "@/components/shared/data-view/types";
@@ -246,10 +246,10 @@ export function RowMenu({
                 </DropdownMenuItem>
                 {canWrite || canStock ? (
                     <DropdownMenuItem asChild>
-                        <Link href={editHref}>
+                        <IntentLink href={editHref}>
                             <Pencil />
                             Edit
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 ) : null}
                 {canWrite ? (

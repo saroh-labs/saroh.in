@@ -1,9 +1,9 @@
 import { formatNumber } from "@/lib/format/money";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Users } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { whoCanChange } from "@/components/shared/states/who-can-change";
@@ -68,15 +68,17 @@ export function ListFirstRun({
             action={
                 <div className="flex flex-wrap justify-center gap-2">
                     <Button data-ph-unmask="" asChild variant="outline">
-                        <Link href="/contacts">
+                        <IntentLink href="/contacts">
                             {contacts && contacts > 0
                                 ? `Open Contacts (${formatNumber(contacts)})`
                                 : "Open Contacts"}
-                        </Link>
+                        </IntentLink>
                     </Button>
                     {hasStorefront ? null : (
                         <Button asChild>
-                            <Link href={newStorefrontHref}>New location</Link>
+                            <IntentLink href={newStorefrontHref}>
+                                New location
+                            </IntentLink>
                         </Button>
                     )}
                 </div>

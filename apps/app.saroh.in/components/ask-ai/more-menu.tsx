@@ -12,8 +12,8 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Ellipsis, ExternalLink, Settings } from "lucide-react";
-import Link from "next/link";
 
 import { MARKETING_URL } from "@/lib/help/links";
 
@@ -127,7 +127,7 @@ export function MoreMenu({
                         asChild
                         className="items-start gap-2.5 py-[9px]"
                     >
-                        <Link href={SETTINGS_HREF}>
+                        <IntentLink href={SETTINGS_HREF}>
                             <Settings
                                 className="mt-px size-[17px] text-muted-foreground"
                                 aria-hidden
@@ -138,7 +138,7 @@ export function MoreMenu({
                                     {SETTINGS_LINE}
                                 </small>
                             </span>
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 ) : null}
             </DropdownMenuContent>

@@ -1,8 +1,8 @@
 "use client";
 
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useState } from "react";
 
 import {
@@ -93,13 +93,13 @@ export function BusinessHoursSection({
         hours.state === "sell-off" ? (
             <>
                 Hours are kept on your locations, and Sell is switched off.{" "}
-                <Link
+                <IntentLink
                     data-ph-unmask=""
                     href="/settings/modules"
                     className={LINK}
                 >
                     Turn on Sell
-                </Link>
+                </IntentLink>
             </>
         ) : hours.state === "unavailable" ? (
             <FailedRead
@@ -109,13 +109,13 @@ export function BusinessHoursSection({
         ) : !first ? (
             <>
                 Hours are kept on a location, and this business has none yet.{" "}
-                <Link
+                <IntentLink
                     data-ph-unmask=""
                     href={newStorefrontHref}
                     className={LINK}
                 >
                     Create a location
-                </Link>
+                </IntentLink>
             </>
         ) : differ ? (
             <>

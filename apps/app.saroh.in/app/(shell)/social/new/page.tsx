@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Globe } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -56,7 +56,9 @@ export default async function NewPostPage({
                     title={POST_WORDS.notLive}
                     action={
                         <Button asChild>
-                            <Link href="/sites">{POST_WORDS.publishSite}</Link>
+                            <IntentLink href="/sites">
+                                {POST_WORDS.publishSite}
+                            </IntentLink>
                         </Button>
                     }
                 />

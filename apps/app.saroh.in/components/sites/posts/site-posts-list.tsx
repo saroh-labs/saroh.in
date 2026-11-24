@@ -1,8 +1,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { NotebookPen } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PausedNote } from "@/components/billing/paused-banner";
@@ -70,7 +70,9 @@ export async function SitePostsList({ siteId }: { siteId: string }) {
                 action={
                     site.can.edit ? (
                         <Button asChild>
-                            <Link href={`${base}/new`}>New post</Link>
+                            <IntentLink href={`${base}/new`}>
+                                New post
+                            </IntentLink>
                         </Button>
                     ) : undefined
                 }
@@ -99,7 +101,7 @@ export async function SitePostsList({ siteId }: { siteId: string }) {
                             key={post.id}
                             className="border-b border-border last:border-b-0"
                         >
-                            <Link
+                            <IntentLink
                                 href={`${base}/${post.id}`}
                                 // A reader opens the post editor read-only,
                                 // with its notes (DEC-200 U8); the row says so.
@@ -154,7 +156,7 @@ export async function SitePostsList({ siteId }: { siteId: string }) {
                                         </span>
                                     }
                                 />
-                            </Link>
+                            </IntentLink>
                         </li>
                     );
                 })}

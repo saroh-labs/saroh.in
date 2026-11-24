@@ -6,8 +6,8 @@ import {
     useScreenPending,
 } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
-import Link from "next/link";
 import { Fragment } from "react";
 
 import {
@@ -171,9 +171,9 @@ export function LevelsPanel({
                             description="Turn on “Track stock” on a product and it shows here."
                             action={
                                 <Button asChild variant="outline">
-                                    <Link href="/commerce/products">
+                                    <IntentLink href="/commerce/products">
                                         Go to Products
-                                    </Link>
+                                    </IntentLink>
                                 </Button>
                             }
                         />

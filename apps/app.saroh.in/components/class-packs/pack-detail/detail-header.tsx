@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { packCrumbs } from "../pack-editor/pack-crumbs";
 
 import type { DetailHeader } from "@/lib/class-packs/pack-detail";
@@ -129,9 +129,9 @@ export function PackDetailHeader({
                                 ) : null}
                                 {canWrite && head.editHref ? (
                                     <Button asChild>
-                                        <Link href={head.editHref}>
+                                        <IntentLink href={head.editHref}>
                                             Edit pack
-                                        </Link>
+                                        </IntentLink>
                                     </Button>
                                 ) : null}
                             </>

@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { reportError } from "@saroh/ui/lib/report-error";
 import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
-import Link from "next/link";
 import { useEffect } from "react";
 
 import { SectionError } from "@/components/shared/states/section-error";
@@ -61,7 +61,7 @@ export function SettingsSectionError({
                 reference={error.digest}
                 action={
                     <Button asChild variant="ghost" className="wk-press">
-                        <Link href="/">{backTo("Home")}</Link>
+                        <IntentLink href="/">{backTo("Home")}</IntentLink>
                     </Button>
                 }
             />

@@ -1,8 +1,8 @@
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { ProductTab } from "@/lib/products/links";
@@ -129,9 +129,9 @@ export function AvailabilityCard({
                 {table && !a.short ? (
                     <>
                         <Button asChild size="sm" variant="outline">
-                            <Link href={href("stock")} scroll={false}>
+                            <IntentLink href={href("stock")} scroll={false}>
                                 Count stock
-                            </Link>
+                            </IntentLink>
                         </Button>
                         {overview.canStock ? (
                             <StockSheetButton
@@ -173,7 +173,7 @@ export function AvailabilityCard({
                 </p>
             )}
             {held && seesOrders ? (
-                <Link
+                <IntentLink
                     href={href("orders")}
                     scroll={false}
                     className={cn(
@@ -182,7 +182,7 @@ export function AvailabilityCard({
                     )}
                 >
                     {held}
-                </Link>
+                </IntentLink>
             ) : held ? (
                 <p className="mt-1.5 text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                     {held}
@@ -204,9 +204,9 @@ export function AvailabilityCard({
                     {addStock([])}
                     {seesOrders ? (
                         <Button asChild size="sm" variant="outline">
-                            <Link href={href("orders")} scroll={false}>
+                            <IntentLink href={href("orders")} scroll={false}>
                                 See the orders
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : null}
                 </div>
@@ -457,13 +457,13 @@ export function VariantsStat({
     );
     if (!href) return stat;
     return (
-        <Link
+        <IntentLink
             href={href}
             scroll={false}
             aria-label="Variants, see each and its price"
             className={cn(FOCUS, "rounded-[12px]")}
         >
             {stat}
-        </Link>
+        </IntentLink>
     );
 }

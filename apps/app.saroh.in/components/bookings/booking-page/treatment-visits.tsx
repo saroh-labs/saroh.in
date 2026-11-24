@@ -1,5 +1,5 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ArrowRight } from "lucide-react";
-import Link from "next/link";
 
 import { NewBookingDialog } from "@/components/bookings/new-booking/new-booking-dialog";
 import type { TreatmentView } from "@/lib/services/booking-calendar";
@@ -46,13 +46,13 @@ export function TreatmentVisits({
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
                         {canReadOrder ? (
-                            <Link
+                            <IntentLink
                                 href={orderHref(treatment)}
                                 className="inline-flex items-center gap-1 rounded-sm font-medium text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                                 {orderLabel(treatment)}
                                 <ArrowRight aria-hidden className="size-3.5" />
-                            </Link>
+                            </IntentLink>
                         ) : (
                             orderLabel(treatment)
                         )}

@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Skeleton } from "@saroh/ui/skeleton";
@@ -19,7 +20,6 @@ import {
     Undo2,
     X,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
@@ -67,14 +67,14 @@ export function PostTopBar({
     // Lit after an edit, never on open (editor audit, 21 Nov).
     const can = useCanUndo(editor);
     const back = siteId ? (
-        <Link
+        <IntentLink
             href={`/sites/${siteId}/overview`}
             aria-label="Back to Website"
             className="flex h-10 shrink-0 items-center gap-1.5 rounded-[9px] pl-1.5 pr-2.5 text-sm font-semibold transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             <ChevronLeft aria-hidden className="size-[18px]" />
             <span className="hidden min-[1600px]:inline">Website</span>
-        </Link>
+        </IntentLink>
     ) : (
         <Skeleton aria-hidden className="ml-1.5 h-10 w-9 rounded-[9px]" />
     );
@@ -344,7 +344,7 @@ function PostPicker({ model }: { model: PostEditorModel }) {
                     {(posts ?? []).slice(0, 8).map((p) => {
                         const current = p.id === model.draft.postId;
                         return (
-                            <Link
+                            <IntentLink
                                 key={p.id}
                                 href={`/sites/${siteId}/write/${p.id}`}
                                 aria-current={current ? "page" : undefined}
@@ -362,21 +362,21 @@ function PostPicker({ model }: { model: PostEditorModel }) {
                                           ? "Live"
                                           : "Not live yet"}
                                 </span>
-                            </Link>
+                            </IntentLink>
                         );
                     })}
                     <span aria-hidden className="mx-1.5 my-1 h-px bg-border" />
                     {readOnly ? null : (
-                        <Link
+                        <IntentLink
                             href={`/sites/${siteId}/write/new`}
                             onClick={() => setOpen(false)}
                             className="flex h-9 items-center gap-2 rounded-[7px] px-2.5 text-sm hover:bg-secondary"
                         >
                             <Plus aria-hidden className="size-4" />
                             New post
-                        </Link>
+                        </IntentLink>
                     )}
-                    <Link
+                    <IntentLink
                         href={`/sites/${siteId}/writing`}
                         onClick={() => setOpen(false)}
                         className="flex h-9 items-center gap-2 rounded-[7px] px-2.5 text-sm hover:bg-secondary"
@@ -387,7 +387,7 @@ function PostPicker({ model }: { model: PostEditorModel }) {
                                 {posts.length}
                             </span>
                         ) : null}
-                    </Link>
+                    </IntentLink>
                 </nav>
             </PopoverContent>
         </Popover>

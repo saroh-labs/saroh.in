@@ -1,11 +1,11 @@
 "use client";
 
 import { ArrowDown, ArrowUp, LayoutGrid, List, Table2 } from "lucide-react";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { cn } from "../../../lib/utils";
 import { Checkbox } from "../checkbox";
 import { EmptyState } from "../data-state";
+import { IntentLink } from "../intent-link";
 import { ListSearch } from "../list-search";
 import { listTable } from "../list-table";
 import { ListFilter, ListPaging, ListToolbar, pagesOf } from "../list-toolbar";
@@ -468,12 +468,12 @@ export function DataView<TRow>({
                                                  * otherwise nest inside it.
                                                  */}
                                                 {href && colIndex === 0 ? (
-                                                    <Link
+                                                    <IntentLink
                                                         href={href}
                                                         className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                                                     >
                                                         {col.cell(row)}
-                                                    </Link>
+                                                    </IntentLink>
                                                 ) : onRowClick &&
                                                   colIndex === 0 ? (
                                                     // A real button, so the row
@@ -555,13 +555,13 @@ export function DataView<TRow>({
                                         // (`after:`), so the row is one
                                         // tap target with one link, never
                                         // two links on the same pixels.
-                                        <Link
+                                        <IntentLink
                                             href={href}
                                             data-row-link=""
                                             className="block min-w-0 truncate rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                                         >
                                             {primary?.cell(row)}
-                                        </Link>
+                                        </IntentLink>
                                     ) : onRowClick ? (
                                         // A real button, as in the table:
                                         // the row's name and its one

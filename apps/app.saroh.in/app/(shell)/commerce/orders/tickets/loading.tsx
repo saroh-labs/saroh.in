@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { PageLoading } from "@/components/shared/page/page-loading";
 
@@ -9,9 +9,9 @@ export default function Loading() {
             width="full"
             breadcrumb={[
                 "Sell",
-                <Link data-ph-unmask="" key="1" href="/commerce/orders">
+                <IntentLink data-ph-unmask="" key="1" href="/commerce/orders">
                     Orders
-                </Link>,
+                </IntentLink>,
                 "Tickets",
             ]}
             label="Loading the tickets"

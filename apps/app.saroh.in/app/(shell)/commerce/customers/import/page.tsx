@@ -1,5 +1,5 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { StorefrontChooser } from "@/components/commerce/sell-pages/storefront-chooser";
@@ -79,14 +79,14 @@ export default async function ImportCustomersPage({
                 holdsData="description"
                 breadcrumb={[
                     "Sell",
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="customers"
                         href="/commerce/customers"
                         className="hover:text-foreground"
                     >
                         Customers
-                    </Link>,
+                    </IntentLink>,
                     "Import",
                 ]}
                 title="Import customers"

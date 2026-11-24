@@ -1,8 +1,8 @@
 import { Button } from "@saroh/ui/button";
 import { CopyButton } from "@saroh/ui/copy-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
-import Link from "next/link";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { StateBadge } from "@/components/sites/header/website-header";
@@ -144,7 +144,9 @@ export function StatusCard({
                         status.waiting > 0 && "max-[759px]:hidden",
                     )}
                 >
-                    <Link href={`/sites/${siteId}`}>Review and publish</Link>
+                    <IntentLink href={`/sites/${siteId}`}>
+                        Review and publish
+                    </IntentLink>
                 </Button>
             ) : null}
         </section>

@@ -7,12 +7,12 @@ import type {
     AskAiUsage,
 } from "@saroh/api-contract";
 import { AbsentValue } from "@saroh/ui/absent-value";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, ListTableHead, listTable } from "@saroh/ui/list-table";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 
 import { PROVIDER_WHERE } from "@/components/ask-ai/words";
@@ -134,12 +134,12 @@ export function AskAiSettingsView({
                         already see.
                     </p>
                     <p data-ph-unmask="" className="mt-2">
-                        <Link
+                        <IntentLink
                             href={ROLES_HREF}
                             className={`${LINK} text-[13px]`}
                         >
                             Change in Team › Roles
-                        </Link>
+                        </IntentLink>
                     </p>
                 </section>
                 <p

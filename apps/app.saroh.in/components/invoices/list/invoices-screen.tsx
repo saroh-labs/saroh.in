@@ -2,8 +2,8 @@
 
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
@@ -390,7 +390,7 @@ export function InvoicesScreen({
                 actions={
                     canWrite ? (
                         <Button asChild>
-                            <Link
+                            <IntentLink
                                 href="/billing/invoices/new"
                                 aria-label="New invoice"
                             >
@@ -398,7 +398,7 @@ export function InvoicesScreen({
                                 <span className="max-sm:hidden">
                                     New invoice
                                 </span>
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : undefined
                 }

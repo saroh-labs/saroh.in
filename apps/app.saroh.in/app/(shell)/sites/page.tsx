@@ -1,8 +1,8 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Globe } from "lucide-react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { navCan } from "@/components/shared/navigation/nav-items";
@@ -88,7 +88,9 @@ export default async function SitesPage() {
                         actions={
                             mayCreate && mayAddWebsite(sites.length) ? (
                                 <Button asChild>
-                                    <Link href="/sites/new">New site</Link>
+                                    <IntentLink href="/sites/new">
+                                        New site
+                                    </IntentLink>
                                 </Button>
                             ) : undefined
                         }
@@ -148,7 +150,9 @@ export default async function SitesPage() {
                     action={
                         mayCreate ? (
                             <Button asChild>
-                                <Link href="/sites/new">New site</Link>
+                                <IntentLink href="/sites/new">
+                                    New site
+                                </IntentLink>
                             </Button>
                         ) : undefined
                     }

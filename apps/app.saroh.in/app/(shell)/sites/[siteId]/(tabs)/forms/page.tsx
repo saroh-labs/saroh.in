@@ -1,8 +1,8 @@
 import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Inbox } from "lucide-react";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { listForms } from "@/lib/forms/service";
@@ -51,7 +51,7 @@ export default async function SiteFormsPage({
                     key={form.id}
                     className="border-b border-border last:border-b-0"
                 >
-                    <Link
+                    <IntentLink
                         href={`/sites/${siteId}/forms/${form.id}`}
                         className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     >
@@ -77,7 +77,7 @@ export default async function SiteFormsPage({
                                 </span>
                             }
                         />
-                    </Link>
+                    </IntentLink>
                 </li>
             ))}
         </ListCard>

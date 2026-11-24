@@ -3,7 +3,7 @@
 import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useState } from "react";
 
 import { EnrolDialog } from "@/components/courses/enrol-dialog";
@@ -94,7 +94,7 @@ export function CoursesPanel({
                             const n = e.upcoming;
                             return (
                                 <li key={e.id} className={ROW_RULE}>
-                                    <Link
+                                    <IntentLink
                                         href={`/courses/${e.course.id}`}
                                         className={`${ROW_BODY} transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring`}
                                     >
@@ -118,7 +118,7 @@ export function CoursesPanel({
                                         >
                                             {on ? "Enrolled" : "Cancelled"}
                                         </Badge>
-                                    </Link>
+                                    </IntentLink>
                                 </li>
                             );
                         })}

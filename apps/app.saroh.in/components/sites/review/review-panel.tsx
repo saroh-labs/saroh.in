@@ -2,9 +2,9 @@
 
 import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -518,11 +518,11 @@ function Note({
                         size="xs"
                         className="min-w-0 px-1.5 text-[0.6875rem]"
                     >
-                        <Link href={`/sites/${siteId}/posts/${postId}`}>
+                        <IntentLink href={`/sites/${siteId}/posts/${postId}`}>
                             <span className="truncate">
                                 Open {note.postTitle ?? "the post"}
                             </span>
-                        </Link>
+                        </IntentLink>
                     </Button>
                 ) : null}
                 {note.orphaned ||

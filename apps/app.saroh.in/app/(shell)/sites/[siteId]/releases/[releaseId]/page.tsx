@@ -1,7 +1,7 @@
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -89,13 +89,13 @@ export default async function TestReleasePage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="site"
                         href={`/sites/${siteId}/pages`}
                     >
                         Website
-                    </Link>,
+                    </IntentLink>,
                     releaseTitle(release),
                 ]}
                 holdsData
@@ -110,7 +110,9 @@ export default async function TestReleasePage({
                             />
                         ) : null}
                         <Button variant="outline" asChild>
-                            <Link href={back.href}>{back.label}</Link>
+                            <IntentLink href={back.href}>
+                                {back.label}
+                            </IntentLink>
                         </Button>
                     </div>
                 }
@@ -121,13 +123,13 @@ export default async function TestReleasePage({
                     {release.status === "live" ? (
                         <>
                             This test link is live now.{" "}
-                            <Link
+                            <IntentLink
                                 data-ph-unmask=""
                                 href={`/sites/${siteId}/versions`}
                                 className="font-medium underline underline-offset-2 hover:text-foreground focus-visible:text-foreground"
                             >
                                 Version history
-                            </Link>{" "}
+                            </IntentLink>{" "}
                             has the version it went live as.
                         </>
                     ) : release.status === "discarded" ? (

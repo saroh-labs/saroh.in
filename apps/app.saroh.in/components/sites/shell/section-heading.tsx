@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import type { PostCategory } from "@/lib/content/service";
@@ -62,9 +62,9 @@ export function SiteSectionHeading({
                             />
                         )}
                         <Button asChild>
-                            <Link href={`/sites/${siteId}/posts/new`}>
+                            <IntentLink href={`/sites/${siteId}/posts/new`}>
                                 New post
-                            </Link>
+                            </IntentLink>
                         </Button>
                     </>
                 ) : undefined

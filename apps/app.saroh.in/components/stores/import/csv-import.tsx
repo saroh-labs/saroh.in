@@ -4,6 +4,7 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
@@ -15,7 +16,6 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 import { Download, FileUp } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
 
@@ -417,7 +417,7 @@ export function CsvImport({
                     ) : null}
                     <div className="flex flex-wrap gap-3">
                         <Button variant="brand" asChild>
-                            <Link href={backHref}>Done</Link>
+                            <IntentLink href={backHref}>Done</IntentLink>
                         </Button>
                         <Button variant="outline" onClick={reset}>
                             Import another file
@@ -807,9 +807,9 @@ export function CsvImport({
                                                 variant="outline"
                                                 size="sm"
                                             >
-                                                <Link href={meter.href}>
+                                                <IntentLink href={meter.href}>
                                                     {planLabel(meter.upgradeTo)}
-                                                </Link>
+                                                </IntentLink>
                                             </Button>
                                         </PlanWay>
                                     </div>

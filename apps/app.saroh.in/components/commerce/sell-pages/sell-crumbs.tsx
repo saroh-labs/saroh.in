@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 /**
  * "Sell › Storefronts › Hill Road" — the breadcrumb every Sell page below a
@@ -13,13 +13,13 @@ export function sellCrumbs(
             typeof step === "string" ? (
                 step
             ) : (
-                <Link
+                <IntentLink
                     key={step.href}
                     href={step.href}
                     className="hover:text-foreground"
                 >
                     {step.label}
-                </Link>
+                </IntentLink>
             ),
         ),
     ];

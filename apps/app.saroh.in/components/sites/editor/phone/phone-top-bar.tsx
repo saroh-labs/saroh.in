@@ -2,8 +2,8 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ChevronDown, ChevronLeft, MoreHorizontal } from "lucide-react";
-import Link from "next/link";
 
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
@@ -48,13 +48,13 @@ export function PhoneTopBar({
                 data-editor-bar=""
                 className="flex h-14 shrink-0 items-center gap-1 border-b px-1.5"
             >
-                <Link
+                <IntentLink
                     href={`/sites/${siteId}/pages`}
                     aria-label="Back to Website"
                     className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-fast hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ChevronLeft aria-hidden className="size-5" />
-                </Link>
+                </IntentLink>
                 <button
                     type="button"
                     aria-haspopup="dialog"

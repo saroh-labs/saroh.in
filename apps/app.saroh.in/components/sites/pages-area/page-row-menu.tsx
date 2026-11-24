@@ -10,6 +10,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import {
     Copy,
@@ -22,7 +23,6 @@ import {
     Share2,
     Trash2,
 } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { SharePageSheet } from "@/components/sites/share/share-page-sheet";
@@ -151,12 +151,12 @@ export function PageRowMenu({
                             </DropdownMenuItem>
                             {page.isHome ? null : (
                                 <DropdownMenuItem asChild className={ITEM}>
-                                    <Link
+                                    <IntentLink
                                         href={`/sites/${siteId}/settings?section=menu-and-footer`}
                                     >
                                         <ListOrdered aria-hidden />
                                         Move in menu
-                                    </Link>
+                                    </IntentLink>
                                 </DropdownMenuItem>
                             )}
                             {page.isHome ? null : (

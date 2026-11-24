@@ -4,7 +4,7 @@ import { AbsentValue } from "@saroh/ui/absent-value";
 import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { DataView } from "@/components/shared/data-view/data-view";
 import type {
@@ -81,12 +81,12 @@ export function LeadsView({
                 (l.contact ? contactName(l.contact) : "").toLowerCase(),
             cell: (l) =>
                 l.contact ? (
-                    <Link
+                    <IntentLink
                         href={personHref(l.contact.id)}
                         className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                     >
                         {contactName(l.contact)}
-                    </Link>
+                    </IntentLink>
                 ) : (
                     <Missing />
                 ),
@@ -177,7 +177,7 @@ export function LeadsView({
                 note: "They show here as enquiries come in, or when you add one.",
             }}
             renderCard={(l) => (
-                <Link href={`/leads/${l.id}`} className="block">
+                <IntentLink href={`/leads/${l.id}`} className="block">
                     {/* `wk-surface`, not a brand-tinted hover edge: the card is a
                         surface, not a link, and the link colour on its border
                         read as though the outline itself were clickable. The
@@ -197,7 +197,7 @@ export function LeadsView({
                             )}
                         </CardContent>
                     </Card>
-                </Link>
+                </IntentLink>
             )}
         />
     );

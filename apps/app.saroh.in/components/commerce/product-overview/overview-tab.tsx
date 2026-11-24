@@ -2,8 +2,8 @@ import { AbsentValue } from "@saroh/ui/absent-value";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ExternalLink, Eye } from "lucide-react";
-import Link from "next/link";
 
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { PriceHistoryPage } from "@/lib/price-history/words";
@@ -286,9 +286,9 @@ function WebsiteCard({
             <div className="flex flex-wrap gap-2">
                 {shopLive === false && overview.canWrite ? (
                     <Button asChild size="sm">
-                        <Link data-ph-unmask="" href="/sites">
+                        <IntentLink data-ph-unmask="" href="/sites">
                             Set up your shop
-                        </Link>
+                        </IntentLink>
                     </Button>
                 ) : null}
                 {shopUrl ? (
@@ -305,10 +305,14 @@ function WebsiteCard({
                     </Button>
                 ) : null}
                 <Button asChild size="sm" variant="outline">
-                    <Link data-ph-unmask="" href={customer} scroll={false}>
+                    <IntentLink
+                        data-ph-unmask=""
+                        href={customer}
+                        scroll={false}
+                    >
                         <Eye aria-hidden className="size-3.5" />
                         Preview as a customer
-                    </Link>
+                    </IntentLink>
                 </Button>
             </div>
         </Card>

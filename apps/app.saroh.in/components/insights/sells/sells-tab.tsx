@@ -2,6 +2,7 @@ import { AbsentValue } from "@saroh/ui/absent-value";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
@@ -9,7 +10,6 @@ import { Notice } from "@saroh/ui/notice";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 import { TextLink } from "@saroh/ui/text-link";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import Link from "next/link";
 
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import type { SourceRead } from "@/lib/analytics/takings";
@@ -230,7 +230,7 @@ function SoldCard({
                 </ListTable>
             ) : canTakeOrder ? (
                 <Button asChild variant="outline" size="sm">
-                    <Link href={newOrderHref()}>Take an order</Link>
+                    <IntentLink href={newOrderHref()}>Take an order</IntentLink>
                 </Button>
             ) : null}
             {view.seeAll ? (
@@ -285,7 +285,9 @@ function BookedCard({
                 </ul>
             ) : view.empty && canAddService ? (
                 <Button asChild variant="outline" size="sm">
-                    <Link href={SEE_ALL.newService}>Add a service</Link>
+                    <IntentLink href={SEE_ALL.newService}>
+                        Add a service
+                    </IntentLink>
                 </Button>
             ) : null}
             {view.seeAll ? (

@@ -7,9 +7,9 @@ import {
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { formatTime } from "@/lib/format/datetime";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
-import Link from "next/link";
 
 import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
 import type { DateRange } from "@/lib/views/date-range";
@@ -301,7 +301,7 @@ export function LogList({
                                                         )}
                                                     </span>
                                                     <span className="grid min-w-0 gap-px max-[759px]:contents">
-                                                        <Link
+                                                        <IntentLink
                                                             href={productHref(
                                                                 e.storeId,
                                                                 e.productId,
@@ -312,7 +312,7 @@ export function LogList({
                                                             {e.variantTitle
                                                                 ? `${e.productName} ${e.variantTitle}`
                                                                 : e.productName}
-                                                        </Link>
+                                                        </IntentLink>
                                                         <span
                                                             aria-hidden
                                                             className="hidden max-[759px]:order-4 max-[759px]:block max-[759px]:basis-full"

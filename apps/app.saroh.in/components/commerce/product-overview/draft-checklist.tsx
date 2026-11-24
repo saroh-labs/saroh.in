@@ -1,8 +1,8 @@
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
-import Link from "next/link";
 
 import { formatMoneyMajor } from "@/lib/format/money";
 import { mediaCounter } from "@/lib/products/editor-sections";
@@ -207,7 +207,7 @@ function ChecklistCta({
     if ("section" in cta) {
         return (
             <Button asChild variant="outline" size="sm">
-                <Link href={edit(cta.section)}>{cta.label}</Link>
+                <IntentLink href={edit(cta.section)}>{cta.label}</IntentLink>
             </Button>
         );
     }

@@ -1,6 +1,6 @@
 import { PartialRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { env } from "@/env";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
@@ -98,7 +98,7 @@ function ReviewItem({ row, first }: { row: ReviewRow; first: boolean }) {
     return (
         <li className={cn(!first && "border-t border-border")}>
             {row.href ? (
-                <Link
+                <IntentLink
                     href={row.href}
                     className="flex items-center gap-3 bg-card px-4 py-3.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active"
                 >
@@ -109,7 +109,7 @@ function ReviewItem({ row, first }: { row: ReviewRow; first: boolean }) {
                     >
                         Open
                     </span>
-                </Link>
+                </IntentLink>
             ) : (
                 <div className="flex items-center gap-3 bg-card px-4 py-3.5 text-foreground">
                     {words}

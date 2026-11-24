@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import type { LockedCopy } from "@/lib/invoices/access";
 
@@ -21,7 +21,7 @@ export function PaymentsLocked({ title, text }: LockedCopy) {
                 description={text}
                 action={
                     <Button asChild variant="outline" className="wk-press mt-1">
-                        <Link href="/">Back to Home</Link>
+                        <IntentLink href="/">Back to Home</IntentLink>
                     </Button>
                 }
             />

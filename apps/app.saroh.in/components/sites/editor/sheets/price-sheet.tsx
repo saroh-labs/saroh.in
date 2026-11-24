@@ -3,10 +3,10 @@
 import { Button } from "@saroh/ui/button";
 import { Field } from "@saroh/ui/field";
 import { FormSheet } from "@saroh/ui/form-sheet";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { Notice } from "@saroh/ui/notice";
 import { showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
@@ -255,11 +255,11 @@ export function PriceSheet({
             doneLabel="Close"
             extra={
                 <Button asChild>
-                    <Link href={editHref}>
+                    <IntentLink href={editHref}>
                         {data && !data.canWrite
                             ? "Open in Services"
                             : "Edit in Services"}
-                    </Link>
+                    </IntentLink>
                 </Button>
             }
         >

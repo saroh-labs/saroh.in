@@ -1,8 +1,8 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoreHorizontal } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import type {
@@ -163,7 +163,7 @@ function TabCount({ count }: { count: number }) {
 function TabLink({ tab }: { tab: MobileTab }) {
     const Icon = tab.icon;
     return (
-        <Link
+        <IntentLink
             href={tab.href}
             aria-current={tab.current ? "page" : "false"}
             aria-label={tabLabel(tab.label, tab.count, tab.current)}
@@ -179,6 +179,6 @@ function TabLink({ tab }: { tab: MobileTab }) {
                 <TabCount count={tab.count} />
             </span>
             <span className="max-w-full truncate">{tab.label}</span>
-        </Link>
+        </IntentLink>
     );
 }

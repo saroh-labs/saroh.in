@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { TextLink } from "@saroh/ui/text-link";
-import Link from "next/link";
 import { useId, useState } from "react";
 
 import type { PhoneNext } from "@/lib/home/phone-home";
@@ -59,11 +59,11 @@ export function DaySheet({
             trigger={<PhoneNextLine next={next} />}
             foot={
                 <Button asChild variant="outline" className="w-full">
-                    <Link href={calendar}>
+                    <IntentLink href={calendar}>
                         {today && !today.bookings
                             ? "All orders"
                             : "Open the calendar"}
-                    </Link>
+                    </IntentLink>
                 </Button>
             }
         >

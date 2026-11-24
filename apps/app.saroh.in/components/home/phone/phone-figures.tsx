@@ -1,6 +1,6 @@
 import { AbsentValue } from "@saroh/ui/absent-value";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import type { PhoneFigure } from "@/lib/home/phone-home";
 
@@ -26,7 +26,7 @@ export function PhoneFigures({ figures }: { figures: readonly PhoneFigure[] }) {
         >
             {figures.map((f, i) => (
                 <li key={f.key} className="min-w-0">
-                    <Link
+                    <IntentLink
                         href={f.href}
                         data-figure={f.key}
                         className={cn(
@@ -50,7 +50,7 @@ export function PhoneFigures({ figures }: { figures: readonly PhoneFigure[] }) {
                         >
                             {f.label}
                         </span>
-                    </Link>
+                    </IntentLink>
                 </li>
             ))}
         </ul>

@@ -1,5 +1,6 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Sheet,
@@ -9,7 +10,6 @@ import {
     SheetTrigger,
 } from "@saroh/ui/sheet";
 import { X } from "lucide-react";
-import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
 import type { MobileSheetGroup, MobileSheetRow } from "@/lib/nav/mobile-nav";
@@ -114,7 +114,7 @@ function SheetGroup({
 function SheetRow({ row, onGo }: { row: MobileSheetRow; onGo: () => void }) {
     const Icon = row.icon;
     return (
-        <Link
+        <IntentLink
             href={row.href}
             onClick={onGo}
             aria-current={row.current ? "page" : undefined}
@@ -142,6 +142,6 @@ function SheetRow({ row, onGo }: { row: MobileSheetRow; onGo: () => void }) {
                     className="shrink-0"
                 />
             ) : null}
-        </Link>
+        </IntentLink>
     );
 }

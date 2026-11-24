@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -57,13 +57,13 @@ export default async function SiteVersionsPage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="site"
                         href={`/sites/${siteId}/pages`}
                     >
                         Website
-                    </Link>,
+                    </IntentLink>,
                     "Version history",
                 ]}
                 holdsData="description"
@@ -71,7 +71,9 @@ export default async function SiteVersionsPage({
                 description={site.name}
                 actions={
                     <Button variant="outline" asChild>
-                        <Link href={`/sites/${siteId}/settings`}>Settings</Link>
+                        <IntentLink href={`/sites/${siteId}/settings`}>
+                            Settings
+                        </IntentLink>
                     </Button>
                 }
             />

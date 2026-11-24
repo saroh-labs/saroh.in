@@ -1,5 +1,5 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { SarohSymbol, Wordmark } from "@saroh/ui/wordmark";
-import Link from "next/link";
 
 import { AskAiButton } from "@/components/ask-ai/ask-ai-button";
 import { OrganizationSwitcher } from "@/components/organizations/switcher/organization-switcher";
@@ -66,9 +66,9 @@ export function AppHeader(props: AppHeaderProps) {
     if (props.onboarding) {
         return (
             <header className="sticky top-0 z-30 flex h-[61px] items-center justify-between border-b bg-background px-3.5 py-[9px]">
-                <Link href="/" aria-label="Saroh">
+                <IntentLink href="/" aria-label="Saroh">
                     <Wordmark />
-                </Link>
+                </IntentLink>
                 <div className="flex items-center gap-1.5">
                     <SkinSwitcher />
                     <UserMenu name={props.user.name} email={props.user.email} />
@@ -93,13 +93,13 @@ export function AppHeader(props: AppHeaderProps) {
         // No menu button: below 760px the tab bar at the foot of the screen
         // is the navigation, so the header only says where you are.
         <header className="sticky top-0 z-30 flex h-[61px] items-center gap-1 border-b bg-background px-2 py-[9px] sm:px-3.5 print:hidden">
-            <Link
+            <IntentLink
                 href="/"
                 aria-label="Saroh, go to Home"
                 className="flex shrink-0 items-center rounded-lg px-[7px] py-[5px] transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
                 <SarohSymbol size={22} />
-            </Link>
+            </IntentLink>
             <span aria-hidden className="px-px text-[15px] text-border-strong">
                 /
             </span>

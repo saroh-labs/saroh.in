@@ -3,6 +3,7 @@
 import type { VariantCap } from "@/lib/billing/variant-cap";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useSaveShortcut } from "@saroh/ui/lib/keyboard-save";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
@@ -10,7 +11,6 @@ import { useEdgeFade } from "@saroh/ui/scroll-x";
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showErrorToast, showSuccess } from "@saroh/ui/toast";
 import { ChevronLeft } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -327,13 +327,13 @@ function EditorBody({
                 many lines the header wraps to on a phone. */}
             <div className="sticky top-[61px] z-20 bg-background">
                 <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
-                    <Link
+                    <IntentLink
                         href={PRODUCTS_HREF}
                         className="flex items-center gap-[7px] rounded-[8px] px-[9px] py-1.5 text-[12.5px] text-foreground/75 hover:bg-muted hover:text-foreground"
                     >
                         <ChevronLeft aria-hidden className="size-[15px]" />
                         Products
-                    </Link>
+                    </IntentLink>
                     <span
                         aria-hidden
                         className="text-[15px] text-muted-foreground"

@@ -9,6 +9,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import {
@@ -22,7 +23,6 @@ import {
     Trash2,
     Users,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -123,10 +123,10 @@ function MoreItem({
                     {entry.label}
                 </a>
             ) : (
-                <Link href={entry.href ?? "#"} scroll={false}>
+                <IntentLink href={entry.href ?? "#"} scroll={false}>
                     <Icon />
                     {entry.label}
-                </Link>
+                </IntentLink>
             )}
         </DropdownMenuItem>
     );
@@ -214,7 +214,7 @@ export function ProductActions({
                 variant={primary ? "outline" : "default"}
                 className="max-sm:flex-1"
             >
-                <Link href={editHref}>Edit product</Link>
+                <IntentLink href={editHref}>Edit product</IntentLink>
             </Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>

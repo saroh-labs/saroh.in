@@ -1,11 +1,11 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { showUndo } from "@saroh/ui/toast";
 import { Check, ExternalLink } from "lucide-react";
-import Link from "next/link";
 import { useId } from "react";
 
 import { FACT_DOT } from "@/lib/format/join";
@@ -80,7 +80,7 @@ export function ChecklistStep({ row }: { row: ChecklistRow }) {
                         size="sm"
                         className="shrink-0"
                     >
-                        <Link
+                        <IntentLink
                             href={action.href}
                             aria-describedby={labelId}
                             // With a press of its own, the link is the
@@ -96,7 +96,7 @@ export function ChecklistStep({ row }: { row: ChecklistRow }) {
                             }
                         >
                             {action.label}
-                        </Link>
+                        </IntentLink>
                     </Button>
                 ) : (
                     <Button

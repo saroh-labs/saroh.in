@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { notFound, redirect } from "next/navigation";
 
 import { InvoiceForm } from "@/components/invoices/new-invoice/invoice-form";
@@ -56,13 +56,13 @@ export default async function EditInvoicePage({
                 header={{
                     breadcrumb: [
                         ...((await paymentsModuleOn()) ? ["Payments"] : []),
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             key="list"
                             href="/billing/invoices"
                         >
                             Invoices
-                        </Link>,
+                        </IntentLink>,
                         "Draft",
                     ],
                     title: "Edit the draft",

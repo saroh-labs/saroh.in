@@ -3,10 +3,10 @@
 import { Button } from "@saroh/ui/button";
 import { useCopy } from "@saroh/ui/copy-button";
 import { FormSheetBody } from "@saroh/ui/form-sheet";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useToastsAboveFoot } from "@saroh/ui/overlay-form";
 import { showError } from "@saroh/ui/toast";
 import { Check, Copy, MessageCircle, MessageSquareText } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type { PayLinkResult } from "@/components/bookings/booking-page/pay-link-panel";
@@ -192,11 +192,11 @@ export function GapBooked({
                     size="lg"
                     className="flex-1 min-[760px]:flex-none"
                 >
-                    <Link
+                    <IntentLink
                         href={`/bookings/${encodeURIComponent(booked.bookingId)}`}
                     >
                         View booking
-                    </Link>
+                    </IntentLink>
                 </Button>
                 <Button
                     type="button"

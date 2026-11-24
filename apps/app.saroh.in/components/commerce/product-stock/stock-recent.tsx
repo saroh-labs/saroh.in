@@ -3,8 +3,8 @@
 import { formatDateTime, viewerTimeZone } from "@/lib/format/datetime";
 import { Card } from "@saroh/ui/card";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
 import { STOCK_CHECKS_HREF, stockLogHref } from "@/lib/products/links";
@@ -52,13 +52,13 @@ export function ProductChecks({ checks }: { checks: readonly StockCheck[] }) {
                 <Notice tone="error" className="mt-3" key={c.key}>
                     <div className="flex flex-wrap items-baseline gap-2.5">
                         <strong className="font-semibold">{c.title}</strong>
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             href={STOCK_CHECKS_HREF}
                             className="ml-auto rounded-sm font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
                         >
                             Open checks
-                        </Link>
+                        </IntentLink>
                     </div>
                 </Notice>
             ))}

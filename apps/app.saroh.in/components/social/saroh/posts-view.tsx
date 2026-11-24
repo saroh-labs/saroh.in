@@ -3,10 +3,10 @@
 import { ChipGroup } from "@saroh/ui/choice-group";
 import { EmptyState } from "@saroh/ui/data-state";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { RadioTower } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -115,12 +115,12 @@ export function PostsView({
                     tone="warning"
                     data-social-waiting=""
                     action={
-                        <Link
+                        <IntentLink
                             href="/social?tab=channels"
                             className="font-semibold underline underline-offset-4"
                         >
                             {SOCIAL_WORDS.reconnect}
-                        </Link>
+                        </IntentLink>
                     }
                 >
                     {waiting
@@ -188,7 +188,7 @@ export function PostsView({
                                         )}
                                     >
                                         {d.posts.map((p) => (
-                                            <Link
+                                            <IntentLink
                                                 key={p.id}
                                                 href={postHref(p.id)}
                                                 scroll={false}
@@ -236,7 +236,7 @@ export function PostsView({
                                                         ),
                                                     )}
                                                 </span>
-                                            </Link>
+                                            </IntentLink>
                                         ))}
                                     </div>
                                 ) : (
@@ -249,7 +249,7 @@ export function PostsView({
                                         )}
                                     >
                                         {canPost ? (
-                                            <Link
+                                            <IntentLink
                                                 href={newPostOn(
                                                     d.key,
                                                     d.goodTimeAt,
@@ -258,7 +258,7 @@ export function PostsView({
                                                 className="inline-flex min-h-11 items-center text-[12.5px] font-semibold underline decoration-border-strong underline-offset-4"
                                             >
                                                 {SOCIAL_WORDS.addPost}
-                                            </Link>
+                                            </IntentLink>
                                         ) : null}
                                         {d.goodTime ? (
                                             <span className="text-[11.5px] text-muted-foreground">
@@ -326,7 +326,7 @@ export function PostsView({
                                         data-status={p.status}
                                         className="grid content-start gap-2"
                                     >
-                                        <Link
+                                        <IntentLink
                                             href={postHref(p.id)}
                                             scroll={false}
                                             className="relative flex justify-center rounded-2xl bg-muted p-3.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -345,7 +345,7 @@ export function PostsView({
                                             <span className="sr-only">
                                                 {p.title}
                                             </span>
-                                        </Link>
+                                        </IntentLink>
                                         <b
                                             data-ph-mask=""
                                             className="line-clamp-2 text-[14.5px] font-semibold leading-[1.3]"

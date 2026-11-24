@@ -8,10 +8,10 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronDown, Store } from "lucide-react";
-import Link from "next/link";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import type { PlanMeter } from "@/lib/billing/meter";
@@ -67,22 +67,22 @@ export function CatalogueHeader({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[220px]">
                         <DropdownMenuItem asChild>
-                            <Link
+                            <IntentLink
                                 data-ph-unmask=""
                                 href={importProductsHref(
                                     here?.id ?? (many ? undefined : first.id),
                                 )}
                             >
                                 Import from a spreadsheet
-                            </Link>
+                            </IntentLink>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                            <Link
+                            <IntentLink
                                 data-ph-unmask=""
                                 href={productSettingsHref()}
                             >
                                 Product settings
-                            </Link>
+                            </IntentLink>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -95,9 +95,9 @@ export function CatalogueHeader({
                         {beside.upgrade ? (
                             <PlanWay fallback={null}>
                                 <Button asChild variant="outline">
-                                    <Link href={meter.href}>
+                                    <IntentLink href={meter.href}>
                                         {planLabel(meter.upgradeTo)}
-                                    </Link>
+                                    </IntentLink>
                                 </Button>
                             </PlanWay>
                         ) : null}
@@ -116,19 +116,19 @@ export function CatalogueHeader({
                             </DropdownMenuLabel>
                             {stores.map((s) => (
                                 <DropdownMenuItem key={s.id} asChild>
-                                    <Link href={newProductHref(s.id)}>
+                                    <IntentLink href={newProductHref(s.id)}>
                                         <Store />
                                         {s.name}
-                                    </Link>
+                                    </IntentLink>
                                 </DropdownMenuItem>
                             ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 ) : (
                     <Button asChild>
-                        <Link href={newProductHref((here ?? first).id)}>
+                        <IntentLink href={newProductHref((here ?? first).id)}>
                             New product
-                        </Link>
+                        </IntentLink>
                     </Button>
                 )}
             </>

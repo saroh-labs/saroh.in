@@ -7,9 +7,9 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronDown, MoreHorizontal, Share2 } from "lucide-react";
-import Link from "next/link";
 
 import type {
     InvoiceAction,
@@ -51,7 +51,7 @@ export function ActionButton({
     if (href && !a.disabled) {
         return (
             <Button asChild variant={variant} className={cls}>
-                <Link href={href}>{a.label}</Link>
+                <IntentLink href={href}>{a.label}</IntentLink>
             </Button>
         );
     }
@@ -130,7 +130,7 @@ export function ActionMenu({
                             key={`${a.id}:${a.kind ?? ""}`}
                             asChild
                         >
-                            <Link href={href}>{body}</Link>
+                            <IntentLink href={href}>{body}</IntentLink>
                         </DropdownMenuItem>
                     ) : (
                         <DropdownMenuItem

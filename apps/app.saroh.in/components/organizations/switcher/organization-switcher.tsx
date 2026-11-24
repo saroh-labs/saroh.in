@@ -1,11 +1,11 @@
 "use client";
 
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { showError } from "@saroh/ui/toast";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -229,7 +229,7 @@ export function OrganizationSwitcher({
                     </p>
                 ) : null}
                 <div className="mt-1.5 border-t border-muted pt-1.5">
-                    <Link
+                    <IntentLink
                         href="/onboarding"
                         onClick={() => setOpen(false)}
                         className="flex items-center gap-[9px] rounded-lg px-[9px] py-2 text-[12.5px] text-neutral-600 transition-colors duration-fast hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:text-muted-foreground"
@@ -238,7 +238,7 @@ export function OrganizationSwitcher({
                         {/* Setup asks what it is (DEC-070): not always a
                             business. */}
                         Set up another
-                    </Link>
+                    </IntentLink>
                 </div>
             </PopoverContent>
         </Popover>

@@ -1,8 +1,8 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight } from "lucide-react";
-import Link from "next/link";
 
 import { cardAttention } from "@/lib/orders/attention";
 import type {
@@ -217,7 +217,7 @@ function VisitRow({
         "grid grid-cols-[26px_minmax(0,1fr)_auto] items-start gap-2.5 py-1";
     if (!href) return <div className={grid}>{body}</div>;
     return (
-        <Link
+        <IntentLink
             href={href}
             aria-label={`Visit ${v.number}, ${when}, ${state.label}. Open the booking to move or cancel it.`}
             className={cn(
@@ -227,7 +227,7 @@ function VisitRow({
             )}
         >
             {body}
-        </Link>
+        </IntentLink>
     );
 }
 

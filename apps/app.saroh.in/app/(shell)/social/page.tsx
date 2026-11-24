@@ -1,8 +1,8 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Globe } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -103,9 +103,9 @@ export default async function SocialPage({
                     compactOnPhone
                     breadcrumb={[
                         "Grow",
-                        <Link key="social" href="/social">
+                        <IntentLink key="social" href="/social">
                             {SOCIAL_WORDS.social}
-                        </Link>,
+                        </IntentLink>,
                     ]}
                     title={SOCIAL_WORDS.channels}
                 />
@@ -128,7 +128,9 @@ export default async function SocialPage({
                     title={POST_WORDS.notLive}
                     action={
                         <Button asChild>
-                            <Link href="/sites">{POST_WORDS.publishSite}</Link>
+                            <IntentLink href="/sites">
+                                {POST_WORDS.publishSite}
+                            </IntentLink>
                         </Button>
                     }
                 />

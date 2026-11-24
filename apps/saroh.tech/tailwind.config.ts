@@ -26,6 +26,7 @@ export const UI_FILES = [
     "components/ui/field.tsx",
     "components/ui/icon-button.tsx",
     "components/ui/input.tsx",
+    "components/ui/intent-link.tsx",
     "components/ui/label.tsx",
     "components/ui/option-select.tsx",
     "components/ui/popover.tsx",

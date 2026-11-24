@@ -2,11 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { showError } from "@saroh/ui/toast";
 import { Megaphone, Plug, Sparkles, X } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -121,9 +121,12 @@ export function Moment({
                                 moment.news && "max-sm:h-11 max-sm:w-full",
                             )}
                         >
-                            <Link href={moment.action.href} onClick={followed}>
+                            <IntentLink
+                                href={moment.action.href}
+                                onClick={followed}
+                            >
                                 {moment.action.label}
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : null}
                     <IconButton

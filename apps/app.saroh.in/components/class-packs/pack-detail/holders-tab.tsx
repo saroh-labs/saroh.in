@@ -6,9 +6,9 @@ import {
     FailedState,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Users } from "lucide-react";
-import Link from "next/link";
 import { useId, useState } from "react";
 
 import { ListFilter } from "@/components/shared/lists/list-toolbar";
@@ -197,13 +197,13 @@ function HolderItem({
         <li className="flex flex-wrap items-center gap-3.5 border-t border-border/70 py-3">
             <div className="min-w-0 flex-[2_1_220px]">
                 <div className="flex items-baseline gap-2.5">
-                    <Link
+                    <IntentLink
                         href={row.href}
                         aria-label={`Open ${row.name}`}
                         className="min-w-0 flex-1 rounded-[4px] text-[14px] font-semibold text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
                     >
                         {row.name}
-                    </Link>
+                    </IntentLink>
                     <span className="font-display text-[15px] font-semibold tabular-nums">
                         {row.left}
                     </span>

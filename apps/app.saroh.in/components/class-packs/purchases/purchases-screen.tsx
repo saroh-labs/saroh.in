@@ -4,9 +4,9 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { AbsentOr } from "@saroh/ui/absent-value";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { Ticket } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -173,9 +173,13 @@ export function PurchasesScreen({
         <>
             <PageHeader
                 breadcrumb={[
-                    <Link data-ph-unmask="" key="bookings" href="/bookings">
+                    <IntentLink
+                        data-ph-unmask=""
+                        key="bookings"
+                        href="/bookings"
+                    >
                         Bookings
-                    </Link>,
+                    </IntentLink>,
                     "Class packs",
                 ]}
                 title="Class packs"

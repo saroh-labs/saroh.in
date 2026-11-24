@@ -1,6 +1,6 @@
 import { plural } from "@/lib/format/plural";
 import { FailedRead } from "@saroh/ui/failed-read";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import type { ReactNode } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -140,7 +140,7 @@ export function ConnectedPanel({
                 <ul className="flex flex-col gap-1.5">
                     {links.map((l) => (
                         <li key={`${l.href}-${l.label}`}>
-                            <Link
+                            <IntentLink
                                 href={l.href}
                                 className="flex items-center gap-2 rounded-[9px] border border-border px-[11px] py-[9px] text-foreground transition-colors duration-fast hover:border-border-strong"
                             >
@@ -155,7 +155,7 @@ export function ConnectedPanel({
                                     ) : null}
                                 </span>
                                 <span aria-hidden>→</span>
-                            </Link>
+                            </IntentLink>
                         </li>
                     ))}
                 </ul>

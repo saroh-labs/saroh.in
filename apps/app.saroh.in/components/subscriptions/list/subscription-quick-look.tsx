@@ -5,8 +5,8 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { QuickLook, QuickLookCard } from "@/components/shared/forms/quick-look";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -113,9 +113,9 @@ export function SubscriptionQuickLook({
             description={`${sub.contact.name}'s subscription: ${sub.plan.name}, ${price}.`}
             footer={
                 <Button asChild className="min-w-[160px] flex-1">
-                    <Link href={`/billing/subscriptions/${sub.id}`}>
+                    <IntentLink href={`/billing/subscriptions/${sub.id}`}>
                         Open full details
-                    </Link>
+                    </IntentLink>
                 </Button>
             }
         >
@@ -250,7 +250,7 @@ function Body({
                         last.map((c) => (
                             // Each charge opens its invoice (UX-080), as
                             // the subscription's own page does.
-                            <Link
+                            <IntentLink
                                 key={c.id}
                                 href={chargeHref(c.id)}
                                 aria-label={`${c.number ?? "Invoice"} · ${c.date} · ${c.result} · ${c.amount}`}
@@ -266,7 +266,7 @@ function Body({
                                 <span className="font-semibold tabular-nums">
                                     {c.amount}
                                 </span>
-                            </Link>
+                            </IntentLink>
                         ))
                     ) : (
                         <EmptyState
@@ -298,7 +298,7 @@ function Body({
                 <QuickLookCard label="Change it" className="py-3">
                     <div className="flex flex-wrap gap-2">
                         {EDITS[tab].map(([label, step]) => (
-                            <Link
+                            <IntentLink
                                 key={label}
                                 href={step ? `${href}?do=${step}` : href}
                                 className={cn(
@@ -309,7 +309,7 @@ function Body({
                                 )}
                             >
                                 {label}
-                            </Link>
+                            </IntentLink>
                         ))}
                     </div>
                     <p

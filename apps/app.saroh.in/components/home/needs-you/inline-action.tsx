@@ -1,10 +1,10 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 import type { RefObject } from "react";
 import { useEffect, useId, useRef } from "react";
 
@@ -45,9 +45,9 @@ const QUIET =
  */
 export function InlineLink({ link }: { link: HomeRowLink }) {
     return (
-        <Link href={link.href} className={cn(QUIET, FOCUS)}>
+        <IntentLink href={link.href} className={cn(QUIET, FOCUS)}>
             {link.label}
-        </Link>
+        </IntentLink>
     );
 }
 

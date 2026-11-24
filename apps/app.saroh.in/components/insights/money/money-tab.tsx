@@ -5,10 +5,10 @@ import {
     FailedState,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronUp } from "lucide-react";
-import Link from "next/link";
 
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
 import type { SourceRead } from "@/lib/analytics/takings";
@@ -127,12 +127,14 @@ export function MoneyTab({
                     action={
                         <div className="flex flex-wrap justify-center gap-2">
                             <Button asChild>
-                                <Link href={newOrderHref()}>Take an order</Link>
+                                <IntentLink href={newOrderHref()}>
+                                    Take an order
+                                </IntentLink>
                             </Button>
                             <Button asChild variant="outline">
-                                <Link href="/billing/invoices/new">
+                                <IntentLink href="/billing/invoices/new">
                                     Send an invoice
-                                </Link>
+                                </IntentLink>
                             </Button>
                         </div>
                     }
@@ -224,7 +226,7 @@ function Tiles({ tiles }: { tiles: readonly MoneyTile[] }) {
         >
             {tiles.map((tile) => (
                 <li key={tile.key} className="min-w-0">
-                    <Link
+                    <IntentLink
                         href={tile.href}
                         data-tile={tile.key}
                         className="flex h-full flex-col gap-[3px] rounded-xl border border-border bg-card px-[15px] py-[13px] text-foreground transition-colors duration-fast hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-muted"
@@ -261,7 +263,7 @@ function Tiles({ tiles }: { tiles: readonly MoneyTile[] }) {
                             ) : null}
                             {tile.sub}
                         </span>
-                    </Link>
+                    </IntentLink>
                 </li>
             ))}
         </ul>
@@ -300,7 +302,7 @@ function Places({
             <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-700 dark:text-muted-foreground">
                 {places.places.map((p, i) => (
                     <li key={p.key}>
-                        <Link
+                        <IntentLink
                             href={p.href}
                             className="inline-flex items-center gap-1.5 rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
                         >
@@ -314,7 +316,7 @@ function Places({
                             <span className="tabular-nums">
                                 {p.name} {p.amount}
                             </span>
-                        </Link>
+                        </IntentLink>
                     </li>
                 ))}
             </ul>

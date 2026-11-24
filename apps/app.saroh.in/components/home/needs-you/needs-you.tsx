@@ -1,8 +1,8 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useId, useRef, useState } from "react";
 
 import { arrivalProps } from "@/components/shared/live-refresh/arrival-props";
@@ -202,7 +202,7 @@ export function NeedRow({
             <div className="flex flex-wrap items-start gap-3">
                 {/* The title and its line are one link, 44px and taller for
                     a thumb, and it wraps before the tag is squeezed (§17). */}
-                <Link
+                <IntentLink
                     href={need.href}
                     className="grid min-w-0 flex-[1_1_260px] content-center gap-[3px] rounded text-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
                 >
@@ -219,7 +219,7 @@ export function NeedRow({
                             {line}
                         </span>
                     ) : null}
-                </Link>
+                </IntentLink>
                 {need.tag && !done ? (
                     <Badge
                         variant={TONE_BADGE[need.tone]}

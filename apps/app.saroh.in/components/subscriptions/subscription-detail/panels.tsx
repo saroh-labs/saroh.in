@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useState } from "react";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
@@ -208,12 +208,12 @@ export function CustomerCard({
                     {initials}
                 </span>
                 <div className="min-w-0">
-                    <Link
+                    <IntentLink
                         href={personHref(contactId)}
                         className="text-[14px] font-semibold text-foreground hover:underline"
                     >
                         {name}
-                    </Link>
+                    </IntentLink>
                     <div className="break-words text-[12px] text-muted-foreground">
                         {reach}
                     </div>

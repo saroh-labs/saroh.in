@@ -2,9 +2,9 @@
 
 import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { Upload } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useCallback } from "react";
 
@@ -76,14 +76,14 @@ export function CustomersList({
         <>
             {first ? (
                 <Button variant="outline" asChild>
-                    <Link href={importCustomersHref(target)}>
+                    <IntentLink href={importCustomersHref(target)}>
                         <Upload className="mr-1.5 size-4" />
                         Import
-                    </Link>
+                    </IntentLink>
                 </Button>
             ) : null}
             <Button asChild>
-                <Link href={newCustomerHref()}>New customer</Link>
+                <IntentLink href={newCustomerHref()}>New customer</IntentLink>
             </Button>
         </>
     );

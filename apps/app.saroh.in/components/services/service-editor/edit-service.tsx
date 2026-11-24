@@ -8,11 +8,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { TextLink } from "@saroh/ui/text-link";
 import { showSuccess } from "@saroh/ui/toast";
 import { ChevronDown, MoreHorizontal } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -244,9 +244,9 @@ export function EditService(props: EditorProps & { service: Service }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[300px] max-w-[90vw]">
                 <DropdownMenuItem asChild>
-                    <Link data-ph-unmask="" href={ALL_BOOKINGS_HREF}>
+                    <IntentLink data-ph-unmask="" href={ALL_BOOKINGS_HREF}>
                         See its bookings
-                    </Link>
+                    </IntentLink>
                 </DropdownMenuItem>
                 {canEdit ? (
                     <>
@@ -298,9 +298,9 @@ export function EditService(props: EditorProps & { service: Service }) {
                             />
                         ) : null}
                         <Button asChild variant="outline" className={DESK}>
-                            <Link href={ALL_BOOKINGS_HREF}>
+                            <IntentLink href={ALL_BOOKINGS_HREF}>
                                 See its bookings
-                            </Link>
+                            </IntentLink>
                         </Button>
                         {more}
                     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import type { SitePublishData } from "@/components/sites/publish/site-publish";
 import { SitePublish } from "@/components/sites/publish/site-publish";
@@ -47,7 +47,9 @@ export function ChangesBar({
                 />
             ) : (
                 <Button asChild className="coarse:h-11">
-                    <Link href={`/sites/${siteId}`}>Review and publish</Link>
+                    <IntentLink href={`/sites/${siteId}`}>
+                        Review and publish
+                    </IntentLink>
                 </Button>
             )}
         </div>

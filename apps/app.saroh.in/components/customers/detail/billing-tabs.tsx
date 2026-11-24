@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useState } from "react";
 
 import { RecordPaymentSheet } from "@/components/invoices/payments/record-payment-sheet";
@@ -46,7 +46,7 @@ export function SubscriptionsTab({
             {rows.map((s) => {
                 const r = subRow(s, timeZone, now);
                 return (
-                    <Link
+                    <IntentLink
                         key={s.id}
                         href={`/billing/subscriptions/${s.id}`}
                         className={ROW_LINK}
@@ -68,7 +68,7 @@ export function SubscriptionsTab({
                         <span aria-hidden className="text-muted-foreground">
                             →
                         </span>
-                    </Link>
+                    </IntentLink>
                 );
             })}
         </div>
@@ -143,9 +143,13 @@ export function InvoicesTab({
                     );
                     if (payer === null || !isPayable(v)) {
                         return (
-                            <Link key={v.id} href={href} className={ROW_LINK}>
+                            <IntentLink
+                                key={v.id}
+                                href={href}
+                                className={ROW_LINK}
+                            >
                                 {facts}
-                            </Link>
+                            </IntentLink>
                         );
                     }
                     // A button may not sit inside a link: the row's facts
@@ -156,7 +160,7 @@ export function InvoicesTab({
                             key={v.id}
                             className="flex flex-wrap items-center rounded-xl border border-border bg-card"
                         >
-                            <Link
+                            <IntentLink
                                 href={href}
                                 className={cn(
                                     ROW_LINK,
@@ -164,7 +168,7 @@ export function InvoicesTab({
                                 )}
                             >
                                 {facts}
-                            </Link>
+                            </IntentLink>
                             <div className="ml-auto px-3.5 pb-3 pt-0 min-[465px]:py-2">
                                 <Button
                                     size="sm"

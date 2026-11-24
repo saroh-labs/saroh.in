@@ -1,7 +1,7 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId } from "react";
 
@@ -237,9 +237,13 @@ export function InvoiceDetailsView({
                 breadcrumb={[
                     // Invoices sit under Payments only while it is on (DEC-070).
                     ...(details.paymentsOn ? ["Payments"] : []),
-                    <Link data-ph-unmask="" key="list" href="/billing/invoices">
+                    <IntentLink
+                        data-ph-unmask=""
+                        key="list"
+                        href="/billing/invoices"
+                    >
                         Invoices
-                    </Link>,
+                    </IntentLink>,
                     i.number ?? "Draft",
                 ]}
                 // A number is a measured value: the mono face, at the

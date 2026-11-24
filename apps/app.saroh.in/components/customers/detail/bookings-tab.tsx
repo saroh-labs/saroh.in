@@ -1,7 +1,7 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useState } from "react";
 
 import type { DetailBooking } from "@/lib/customer-workspace/detail";
@@ -53,7 +53,7 @@ export function BookingsTab({
                 {list.map((b) => {
                     const r = bookingRow(b, upcoming, now);
                     return (
-                        <Link
+                        <IntentLink
                             key={b.id}
                             href={`/bookings/${b.id}`}
                             className={cn(ROW_LINK, "gap-3.5 py-[11px]")}
@@ -89,7 +89,7 @@ export function BookingsTab({
                             <StatusBadge tone={r.state.tone} data-ph-unmask="">
                                 {r.state.label}
                             </StatusBadge>
-                        </Link>
+                        </IntentLink>
                     );
                 })}
             </div>

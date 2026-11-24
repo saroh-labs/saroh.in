@@ -1,8 +1,8 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 /**
@@ -66,13 +66,13 @@ export function ReadoutBars({
                     {shown?.readout}
                 </p>
                 {shown?.link ? (
-                    <Link
+                    <IntentLink
                         href={shown.link.href}
                         className="inline-flex min-h-11 items-center gap-0.5 rounded-md text-[13px] font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         {shown.link.label}
                         <ChevronRight aria-hidden className="size-4" />
-                    </Link>
+                    </IntentLink>
                 ) : null}
             </div>
             <div

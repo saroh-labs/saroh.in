@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CourseForm } from "@/components/courses/course-form";
@@ -46,30 +46,30 @@ export default async function EditCoursePage({
                     className="mb-0"
                     breadcrumb={[
                         "Bookings",
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             key="courses"
                             href="/courses"
                             className="hover:text-foreground"
                         >
                             Courses
-                        </Link>,
-                        <Link
+                        </IntentLink>,
+                        <IntentLink
                             key="course"
                             data-ph-mask=""
                             href={`/courses/${course.id}`}
                             className="hover:text-foreground"
                         >
                             {course.name}
-                        </Link>,
+                        </IntentLink>,
                         "Edit",
                     ]}
                     title="Edit course"
                     actions={
                         <Button variant="outline" asChild>
-                            <Link href={`/courses/${course.id}`}>
+                            <IntentLink href={`/courses/${course.id}`}>
                                 Back to the course
-                            </Link>
+                            </IntentLink>
                         </Button>
                     }
                 />

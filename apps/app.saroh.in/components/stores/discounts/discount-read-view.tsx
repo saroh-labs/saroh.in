@@ -1,6 +1,6 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
@@ -72,7 +72,9 @@ export function DiscountReadView({ discount }: { discount: Discount }) {
                 </Row>
             </dl>
             <Button asChild variant="outline">
-                <Link href="/commerce/discounts">Back to Discounts</Link>
+                <IntentLink href="/commerce/discounts">
+                    Back to Discounts
+                </IntentLink>
             </Button>
         </div>
     );

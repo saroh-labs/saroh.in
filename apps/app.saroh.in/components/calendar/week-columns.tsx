@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import type { WeekColumn } from "@/lib/calendar/week-columns";
 
@@ -85,7 +85,7 @@ export function WeekColumns({
                             ) : null}
                             {col.cards.map((card) => (
                                 <Tip key={card.key} label={card.full}>
-                                    <Link
+                                    <IntentLink
                                         href={card.href}
                                         className={cn(
                                             "grid min-w-0 grid-cols-[minmax(0,1fr)] gap-0.5 overflow-hidden rounded-[7px] border border-foreground/10 bg-card px-[7px] py-1.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70",
@@ -125,7 +125,7 @@ export function WeekColumns({
                                                 {card.amount}
                                             </span>
                                         ) : null}
-                                    </Link>
+                                    </IntentLink>
                                 </Tip>
                             ))}
                             {col.more > 0 ? (

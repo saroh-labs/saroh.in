@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useId, useState } from "react";
 
 import type { PrintEnv, QrPrintFormat } from "@/lib/qr/print";
@@ -152,13 +152,13 @@ function PrintSection({
                 >
                     {lock.line}{" "}
                     <PlanWay fallback={lock.plan}>
-                        <Link
+                        <IntentLink
                             href={lock.href}
                             aria-label={lock.cta}
                             className={linkClass}
                         >
                             {lock.plan}
-                        </Link>
+                        </IntentLink>
                     </PlanWay>
                     .
                 </p>

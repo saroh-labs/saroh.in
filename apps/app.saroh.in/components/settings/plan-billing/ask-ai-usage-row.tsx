@@ -1,5 +1,5 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ChevronRight } from "lucide-react";
-import Link from "next/link";
 
 import { ASK_AI_SETTINGS_HREF } from "@/lib/settings/developers";
 
@@ -42,12 +42,12 @@ export function AskAiUsageRow({
     const row =
         "flex min-h-[52px] items-center gap-3 rounded-xl border border-border bg-card px-[18px] py-3";
     return canOpen ? (
-        <Link
+        <IntentLink
             href={ASK_AI_SETTINGS_HREF}
             className={`${row} active:bg-foreground/[0.07]`}
         >
             {body}
-        </Link>
+        </IntentLink>
     ) : (
         <p className={row}>{body}</p>
     );

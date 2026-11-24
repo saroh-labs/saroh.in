@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useState } from "react";
 
 import { RemoveDetailsDialog } from "@/components/customers/more-actions/remove-details-dialog";
@@ -153,9 +153,9 @@ export function RequestSheet({
                     ) : null}
                     {request.contactId ? (
                         <Button type="button" variant="ghost" asChild>
-                            <Link href={personHref(request.contactId)}>
+                            <IntentLink href={personHref(request.contactId)}>
                                 Open customer
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : null}
                 </div>

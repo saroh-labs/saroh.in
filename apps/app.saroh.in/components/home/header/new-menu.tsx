@@ -7,6 +7,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import type { LucideIcon } from "lucide-react";
 import {
     CalendarClock,
@@ -15,7 +16,6 @@ import {
     Plus,
     Store,
 } from "lucide-react";
-import Link from "next/link";
 import { useId } from "react";
 
 import type {
@@ -67,9 +67,9 @@ export function NewMenu({ items, roleLine }: HomeNew) {
             >
                 {items.map((item) => (
                     <DropdownMenuItem key={item.key} asChild>
-                        <Link href={item.href} className={NEW_ROW}>
+                        <IntentLink href={item.href} className={NEW_ROW}>
                             <NewRowBody item={item} />
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 ))}
                 {roleLine ? (

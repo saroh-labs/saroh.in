@@ -3,10 +3,10 @@
 import type { AskAiConversationSummary } from "@saroh/api-contract";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { Info, Lock, Power, Sparkles } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { useCanChangePlan } from "@/components/billing/plan-way";
@@ -129,7 +129,9 @@ export function PlanLocked({
                 {canChangePlan ? (
                     plansShown() ? (
                         <Button asChild className="h-11">
-                            <Link href={upgradeHref()}>See plans</Link>
+                            <IntentLink href={upgradeHref()}>
+                                See plans
+                            </IntentLink>
                         </Button>
                     ) : null
                 ) : (

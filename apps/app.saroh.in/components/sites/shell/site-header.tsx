@@ -2,8 +2,8 @@
 
 import { Button } from "@saroh/ui/button";
 import { CopyButton } from "@saroh/ui/copy-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Lock, PenLine, Sparkles } from "lucide-react";
-import Link from "next/link";
 
 import { openAskAi } from "@/components/ask-ai/open";
 import { QrButton } from "@/components/qr/link-qr/qr-button";
@@ -168,10 +168,13 @@ function HeaderActions({
                 variant="outline"
                 size={compact ? "icon" : "default"}
             >
-                <Link href={base} aria-label={compact ? editor : undefined}>
+                <IntentLink
+                    href={base}
+                    aria-label={compact ? editor : undefined}
+                >
                     <PenLine aria-hidden className="size-4" />
                     {compact ? null : <span>Open editor</span>}
-                </Link>
+                </IntentLink>
             </Button>
             {askAi ? (
                 <Button

@@ -7,11 +7,11 @@ import {
     CommandItem,
     CommandList,
 } from "@saroh/ui/command";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, ChevronDown } from "lucide-react";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -145,13 +145,13 @@ export function CategoryPicker({
                         ) : null}
                     </CommandList>
                 </Command>
-                <Link
+                <IntentLink
                     data-ph-unmask=""
                     href={manageHref}
                     className="block px-[9px] pb-[3px] pt-[7px] text-[11.5px] text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                 >
                     Manage categories
-                </Link>
+                </IntentLink>
             </PopoverContent>
         </Popover>
     );

@@ -10,6 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Sheet,
@@ -30,7 +31,6 @@ import {
     Trash2,
     X,
 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
@@ -264,12 +264,12 @@ export function QuickLook({
                                             "Open product page" instead: one
                                             way, not two. */}
                                         {canWrite || canStock ? (
-                                            <Link
+                                            <IntentLink
                                                 href={pageHref}
                                                 className="rounded-sm underline-offset-4 outline-none hover:underline focus-visible:underline focus-visible:ring-2 focus-visible:ring-ring"
                                             >
                                                 {row.name}
-                                            </Link>
+                                            </IntentLink>
                                         ) : (
                                             row.name
                                         )}
@@ -328,14 +328,16 @@ export function QuickLook({
                                 Edit is one press away, in the ⋯ for someone
                                 who changes it, beside it for a stock role. */}
                             <Button asChild className="flex-1">
-                                <Link href={pageHref}>
+                                <IntentLink href={pageHref}>
                                     Open the product
                                     <ChevronRight className="ml-1 size-4" />
-                                </Link>
+                                </IntentLink>
                             </Button>
                             {canStock && !canWrite ? (
                                 <Button asChild variant="outline">
-                                    <Link href={editHref}>Edit</Link>
+                                    <IntentLink href={editHref}>
+                                        Edit
+                                    </IntentLink>
                                 </Button>
                             ) : null}
                             {canWrite ? (
@@ -396,10 +398,10 @@ function RowActions({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="top" className="w-64">
                 <DropdownMenuItem asChild>
-                    <Link href={editHref}>
+                    <IntentLink href={editHref}>
                         <Pencil />
                         Edit
-                    </Link>
+                    </IntentLink>
                 </DropdownMenuItem>
                 {canSell ? (
                     <DropdownMenuItem

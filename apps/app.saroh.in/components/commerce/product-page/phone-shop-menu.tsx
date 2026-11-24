@@ -7,8 +7,8 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ExternalLink, Eye, MoreHorizontal, Users } from "lucide-react";
-import Link from "next/link";
 
 import { productHref } from "@/lib/products/links";
 
@@ -68,7 +68,7 @@ export function PhoneShopMenu({
                         </DropdownMenuItem>
                     ) : null}
                     <DropdownMenuItem asChild>
-                        <Link
+                        <IntentLink
                             href={
                                 view === "customer"
                                     ? base
@@ -80,7 +80,7 @@ export function PhoneShopMenu({
                             {view === "customer"
                                 ? "Your view"
                                 : "Customer view"}
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

@@ -1,9 +1,9 @@
 import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight, Info } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { WHO_CAN_CHANGE } from "@/components/shared/states/who-can-change";
@@ -113,12 +113,14 @@ export function Overview({
                     action={
                         <div className="flex flex-wrap justify-center gap-2">
                             <Button asChild>
-                                <Link href={newOrderHref()}>Take an order</Link>
+                                <IntentLink href={newOrderHref()}>
+                                    Take an order
+                                </IntentLink>
                             </Button>
                             <Button asChild variant="outline">
-                                <Link href="/billing/invoices/new">
+                                <IntentLink href="/billing/invoices/new">
                                     Send an invoice
-                                </Link>
+                                </IntentLink>
                             </Button>
                         </div>
                     }

@@ -1,6 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import {
     couldntLoad,
     nothingChanged,
@@ -9,7 +10,6 @@ import {
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { CalendarClock, Check } from "lucide-react";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { planMoney } from "@/lib/saroh-billing/money";
@@ -54,9 +54,9 @@ export function CurrentPlanCard({
     }
     const way = canChange ? (
         <Button asChild className="max-desk:w-full">
-            <Link href={PLANS_HREF}>
+            <IntentLink href={PLANS_HREF}>
                 {row.amount === planMoney(0) ? planLabel() : "Change plan"}
-            </Link>
+            </IntentLink>
         </Button>
     ) : (
         <TextLink data-ph-unmask="" href={PLANS_HREF} className="text-[13px]">

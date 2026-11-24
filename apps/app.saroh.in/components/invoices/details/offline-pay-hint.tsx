@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import { isPlanHref } from "@/lib/billing/plan-access";
@@ -33,9 +33,9 @@ export function OfflinePayHint(props: {
                         when={isPlanHref(hint.fix.href)}
                         className="text-[length:inherit]"
                     >
-                        <Link href={hint.fix.href} className={LINK}>
+                        <IntentLink href={hint.fix.href} className={LINK}>
                             {hint.fix.label}
-                        </Link>
+                        </IntentLink>
                     </PlanWay>
                 </>
             ) : null}

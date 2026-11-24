@@ -1,5 +1,5 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -27,13 +27,13 @@ export function ProductPageBar() {
             <PageHeader
                 breadcrumb={[
                     "Sell",
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="list"
                         href="/commerce/products"
                     >
                         Products
-                    </Link>,
+                    </IntentLink>,
                 ]}
                 title="Product"
             />

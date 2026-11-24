@@ -1,8 +1,8 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { TabStrip } from "@saroh/ui/tabs";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import type { DevelopersTabItem } from "@/lib/settings/developers";
@@ -74,7 +74,7 @@ export function DevelopersNav({
                                 key={t.tab}
                                 className="border-b border-border last:border-b-0"
                             >
-                                <Link
+                                <IntentLink
                                     href={
                                         t.tab === "ai"
                                             ? `${DEVELOPERS_HREF}/ai`
@@ -94,7 +94,7 @@ export function DevelopersNav({
                                         aria-hidden
                                         className="size-4 shrink-0 text-muted-foreground"
                                     />
-                                </Link>
+                                </IntentLink>
                             </li>
                         ))}
                     </ul>
@@ -104,13 +104,13 @@ export function DevelopersNav({
                     className="flex items-center gap-1 min-[760px]:hidden"
                     data-ph-unmask=""
                 >
-                    <Link
+                    <IntentLink
                         href={DEVELOPERS_HREF}
                         aria-label="Back to API and AI apps"
                         className="-ml-2 inline-flex size-11 items-center justify-center rounded-lg active:bg-foreground/[0.07]"
                     >
                         <ChevronLeft aria-hidden className="size-5" />
-                    </Link>
+                    </IntentLink>
                     <h2 className="text-[17px] font-semibold">
                         {open ? <Label tab={open} /> : null}
                     </h2>

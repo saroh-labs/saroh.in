@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { useScreenLink } from "@/components/shared/page/screen-pending";
 
@@ -54,9 +54,13 @@ export function MonthStep({
             size="sm"
             className={cn("w-8 px-0", className)}
         >
-            <Link href={href} onNavigate={screenLink(href)} aria-label={label}>
+            <IntentLink
+                href={href}
+                onNavigate={screenLink(href)}
+                aria-label={label}
+            >
                 {children}
-            </Link>
+            </IntentLink>
         </Button>
     );
 }

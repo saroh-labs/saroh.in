@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { showError } from "@saroh/ui/toast";
 import { X } from "lucide-react";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { LATE_AFTER_ANCHOR } from "@/components/stores/delivery/fulfilment-section";
@@ -65,11 +65,11 @@ export function LateRuleNoticeCard({
                             variant="outline"
                             className="border-border-strong"
                         >
-                            <Link
+                            <IntentLink
                                 href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
                             >
                                 Change it
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : (
                         <span

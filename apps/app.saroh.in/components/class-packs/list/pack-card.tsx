@@ -2,8 +2,8 @@
 
 import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useId } from "react";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
@@ -47,12 +47,12 @@ export function PackCard({
         >
             <div className="flex flex-wrap items-center gap-2">
                 {card.href ? (
-                    <Link
+                    <IntentLink
                         href={card.href}
                         className="min-w-0 flex-1 rounded-sm text-[15px] font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
                     >
                         {card.name}
-                    </Link>
+                    </IntentLink>
                 ) : (
                     <span className="min-w-0 flex-1 text-[15px] font-semibold">
                         {card.name}
@@ -131,12 +131,12 @@ export function PackCard({
                 <div className="mt-3 flex flex-wrap gap-2">
                     {card.openHref ? (
                         <Button asChild variant="outline">
-                            <Link
+                            <IntentLink
                                 href={card.openHref}
                                 aria-label={`Open ${card.name}`}
                             >
                                 Open
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : null}
                     {canSell && card.showSell ? (
@@ -155,12 +155,12 @@ export function PackCard({
                     ) : null}
                     {canWrite ? (
                         <Button asChild variant="outline">
-                            <Link
+                            <IntentLink
                                 href={card.editHref}
                                 aria-label={`Edit ${card.name}`}
                             >
                                 Edit
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ) : null}
                     {canWrite && card.canArchive ? (

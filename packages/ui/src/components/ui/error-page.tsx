@@ -1,5 +1,5 @@
-import Link from "next/link";
 import * as React from "react";
+import { IntentLink } from "./intent-link";
 
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
@@ -130,7 +130,9 @@ export function ErrorPage({
                             asChild
                             variant={onRetry ? "outline" : "default"}
                         >
-                            <Link href={home.href}>{home.label}</Link>
+                            <IntentLink href={home.href}>
+                                {home.label}
+                            </IntentLink>
                         </Button>
                     ) : null}
                 </div>
