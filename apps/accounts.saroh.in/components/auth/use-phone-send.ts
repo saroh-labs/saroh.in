@@ -16,12 +16,16 @@ export type PhoneSendStage = "number" | "captcha" | "code";
 /** Couldn't open the widget or send through it. */
 export const SEND_FAILED = "Couldn't send the code. Try again.";
 /**
- * A refusal that says codes can't go out at all just now (the provider or
- * the API is down), not that this number or this person did something wrong.
+ * A refusal that says codes can't go out just now (the provider or the API
+ * is down, or WhatsApp refused the send), not that this person did something
+ * wrong.
  */
 export function cannotSend(failure: AuthFailure): boolean {
     return (
         failure.code === "UNAVAILABLE" ||
+        // WhatsApp refused on our side (e.g. Meta billing or access): SMS may
+        // be off too, so nobody is held at a step they can't finish.
+        failure.code === "WHATSAPP_FAILED" ||
         failure.code === NETWORK_ERROR ||
         (failure.status ?? 0) >= 500
     );
