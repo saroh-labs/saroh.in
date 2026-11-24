@@ -31,6 +31,10 @@ export interface ShellLoadingWords {
  * the address, so every page flashed Home's name on its way in. It now reads
  * the address against the same menu the rail draws: the section and page you
  * pressed, and a bar for a title it can't know (a record's page).
+ *
+ * It draws the header only (`none`): the section's own loader follows with
+ * the body's grey, and two greys in a row read as two loads. Home and
+ * Settings have no loader beneath this one, so they keep their shapes.
  */
 export function shellLoadingWords(pathname: string): ShellLoadingWords {
     if (pathname === "/") {
@@ -64,13 +68,13 @@ export function shellLoadingWords(pathname: string): ShellLoadingWords {
                 ? {
                       breadcrumb,
                       title: name,
-                      shape: "list",
+                      shape: "none",
                       label: `Loading ${name}`,
                   }
-                : { breadcrumb, shape: "detail", label: "Loading" };
+                : { breadcrumb, shape: "none", label: "Loading" };
         }
     }
-    return { breadcrumb: [], shape: "detail", label: "Loading" };
+    return { breadcrumb: [], shape: "none", label: "Loading" };
 }
 
 /** The shell's loader: named for the page being opened, never for Home. */

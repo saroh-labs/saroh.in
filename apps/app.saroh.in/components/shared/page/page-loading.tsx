@@ -19,6 +19,8 @@ export type PageShape =
     | "settings"
     | "home"
     | "money-list"
+    // The header alone: the shell's own loader, before a section's.
+    | "none"
     // Regions of an editor, drawn `bare` inside the frame that stays.
     | "writing"
     | "canvas"
@@ -535,6 +537,7 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     settings: SettingsBody,
     home: HomeBody,
     "money-list": MoneyListBody,
+    none: () => null,
     writing: WritingBody,
     canvas: CanvasBody,
     inspector: InspectorBody,

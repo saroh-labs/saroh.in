@@ -15,7 +15,8 @@ describe("the shell's loader names the page being opened", () => {
         expect(shellLoadingWords("/commerce/orders")).toMatchObject({
             breadcrumb: ["Sell", "Orders"],
             title: "Orders",
-            shape: "list",
+            // The header only: Orders' own loader draws the body.
+            shape: "none",
             label: "Loading Orders",
         });
         expect(shellLoadingWords("/leads")).toMatchObject({
@@ -33,13 +34,25 @@ describe("the shell's loader names the page being opened", () => {
         const words = shellLoadingWords("/commerce/orders/ord_1");
         expect(words.breadcrumb).toEqual(["Sell", "Orders"]);
         expect(words.title).toBeUndefined();
-        expect(words.shape).toBe("detail");
+        expect(words.shape).toBe("none");
     });
 
-    it("says Settings for any settings page", () => {
-        expect(shellLoadingWords("/settings/team").breadcrumb).toEqual([
-            "Settings",
-        ]);
+    it("says Settings for any settings page, in Settings' own shape", () => {
+        expect(shellLoadingWords("/settings/team")).toMatchObject({
+            breadcrumb: ["Settings"],
+            shape: "settings",
+        });
+    });
+
+    it("draws no body grey outside Home and Settings", () => {
+        for (const path of [
+            "/commerce/orders",
+            "/commerce/products",
+            "/commerce/orders/ord_1",
+            "/nowhere",
+        ]) {
+            expect(shellLoadingWords(path).shape).toBe("none");
+        }
     });
 
     it("never says Home for an address it doesn't know", () => {
