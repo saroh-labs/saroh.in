@@ -14,6 +14,7 @@ import {
     tradeStored,
 } from "@/lib/organizations/setup-steps";
 import { browserZone } from "@/lib/organizations/time-zones";
+import { invalidateOrganizations } from "@/lib/query/invalidate";
 import {
     startCheckoutAfterOnboarding,
     takeLaunchOfferAfterOnboarding,
@@ -122,6 +123,8 @@ export async function createFromSetup(
         return { made: false };
     }
     onMade();
+    // A new business in the list (DEC-259).
+    invalidateOrganizations();
     // Turn its first goal on with the defaults and learn where to land. A
     // goal that can't be turned on lands on Home with the reason: the
     // business is set up either way.

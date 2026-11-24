@@ -21,6 +21,7 @@ import type {
     SettingsResult,
 } from "@/lib/organizations/settings-service";
 import { logoUndo, settingsUndo } from "@/lib/organizations/settings-undo";
+import { invalidateOrganizations } from "@/lib/query/invalidate";
 
 /** What an Undo's save said: done, or refused with a sentence to show. */
 export type UndoOutcome = { ok: true } | { ok: false; error: string };
@@ -100,6 +101,7 @@ const outcome = (
     apply: Apply,
 ): UndoOutcome => {
     if (!result.ok) return { ok: false, error: result.error };
+    invalidateOrganizations();
     apply(result.data);
     return { ok: true };
 };

@@ -12,6 +12,7 @@ import {
     onlyOwnerLine,
 } from "@/lib/organizations/leave-business";
 import { leaveBusiness } from "@/lib/organizations/member-actions";
+import { invalidateOrganizations } from "@/lib/query/invalidate";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
@@ -72,6 +73,7 @@ export function LeaveBusiness({
     async function leave(): Promise<ConfirmResult> {
         const res = await leaveBusiness();
         if (!res.ok) return { ok: false, error: res.error || LEAVE_FAILED };
+        invalidateOrganizations();
         onLeft();
     }
 

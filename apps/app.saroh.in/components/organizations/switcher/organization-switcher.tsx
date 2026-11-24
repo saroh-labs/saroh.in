@@ -16,6 +16,7 @@ import type {
     Organization,
     OrganizationRole,
 } from "@/lib/organizations/service";
+import { afterSwitch } from "@/lib/query/invalidate";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 const ROLE_LABEL: Record<OrganizationRole, string> = {
@@ -95,6 +96,9 @@ export function OrganizationSwitcher({
             }
             setOpen(false);
             setQuery("");
+            // Before the refresh: no tab may show this business's cache
+            // under the next one (DEC-259).
+            afterSwitch();
             router.refresh();
         });
     }

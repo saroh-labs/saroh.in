@@ -7,6 +7,7 @@ import Link from "next/link";
 
 import { accountsLoginUrl } from "@/lib/accounts";
 import { clearSetupDraft } from "@/lib/organizations/setup-steps";
+import { afterSignOut } from "@/lib/query/invalidate";
 
 /**
  * The foot of every setup step, in the same order on each: how far along
@@ -99,6 +100,7 @@ export function SetupFoot({
                         // The draft is this account's: it goes with it.
                         clearSetupDraft();
                         void authClient.signOut().then(() => {
+                            afterSignOut();
                             window.location.href = accountsLoginUrl;
                         });
                     }}

@@ -54,6 +54,7 @@
         "@saroh/templates": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
+        "@tanstack/react-query": "catalog:",
         "@tanstack/react-table": "^8.21.3",
         "@tiptap/extension-character-count": "^3.31.2",
         "@tiptap/extension-highlight": "^3.31.2",
