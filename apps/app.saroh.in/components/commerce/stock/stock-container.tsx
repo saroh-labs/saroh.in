@@ -5,7 +5,9 @@ import {
     ROWS_COOKIE,
     readRowsCookie,
 } from "@saroh/ui/lib/paging";
+import { PageContainer } from "@saroh/ui/page-container";
 import { useSearchParams } from "next/navigation";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ScreenPending } from "@/components/shared/page/screen-pending";
@@ -42,7 +44,8 @@ function rememberedSizes(server: Sizes): Sizes {
 /**
  * Sell › Stock on React Query (DEC-259): the same `StockScreen`, its
  * levels, checks and (on its tab) log each a query keyed on what the
- * address asks (`stockView`, shared with the page's prefetch). A tab, a
+ * address asks (`stockView`), read in the browser behind the route's
+ * loader (`skeleton`) until the open tab's lists are here. A tab, a
  * filter or a page changes the address in place; the last rows stay,
  * greyed, until the new ones land, and the Log tab opens once its first
  * page is here. Levels failing fails the page; the log and the checks
@@ -52,7 +55,10 @@ export function StockContainer({
     business,
     storefronts,
     sizes,
+    skeleton,
 }: {
+    /** The route's loader, until the first read. */
+    skeleton: ReactNode;
     business: string | null;
     /** The business's open storefronts, first made first. */
     storefronts: { id: string; name: string }[];
@@ -106,7 +112,14 @@ export function StockContainer({
 
     // Levels is the screen's own read: it failing is the page failing.
     if (levels.isError && !levels.data) throw levels.error;
-    if (!levels.data || (!checks.data && !checks.isError)) return null;
+    // Opened on the Log: it is waited for too, never said "failed" first.
+    if (
+        !levels.data ||
+        (!checks.data && !checks.isError) ||
+        (tab === "log" && !logReady)
+    ) {
+        return skeleton;
+    }
 
     const pending =
         levels.isPlaceholderData ||
@@ -114,33 +127,35 @@ export function StockContainer({
         (onLog && (!logReady || log.isPlaceholderData));
 
     return (
-        <ScreenPending inPlace={{ pending }}>
-            <StockScreen
-                business={business}
-                tab={tab}
-                show={address.show}
-                q={address.q}
-                levels={levels.data}
-                needsYou={levels.data.needsYou ?? 0}
-                storefronts={storefronts}
-                checks={checks.data ?? "failed"}
-                log={tab === "log" ? (log.data ?? "failed") : null}
-                logFilter={{
-                    kind: logKindId(address.kind),
-                    store: address.store,
-                    product: address.product,
-                    date: address.date,
-                    from: address.from,
-                    to: address.to,
-                }}
-                products={log.data?.products ?? []}
-                canWrite={levels.data.canWrite}
-                pages={address.pages}
-                reload={{
-                    log: () => void log.refetch(),
-                    checks: () => void checks.refetch(),
-                }}
-            />
-        </ScreenPending>
+        <PageContainer width="full">
+            <ScreenPending inPlace={{ pending }}>
+                <StockScreen
+                    business={business}
+                    tab={tab}
+                    show={address.show}
+                    q={address.q}
+                    levels={levels.data}
+                    needsYou={levels.data.needsYou ?? 0}
+                    storefronts={storefronts}
+                    checks={checks.data ?? "failed"}
+                    log={tab === "log" ? (log.data ?? "failed") : null}
+                    logFilter={{
+                        kind: logKindId(address.kind),
+                        store: address.store,
+                        product: address.product,
+                        date: address.date,
+                        from: address.from,
+                        to: address.to,
+                    }}
+                    products={log.data?.products ?? []}
+                    canWrite={levels.data.canWrite}
+                    pages={address.pages}
+                    reload={{
+                        log: () => void log.refetch(),
+                        checks: () => void checks.refetch(),
+                    }}
+                />
+            </ScreenPending>
+        </PageContainer>
     );
 }

@@ -1,13 +1,8 @@
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
-
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { TicketsContainer } from "@/components/commerce/orders/tickets-container";
 import { orderLockedText, ordersAccess } from "@/lib/orders/access";
-import { ticketsServer } from "@/lib/orders/access-server";
 import { readTicketIds } from "@/lib/orders/tickets";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { prefetchRead } from "@/lib/query/prefetch";
-import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Print tickets" };
@@ -23,8 +18,8 @@ export const metadata = { title: "Print tickets" };
  * the rest still print. Someone holding neither `order:read` nor
  * `order:stage` gets the locked card before anything is read.
  *
- * On React Query (DEC-259): the tickets' read (`/api/orders/tickets`) is
- * prefetched and hydrated; `TicketsContainer` draws them.
+ * On React Query (DEC-259), loaded in the browser: the tickets' read
+ * (`/api/orders/tickets`) is `TicketsContainer`'s query.
  */
 export default async function TicketsPage({
     searchParams,
@@ -42,14 +37,5 @@ export default async function TicketsPage({
 
     // The ids the page reads, as the route takes them.
     const ask = { ids: readTicketIds(params).join(",") };
-    const client = getServerQueryClient();
-    if (organization) {
-        await prefetchRead(client, ticketsServer, organization.id, ask);
-    }
-
-    return (
-        <HydrationBoundary state={dehydrate(client)}>
-            <TicketsContainer ask={ask} />
-        </HydrationBoundary>
-    );
+    return <TicketsContainer ask={ask} />;
 }

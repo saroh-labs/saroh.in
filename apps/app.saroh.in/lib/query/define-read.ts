@@ -9,9 +9,9 @@ import type { DomainKey } from "@/lib/query/keys";
  * A read, defined once for both paths (DEC-259). Client-safe: it names the
  * route and the key, not the service, so a component importing it pulls no
  * server code. The server side pairs it with its service once
- * (`ServerRead`, `route.ts`), and both the page's prefetch and the route
- * answer through {@link toWire}, so a hydrated query and its refetch can't
- * differ in shape.
+ * (`ServerRead`, `route.ts`), and the route answers through
+ * {@link toWire} (as the contract test's `prefetchRead` does), so the
+ * service and the wire can't differ in shape.
  *
  *     export const ordersList = defineRead<Order[]>()({
  *         key: (orgId, p) => domainKey("orders", orgId, "list", p),
@@ -30,7 +30,7 @@ export interface Read<P, T> {
     };
 }
 
-/** How long a read just made (by the page's prefetch) counts as fresh. */
+/** How long a read just made counts as fresh: a remount reads nothing. */
 export const HYDRATED_FRESH_MS = 5_000;
 
 export function defineRead<T>() {
@@ -46,8 +46,9 @@ export function defineRead<T>() {
                 queryKey: def.key(orgId, params),
                 queryFn: ({ signal }) =>
                     apiRead<T>(def.route.path, params, { orgId, signal }),
-                // The page's prefetch is fresh for a moment, so mounting
-                // over it reads nothing (KTD-4); an invalidation still reads.
+                // A read just made is fresh for a moment, so a second
+                // mount (Back, a sheet) reads nothing (KTD-4); an
+                // invalidation still reads.
                 staleTime: HYDRATED_FRESH_MS,
             }),
     });

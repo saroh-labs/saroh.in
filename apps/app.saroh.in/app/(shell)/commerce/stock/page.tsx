@@ -1,32 +1,17 @@
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
-import { redirect } from "next/navigation";
-
 import { StockContainer } from "@/components/commerce/stock/stock-container";
 import {
     StockLocked,
     StockTrackingOff,
 } from "@/components/commerce/stock/stock-states";
-import { PageContainer } from "@/components/shared/page/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { rememberedPageSize } from "@/lib/paging/remembered";
-import { prefetchRead } from "@/lib/query/prefetch";
-import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
-import {
-    stockChecksServer,
-    stockLevelsServer,
-    stockLogServer,
-} from "@/lib/stock/access";
 import type { StockTab } from "@/lib/stock/list-query";
-import { STOCK_LISTS, stockHref } from "@/lib/stock/list-query";
-import {
-    stockChecksRead,
-    stockLevelsRead,
-    stockLogRead,
-    stockView,
-} from "@/lib/stock/queries";
+import { STOCK_LISTS } from "@/lib/stock/list-query";
 import { getStockTracking } from "@/lib/stock/service";
 import { listStorefronts } from "@/lib/stores/storefronts";
+
+import Loading from "./loading";
 
 export const metadata = { title: "Stock" };
 
@@ -52,25 +37,20 @@ function roleWords(org: { role: string; roleLabel?: string | null }) {
  * fails the page. The log and the checks fail on their own, named where
  * they show.
  *
- * On React Query (DEC-259): the gates (who may read stock, Track stock on)
- * and the storefronts are the page's; the levels, the checks and, on its
- * tab, the log as the address asks (`stockView`) are prefetched and
- * hydrated, and `StockContainer` reads every later one in place.
+ * On React Query (DEC-259), loaded in the browser: the gates (who may read
+ * stock, Track stock on) and the storefronts are the page's; the levels,
+ * the checks and, on its tab, the log as the address asks (`stockView`)
+ * are `StockContainer`'s queries, read from the browser behind the route's
+ * loader, and every later one in place.
  */
-export default async function StockPage({
-    searchParams,
-}: {
-    searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function StockPage() {
     await requireSession();
-    const [query, organization, levelsSize, logSize, checksSize] =
-        await Promise.all([
-            searchParams,
-            resolveActiveOrganization(),
-            rememberedPageSize(STOCK_LISTS.levels),
-            rememberedPageSize(STOCK_LISTS.log),
-            rememberedPageSize(STOCK_LISTS.checks),
-        ]);
+    const [organization, levelsSize, logSize, checksSize] = await Promise.all([
+        resolveActiveOrganization(),
+        rememberedPageSize(STOCK_LISTS.levels),
+        rememberedPageSize(STOCK_LISTS.log),
+        rememberedPageSize(STOCK_LISTS.checks),
+    ]);
 
     // Reading stock is reading the catalogue (`store:read`).
     if (organization?.actions && !organization.actions.includes("store:read")) {
@@ -104,54 +84,13 @@ export default async function StockPage({
         name: s.name,
     }));
     const sizes = { levels: levelsSize, log: logSize, checks: checksSize };
-    const view = stockView(query, sizes, storefronts);
-    const { tab } = view.address;
-    const client = getServerQueryClient();
-    const org = organization.id;
-    await Promise.all([
-        prefetchRead(client, stockLevelsServer, org, view.levels),
-        prefetchRead(client, stockChecksServer, org, view.checks),
-        tab === "log"
-            ? prefetchRead(client, stockLogServer, org, view.log)
-            : null,
-    ]);
-    const levels = client.getQueryState(
-        stockLevelsRead.options(org, view.levels).queryKey,
-    );
-    // Levels is the page's own read: it failing fails the page.
-    if (levels?.status === "error") {
-        throw levels.error ?? new Error("Stock couldn't be read");
-    }
-
-    // A page past the end (the list has since got shorter, or the address
-    // was typed): start again at the first page rather than show an empty
-    // one with nothing to press.
-    const rows = (
-        {
-            levels: () => levels?.data?.rows,
-            log: () =>
-                client.getQueryData(
-                    stockLogRead.options(org, view.log).queryKey,
-                )?.entries,
-            checks: () =>
-                client.getQueryData(
-                    stockChecksRead.options(org, view.checks).queryKey,
-                )?.checks,
-        } satisfies Record<StockTab, () => unknown[] | undefined>
-    )[tab]();
-    if (view.address.pages[tab].page > 1 && rows?.length === 0) {
-        redirect(stockHref(view.address, { page: 1 }));
-    }
 
     return (
-        <PageContainer width="full">
-            <HydrationBoundary state={dehydrate(client)}>
-                <StockContainer
-                    business={organization.name}
-                    storefronts={storefronts}
-                    sizes={sizes}
-                />
-            </HydrationBoundary>
-        </PageContainer>
+        <StockContainer
+            skeleton={<Loading />}
+            business={organization.name}
+            storefronts={storefronts}
+            sizes={sizes}
+        />
     );
 }

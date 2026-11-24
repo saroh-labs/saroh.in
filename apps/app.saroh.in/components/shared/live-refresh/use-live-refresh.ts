@@ -96,14 +96,12 @@ export function useLiveRefresh({
             if (client.isFetching({ predicate }) > 0) return;
             if (client.isMutating() > 0) return;
             startedAt.current = Date.now();
-            if (!isChromeRefresh(path)) {
-                void client.invalidateQueries({ predicate });
-                return;
-            }
-            // A chrome page renders again on the server, whose prefetch
-            // hydrates its queries with the new rows: marked stale only, so
-            // they aren't read twice.
-            void client.invalidateQueries({ predicate, refetchType: "none" });
+            // The page's data is read in the browser (DEC-259): its queries
+            // read again. A chrome page also renders again on the server,
+            // for the chrome alone (the unread count); nothing it sends
+            // carries the rows.
+            void client.invalidateQueries({ predicate });
+            if (!isChromeRefresh(path)) return;
         } else {
             startedAt.current = Date.now();
         }

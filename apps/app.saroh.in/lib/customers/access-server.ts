@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { listContacts } from "@/lib/contacts/service";
 import { listDataRequests } from "@/lib/customer-workspace/data-requests";
 import { openRequestFor } from "@/lib/customer-workspace/data-requests-view";
@@ -82,6 +84,14 @@ export async function readCustomerRequests({
 }
 
 /**
+ * Their record, once per render: the person page's gate (missing, merged)
+ * and the read below share it.
+ */
+export const readCustomerDetailOnce = cache((contactId: string) =>
+    getCustomerDetail(contactId),
+);
+
+/**
  * One customer's page; null (a 404): no such contact in this business. What
  * each part shows is the API's; a part this role isn't shown isn't read.
  */
@@ -90,7 +100,7 @@ export async function readCustomerView({
 }: CustomerAsk): Promise<CustomerView | null> {
     const may = await mayOnce();
     const [detail, thread, suggestions, open] = await Promise.all([
-        getCustomerDetail(customerId),
+        readCustomerDetailOnce(customerId),
         // A failed read shows the tab with the failure said, never an
         // empty thread.
         may("message:read")

@@ -1,28 +1,14 @@
 import { rememberedPageSize } from "@/lib/paging/remembered";
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
-import { redirect } from "next/navigation";
 
 import { RequestsContainer } from "@/components/customers/data-requests/requests-container";
 import { CustomersContainer } from "@/components/customers/list/customers-container";
 import { ListHeading, ListLocked } from "@/components/customers/list/states";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { readRequestFilter } from "@/lib/customer-workspace/data-requests-view";
-import {
-    customerRequestsServer,
-    customersListServer,
-} from "@/lib/customers/access-server";
-import {
-    allowedQuery,
-    listHref,
-    listMay,
-    readListQuery,
-} from "@/lib/customers/list";
-import { customersAsk, customersListRead } from "@/lib/customers/queries";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { prefetchRead } from "@/lib/query/prefetch";
-import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
+
+import Loading from "./loading";
 
 /**
  * Sell → Customers (DEC-041, round 2 C4): the business's customers — everyone
@@ -40,11 +26,11 @@ import { listBusinessStores } from "@/lib/stores/service";
  * while any are open. A requests read that fails says so on its tab, and
  * leaves the list as it is.
  *
- * On React Query (DEC-259): the gate and the storefronts (Add customer,
- * Import) are the page's; the page of the list as the address asks
- * (`/api/customers`) and the open requests (`/api/customers/requests`) are
- * prefetched and hydrated, and the containers read every later one in
- * place.
+ * On React Query (DEC-259), loaded in the browser: the gate and the
+ * storefronts (Add customer, Import) are the page's; the page of the list
+ * as the address asks (`/api/customers`) and the open requests
+ * (`/api/customers/requests`) are the containers' queries, read from the
+ * browser behind the route's loader, and every later one in place.
  */
 export const metadata = { title: "Customers" };
 
@@ -79,78 +65,30 @@ export default async function CustomersPage({
 
     // Customers' removal requests (DEC-172): only for whoever can act on them.
     const canRemove = may("customer:remove");
-    const client = getServerQueryClient();
-    // The open requests: the Requests tab's count and the list's banner.
-    const openRequests = canRemove
-        ? prefetchRead(client, customerRequestsServer, organization.id, {
-              status: "open",
-          })
-        : null;
-
     if (canRemove && params.tab === "requests") {
-        const status = readRequestFilter(params.status);
-        await Promise.all([
-            openRequests,
-            status === "open"
-                ? null
-                : prefetchRead(
-                      client,
-                      customerRequestsServer,
-                      organization.id,
-                      {
-                          status,
-                      },
-                  ),
-        ]);
         return (
-            <PageContainer width="full">
-                <HydrationBoundary state={dehydrate(client)}>
-                    <RequestsContainer
-                        heading={<ListHeading count={null} />}
-                        canRemove={canRemove}
-                    />
-                </HydrationBoundary>
-            </PageContainer>
+            <RequestsContainer
+                skeleton={<Loading />}
+                heading={<ListHeading count={null} />}
+                canRemove={canRemove}
+            />
         );
     }
 
-    const defaultSize = await rememberedPageSize("customers");
-    const actions = organization.actions ?? null;
-    const query = allowedQuery(
-        readListQuery(params, defaultSize),
-        listMay(actions),
-    );
-    const ask = customersAsk(query);
-    const [stores] = await Promise.all([
+    const [defaultSize, stores] = await Promise.all([
+        rememberedPageSize("customers"),
         // Only for Add customer and Import; without it they are left out.
         listBusinessStores().catch(() => []),
-        prefetchRead(client, customersListServer, organization.id, ask),
-        openRequests,
     ]);
-    const state = client.getQueryState(
-        customersListRead.options(organization.id, ask).queryKey,
-    );
-    if (state?.status === "error") {
-        // A storefront that isn't this business's is a 404 from the API:
-        // no filter, rather than no page.
-        const status = (state.error as { status?: number } | null)?.status;
-        if (query.store && status === 404) {
-            redirect(listHref(query, { store: null }));
-        }
-        throw state.error ?? new Error("The customers couldn't be read");
-    }
 
     return (
-        <PageContainer width="full">
-            <HydrationBoundary state={dehydrate(client)}>
-                <CustomersContainer
-                    defaultSize={defaultSize}
-                    actions={actions}
-                    canRemove={canRemove}
-                    stores={stores.map((s) => ({ id: s.id, name: s.name }))}
-                    canLink={may("contact:write")}
-                />
-            </HydrationBoundary>
-        </PageContainer>
+        <CustomersContainer
+            skeleton={<Loading />}
+            defaultSize={defaultSize}
+            actions={organization.actions ?? null}
+            canRemove={canRemove}
+            stores={stores.map((s) => ({ id: s.id, name: s.name }))}
+            canLink={may("contact:write")}
+        />
     );
 }

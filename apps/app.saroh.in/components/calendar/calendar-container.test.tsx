@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 /**
  * The Business Calendar on React Query (DEC-259), in the browser: the
- * page's month is mounted over without a read; a new month is one read,
+ * first load shows the route's loader, then the month from one read
+ * (nothing comes with the page's HTML); a month already read is mounted
+ * over without a read; a new month is one read,
  * the old one kept and greyed meanwhile; Back opens a month seen from the
  * cache; a failed read is the segment's failed state; a switch or sign-out
  * drops it all.
@@ -61,6 +63,10 @@ vi.mock("@/components/calendar/calendar-nothing", () => ({
         shown.props = { locked: true };
         return null;
     },
+    CalendarNothing: () => {
+        shown.props = { nothing: true };
+        return null;
+    },
 }));
 
 import { CalendarContainer } from "@/components/calendar/calendar-container";
@@ -117,7 +123,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** A browser client holding what the page's server render sent. */
+/** A browser client that has already read November (an earlier visit). */
 function hydrated() {
     const server = makeTestClient();
     server.setQueryData(
@@ -129,11 +135,13 @@ function hydrated() {
     return client;
 }
 
+const SKELETON = <p>loading</p>;
+
 function open(client = hydrated()) {
-    return renderWithQuery(<CalendarContainer now={NOW} can={CAN} />, {
-        client,
-        orgId: ORG,
-    });
+    return renderWithQuery(
+        <CalendarContainer now={NOW} can={CAN} skeleton={SKELETON} />,
+        { client, orgId: ORG },
+    );
 }
 
 /** The address changed in place (a link's `pushState`, or Back). */
@@ -170,7 +178,35 @@ class Boundary extends Component<{ children: ReactNode }, { error: unknown }> {
 }
 
 describe("the calendar's reads", () => {
-    it("first load renders the page's month with no read of its own", async () => {
+    it("first load shows the loader, then this month from one read", async () => {
+        const release = held();
+        const { host, unmount } = open(makeTestClient());
+        expect(host.textContent).toBe("loading");
+        expect(shown.props).toBeNull();
+        release();
+        await tick();
+        expect(host.textContent).toBe("");
+        expect(drawn()).toBe("2026-11");
+        expect(reads()).toEqual([
+            "/api/calendar?from=2026-11-01&to=2026-11-30",
+        ]);
+        unmount();
+    });
+
+    it("no business found is the nothing state", async () => {
+        answer = () =>
+            Promise.resolve(
+                new Response(JSON.stringify({ code: "not_found" }), {
+                    status: 404,
+                }),
+            );
+        const { unmount } = open(makeTestClient());
+        await tick();
+        expect(shown.props).toEqual({ nothing: true });
+        unmount();
+    });
+
+    it("a month already read is mounted over without a read", async () => {
         const { unmount } = open();
         await tick();
         expect(shown.props).toMatchObject({ view: "month", pending: false });
@@ -205,7 +241,7 @@ describe("the calendar's reads", () => {
         go("");
         expect(drawn()).toBe("2026-11");
         expect(shown.props?.pending).toBe(false);
-        // Fresh from the page a moment ago: nothing read again.
+        // Fresh from a moment ago: nothing read again.
         expect(fetchMock).not.toHaveBeenCalled();
         unmount();
     });
@@ -251,7 +287,7 @@ describe("the calendar's reads", () => {
         const client = hydrated();
         const { host, unmount } = renderWithQuery(
             <Boundary>
-                <CalendarContainer now={NOW} can={CAN} />
+                <CalendarContainer now={NOW} can={CAN} skeleton={SKELETON} />
             </Boundary>,
             { client, orgId: ORG },
         );

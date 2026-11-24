@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
- * Invoices on React Query (DEC-259), in the browser: the page's prefetch is
- * mounted over without a read; a status or source pick reads nothing, a
+ * Invoices on React Query (DEC-259), in the browser: the first load reads
+ * the list, the strip and the invoice once each (nothing comes with the
+ * page's HTML); what was already read is mounted over without a read; a status or source pick reads nothing, a
  * search is a new list key; a payment that landed reads the list, the strip
  * and the invoice open once each, Home only marked stale; a refused one
  * reads nothing. Outside Invoices (a customer's page) a write names no
@@ -72,7 +73,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** A browser client holding what the page's server render sent. */
+/** A browser client that has already read them (an earlier visit). */
 function hydrated() {
     const server = makeTestClient();
     server.setQueryData(invoicesListRead.options(ORG, ALL).queryKey, LIST);
@@ -125,7 +126,19 @@ describe("the list's key", () => {
 });
 
 describe("the list's reads", () => {
-    it("first load draws the hydrated list, strip and invoice with no read of its own", async () => {
+    it("first load reads the list, the strip and the invoice once each", async () => {
+        const { unmount } = renderWithQuery(
+            <Screen ask={ALL} report={() => undefined} />,
+            { client: makeTestClient(), orgId: ORG },
+        );
+        await tick();
+        expect(reads("/api/invoices")).toBe(1);
+        expect(reads("/api/invoices/summary")).toBe(1);
+        expect(reads("/api/invoices/inv_1")).toBe(1);
+        unmount();
+    });
+
+    it("what was already read is mounted over without a read", async () => {
         const { unmount } = renderWithQuery(
             <Screen ask={ALL} report={() => undefined} />,
             { client: hydrated(), orgId: ORG },

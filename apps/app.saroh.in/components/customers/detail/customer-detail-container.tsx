@@ -1,7 +1,8 @@
 "use client";
 
+import { PageContainer } from "@saroh/ui/page-container";
 import { useRouter } from "next/navigation";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { useEffect } from "react";
 
 import {
@@ -12,6 +13,7 @@ import type {
     DuplicateSuggestion,
     IdentitySuggestion,
 } from "@/lib/customer-workspace/service";
+import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
 import type { CustomerAsk } from "@/lib/customers/queries";
 import { useCustomer, useCustomerSave } from "@/lib/customers/use-customers";
 import { InvoiceSaveFor } from "@/lib/invoices/use-invoices";
@@ -25,20 +27,24 @@ type Screen = ComponentProps<typeof CustomerDetailScreen>;
  * `CustomerDetailScreen`, its record, messages, link and merge offers and
  * open removal request one query, which a note, a reply, an edit or a merge
  * reads again (`useCustomerSave`); a payment recorded on their Invoices tab
- * too (`InvoiceSaveFor`). The tabs the page draws on the server (Leads,
- * Enquiries, Courses) come in as props.
+ * too (`InvoiceSaveFor`). Read in the browser, behind the route's loader
+ * (`skeleton`). The tabs the page draws on the server (Leads, Enquiries,
+ * Courses) come in as props.
  */
 export function CustomerDetailContainer({
     ask,
     tab,
+    skeleton,
     ...screen
 }: Omit<
     Screen,
-    "d" | "suggestions" | "duplicates" | "thread" | "dataRequest"
+    "d" | "suggestions" | "duplicates" | "thread" | "dataRequest" | "initialTab"
 > & {
     ask: CustomerAsk;
-    /** `?tab=`, kept when a merged-away record leads to the one kept. */
+    /** `?tab=`: the tab it opens on, kept when a merged-away record leads on. */
     tab?: string;
+    /** The route's loader, until the record is read. */
+    skeleton: ReactNode;
 }) {
     const router = useRouter();
     const read = useCustomer(ask);
@@ -54,22 +60,35 @@ export function CustomerDetailContainer({
 
     // A failed read is the page failing (`error.tsx`).
     if (read.isError && !view) throw read.error;
-    if (!view || isMergedRedirect(view.detail)) return null;
+    if (!view || isMergedRedirect(view.detail)) return skeleton;
+    // The tab in the address, if this person has it (their messages are
+    // the read's, for `message:read`); else the Overview.
+    const initialTab = tabFromQuery(tab, [
+        ...tabsFor(view.detail, view.thread, screen.reviews),
+        ...(screen.extra ?? []).map(({ key, label, count }) => ({
+            key,
+            label,
+            count,
+        })),
+    ]);
 
     return (
-        <InvoiceSaveFor saved={saved}>
-            <CustomerDetailScreen
-                {...screen}
-                d={view.detail}
-                suggestions={view.suggestions.filter(
-                    (s): s is IdentitySuggestion => s.kind === "customer",
-                )}
-                duplicates={view.suggestions.filter(
-                    (s): s is DuplicateSuggestion => s.kind === "contact",
-                )}
-                thread={view.thread}
-                dataRequest={view.dataRequest}
-            />
-        </InvoiceSaveFor>
+        <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
+            <InvoiceSaveFor saved={saved}>
+                <CustomerDetailScreen
+                    {...screen}
+                    initialTab={initialTab}
+                    d={view.detail}
+                    suggestions={view.suggestions.filter(
+                        (s): s is IdentitySuggestion => s.kind === "customer",
+                    )}
+                    duplicates={view.suggestions.filter(
+                        (s): s is DuplicateSuggestion => s.kind === "contact",
+                    )}
+                    thread={view.thread}
+                    dataRequest={view.dataRequest}
+                />
+            </InvoiceSaveFor>
+        </PageContainer>
     );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { ProductCollectionsTab } from "@/components/commerce/collections/collections-tab";
@@ -69,6 +69,8 @@ export function ProductContainer({
     sellsFood,
     waiting,
     now,
+    stockShown,
+    skeleton,
 }: {
     ask: ProductAsk;
     tab: ProductTab;
@@ -89,21 +91,34 @@ export function ProductContainer({
     sellsFood: boolean;
     waiting: StockTab["waiting"];
     now: Date;
+    /**
+     * The page opened on the Stock tab of a counted product (the page's
+     * own read of it), so its log and checks are asked beside the product.
+     */
+    stockShown: boolean;
+    /** The route's loader, until the product is read. */
+    skeleton: ReactNode;
 }) {
     const saved = useProductsSaved();
     const quick = useQuickEditsHost();
-    const { data } = useProduct(ask);
+    const productRead = useProduct(ask);
+    const { data } = productRead;
     // The Stock tab's log and checks, only while it shows a counted product.
     const onStock =
         tab === "stock" &&
         view === "team" &&
-        !!data &&
-        countsStock(data.overview.product.stockTracked, businessTracks);
+        (data
+            ? countsStock(data.overview.product.stockTracked, businessTracks)
+            : stockShown);
     const logRead = useStockLog(productLogAsk(ask.productId), onStock);
     const checksRead = useStockChecks(ALL_CHECKS, onStock);
-    // Hydrated by the page, so only a failed read again is missing: the
-    // last answer stays (react-query keeps it), the segment says the rest.
-    if (!data) return null;
+    // A first read that failed is the page failing (`error.tsx`); a read
+    // again that fails keeps the last answer (react-query keeps it). The
+    // Stock tab waits for its log and checks too, never said unread first.
+    if (productRead.isError && !data) throw productRead.error;
+    if (!data || (onStock && (logRead.isPending || checksRead.isPending))) {
+        return skeleton;
+    }
 
     const read = data.overview;
     const isPaused = pausedByCut(read.product, cut);
