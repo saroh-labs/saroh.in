@@ -267,11 +267,18 @@ export async function resolveActiveOrganization(
  * the same role, permissions and words, without reading every business
  * they belong to (DEC-259). Once per request (`readOnce`). A refusal (no
  * longer a member, or a paused seat) or a failure throws, so the read
- * route answers 403 or 503 rather than a role's no.
+ * route answers 403 or 503 rather than a role's no. Without the endpoint
+ * (404/405 during a deploy) the list answers, as before it.
  */
 async function settledMembership(orgId: string): Promise<Organization | null> {
     const path = `/organizations/${encodeURIComponent(orgId)}/me`;
     const res = await apiFetch(path);
+    // An API not yet deployed with `/me` (the app ships first): this
+    // business's own row of the list, never another's.
+    if (res.status === 404 || res.status === 405) {
+        const orgs = await organizationsOnce();
+        return orgs.find((o) => o.id === orgId && !o.paused) ?? null;
+    }
     if (!res.ok) throw new ApiError(res.status, `GET ${path}`);
     const org = (await res.json()) as Organization;
     // This deployment's businesses only (DEC-204), as the list.

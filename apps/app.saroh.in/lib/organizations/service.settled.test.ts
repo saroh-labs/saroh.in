@@ -78,6 +78,30 @@ describe("a settled business", () => {
         ).rejects.toMatchObject({ status: 403 });
     });
 
+    it.each([404, 405])(
+        "an API without /me yet (%i): this business's row of the list",
+        async (status) => {
+            me = () => new Response("{}", { status });
+            await expect(
+                settled(() => activeOrganizationOnce()),
+            ).resolves.toMatchObject({
+                id: "org_a",
+                actions: ["contact:read"],
+            });
+            expect(asked).toContain("/organizations");
+        },
+    );
+
+    it("the fallback never answers with another business's row", async () => {
+        me = () => new Response("{}", { status: 404 });
+        const missing = () =>
+            inReadScope(() => {
+                setScopedOrg("org_gone");
+                return activeOrganizationOnce();
+            });
+        await expect(missing()).resolves.toBe(null);
+    });
+
     it("another edition's business is no business here", async () => {
         me = () => Response.json({ ...ROW, edition: "GLOBAL" });
         await expect(settled(() => activeOrganizationOnce())).resolves.toBe(
