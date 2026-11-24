@@ -2,9 +2,10 @@
 /**
  * The shell's React Query provider (DEC-259): it holds the business list
  * the server read, gives the open business to `useOrgId`, and hears the
- * other tabs: a switch there clears this tab and draws it again, a
+ * other tabs: a switch there draws this tab again and keeps its cache, a
  * sign-out there clears it. A later server render's list replaces the
- * held one only once a writer marked it stale.
+ * held one only once a writer marked it stale, and drops the businesses
+ * no longer on it.
  */
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -54,6 +55,13 @@ afterEach(() => {
 function ShowOrg() {
     return <span>{useOrgId()}</span>;
 }
+/** What another tab's `announce` sends: its own tab id. */
+function fromOtherTab(kind: "switch" | "signout") {
+    const c = new BroadcastChannel("saroh-query");
+    c.postMessage({ kind, from: "other-tab" });
+    c.close();
+}
+
 const draw = (orgs: Organization[]) =>
     act(() =>
         root.render(
@@ -95,12 +103,41 @@ describe("QueryProvider", () => {
         ]);
     });
 
-    it("another tab's switch clears this one and draws it again", async () => {
+    it("another tab's switch draws this one again and keeps its cache", async () => {
         draw([org("o1", "Northwind")]);
         qc().setQueryData(domainKey("orders", "o1", "list"), [1]);
-        announce("switch");
+        fromOtherTab("switch");
         await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
-        expect(qc().getQueryCache().getAll()).toHaveLength(0);
+        expect(qc().getQueryData(domainKey("orders", "o1", "list"))).toEqual([
+            1,
+        ]);
+    });
+
+    it("a business gone from a fresh list is dropped, the others kept", () => {
+        draw([org("o1", "Northwind"), org("o2", "Left")]);
+        qc().setQueryData(domainKey("orders", "o1", "list"), [1]);
+        qc().setQueryData(domainKey("orders", "o2", "list"), [2]);
+        act(() => invalidateOrganizations());
+        draw([org("o1", "Northwind")]);
+        expect(qc().getQueryData(domainKey("orders", "o1", "list"))).toEqual([
+            1,
+        ]);
+        expect(qc().getQueryData(domainKey("orders", "o2", "list"))).toBe(
+            undefined,
+        );
+    });
+
+    it("its own switch isn't heard: the page is drawn once, its new cache kept", async () => {
+        draw([org("o1", "Northwind")]);
+        announce("switch");
+        // Delivered or not, give the message a turn, then a second marker.
+        await new Promise((r) => setTimeout(r, 20));
+        qc().setQueryData(domainKey("orders", "o2", "list"), [1]);
+        await new Promise((r) => setTimeout(r, 20));
+        expect(refresh).not.toHaveBeenCalled();
+        expect(qc().getQueryData(domainKey("orders", "o2", "list"))).toEqual([
+            1,
+        ]);
     });
 
     it("another tab's sign-out clears this one and reloads it", async () => {
@@ -113,7 +150,7 @@ describe("QueryProvider", () => {
         try {
             draw([org("o1", "Northwind")]);
             qc().setQueryData(domainKey("orders", "o1", "list"), [1]);
-            announce("signout");
+            fromOtherTab("signout");
             await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
             expect(qc().getQueryCache().getAll()).toHaveLength(0);
             expect(refresh).not.toHaveBeenCalled();

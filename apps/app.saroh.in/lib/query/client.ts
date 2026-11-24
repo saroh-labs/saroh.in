@@ -77,7 +77,9 @@ export function makeQueryClient(): QueryClient {
         defaultOptions: {
             queries: {
                 staleTime: 0,
-                gcTime: 5 * 60_000,
+                // A business left in a switch stays this long, so a switch
+                // back within the session draws from cache (owner, 25 Nov).
+                gcTime: 30 * 60_000,
                 retry: false,
                 refetchOnWindowFocus: false,
                 refetchOnReconnect: false,

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * Choosing another business (DEC-259): once the switch is saved, every
- * tab's React Query cache is dropped and the other tabs told, before the
- * page is drawn again under the new business. A refused switch drops
- * nothing.
+ * Choosing another business (DEC-259): once the switch is saved, the
+ * other tabs are told; the action's own response draws the page under the
+ * new business, so nothing refreshes it a second time. A refused switch
+ * tells no one.
  */
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -83,14 +83,15 @@ async function choose(name: string) {
 }
 
 describe("OrganizationSwitcher", () => {
-    it("a saved switch clears every tab's cache, then draws the page again", async () => {
+    it("a saved switch tells the other tabs, and draws the page once", async () => {
         setActive.mockResolvedValue({ ok: true, data: { id: "o2" } });
         await choose("Rye & Co.");
         expect(setActive).toHaveBeenCalledWith("o2");
-        expect(calls).toEqual(["afterSwitch", "refresh"]);
+        // No refresh: the action's cookie already renders the new page.
+        expect(calls).toEqual(["afterSwitch"]);
     });
 
-    it("a refused switch clears nothing", async () => {
+    it("a refused switch tells no one", async () => {
         setActive.mockResolvedValue({ ok: false, error: "Not yours." });
         await choose("Rye & Co.");
         expect(calls).toEqual(["error:Not yours."]);

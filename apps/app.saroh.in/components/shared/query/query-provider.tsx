@@ -7,17 +7,18 @@ import { useEffect, useState } from "react";
 import type { Organization } from "@/lib/organizations/service";
 import { listen } from "@/lib/query/broadcast";
 import { getBrowserQueryClient, setReadErrorHooks } from "@/lib/query/client";
+import { dropLeftBusinesses } from "@/lib/query/invalidate";
 import { ORGANIZATIONS_KEY } from "@/lib/query/keys";
 import { OrgProvider } from "@/lib/query/org";
 
 /**
  * React Query for the app shell (DEC-259), mounted once. Not keyed by the
- * business: a switch clears the cache instead of remounting the shell.
+ * business, and a switch keeps the cache: every key carries its business,
+ * so the one left stays beside the new one for a switch back.
  *
  * It holds the business list the server already read for this render
  * (`['organizations']`), and hears the other tabs: a business switched
- * there clears this tab's cache and draws the page again under it; a
- * sign-out there clears it.
+ * there draws this tab's page again under it; a sign-out there clears it.
  */
 export function QueryProvider({
     orgId,
@@ -45,11 +46,14 @@ export function QueryProvider({
             signIn: () => window.location.reload(),
         });
         const stop = listen((kind) => {
+            if (kind === "switch") {
+                router.refresh();
+                return;
+            }
+            // Signed out elsewhere: drop it all and reload so this tab's
+            // page is gone too (the middleware then sends it to sign-in).
             client.clear();
-            // Signed out elsewhere: reload so this tab's page is gone too
-            // (the middleware then sends it to sign-in).
-            if (kind === "signout") window.location.reload();
-            else router.refresh();
+            window.location.reload();
         });
         return () => {
             stop();
@@ -71,4 +75,6 @@ function seed(
     const state = client.getQueryState(ORGANIZATIONS_KEY);
     if (state?.data !== undefined && !state.isInvalidated) return;
     client.setQueryData(ORGANIZATIONS_KEY, organizations);
+    // A business no longer on it (removed or left elsewhere) isn't held.
+    dropLeftBusinesses(client, organizations);
 }

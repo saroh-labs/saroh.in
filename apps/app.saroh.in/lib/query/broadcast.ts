@@ -4,8 +4,11 @@
  * for every tab: a tab still holding the last business's rows would show
  * them under the new one.
  *
- * A tab never hears its own message (BroadcastChannel doesn't deliver to
- * the sender), so there is no echo loop. Without BroadcastChannel (an older
+ * A tab never hears its own message. BroadcastChannel only skips the one
+ * channel object that sent it, and `announce` opens its own, so a tab's
+ * listener would hear it: the switching tab then cleared its cache and drew
+ * the page a second time (24 Nov 2026). Each message carries this tab's id,
+ * and the listener drops its own. Without BroadcastChannel (an older
  * WebView) it does nothing: that tab refreshes its own cache on its next
  * server render, as today.
  */
@@ -13,6 +16,9 @@
 export type BroadcastKind = "switch" | "signout";
 
 const CHANNEL = "saroh-query";
+
+/** This tab, so it can tell its own messages apart. */
+const TAB = Math.random().toString(36).slice(2);
 
 function channel(): BroadcastChannel | null {
     if (typeof BroadcastChannel === "undefined") return null;
@@ -27,7 +33,7 @@ function channel(): BroadcastChannel | null {
 export function announce(kind: BroadcastKind): void {
     const c = channel();
     if (!c) return;
-    c.postMessage({ kind });
+    c.postMessage({ kind, from: TAB });
     c.close();
 }
 
@@ -36,7 +42,9 @@ export function listen(onMessage: (kind: BroadcastKind) => void): () => void {
     const c = channel();
     if (!c) return () => undefined;
     c.onmessage = (e: MessageEvent<unknown>) => {
-        const kind = (e.data as { kind?: unknown } | null)?.kind;
+        const data = e.data as { kind?: unknown; from?: unknown } | null;
+        if (data?.from === TAB) return;
+        const kind = data?.kind;
         if (kind === "switch" || kind === "signout") onMessage(kind);
     };
     return () => c.close();

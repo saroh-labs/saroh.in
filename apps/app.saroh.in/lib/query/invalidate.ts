@@ -1,3 +1,5 @@
+import type { QueryClient } from "@tanstack/react-query";
+
 import { announce } from "@/lib/query/broadcast";
 import { getBrowserQueryClient } from "@/lib/query/client";
 import { isOrgKey, ORGANIZATIONS_KEY } from "@/lib/query/keys";
@@ -8,9 +10,13 @@ export function clearAll(): void {
     getBrowserQueryClient().clear();
 }
 
-/** The business changed here: clear, and tell the other tabs. */
+/**
+ * The business changed here: tell the other tabs. Nothing is dropped: every
+ * key carries its business (`[domain, orgId, ...]`), so the one left stays
+ * cached beside the new one and a switch back draws at once (owner, 25 Nov
+ * 2026). Sign-out is the only clear.
+ */
 export function afterSwitch(): void {
-    clearAll();
     announce("switch");
 }
 
@@ -18,6 +24,22 @@ export function afterSwitch(): void {
 export function afterSignOut(): void {
     clearAll();
     announce("signout");
+}
+
+/**
+ * The business list as read now: drop every business's cache that isn't on
+ * it (removed or left elsewhere), so nothing of it is held for the visit.
+ */
+export function dropLeftBusinesses(
+    client: QueryClient,
+    organizations: { id: string }[],
+): void {
+    client.removeQueries({
+        // `['organizations']` itself is one long, and no business's.
+        predicate: (q) =>
+            q.queryKey.length > 1 &&
+            !organizations.some((o) => isOrgKey(q.queryKey, o.id)),
+    });
 }
 
 /**

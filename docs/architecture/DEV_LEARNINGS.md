@@ -7048,3 +7048,10 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** `use-publish.ts` copied the server's counts into `useState` once. `router.refresh()` brings new counts as props, but state initialised from props never follows them.
 - **Fix:** the state takes the server's counts whenever they change (test: `components/sites/publish/use-publish.test.tsx`).
 - **Rule:** state seeded from a server prop must re-sync when the prop changes (or not be state at all). `docs/patterns/frontend-data-and-state.md`.
+
+## A business switch rendered the page three times (25 Nov 2026)
+
+- **Symptom:** on saroh.io a top-bar business switch took 3.3 to 5.1 s and 122 to 154 API calls after the React Query layer landed (1.5 to 4.3 s, 81 to 192 before). Locally on Orders: one action POST plus two RSC refreshes, 38 API calls.
+- **Cause:** (1) a Server Action that sets a cookie already renders the page in its own response, and the switcher then called `router.refresh()` as well; (2) `broadcast.ts` assumed a tab never hears its own `BroadcastChannel` message, but only the sending channel object is skipped: `announce` opens a new one, so the tab's own listener cleared the cache and refreshed a third time.
+- **Fix:** each message carries the tab's id and the listener drops its own; the switcher no longer refreshes; a switch keeps the cache (keys carry the business). One action POST, no RSC request, 14 API calls on Orders.
+- **Rule:** after a Server Action that sets a cookie or revalidates, don't `router.refresh()`. Tests in `lib/query/broadcast.test.ts` and `query-provider.test.tsx` post as another tab; a same-tab `announce` must not be heard. `docs/patterns/frontend-data-and-state.md`.
