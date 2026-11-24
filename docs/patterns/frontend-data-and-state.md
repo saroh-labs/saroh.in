@@ -3,21 +3,90 @@
 > **Read when:** reading or writing API data from a Next.js app, or adding
 > client or URL state.
 > Adapted from claude-patterns `frontend/02-data-and-state.md`. The library
-> routes server state through React Query; this repo does not, by design
-> (DEC-004).
+> routes server state through React Query; `app.saroh.in` adopts it screen by
+> screen (DEC-259). Everything else stays server-rendered (DEC-004).
 
-## Where each kind of state lives — all **Current**
+## Where each kind of state lives
 
-| State                                      | Mechanism                                                                                                                                                                                             |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Server data                                | Server Components through `lib/<domain>/service.ts`, request-cached with React `cache()`                                                                                                              |
-| Writes                                     | Server Action → service → `mutate()` → `{ ok: true, data }` or `{ ok: false, error }`, then `router.refresh()` or navigate. Called from the client through `runAction` (`frontend-error-feedback.md`) |
-| Shareable filters, tabs, the selected page | The URL, read from the page's `searchParams` on the server (8 pages)                                                                                                                                  |
-| Active organization                        | The `active_org` cookie, sent as `x-organization-id`; the API re-validates membership                                                                                                                 |
-| Open/closed, draft input, hover            | `useState` in the component                                                                                                                                                                           |
+Two patterns run side by side. A route is one or the other, never both
+(boundary rule below). The registry is `lib/query/rq-routes.ts`.
 
-There is no client-side server-state library and no global client store.
-`@tanstack/react-query` was installed, never used, and removed (`5ec5560`).
+- **Current** — the Server Component + `router.refresh()` pattern, for every
+  route not yet migrated, for `accounts`, `saroh.app` and `admin`.
+- **Adopted** — React Query, for the routes in the registry (DEC-259). Home
+  first; it is Current per section as each screen ships.
+
+| State                                      | Unmigrated route (**Current**), accounts, merchant sites, admin                                                                                                                                       | Migrated `app.saroh.in` route (**Adopted**)                                                                                                         |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Server data                                | Server Components through `lib/<domain>/service.ts`, request-cached with React `cache()`                                                                                                              | Prefetched on the server into a per-request QueryClient, read by `useQuery` through `lib/<domain>/use-<domain>.ts`; refetched over a GET read route |
+| Writes                                     | Server Action → service → `mutate()` → `{ ok: true, data }` or `{ ok: false, error }`, then `router.refresh()` or navigate. Called from the client through `runAction` (`frontend-error-feedback.md`) | The same Server Action, called through `useActionMutation`, which declares `invalidates`; no `router.refresh()`                                     |
+| Shareable filters, tabs, the selected page | The URL, read from the page's `searchParams` on the server                                                                                                                                            | The URL; the value is part of the query key                                                                                                         |
+| Active organization                        | The `active_org` cookie, sent as `x-organization-id`; the API re-validates membership                                                                                                                 | The same cookie; the organization id is also in every key and sent with every read and write, and the server refuses a mismatch                     |
+| Open/closed, draft input, hover            | `useState` in the component                                                                                                                                                                           | `useState` in the component                                                                                                                         |
+
+There is no global client store. React Query holds server state only, in
+`app.saroh.in`, and nowhere else.
+
+## Boundary rule: a route is React Query or refresh, never both
+
+- Routes are registered by **route glob** in `lib/query/rq-routes.ts`, not by
+  domain.
+- On a registered route anything that shows changeable data is a Client
+  Component reading a query; the server component renders the frame, the gates
+  and the prefetch.
+- A registered route never calls `router.refresh()`. An unregistered route keeps
+  it. The exceptions are chrome a write changes on the server (unread count,
+  tab title, module badges, active business name), listed in
+  `lib/query/chrome-refresh.ts` and capped.
+- Mixed state lasts at most one batch: a domain's routes migrate together.
+
+## React Query — **Adopted** (DEC-259)
+
+- **One definition, two paths.** A domain's `lib/<domain>/queries.ts` defines
+  the key factory and each read once; the server prefetch calls the service, the
+  browser calls the read route. A contract test per domain asserts both give the
+  same shape.
+- **Hooks, not fetches.** Components import `use-<domain>.ts`; none writes its
+  own fetch or key. Presentational components stay props-in; a thin container
+  calls the hook.
+- **Prefetch.** Gate reads (session, organization, permissions, `notFound`) are
+  awaited and decide the response. Display reads are `prefetchQuery`, awaited
+  only where a section would flash empty. **Every un-awaited prefetch is
+  dehydrated**, pending included, or it is orphaned when the response ends. A
+  failed prefetch is swallowed; the client then reads and lands in the section's
+  existing failed state, never an empty list.
+- **Keys.** `[domain, orgId, kind, ...params]`, built only through
+  `domainKey(domain, orgId)`, a branded tuple; a key without the organization
+  fails the typecheck. Each mutation declares `invalidates`; invalidation fires
+  only on `ok !== false`, and the mutation resolves after the refetch settles.
+  Optimistic updates only where DEC-259 names them.
+- **Business switch and sign-out** call `clear()` and announce it on a
+  `BroadcastChannel`, so every tab drops the cache.
+- **`staleTime: 0`** for every domain until the epic's close-out; `retry: false`,
+  no refetch on window focus or reconnect (live refresh owns those).
+- **Never cached:** billing secrets, API keys, tokens, provider credentials. The
+  dehydrate allowlist is explicit.
+
+### The read-route contract
+
+Every `app/api/<area>/route.ts` is built with `readRoute(...)` and nothing else:
+
+- `export const dynamic = "force-dynamic"`; GET only, no side effects; every
+  other method answers 405.
+- `Cache-Control: private, no-store` and `Vary: Cookie` on every answer, errors
+  included. The edge never caches `/api/*`.
+- The organization is resolved on the server (`getActiveOrgId()`, fails closed:
+  no organization is 401). The client sends the one it believes it is in; a
+  difference answers 409 `{ code: "org_mismatch" }` with no data.
+- Params are an allowlist parsed per route; unknown params are rejected, page
+  size and search length are capped.
+- Generic bodies only (401, 403, 404, 409, 429, 503): no upstream message, stack
+  or id. Another organization's id is a 404, never a 403.
+- Same origin only: reject cross-site requests, send no CORS headers.
+- Each handler authorises itself, with the same per-domain gate
+  (`lib/<domain>/access.ts`) its page uses, run before the service. Each route
+  has a test that proves the gate across owner, member, Reviewer, calendar-only,
+  signed-out and another organization's id.
 
 ## Rules
 
@@ -341,9 +410,11 @@ a skeleton only, not the full section."
   navigation while the server HTML keeps its `<a href>`, and a pending mark
   uses the site's own tokens and never loops (DEC-172).
 
-## If you think you need React Query
+## If you think you need React Query — **Adopted** (DEC-259)
 
-You probably need a Server Component read plus `router.refresh()`. Genuine
-client-side polling or optimistic updates across many components is a decision
-to make explicitly: write it into this file and AGENTS.md → Triggers before
-adding the dependency.
+On a registered `app.saroh.in` route, you have it: add a query in
+`lib/<domain>/queries.ts`, a hook in `use-<domain>.ts`, and a read route built
+with `readRoute`. Anywhere else (accounts, merchant sites, admin, an unmigrated
+route), use a Server Component read plus `router.refresh()`. Moving a route to
+React Query means registering it, removing its `router.refresh()` calls and
+declaring `invalidates` on its mutations in the same batch.
