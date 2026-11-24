@@ -21,3 +21,8 @@ export function useOrgId(): string {
     if (!orgId) throw new Error("useOrgId() is used outside OrgProvider");
     return orgId;
 }
+
+/** The open business's id, or null outside the shell, for a hook that also runs without it. */
+export function useOrgIdOrNull(): string | null {
+    return useContext(OrgContext);
+}

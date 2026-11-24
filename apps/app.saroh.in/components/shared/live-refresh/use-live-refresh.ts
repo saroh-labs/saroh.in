@@ -1,7 +1,14 @@
 "use client";
 
+import { QueryClientContext } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useTransition } from "react";
+import {
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useTransition,
+} from "react";
 
 import {
     clearTyped,
@@ -11,6 +18,10 @@ import {
     pageBusy,
     titleWithUnread,
 } from "@/lib/live/refresh";
+import { isChromeRefresh } from "@/lib/query/chrome-refresh";
+import { isOrgKey } from "@/lib/query/keys";
+import { liveDomains } from "@/lib/query/live-routes";
+import { useOrgIdOrNull } from "@/lib/query/org";
 
 /** Two refreshes are never closer together than this. */
 const MIN_GAP_MS = 2_000;
@@ -34,6 +45,12 @@ const MIN_GAP_MS = 2_000;
  *
  * A refresh keeps what is on screen. It is the same call every save
  * already makes, so nothing here can lose typed work that a save couldn't.
+ *
+ * On a page moved to React Query (`lib/query/live-routes.ts`) the refresh
+ * invalidates that page's domains for the open business instead, so its
+ * shown queries read again; `router.refresh()` too only where the page's
+ * chrome is server-rendered (`chrome-refresh.ts`). There it also waits
+ * while those queries are still reading or a save is on its way.
  */
 export function useLiveRefresh({
     intervalMs = LIVE_INTERVAL_MS,
@@ -47,6 +64,13 @@ export function useLiveRefresh({
         inFlight.current = pending;
     }, [pending]);
     const startedAt = useRef(0);
+    // Null outside the shell's QueryProvider: then it is always today's path.
+    const queryClient = useContext(QueryClientContext);
+    const orgId = useOrgIdOrNull();
+    const page = useRef({ pathname, queryClient, orgId });
+    useEffect(() => {
+        page.current = { pathname, queryClient, orgId };
+    }, [pathname, queryClient, orgId]);
 
     const refresh = useCallback(() => {
         if (document.visibilityState !== "visible") return;
@@ -56,7 +80,26 @@ export function useLiveRefresh({
         if (inFlight.current) return;
         if (Date.now() - startedAt.current < MIN_GAP_MS) return;
         if (pageBusy(document)) return;
-        startedAt.current = Date.now();
+        // The business at the trigger: a switch after this never has its
+        // new business's queries invalidated under the old id.
+        const {
+            pathname: path,
+            queryClient: client,
+            orgId: org,
+        } = page.current;
+        const domains = client && org ? liveDomains(path) : null;
+        if (client && org && domains) {
+            const predicate = (q: { queryKey: readonly unknown[] }) =>
+                domains.includes(q.queryKey[0] as string) &&
+                isOrgKey(q.queryKey, org);
+            if (client.isFetching({ predicate }) > 0) return;
+            if (client.isMutating() > 0) return;
+            startedAt.current = Date.now();
+            void client.invalidateQueries({ predicate });
+            if (!isChromeRefresh(path)) return;
+        } else {
+            startedAt.current = Date.now();
+        }
         startTransition(() => {
             router.refresh();
         });
