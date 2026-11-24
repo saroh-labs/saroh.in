@@ -305,6 +305,7 @@ describe("the registries", () => {
         expect(LIVE_QUERY_ROUTES).toEqual({
             "/": ["home"],
             "/bookings/all": ["bookings"],
+            "/commerce/products": ["products"],
         });
         expect(CHROME_REFRESH_ROUTES.length).toBeLessThanOrEqual(
             CHROME_REFRESH_CAP,

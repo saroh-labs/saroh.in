@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import {
     listProductAt as listProductAtApi,
     unlistProductAt as unlistProductAtApi,
@@ -46,8 +48,9 @@ export async function createProduct(storeId: string, input: NewProductInput) {
 }
 
 /** Delete it from the catalogue, and so from every storefront. */
-export async function deleteProduct(productId: string) {
-    return deleteProductApi(productId);
+export async function deleteProduct(productId: string, orgId?: string) {
+    const write = () => deleteProductApi(productId);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** A category of the business (#529), made from any storefront's product. */
@@ -114,8 +117,10 @@ export async function setProductSoldOut(
 export async function setProductStatus(
     productId: string,
     status: ProductStatus,
+    orgId?: string,
 ) {
-    return patchProductApi(null, productId, { status });
+    const write = () => patchProductApi(null, productId, { status });
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** One section of a product; the API judges the whole product after it. */
@@ -123,8 +128,10 @@ export async function patchProduct(
     storeId: string,
     productId: string,
     patch: ProductPatch,
+    orgId?: string,
 ) {
-    return patchProductApi(storeId, productId, patch);
+    const write = () => patchProductApi(storeId, productId, patch);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 export async function replaceProductImages(

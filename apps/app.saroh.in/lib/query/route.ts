@@ -134,16 +134,31 @@ function paramsOf(url: URL): Record<string, string> | null {
     return Object.keys(out).length === url.searchParams.size ? out : null;
 }
 
+/** Next's second argument: a dynamic segment's values (`[productId]`). */
+interface Segments {
+    params?: Promise<Record<string, string | string[]>>;
+}
+
 export function readRoute<P, T>(
     def: ServerRead<P, T>,
     access?: Access,
-): (request: Request) => Promise<Response> {
+): (request: Request, segments?: Segments) => Promise<Response> {
     const schema = z.strictObject(def.read.params);
     // One API answer per URL for the whole handler (`inReadScope`).
-    return (request) => inReadScope(() => answerRead(request));
-    async function answerRead(request: Request): Promise<Response> {
+    return (request, segments) =>
+        inReadScope(() => answerRead(request, segments));
+    async function answerRead(
+        request: Request,
+        segments?: Segments,
+    ): Promise<Response> {
         if (crossSite(request.headers)) return refuse(403);
-        const raw = paramsOf(new URL(request.url));
+        const query = paramsOf(new URL(request.url));
+        const path = (await segments?.params) ?? {};
+        // A segment named again in the query is refused, never overridden.
+        const raw =
+            query && Object.keys(path).every((k) => !(k in query))
+                ? { ...query, ...path }
+                : null;
         const parsed = raw && schema.safeParse(raw);
         if (!parsed?.success) return refuse(400);
         try {

@@ -31,6 +31,10 @@ import type { WaitingCount } from "@/lib/stock/waiting";
 
 import { WaitingLine } from "@/components/commerce/stock/waiting-line";
 
+import {
+    runOne,
+    useQuickEdits,
+} from "@/components/commerce/quick-edits/quick-edits";
 import { runAction } from "@/lib/api/run-action";
 import { Label } from "@saroh/ui/label";
 import { Notice } from "@saroh/ui/notice";
@@ -277,6 +281,7 @@ function ShelfRow({
     onChanged: () => void;
 }) {
     const [draft, setDraft] = useState("");
+    const quick = useQuickEdits();
     const [saving, setSaving] = useState(false);
     const [key, setKey] = useState(() => crypto.randomUUID());
     const input = useRef<HTMLInputElement>(null);
@@ -292,15 +297,26 @@ function ShelfRow({
             return;
         }
         if (storeId === null || saving) return;
+        // The shelf shows the units at once; the list's host reads it
+        // again once, or puts it back when refused (DEC-259).
         const res = await runAction(
             () =>
-                addQuickStock({
-                    storeId,
+                runOne(
+                    quick,
                     productId,
-                    variantId: shelf.variantId,
-                    units,
-                    idempotencyKey: key,
-                }),
+                    { stockAdd: { storeId, units } },
+                    (org) =>
+                        addQuickStock(
+                            {
+                                storeId,
+                                productId,
+                                variantId: shelf.variantId,
+                                units,
+                                idempotencyKey: key,
+                            },
+                            org,
+                        ),
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;

@@ -107,4 +107,5 @@ test("routeOf drops groups and private folders; matchRoute is exact", () => {
     assert.equal(routeOf(`${APP}components/x.tsx`), null);
     assert.ok(matchRoute("/a/[id]", "/a/[orderId]"));
     assert.ok(!matchRoute("/a", "/a/b"));
+    assert.ok(!matchRoute("/a/[id]", "/a/settings"));
 });

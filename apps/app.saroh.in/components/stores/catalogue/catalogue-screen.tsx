@@ -2,14 +2,14 @@
 
 import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { count, plural } from "@/lib/format/plural";
-import { pagesOf } from "@saroh/ui/lib/paging";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { useQuickEdits } from "@/components/commerce/quick-edits/quick-edits";
 import { DataView } from "@/components/shared/data-view/data-view";
 import type { PlanMeter } from "@/lib/billing/meter";
 import type { PausedCut } from "@/lib/billing/paused";
@@ -20,22 +20,16 @@ import type { CatalogueRow } from "@/lib/products/catalogue";
 import { catalogueRows } from "@/lib/products/catalogue";
 import type { FilterChoices } from "@/lib/products/filter-choices";
 import { productEditHref } from "@/lib/products/links";
-import {
-    duplicateListedProduct,
-    loadCataloguePage,
-} from "@/lib/products/list-actions";
+import { duplicateListedProduct } from "@/lib/products/list-actions";
 import type { ListQuery } from "@/lib/products/list-query";
-import {
-    catalogueFilter,
-    emptyCopy,
-    listHref,
-    pageHref,
-} from "@/lib/products/list-query";
+import { emptyCopy, listHref, pageHref } from "@/lib/products/list-query";
 import type { NeedDetail } from "@/lib/products/needs-you";
 import { needOf } from "@/lib/products/needs-you";
+import type { CatalogueAsk } from "@/lib/products/queries";
 import type { SellsOnline } from "@/lib/products/quick-look";
 import { statusToast, step } from "@/lib/products/quick-look";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
+import { useOrgId } from "@/lib/query/org";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { NeedsYou } from "./needs-you";
 
@@ -77,6 +71,20 @@ import { QuickLook } from "./quick-look";
 const OFFLINE = "Couldn't search. Check your connection and try again.";
 const OFFLINE_HOW = "Check your connection and try again.";
 
+/**
+ * How the screen opens an address of the list and reads it again
+ * (`CatalogueContainer`, DEC-259): in place, from the list's queries.
+ */
+export interface ListAdapter {
+    navigate: (href: string) => void;
+    /** The list's pages read again (the one on screen now). */
+    reload: () => Promise<void>;
+    /** A page of the list asked for itself (a product off this page). */
+    find: (ask: CatalogueAsk) => Promise<CataloguePage>;
+    /** The list is on its way and the old rows are held. */
+    fetching: boolean;
+}
+
 /** How many of `rows` match, for a bulk label: "Archive 2". */
 function countOf(
     rows: readonly CatalogueRow[],
@@ -102,10 +110,12 @@ export function CatalogueScreen({
     limitBannerShown = false,
     pausedCut = null,
     sellsOnline = null,
+    adapter,
 }: {
     query: ListQuery;
-    /** The page the address asks for, read on the server. */
+    /** The page the address asks for, from the list's query. */
     page: CataloguePage;
+    adapter: ListAdapter;
     stores: { id: string; name: string }[];
     /** All · Collections · Inventory · Reviews, under Needs you. */
     tabs: ReactNode;
@@ -136,8 +146,10 @@ export function CatalogueScreen({
     sellsOnline?: SellsOnline;
 }) {
     const router = useRouter();
-    const [navigating, startNavigation] = useTransition();
-    const [data, setData] = useState(page);
+    const orgId = useOrgId();
+    const quick = useQuickEdits();
+    const navigating = adapter.fetching;
+    const data = page;
     const [openId, setOpenId] = useState<string | null>(null);
     /** Restock opened it: the Add box gets the keyboard. */
     const [focusAdd, setFocusAdd] = useState(false);
@@ -150,15 +162,6 @@ export function CatalogueScreen({
         null,
     );
 
-    // A new page from the server (a new address, or a refresh) replaces
-    // the one on screen.
-    // (Adjusted while rendering, as React recommends, not in an effect.)
-    const [seen, setSeen] = useState(page);
-    if (seen !== page) {
-        setSeen(page);
-        setData(page);
-    }
-
     const rows = useMemo(
         () => catalogueRows(data.items, pausedCut),
         [data.items, pausedCut],
@@ -170,7 +173,6 @@ export function CatalogueScreen({
     const store = stores.find((s) => s.id === query.storefront) ?? null;
     const many = stores.length > 1;
     const first = stores.at(0);
-    const filter = catalogueFilter(query);
 
     const needs = data.needs as NeedDetail[];
     const needById = useMemo(
@@ -186,52 +188,50 @@ export function CatalogueScreen({
                 showError(OFFLINE);
                 return;
             }
-            startNavigation(() => {
-                try {
-                    router.replace(listHref(query, patch), { scroll: false });
-                } catch {
-                    showError(OFFLINE);
-                }
-            });
+            adapter.navigate(listHref(query, patch));
         },
-        [query, router],
+        [query, adapter],
     );
 
-    /** Read the page on screen again, and the counts with it. */
+    /**
+     * The tabs are links: sent through the list's own navigation (in place,
+     * the old rows greyed) rather than a server render.
+     */
+    function openTab(e: React.MouseEvent<HTMLElement>) {
+        const a = (e.target as Element).closest("a[href]");
+        if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) {
+            return;
+        }
+        const href = a.getAttribute("href") ?? "";
+        if (!href.startsWith("/commerce/products")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        adapter.navigate(href);
+    }
+
+    /**
+     * Read the page on screen again, and the counts with it; a page past
+     * the end moves back in the container.
+     */
     async function reload() {
         if (typeof navigator !== "undefined" && !navigator.onLine) {
             showError(OFFLINE);
             return;
         }
-        let res: Awaited<ReturnType<typeof loadCataloguePage>>;
         try {
-            res = await loadCataloguePage(filter);
+            await adapter.reload();
         } catch {
-            // The action's request itself failed: the connection.
             showError("The list couldn't be refreshed.", OFFLINE_HOW);
             return;
         }
-        if (!res.ok) {
-            showError("The list couldn't be refreshed.", res.error);
-            return;
-        }
-        // The page's last rows have gone (deleted, or out of this view):
-        // the last page that still holds some.
-        if (res.data.items.length === 0 && query.page > 1) {
-            go({
-                page: Math.min(
-                    query.page - 1,
-                    pagesOf(res.data.total, query.size),
-                ),
-            });
-            return;
-        }
-        setData(res.data);
-        // A product Restock opened from beyond this page: its row again.
-        if (extra) {
-            const fresh = await findRow(extra.id, extra.name);
-            if (fresh) setExtra(fresh);
-        }
+        await refreshExtra();
+    }
+
+    /** A product Restock opened from beyond this page: its row again. */
+    async function refreshExtra() {
+        if (!extra) return;
+        const fresh = await findRow(extra.id, extra.name);
+        if (fresh) setExtra(fresh);
     }
 
     /**
@@ -244,14 +244,13 @@ export function CatalogueScreen({
         name: string,
     ): Promise<CatalogueRow | null> {
         try {
-            const res = await loadCataloguePage({
+            const found = await adapter.find({
                 q: name,
                 storefront: query.storefront ?? undefined,
                 size: 100,
             });
-            if (!res.ok) return null;
             return (
-                catalogueRows(res.data.items, pausedCut).find(
+                catalogueRows(found.items, pausedCut).find(
                     (r) => r.id === id,
                 ) ?? null
             );
@@ -296,8 +295,15 @@ export function CatalogueScreen({
         status: ProductStatus,
         clear?: () => void,
     ) {
-        const results = await Promise.all(
-            targets.map((r) => setProductStatus(r.id, status)),
+        // At once in every list page and the products' own pages; the
+        // snapshot comes back when any is refused (DEC-259, owner 23 Nov).
+        const results = await quick.run(
+            targets.map((r) => r.id),
+            { status },
+            (org) =>
+                Promise.all(
+                    targets.map((r) => setProductStatus(r.id, status, org)),
+                ),
         );
         // Undo puts back only what changed.
         const before: { id: string; was: ProductStatus }[] = [];
@@ -332,7 +338,6 @@ export function CatalogueScreen({
             );
         }
         clear?.();
-        await reload();
         const changed = targets.filter((r) =>
             before.some((b) => b.id === r.id),
         );
@@ -342,10 +347,13 @@ export function CatalogueScreen({
         );
         showUndo(said, async () => {
             const back = await Promise.all(
-                before.map((r) => setProductStatus(r.id, r.was)),
+                before.map((r) =>
+                    quick.run([r.id], { status: r.was }, async (org) => [
+                        await setProductStatus(r.id, r.was, org),
+                    ]),
+                ),
             );
-            await reload();
-            return back.every((r) => r.ok);
+            return back.every((r) => r.every((x) => x.ok));
         });
     }
 
@@ -353,7 +361,7 @@ export function CatalogueScreen({
     async function confirmDelete() {
         const targets = pendingDelete ?? [];
         const results = await Promise.all(
-            targets.map((r) => deleteProduct(r.id)),
+            targets.map((r) => deleteProduct(r.id, orgId)),
         );
         const failed = results.filter((r) => !r.ok).length;
         const gone = targets.length - failed;
@@ -370,7 +378,11 @@ export function CatalogueScreen({
     }
 
     async function duplicate(row: CatalogueRow) {
-        const res = await duplicateListedProduct(row.id, query.storefront);
+        const res = await duplicateListedProduct(
+            row.id,
+            query.storefront,
+            orgId,
+        );
         if (!res.ok) {
             if (res.plan) showPlanRefusal(res.plan);
             else showError("It couldn't be duplicated.", res.error);
@@ -451,7 +463,9 @@ export function CatalogueScreen({
                 server element can arrive as a lazy chunk, and a lazy one
                 among siblings is keyed like a list item — React's "unique
                 key" warning. Alone in a fragment it is a single child. */}
-            <>{tabs}</>
+            <div onClickCapture={openTab}>
+                <>{tabs}</>
+            </div>
             <>{notice}</>
             <>{collectionsPanel}</>
             <PendingRegion
@@ -644,7 +658,9 @@ export function CatalogueScreen({
                 onStatus={(r, s) => void setStatus([r], s)}
                 onDuplicate={(r) => void duplicate(r)}
                 onDelete={(r) => setPendingDelete([r])}
-                onChanged={() => void reload()}
+                // The list was read again by the quick edit itself; a
+                // product from beyond the page is read again here.
+                onChanged={() => void refreshExtra()}
             />
 
             <ConfirmDialog

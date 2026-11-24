@@ -46,6 +46,7 @@ export function useReviewActions() {
             }
             showSuccess("Reply posted.");
             setReplyingTo(null);
+            // rq-refresh-ok: a product's Reviews tab moves in U24.
             router.refresh();
         });
     }
@@ -63,6 +64,7 @@ export function useReviewActions() {
                 );
                 return;
             }
+            // rq-refresh-ok: a product's Reviews tab moves in U24.
             router.refresh();
             if (hide) {
                 showUndo(
@@ -73,6 +75,7 @@ export function useReviewActions() {
                             { quiet: true },
                         );
                         if (!back) return { ok: false, error: UNREACHED };
+                        // rq-refresh-ok: a product's Reviews tab moves in U24.
                         router.refresh();
                         return back;
                     },

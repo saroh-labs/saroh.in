@@ -76,6 +76,7 @@ export function InviteReviewsSheet({
                 const res = await inviteReviews(ids);
                 if (!res.ok) return res;
                 sent = res.data.filter((r) => r.status === "queued").length;
+                // rq-refresh-ok: Reviews on Products is server-drawn until U24.
                 router.refresh();
                 if (res.data.length - sent > 0) {
                     // What was skipped, and why, is listed in the sheet.

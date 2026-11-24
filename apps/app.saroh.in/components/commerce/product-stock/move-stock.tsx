@@ -3,9 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { useQuickEdits } from "@/components/commerce/quick-edits/quick-edits";
 import type { ProductDetail } from "@/lib/products/service";
 import { moveProductStock } from "@/lib/products/stock-actions";
 import { movable } from "@/lib/products/stock-sheet";
@@ -29,7 +29,7 @@ export function MoveStock({
     /** Why Move is off, when it is. */
     blocked: string | null;
 }) {
-    const router = useRouter();
+    const quick = useQuickEdits();
     const sizes = stock.sizes;
     const [sizeKey, setSizeKey] = useState(sizes.at(0)?.variantId ?? "");
     const size: SizeStock | undefined =
@@ -75,21 +75,23 @@ export function MoveStock({
         if (problem || !size || Number.isNaN(n)) return;
         setPending(true);
         try {
-            const res = await moveProductStock({
-                fromStoreId: from,
-                toStoreId: to,
-                productId: product.id,
-                variantId: size.variantId,
-                units: n,
-                idempotencyKey: crypto.randomUUID(),
-            });
+            // The page reads its shelves again once it moved (DEC-259).
+            const [res] = await quick.run([product.id], {}, async () => [
+                await moveProductStock({
+                    fromStoreId: from,
+                    toStoreId: to,
+                    productId: product.id,
+                    variantId: size.variantId,
+                    units: n,
+                    idempotencyKey: crypto.randomUUID(),
+                }),
+            ]);
             if (!res.ok) {
                 showError("Nothing was moved.", res.error);
                 return;
             }
             showSuccess(movedWords(n, nameOf(to)));
             setUnits("");
-            router.refresh();
         } finally {
             setPending(false);
         }

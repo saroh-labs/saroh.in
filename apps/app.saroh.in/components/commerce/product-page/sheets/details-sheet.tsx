@@ -1,5 +1,6 @@
 "use client";
 
+import { useProductSaved } from "@/components/commerce/quick-edits/quick-edits";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Form,
@@ -13,7 +14,6 @@ import {
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -96,7 +96,7 @@ export function DetailsSheet({
     storeId: string;
     categories: { id: string; name: string }[];
 }) {
-    const router = useRouter();
+    const saved = useProductSaved();
     const form = useForm<Values>({
         resolver: zodResolver(schema),
         values: valuesOf(product),
@@ -140,10 +140,10 @@ export function DetailsSheet({
             return;
         }
         onOpenChange(false);
-        router.refresh();
+        void saved();
         showUndo("Details saved.", async () => {
             const undo = await patchProduct(storeId, product.id, before);
-            router.refresh();
+            void saved();
             return undo;
         });
     }

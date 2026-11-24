@@ -5,6 +5,10 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import {
+    runOne,
+    useHostedQuickEdits,
+} from "@/components/commerce/quick-edits/quick-edits";
 import { runAction } from "@/lib/api/run-action";
 import { setProductSoldOut } from "@/lib/products/actions";
 import type { SoldOutPlace } from "@/lib/products/tracking";
@@ -95,13 +99,17 @@ function SoldOutButton({
     className?: string;
 }) {
     const router = useRouter();
+    const hosted = useHostedQuickEdits();
     const [pending, start] = useTransition();
     const next = !place.soldOut;
 
     function toggle() {
         start(async () => {
+            const send = () =>
+                setProductSoldOut(productId, place.storefrontId, next);
+            // On the product page its quick edits read it again (DEC-259).
             const res = await runAction(() =>
-                setProductSoldOut(productId, place.storefrontId, next),
+                hosted ? runOne(hosted, productId, {}, send) : send(),
             );
             if (!res) return;
             if (!res.ok) {
@@ -109,7 +117,8 @@ function SoldOutButton({
                 return;
             }
             showSuccess(soldOutSaid(res.data.name || place.name, next));
-            router.refresh();
+            // rq-refresh-ok: the product editor is server-rendered.
+            if (!hosted) router.refresh();
         });
     }
 

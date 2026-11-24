@@ -73,6 +73,17 @@ There is no global client store. React Query holds server state only, in
   `runAction` then `router.refresh()` and whose React Query provider is
   `useActionMutation` with the tab's business and nothing after. The page
   puts the provider around everything that writes, New booking's host too.
+- **Optimistic quick edits** (Products only, owner 23 Nov 2026: archive or
+  publish, add stock, price): a control calls the screen's
+  `QuickEdits.run(ids, patch, action)` (`components/commerce/quick-edits/`);
+  the host (`useQuickEditsHost`) writes the patch into every cached list page
+  and the product's reads (`lib/products/cache.ts`), runs the action with the
+  tab's business, puts the snapshot back on any refusal and hands the refusal
+  to the caller untouched, and reads Products once after a save that landed.
+- **A record's read route** (`/api/products/[productId]`): the read's path
+  names the segment (`path: "/api/products/[productId]"`), `apiRead` fills it
+  from the param of that name, and `readRoute` takes it from Next's segment,
+  never from the query (named again there, a 400). Another business's id is a 404.
 - **A React Query page is not `force-dynamic`**: the session cookie already
   makes it dynamic, and `force-dynamic` turns off Next's fetch memo, so two
   readers of one URL in a render (the shell and a module gate) both reach

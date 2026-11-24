@@ -1,7 +1,7 @@
 "use client";
 
+import { useProductSaved } from "@/components/commerce/quick-edits/quick-edits";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { PhotosField } from "@/components/commerce/product-sections/photos-field";
@@ -32,7 +32,7 @@ export function PhotosSheet({
     product: ProductDetail;
     storeId: string;
 }) {
-    const router = useRouter();
+    const saved = useProductSaved();
     const baseline = photosFrom(product.images);
     const [draft, setDraft] = useState<PhotoDraft[]>(baseline);
     const [saving, setSaving] = useState(false);
@@ -58,7 +58,7 @@ export function PhotosSheet({
             return;
         }
         onOpenChange(false);
-        router.refresh();
+        void saved();
         // Undo re-adds what was there: kept photos by id where they survive,
         // the rest by the address or library object they came from.
         const survivors = new Set(res.data.map((i) => i.id));
@@ -70,7 +70,7 @@ export function PhotosSheet({
                 product.id,
                 photosInput(previous),
             );
-            router.refresh();
+            void saved();
             return undo;
         });
     }
