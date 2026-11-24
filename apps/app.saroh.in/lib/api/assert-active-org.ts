@@ -3,7 +3,7 @@ import { getActiveOrgId } from "@/lib/api/http";
 
 /** Said when a tab saves into a business that is no longer the open one. */
 export const ORG_MOVED =
-    "Another business was opened in another tab. Reload this page to carry on.";
+    "Another business was opened in another tab, so this change wasn’t saved. Open this business again to carry on.";
 
 /**
  * A Server Action's first step on a migrated screen (DEC-259): the business
