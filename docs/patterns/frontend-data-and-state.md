@@ -102,12 +102,15 @@ Every `app/api/<area>/route.ts` is built with `readRoute(...)` and nothing else:
   other method answers 405.
 - `Cache-Control: private, no-store` and `Vary: Cookie` on every answer, errors
   included. The edge never caches `/api/*`.
-- The organization is resolved on the server (`getActiveOrgId()`, fails closed:
-  no organization is 401). The client sends the one it believes it is in; a
-  difference answers 409 `{ code: "org_mismatch" }` with no data.
+- The organization is resolved on the server. The client sends the one it
+  believes it is in; when that equals the `active_org` cookie it is settled
+  without the business list (the API refuses a non-member or a paused seat on
+  every call, a 403 that marks the tab's list stale). Otherwise
+  `getActiveOrgId()` decides (fails closed: none is 401), and a difference
+  answers 409 `{ code: "org_mismatch" }` with no data.
 - Params are an allowlist parsed per route; unknown params are rejected, page
   size and search length are capped.
-- Generic bodies only (401, 403, 404, 409, 429, 503): no upstream message, stack
+- Generic bodies only (400, 401, 403, 404, 409, 429, 503): no upstream message, stack
   or id. Another organization's id is a 404, never a 403.
 - Same origin only: reject cross-site requests, send no CORS headers.
 - Each handler authorises itself, with the same per-domain gate

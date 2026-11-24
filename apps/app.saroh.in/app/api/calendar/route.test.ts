@@ -18,6 +18,7 @@ const h = vi.hoisted(
     } => ({ active: "org_a", business: null, calendar: vi.fn() }),
 );
 vi.mock("@/lib/api/http", () => ({
+    ACTIVE_ORG_COOKIE: "active_org",
     getActiveOrgId: () => Promise.resolve(h.active),
 }));
 vi.mock("@/lib/calendar/service", () => ({

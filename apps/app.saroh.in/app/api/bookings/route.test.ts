@@ -24,6 +24,7 @@ const h = vi.hoisted(
     }),
 );
 vi.mock("@/lib/api/http", () => ({
+    ACTIVE_ORG_COOKIE: "active_org",
     getActiveOrgId: () => Promise.resolve(h.active),
 }));
 vi.mock("@/lib/organizations/service", () => ({

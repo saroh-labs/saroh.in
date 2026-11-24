@@ -37,9 +37,6 @@ import { firstStepsLead } from "@/lib/settings/ready";
 /** It had none: Home's tab read the bare "Saroh" (12 Oct 2026). */
 export const metadata = { title: "Home" };
 
-/** On React Query: never cached, read per request (DEC-259). */
-export const dynamic = "force-dynamic";
-
 /**
  * Action-oriented Home (#119). Answers "where am I / what should I do next"
  * instead of listing stores. The ranked next-actions come from one aggregated

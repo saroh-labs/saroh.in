@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api/errors";
-import { getActiveOrgId } from "@/lib/api/http";
-import { inReadScope } from "@/lib/api/read-scope";
+import { ACTIVE_ORG_COOKIE, getActiveOrgId } from "@/lib/api/http";
+import { inReadScope, setScopedOrg } from "@/lib/api/read-scope";
 import { ROLE_DENIED } from "@/lib/api/role-denied";
 import { ORG_HEADER } from "@/lib/query/api-read";
 import type { Read } from "@/lib/query/define-read";
@@ -98,7 +98,9 @@ function crossSite(headers: Headers): boolean {
 /** The status a failed service or gate answers with: generic, never its words. */
 function statusOf(error: unknown): number {
     if (error instanceof ApiError) {
-        return [401, 403, 404, 429].includes(error.status) ? error.status : 503;
+        return [400, 401, 403, 404, 429].includes(error.status)
+            ? error.status
+            : 503;
     }
     // Next's own interrupts: `forbidden()`, `notFound()`, `unauthorized()`
     // carry their status; a redirect means this isn't for them.
@@ -111,6 +113,18 @@ function statusOf(error: unknown): number {
         if (digest.startsWith("NEXT_REDIRECT")) return 403;
     }
     return 503;
+}
+
+/** One cookie's value from the request's own header. */
+function cookieOf(headers: Headers, name: string | undefined): string | null {
+    if (!name) return null;
+    for (const part of (headers.get("cookie") ?? "").split(";")) {
+        const at = part.indexOf("=");
+        if (part.slice(0, at).trim() === name) {
+            return decodeURIComponent(part.slice(at + 1).trim());
+        }
+    }
+    return null;
 }
 
 function paramsOf(url: URL): Record<string, string> | null {
@@ -133,9 +147,17 @@ export function readRoute<P, T>(
         const parsed = raw && schema.safeParse(raw);
         if (!parsed?.success) return refuse(400);
         try {
-            const orgId = await getActiveOrgId();
+            // The tab's claim matching the cookie settles the business without
+            // the business list: the API refuses a non-member or a paused
+            // seat on every call (403, which marks the tab's list stale).
+            // Otherwise the list decides, and a difference is a 409.
+            const claimed = request.headers.get(ORG_HEADER);
+            const cookie = cookieOf(request.headers, ACTIVE_ORG_COOKIE);
+            const orgId =
+                claimed && claimed === cookie ? cookie : await getActiveOrgId();
             if (!orgId) return refuse(401);
-            if (request.headers.get(ORG_HEADER) !== orgId) return refuse(409);
+            if (claimed !== orgId) return refuse(409);
+            setScopedOrg(orgId);
             // The gate reads this request's membership, so its no is the
             // role's: the browser doesn't take it for a stale business list.
             if (access && !(await access(orgId))) {

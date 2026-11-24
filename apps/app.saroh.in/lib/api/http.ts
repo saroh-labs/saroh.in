@@ -5,7 +5,7 @@ import { cache } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { toFailure } from "@/lib/api/failure";
-import { readOnce } from "@/lib/api/read-scope";
+import { readOnce, scopedOrg } from "@/lib/api/read-scope";
 import { roleDeniedMessage } from "@/lib/api/role-denied";
 import type { Said } from "@/lib/api/unreached";
 import {
@@ -117,6 +117,8 @@ export const memberOrganizations = cache(
  * rather than silently retargeting the tenant.
  */
 export const getActiveOrgId = cache(async (): Promise<string | null> => {
+    const settled = scopedOrg();
+    if (settled) return settled;
     const cookieId = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
     const orgs = await memberOrganizations();
     if (orgs === null) return cookieId;
