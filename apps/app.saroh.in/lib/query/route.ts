@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api/errors";
 import { getActiveOrgId } from "@/lib/api/http";
+import { inReadScope } from "@/lib/api/read-scope";
 import { ROLE_DENIED } from "@/lib/api/role-denied";
 import { ORG_HEADER } from "@/lib/query/api-read";
 import type { Read } from "@/lib/query/define-read";
@@ -124,7 +125,9 @@ export function readRoute<P, T>(
     access?: Access,
 ): (request: Request) => Promise<Response> {
     const schema = z.strictObject(def.read.params);
-    return async (request) => {
+    // One API answer per URL for the whole handler (`inReadScope`).
+    return (request) => inReadScope(() => answerRead(request));
+    async function answerRead(request: Request): Promise<Response> {
         if (crossSite(request.headers)) return refuse(403);
         const raw = paramsOf(new URL(request.url));
         const parsed = raw && schema.safeParse(raw);
@@ -146,5 +149,5 @@ export function readRoute<P, T>(
             if (status === 503) console.error("read route failed", error);
             return refuse(status);
         }
-    };
+    }
 }

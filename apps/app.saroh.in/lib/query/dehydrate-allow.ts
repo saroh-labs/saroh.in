@@ -5,9 +5,9 @@ import { defaultShouldDehydrateQuery } from "@tanstack/react-query";
  * The domains whose queries may cross from the server render to the
  * browser (DEC-259). An allowlist, so a new domain is sent only once it is
  * named here: billing secrets, API keys, tokens and provider credentials
- * are never dehydrated. Empty until a screen moves to React Query.
+ * are never dehydrated.
  */
-export const DEHYDRATE_DOMAINS: ReadonlySet<string> = new Set<string>([]);
+export const DEHYDRATE_DOMAINS: ReadonlySet<string> = new Set<string>(["home"]);
 
 /** Done or still pending (an un-awaited prefetch must cross too), and allowed. */
 export function shouldDehydrateQuery(query: Query): boolean {

@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { toFailure } from "@/lib/api/failure";
+import { readOnce } from "@/lib/api/read-scope";
 import { roleDeniedMessage } from "@/lib/api/role-denied";
 import type { Said } from "@/lib/api/unreached";
 import {
@@ -85,7 +86,7 @@ export type CrmResult<T> =
 export const memberOrganizations = cache(
     async (): Promise<Organization[] | null> => {
         const cookie = (await headers()).get("cookie") ?? "";
-        const res = await fetch(`${API_URL}/organizations`, {
+        const res = await readOnce(`${API_URL}/organizations`, {
             headers: { "content-type": "application/json", cookie },
             cache: "no-store",
         });
@@ -216,6 +217,9 @@ export async function apiFetch(
         cache: "no-store",
     };
     const method = (init?.method ?? "GET").toUpperCase();
+    if (method === "GET" && !init?.headers && !init?.signal) {
+        return readOnce(`${API_URL}${path}`, request);
+    }
     if (method === "GET" || method === "HEAD") {
         return fetch(`${API_URL}${path}`, request);
     }

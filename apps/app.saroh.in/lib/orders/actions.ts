@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { revalidatePath } from "next/cache";
 
 import type { CourierFields } from "./courier";
@@ -53,7 +54,13 @@ function refreshOrder(orderId: string) {
 
 /* One order's kitchen flow (ADR-008) — org-scoped; the API authorizes each. */
 
-export async function moveStage(orderId: string, input: MoveStageInput) {
+/** `orgId`: from a React Query screen (Home), `writeAsOrg` (DEC-259). */
+export async function moveStage(
+    orderId: string,
+    input: MoveStageInput,
+    orgId?: string,
+) {
+    if (orgId) return writeAsOrg(orgId, () => moveOrderStage(orderId, input));
     return moveOrderStage(orderId, input);
 }
 
@@ -66,7 +73,12 @@ export async function markVisitAttended(orderId: string, visitNumber: number) {
     return markOrderVisitAttended(orderId, visitNumber);
 }
 
-export async function undoStage(orderId: string, eventId: string) {
+export async function undoStage(
+    orderId: string,
+    eventId: string,
+    orgId?: string,
+) {
+    if (orgId) return writeAsOrg(orgId, () => undoOrderStage(orderId, eventId));
     return undoOrderStage(orderId, eventId);
 }
 

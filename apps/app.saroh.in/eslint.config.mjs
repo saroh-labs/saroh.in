@@ -85,6 +85,8 @@ export default [
                                   `@/lib/${d}/read`,
                                   `@/lib/${d}/reads`,
                               ]),
+                              // Types carry no server code.
+                              allowTypeImports: true,
                               message:
                                   "This domain is on React Query: read through its lib/<domain>/queries.ts, not the server service.",
                           },

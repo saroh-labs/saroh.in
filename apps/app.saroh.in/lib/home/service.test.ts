@@ -6,7 +6,7 @@ vi.mock("@/lib/api/http", () => ({
     orgBase: () => Promise.resolve("/organizations/org_1"),
 }));
 
-import { getHomeRail } from "@/lib/home/service";
+import { getHomeRail } from "@/lib/home/rail";
 
 const json = (status: number, body: unknown) => ({
     ok: status >= 200 && status < 300,

@@ -1,29 +1,26 @@
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
-import type { HomeSetup } from "@/components/home/dashboard/home-dashboard";
-import { HomeDashboard } from "@/components/home/dashboard/home-dashboard";
-import { ReviewerHome } from "@/components/home/dashboard/reviewer-home";
-import { StaffHome } from "@/components/home/dashboard/staff-home";
-import { HomeHeader } from "@/components/home/header/home-header";
-import { NewSpace } from "@/components/home/header/new-sheet";
+import { HomeContainer } from "@/components/home/home-container";
 import {
     homeNewFor,
     homeNewModuleKeys,
 } from "@/components/shared/navigation/quick-actions";
-import { Moment } from "@/components/shared/notices/moment";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
-import { businessPage } from "@/lib/ask-ai/page-hints";
+import {
+    homeModules,
+    homeServer,
+    homeSetupServer,
+    maySeeSetup,
+} from "@/lib/home/access";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";
-import { getHome } from "@/lib/home/service";
+import { homeRead, homeSetupRead } from "@/lib/home/queries";
 import { hasAnyInvoice } from "@/lib/invoices/service";
-import type { ModuleView } from "@/lib/modules/schema";
 import { listModules } from "@/lib/modules/service";
 import { homeMoment, homeNewFeature } from "@/lib/moments/read";
-import { getSeenMoments } from "@/lib/moments/service";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
 import { permits } from "@/lib/organizations/permits";
@@ -32,20 +29,16 @@ import {
     organizationsOnce,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
-import { getOrganizationSettings } from "@/lib/organizations/settings-service";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
-import {
-    checklistSubject,
-    firstSteps,
-    firstStepsLead,
-    mayFinishSetup,
-} from "@/lib/settings/ready";
-import { loadReadyChecklist } from "@/lib/settings/ready-service";
-import { shareLink } from "@/lib/sites/share-links";
-import { readWebAddressLinks } from "@/lib/sites/share-links-read";
+import { firstStepsLead } from "@/lib/settings/ready";
 
 /** It had none: Home's tab read the bare "Saroh" (12 Oct 2026). */
 export const metadata = { title: "Home" };
+
+/** On React Query: never cached, read per request (DEC-259). */
+export const dynamic = "force-dynamic";
 
 /**
  * Action-oriented Home (#119). Answers "where am I / what should I do next"
@@ -73,25 +66,51 @@ export default async function Home() {
     const chosen = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value;
     if (organizations.length > 1 && !chosen) redirect("/choose");
 
-    const [home, business] = await Promise.all([
-        getHome(),
-        resolveActiveOrganization(organizations),
-    ]);
+    // Every business paused for them: the shell says so instead (#800).
+    const business = await resolveActiveOrganization(organizations);
+    if (!business) return null;
+
+    // Home is read through React Query (DEC-259): prefetched here, read by
+    // the container from the hydrated cache. Awaited, since which Home this
+    // is (Reviewer, staff, the business's) and what else to read follow it.
+    const client = getServerQueryClient();
+    const showSetup = await maySeeSetup();
+    await prefetchRead(client, homeServer, business.id, {});
+    const home = client.getQueryData(
+        homeRead.options(business.id, {}).queryKey,
+    );
+    // Home unread is the page's failure, as before.
+    if (!home) {
+        throw (
+            client.getQueryState(homeRead.key(business.id, {}))?.error ??
+            new Error("Home couldn't be read")
+        );
+    }
+    const hydrate = (body: React.ReactNode) => (
+        <PageContainer width="full">
+            <HydrationBoundary state={dehydrate(client)}>
+                {body}
+            </HydrationBoundary>
+        </PageContainer>
+    );
+    const name = session.user.name;
+    const businessName = business.name;
 
     // A Reviewer's Home (F9): the greeting and what was sent to them for
     // review — nothing about the business, so nothing else is read.
     if (home.view === "reviewer") {
-        return (
-            <PageContainer width="full">
-                <HomeHeader
-                    lastDay={home.lastDay}
-                    name={session.user.name}
-                    businessName={business?.name ?? "This business"}
-                />
-                <div className="mt-5">
-                    <ReviewerHome home={home} />
-                </div>
-            </PageContainer>
+        return hydrate(
+            <HomeContainer
+                name={name}
+                businessName={businessName}
+                kind={kindOf(business.kind)}
+                newMenu={{ items: [], roleLine: null }}
+                modules={null}
+                setupShown={false}
+                insights={false}
+                moment={null}
+                news={null}
+            />,
         );
     }
 
@@ -99,7 +118,7 @@ export default async function Home() {
     // (a failed read leaves that to the permissions alone), and a business
     // with nothing on is asked what it wants to do first, which needs to
     // know what may be turned on and by whom.
-    const allModules = await listModules().catch(() => null);
+    const allModules = await homeModules();
     const modules = home.hasAnyModule
         ? null
         : (allModules ?? (await listModules()));
@@ -107,35 +126,42 @@ export default async function Home() {
     // person, never by their role's name.
     const newMenu = homeNewFor({
         moduleKeys: allModules ? homeNewModuleKeys(allModules) : null,
-        actions: business?.actions,
+        actions: business.actions,
     });
 
     // A staff member's Home (F11): their storefronts and their own diary,
     // each part as their role allows. No setup checklist to read.
     if (home.view === "staff") {
-        return (
-            <PageContainer width="full">
-                <StaffHome
-                    moment={
-                        home.hasAnyModule && home.unavailable.length === 0
-                            ? await homeNewFeature(business)
-                            : null
-                    }
-                    home={home}
-                    modules={modules}
-                    name={session.user.name}
-                    businessName={business?.name ?? "This business"}
-                    newMenu={newMenu}
-                />
-            </PageContainer>
+        return hydrate(
+            <HomeContainer
+                name={name}
+                businessName={businessName}
+                kind={kindOf(business.kind)}
+                newMenu={newMenu}
+                modules={modules}
+                setupShown={false}
+                insights={false}
+                moment={
+                    home.hasAnyModule && home.unavailable.length === 0
+                        ? await homeNewFeature(business)
+                        : null
+                }
+                news={null}
+            />,
         );
     }
 
-    const setup = home.hasAnyModule
-        ? await loadSetup(business, allModules)
+    // "Finish setup" (F8), for owners and admins (`access.ts`): read with
+    // Home's queries, so a step done on Home ticks without a reload.
+    const withSetup = showSetup && home.hasAnyModule;
+    if (withSetup) await prefetchRead(client, homeSetupServer, business.id, {});
+    const setup = withSetup
+        ? (client.getQueryData(
+              homeSetupRead.options(business.id, {}).queryKey,
+          ) ?? null)
         : null;
     // What is being set up (DEC-070) orders and words the first-run jobs.
-    const kind = kindOf(business?.kind);
+    const kind = kindOf(business.kind);
     const invoicing = home.hasAnyModule
         ? undefined
         : await loadInvoicing(business, kind);
@@ -163,53 +189,23 @@ export default async function Home() {
             ? await homeNewFeature(business)
             : null;
 
-    return (
-        // A dashboard, so the width matches the other data screens rather than
-        // the old reading measure — the schedule column needs room to sit
-        // beside the work instead of below it.
-        <PageContainer width="full">
-            {/* The greeting is the page's title (F6): who, when, and the
-                last 24 hours, then the work. */}
-            <HomeHeader
-                lastDay={home.lastDay}
-                name={session.user.name}
-                businessName={business?.name ?? "This business"}
-                kind={kind}
-                // The line under the greeting follows the checklist below.
-                subject={
-                    setup
-                        ? firstStepsLead(setup.first)
-                            ? "setup"
-                            : checklistSubject(setup.list)
-                        : null
-                }
-                newMenu={newMenu}
-                // The phone Home says it in the day sheet (U17).
-                sinceOnPhone={!home.hasAnyModule}
-            />
-            {/* What Ask AI offers here, from Home's own figures (AF 1). */}
-            <AskAiPageIs
-                page={businessPage({
-                    today: home.lastDay?.date,
-                    dueToday: home.tiles?.toPack?.dueToday,
-                    bookings: !!home.tiles?.bookingsToday,
-                })}
-            />
-            {moment ? <Moment moment={moment} className="mt-5" /> : null}
-            <div className="mt-5">
-                <HomeDashboard
-                    home={home}
-                    modules={modules}
-                    businessName={business?.name ?? "This business"}
-                    setup={setup}
-                    kind={kind}
-                    invoicing={invoicing}
-                    insights={insights}
-                    news={news}
-                />
-            </div>
-            {newMenu.items.length > 0 ? <NewSpace /> : null}
-        </PageContainer>
+    // A dashboard, so the width matches the other data screens rather than
+    // the old reading measure — the schedule column needs room to sit
+    // beside the work instead of below it. The greeting is the page's
+    // title (F6): who, when, and the last 24 hours, then the work.
+    return hydrate(
+        <HomeContainer
+            name={name}
+            businessName={businessName}
+            kind={kind}
+            newMenu={newMenu}
+            modules={modules}
+            setupShown={withSetup}
+            invoicing={invoicing}
+            insights={insights}
+            moment={moment}
+            news={news}
+        />,
     );
 }
 
@@ -226,34 +222,4 @@ async function loadInvoicing(
     if (!mayWriteInvoices(business))
         return { mayWrite: false, hasInvoice: null };
     return { mayWrite: true, hasInvoice: await hasAnyInvoice() };
-}
-
-/**
- * "Finish setup" (F8): for owners and admins only (`org:update`),
- * whose steps they are. Best-effort — a settings read that fails leaves the
- * checklist off Home, never Home itself.
- */
-async function loadSetup(
-    business: Organization | null,
-    modules: ModuleView[] | null,
-): Promise<HomeSetup | null> {
-    if (!business || !mayFinishSetup(business)) return null;
-    const settings = await getOrganizationSettings().catch(() => null);
-    if (!settings) return null;
-    // The 4 first steps lead until done (#1194); the money card then.
-    const [list, seen] = await Promise.all([
-        loadReadyChecklist(settings),
-        getSeenMoments(),
-    ]);
-    const first = firstSteps({
-        settings,
-        modules,
-        shared: seen?.has("shared-booking-link") ?? false,
-    });
-    // The link the share step hands over, read only while it is left.
-    const share =
-        first.shares && first.steps.some((s) => s.key === "share" && !s.done)
-            ? shareLink(await readWebAddressLinks(), [first.shares])
-            : null;
-    return { list, businessId: settings.id, first, share };
 }

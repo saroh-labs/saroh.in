@@ -6,7 +6,6 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useId, useMemo, useState } from "react";
 
@@ -14,6 +13,7 @@ import { useHold } from "@/components/shared/undo/use-hold";
 import type { HomeToday, HomeTodayItem } from "@/lib/home/service";
 import type { TodayRow } from "@/lib/home/today";
 import { laterTodayLabel, todayView } from "@/lib/home/today";
+import { useHomeSave } from "@/lib/home/use-home";
 import { recordBookingOutcome } from "@/lib/services/actions";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -172,7 +172,7 @@ export interface TodayMarks {
  * A refusal puts the row back and says why.
  */
 export function useTodayMarks(zone: string): TodayMarks {
-    const router = useRouter();
+    const save = useHomeSave();
     const { hold } = useHold();
     const [marked, setMarked] = useState<Partial<Record<string, Marked>>>({});
 
@@ -198,12 +198,17 @@ export function useTodayMarks(zone: string): TodayMarks {
                 ? `${who} arrived.`
                 : `Marked ${who} as didn't come.`,
             async () => {
-                const res = await recordBookingOutcome(row.id, outcome);
-                if (!res.ok) {
+                // Home is read again once it is written (DEC-259).
+                const res = await save(
+                    (...org) => recordBookingOutcome(row.id, outcome, ...org),
+                    { reread: true },
+                );
+                if (!res) {
+                    put(row.id, was);
+                } else if (!res.ok) {
                     showError(res.error);
                     put(row.id, was);
                 }
-                router.refresh();
             },
             () => put(row.id, was),
         );

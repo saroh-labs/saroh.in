@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -20,7 +21,9 @@ export async function inviteReviews(orderIds: string[]) {
     return res;
 }
 
-export async function replyToReview(id: string, reply: string) {
+/** `orgId`: from Home on React Query (DEC-259), which reads itself again. */
+export async function replyToReview(id: string, reply: string, orgId?: string) {
+    if (orgId) return writeAsOrg(orgId, () => replyToReviewApi(id, reply));
     const res = await replyToReviewApi(id, reply);
     if (res.ok) revalidatePath("/", "layout");
     return res;
