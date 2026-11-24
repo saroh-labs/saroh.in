@@ -9,12 +9,11 @@ import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { formatMoney } from "@/lib/format/money";
 import { takeDeskPayment } from "@/lib/services/actions";
 import type { DeskChoice, DeskTake } from "@/lib/services/desk-pay";
@@ -91,7 +90,7 @@ export function TakePayment({
     /** A sheet with Cash · UPI · Card, not the dialog (U12). */
     panel?: boolean;
 }) {
-    const router = useRouter();
+    const { save: bookingSave, saved } = useBookingSave();
     const ids = { given: useId(), how: useId(), error: useId() };
     const [ownOpen, setOwnOpen] = useState(false);
     const controlled = openProp !== undefined;
@@ -134,7 +133,7 @@ export function TakePayment({
 
     function close() {
         setOpen(false);
-        router.refresh();
+        saved();
         onTaken?.();
     }
 
@@ -145,8 +144,9 @@ export function TakePayment({
         setError(null);
         if (choice === "LINK") {
             // No GST rate on the service: chosen here, then the link.
-            const made = await runAction(
-                () => rates.run(() => makePayLink(bookingId), LINK_STEP),
+            const made = await bookingSave(
+                (...org) =>
+                    rates.run(() => makePayLink(bookingId, ...org), LINK_STEP),
                 { setBusy },
             );
             if (made) setLink(made);
@@ -155,12 +155,20 @@ export function TakePayment({
         try {
             // The same for the desk: the rate is chosen in place, saved to
             // the service, and the payment is taken as it was asked.
-            const res = await rates.run(() =>
-                takeDeskPayment(
-                    bookingId,
-                    deskInput(choice, take.cents, given),
-                ),
-            );
+            const res = await rates.run(async () => {
+                const taken = await bookingSave(
+                    (...org) =>
+                        takeDeskPayment(
+                            bookingId,
+                            deskInput(choice, take.cents, given),
+                            ...org,
+                        ),
+                    { quiet: true },
+                );
+                // It never got there: said below, as before.
+                if (!taken) throw new Error(UNREACHED);
+                return taken;
+            });
             // Closed without choosing: nothing was taken, nothing to say.
             if (!res) {
                 setBusy(false);

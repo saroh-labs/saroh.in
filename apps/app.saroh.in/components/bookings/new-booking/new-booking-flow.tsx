@@ -2,7 +2,6 @@
 
 import { Notice } from "@saroh/ui/notice";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
@@ -12,7 +11,7 @@ import {
     useCustomerFinder,
 } from "@/components/bookings/sheets/customer-step";
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
-import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
@@ -97,7 +96,7 @@ export function NewBookingFlow({
     onAgain: () => void;
     onDone: () => void;
 }) {
-    const router = useRouter();
+    const { save: bookingSave, saved } = useBookingSave();
     const [now] = useState(() => setup.now ?? Date.now());
     const zone = setup.timezone;
     const today = localDateOf(new Date(now), zone);
@@ -266,19 +265,23 @@ export function NewBookingFlow({
         setRefusal(null);
         setPackRefusal(null);
         const staffId = isClass(service) ? undefined : (atPerson?.id ?? withId);
-        const res = await runAction(
-            () =>
-                bookByHand(service.id, {
-                    startAt,
-                    idempotencyKey: attempt,
-                    ...(staffId ? { staffId } : {}),
-                    ...(paying ? { packPurchaseId: pack.id } : {}),
-                    ...(paying ? {} : payInput(payNow, paidBy)),
-                    ...(meet && offerMeet
-                        ? { meetingLink: "GOOGLE_MEET" as const }
-                        : {}),
-                    ...booker,
-                }),
+        const res = await bookingSave(
+            (...org) =>
+                bookByHand(
+                    service.id,
+                    {
+                        startAt,
+                        idempotencyKey: attempt,
+                        ...(staffId ? { staffId } : {}),
+                        ...(paying ? { packPurchaseId: pack.id } : {}),
+                        ...(paying ? {} : payInput(payNow, paidBy)),
+                        ...(meet && offerMeet
+                            ? { meetingLink: "GOOGLE_MEET" as const }
+                            : {}),
+                        ...booker,
+                    },
+                    ...org,
+                ),
             { quiet: true, onUnreached: setRefusal },
         );
         if (!res) {
@@ -343,7 +346,7 @@ export function NewBookingFlow({
                 business: setup.business ?? null,
             }),
         );
-        router.refresh();
+        saved();
     }
 
     async function next() {

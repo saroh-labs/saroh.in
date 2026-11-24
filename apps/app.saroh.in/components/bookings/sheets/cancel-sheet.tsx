@@ -3,12 +3,12 @@
 import { Skeleton } from "@saroh/ui/skeleton";
 import { TextLink } from "@saroh/ui/text-link";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import type { HeldResult } from "@/components/shared/undo/use-hold";
 import { useHold } from "@/components/shared/undo/use-hold";
-import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { cancelBooking, readBookingForCancel } from "@/lib/services/actions";
 import type { BookingMoney } from "@/lib/services/booking-money";
 import { cancelledMessage } from "@/lib/services/booking-money";
@@ -145,7 +145,7 @@ function CancelDraft({
     onClose: () => void;
     onCancelled?: () => void;
 }) {
-    const router = useRouter();
+    const { save, saved } = useBookingSave();
     const headingId = useId();
     const given = booking.money !== undefined;
     const [read, setRead] = useState<Read>(
@@ -198,7 +198,7 @@ function CancelDraft({
 
     function finish() {
         onCancelled?.();
-        router.refresh();
+        saved();
     }
 
     async function submit() {
@@ -211,7 +211,11 @@ function CancelDraft({
                 soon: "Cancelling in 10 seconds",
                 description: "They're told once it is cancelled.",
                 run: async (): Promise<HeldResult> => {
-                    const res = await cancelBooking(booking.id, {});
+                    const res = await save(
+                        (...org) => cancelBooking(booking.id, {}, ...org),
+                        { quiet: true },
+                    );
+                    if (!res) throw new Error(UNREACHED);
                     if (!res.ok) return res;
                     const message = cancelledMessage(res.data.money);
                     if (message.tone === "error") {
@@ -228,8 +232,9 @@ function CancelDraft({
             });
             return;
         }
-        const res = await runAction(
-            () => cancelBooking(booking.id, cancelOptions(choice, pick)),
+        const res = await save(
+            (...org) =>
+                cancelBooking(booking.id, cancelOptions(choice, pick), ...org),
             { setBusy },
         );
         if (!res) return;

@@ -9,6 +9,7 @@
  */
 export const LIVE_QUERY_ROUTES: Readonly<Record<string, readonly string[]>> = {
     "/": ["home"],
+    "/bookings/all": ["bookings"],
 };
 
 /** Whether `pathname` is the route `glob` names. */

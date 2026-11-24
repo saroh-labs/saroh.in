@@ -10,6 +10,7 @@ import { defaultShouldDehydrateQuery } from "@tanstack/react-query";
 export const DEHYDRATE_DOMAINS: ReadonlySet<string> = new Set<string>([
     "home",
     "calendar",
+    "bookings",
 ]);
 
 /** Done or still pending (an un-awaited prefetch must cross too), and allowed. */

@@ -67,6 +67,16 @@ There is no global client store. React Query holds server state only, in
   holds the last answer greyed (`keepPreviousData`) until the new one lands,
   and Back draws a seen one from the cache. The page and the container turn
   the address into the key through one pure function (`calendarAt`).
+- **A write from a shared component** (a sheet used by a React Query screen
+  and by a server-rendered one, like the bookings cancel sheet): it saves
+  through the domain's save context (`useBookingSave`), whose default is
+  `runAction` then `router.refresh()` and whose React Query provider is
+  `useActionMutation` with the tab's business and nothing after. The page
+  puts the provider around everything that writes, New booking's host too.
+- **A React Query page is not `force-dynamic`**: the session cookie already
+  makes it dynamic, and `force-dynamic` turns off Next's fetch memo, so two
+  readers of one URL in a render (the shell and a module gate) both reach
+  the API. Read routes keep it.
 - **Business switch and sign-out** call `clear()` and announce it on a
   `BroadcastChannel`, so every tab drops the cache.
 - **`staleTime: 0`** for every domain until the epic's close-out; `retry: false`,
