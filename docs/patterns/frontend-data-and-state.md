@@ -67,6 +67,16 @@ There is no global client store. React Query holds server state only, in
   holds the last answer greyed (`keepPreviousData`) until the new one lands,
   and Back draws a seen one from the cache. The page and the container turn
   the address into the key through one pure function (`calendarAt`).
+- **A write from a shared component** (a sheet used by a React Query screen
+  and by a server-rendered one, like the bookings cancel sheet): it saves
+  through the domain's save context (`useBookingSave`), whose default is
+  `runAction` then `router.refresh()` and whose React Query provider is
+  `useActionMutation` with the tab's business and nothing after. The page
+  puts the provider around everything that writes, New booking's host too.
+- **A React Query page is not `force-dynamic`**: the session cookie already
+  makes it dynamic, and `force-dynamic` turns off Next's fetch memo, so two
+  readers of one URL in a render (the shell and a module gate) both reach
+  the API. Read routes keep it.
 - **Business switch and sign-out** call `clear()` and announce it on a
   `BroadcastChannel`, so every tab drops the cache.
 - **`staleTime: 0`** for every domain until the epic's close-out; `retry: false`,
@@ -92,12 +102,15 @@ Every `app/api/<area>/route.ts` is built with `readRoute(...)` and nothing else:
   other method answers 405.
 - `Cache-Control: private, no-store` and `Vary: Cookie` on every answer, errors
   included. The edge never caches `/api/*`.
-- The organization is resolved on the server (`getActiveOrgId()`, fails closed:
-  no organization is 401). The client sends the one it believes it is in; a
-  difference answers 409 `{ code: "org_mismatch" }` with no data.
+- The organization is resolved on the server. The client sends the one it
+  believes it is in; when that equals the `active_org` cookie it is settled
+  without the business list (the API refuses a non-member or a paused seat on
+  every call, a 403 that marks the tab's list stale). Otherwise
+  `getActiveOrgId()` decides (fails closed: none is 401), and a difference
+  answers 409 `{ code: "org_mismatch" }` with no data.
 - Params are an allowlist parsed per route; unknown params are rejected, page
   size and search length are capped.
-- Generic bodies only (401, 403, 404, 409, 429, 503): no upstream message, stack
+- Generic bodies only (400, 401, 403, 404, 409, 429, 503): no upstream message, stack
   or id. Another organization's id is a 404, never a 403.
 - Same origin only: reject cross-site requests, send no CORS headers.
 - Each handler authorises itself, with the same per-domain gate

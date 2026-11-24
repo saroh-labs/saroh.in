@@ -7,14 +7,18 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
 import { useLocalPages } from "@saroh/ui/page-sizes";
 import { CalendarDays } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { TakePayment } from "@/components/bookings/booking-page/take-payment";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
-import { PendingRegion } from "@/components/shared/page/screen-pending";
+import {
+    PendingRegion,
+    useScreenGo,
+} from "@/components/shared/page/screen-pending";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { useHold } from "@/components/shared/undo/use-hold";
+import { UNREACHED } from "@/lib/api/unreached";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatDateTime } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";
@@ -147,8 +151,8 @@ export function BookingsView({
     /** "Show bookings for" opens on this person (Just me, or the last pick). */
     initialStaff?: string | null;
 }) {
-    const router = useRouter();
-    const [datesPending, startDates] = useTransition();
+    const go = useScreenGo();
+    const { save, saved } = useBookingSave();
     const [view, setViewState] = useState<ViewId>(() => readView(initialView));
     const [term, setTerm] = useState("");
     const [searchKey, setSearchKey] = useState(0);
@@ -278,14 +282,13 @@ export function BookingsView({
             : []),
     ];
 
-    // The date filter is read on the server, so a change goes by the
-    // address; the view, the search and the rest stay as they are.
+    // The date filter is read for those days, so a change goes by the
+    // address (in place on React Query); the view, the search and the rest
+    // stay as they are.
     const pickDates = (patch: Partial<DateRange>) => {
         const url = new URL(window.location.href);
         writeDateRange({ ...dates, ...patch }, url.searchParams);
-        startDates(() =>
-            router.replace(`${url.pathname}${url.search}`, { scroll: false }),
-        );
+        go(`${url.pathname}${url.search}`, "replace");
     };
     const clearAll = () => {
         setTerm("");
@@ -316,9 +319,14 @@ export function BookingsView({
                 : `Marked ${first || "them"} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
             async () => {
                 try {
-                    return await recordBookingOutcome(b.id, outcome);
+                    const res = await save(
+                        (...org) => recordBookingOutcome(b.id, outcome, ...org),
+                        { quiet: true },
+                    );
+                    if (!res) throw new Error(UNREACHED);
+                    return res;
                 } finally {
-                    router.refresh();
+                    saved();
                 }
             },
             back,
@@ -469,8 +477,8 @@ export function BookingsView({
                 ) : null}
             </div>
 
-            {/* A date range is read on the server: the rows grey until it lands. */}
-            <PendingRegion pending={datesPending}>
+            {/* A date range is read for those days: the rows grey until it lands. */}
+            <PendingRegion>
                 {shown.length === 0 ? (
                     searching || filtering ? (
                         <EmptyState

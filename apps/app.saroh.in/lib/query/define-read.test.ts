@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const active = vi.hoisted(() => ({ id: "org_a" }));
 vi.mock("@/lib/api/http", () => ({
+    ACTIVE_ORG_COOKIE: "active_org",
     getActiveOrgId: () => Promise.resolve(active.id),
 }));
 

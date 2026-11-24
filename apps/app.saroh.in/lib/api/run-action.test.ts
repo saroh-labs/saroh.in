@@ -156,6 +156,8 @@ const CATCHES_ITSELF = [
     "await run(",
     // Clipboard helpers answer false; they don't throw.
     "await copy(",
+    // `useBookingSave().save`: `runAction`, or `useActionMutation` over it.
+    "await bookingSave(",
 ];
 
 function sources(dir: string): string[] {

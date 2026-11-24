@@ -20,9 +20,6 @@ import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Business calendar" };
 
-/** On React Query: never cached, read per request (DEC-259). */
-export const dynamic = "force-dynamic";
-
 /** Before the first read names the business's zone, the one it falls back to. */
 const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
 

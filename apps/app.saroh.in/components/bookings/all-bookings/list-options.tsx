@@ -2,7 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { MoreHorizontal } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { OptionsSheet } from "@/components/bookings/calendar/header/options-sheet";
@@ -21,14 +21,14 @@ import { callName } from "@/lib/services/call-name";
 export function ListOptions({
     opens: kept,
     me,
-    showCancelled,
 }: {
     opens: BookingsOpens;
     /** The viewer on the diary, for "Just me"; null when they aren't on it. */
     me: { id: string; name: string } | null;
-    showCancelled: boolean;
 }) {
-    const router = useRouter();
+    // The address holds it (`?cancelled=1`); a change only opens what was
+    // read, so it is made in place, with no read (DEC-259).
+    const showCancelled = useSearchParams().get("cancelled") === "1";
     const [open, setOpen] = useState(false);
     const { opens, change } = useBookingsOpens(kept);
     useEffect(() => rememberLastView("list"), []);
@@ -37,7 +37,7 @@ export function ListOptions({
         const url = new URL(window.location.href);
         if (on) url.searchParams.set("cancelled", "1");
         else url.searchParams.delete("cancelled");
-        router.replace(`${url.pathname}${url.search}`, { scroll: false });
+        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
     };
 
     return (

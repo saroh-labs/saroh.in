@@ -1,6 +1,7 @@
 "use server";
 
 import { writeAsOrg } from "@/lib/api/assert-active-org";
+import { inReadScope, isOrganizationList } from "@/lib/api/read-scope";
 import type { BookingMoney } from "./booking-money";
 import type { DeskPaymentInput } from "./desk-pay";
 import type { PeekPerson } from "./peek";
@@ -45,8 +46,13 @@ import {
  * DB directly.
  */
 
-export async function bookByHand(serviceId: string, input: BookByHandInput) {
-    return bookByHandApi(serviceId, input);
+export async function bookByHand(
+    serviceId: string,
+    input: BookByHandInput,
+    orgId?: string,
+) {
+    const write = () => bookByHandApi(serviceId, input);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Book the next visit of a treatment (E10), against its order. */
@@ -61,8 +67,10 @@ export async function bookVisit(
 export async function takeDeskPayment(
     bookingId: string,
     input: DeskPaymentInput,
+    orgId?: string,
 ) {
-    return takeDeskPaymentApi(bookingId, input);
+    const write = () => takeDeskPaymentApi(bookingId, input);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** "Send a payment link" for a booking just made (E4). */
@@ -113,8 +121,10 @@ export async function cancelBooking(
         /** Why the whole class is cancelled (DEC-178, #1172). */
         reason?: string;
     } = {},
+    orgId?: string,
 ) {
-    return cancelBookingApi(bookingId, options);
+    const write = () => cancelBookingApi(bookingId, options);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /**
@@ -138,7 +148,11 @@ export async function readBookingForCancel(bookingId: string): Promise<{
     freeCancelUntil: string | null;
     timezone: string;
 } | null> {
-    const booking = await getBooking(bookingId);
+    // The business list once for the read (an action has no render memo).
+    const booking = await inReadScope(
+        () => getBooking(bookingId),
+        isOrganizationList,
+    );
     if (!booking) return null;
     return {
         money: booking.money ?? null,
@@ -148,8 +162,13 @@ export async function readBookingForCancel(bookingId: string): Promise<{
 }
 
 /** Move a booking to another slot (#121). */
-export async function rescheduleBooking(bookingId: string, startAt: string) {
-    return rescheduleBookingApi(bookingId, startAt);
+export async function rescheduleBooking(
+    bookingId: string,
+    startAt: string,
+    orgId?: string,
+) {
+    const write = () => rescheduleBookingApi(bookingId, startAt);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Change who a booking is with, optionally at a new time (#1157). */

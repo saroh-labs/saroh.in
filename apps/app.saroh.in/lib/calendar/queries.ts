@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { defineRead } from "@/lib/query/define-read";
+import type { DomainKey } from "@/lib/query/keys";
 import { domainKey } from "@/lib/query/keys";
 
 import { calendarRange, clampMonth, monthSpan } from "./range";
@@ -15,6 +16,10 @@ import { clampWeekDay, isDay, weekHref, weekSpan } from "./week";
  */
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/** Every calendar read of a business: what a booking save marks stale. */
+export const calendarKeys = (orgId: string): DomainKey =>
+    domainKey("calendar", orgId);
 
 /** The days read, both inclusive: a month or a Monday-to-Sunday week. */
 export interface CalendarSpan {

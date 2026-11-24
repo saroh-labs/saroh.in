@@ -7,11 +7,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const active = vi.hoisted((): { id: string | null } => ({ id: "org_a" }));
+const listAsked = vi.hoisted(() => ({ n: 0 }));
 vi.mock("@/lib/api/http", () => ({
-    getActiveOrgId: () => Promise.resolve(active.id),
+    ACTIVE_ORG_COOKIE: "active_org",
+    getActiveOrgId: () => {
+        listAsked.n += 1;
+        return Promise.resolve(active.id);
+    },
 }));
 
 import { ApiError } from "@/lib/api/errors";
+import { scopedOrg } from "@/lib/api/read-scope";
 import { defineRead } from "@/lib/query/define-read";
 import { domainKey } from "@/lib/query/keys";
 import {
@@ -52,9 +58,54 @@ beforeEach(() => {
     ]);
     access.mockReset();
     access.mockResolvedValue(true);
+    listAsked.n = 0;
 });
 
 describe("readRoute", () => {
+    it("the tab's business matching the cookie settles it without the business list", async () => {
+        let seen: string | undefined;
+        service.mockImplementation(() => {
+            seen = scopedOrg();
+            return Promise.resolve([]);
+        });
+        const res = await ask({
+            orgId: "org_a",
+            headers: { cookie: "x=1; active_org=org_a" },
+        });
+        expect(res.status).toBe(200);
+        expect(listAsked.n).toBe(0);
+        // The service's API calls carry it (getActiveOrgId reads the scope).
+        expect(seen).toBe("org_a");
+        expect(access).toHaveBeenCalledWith("org_a");
+    });
+
+    it("a cookie the tab doesn't claim still goes through the business list", async () => {
+        const res = await ask({
+            orgId: "org_b",
+            headers: { cookie: "active_org=org_a" },
+        });
+        expect(res.status).toBe(409);
+        expect(listAsked.n).toBe(1);
+        expect(service).not.toHaveBeenCalled();
+    });
+
+    it("an API refusal of the business (not a member, paused seat) is a 403", async () => {
+        service.mockRejectedValueOnce(new ApiError(403, "MEMBER_PAUSED"));
+        const res = await ask({
+            orgId: "org_a",
+            headers: { cookie: "active_org=org_a" },
+        });
+        expect(res.status).toBe(403);
+        expect(await res.json()).toEqual({ code: "forbidden" });
+    });
+
+    it("an API 400 stays a 400, not a 503", async () => {
+        service.mockRejectedValueOnce(new ApiError(400, "Bad range"));
+        const res = await ask();
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({ code: "bad_request" });
+    });
+
     it("answers the active business's rows, private, with no CORS", async () => {
         const res = await ask({
             orgId: "org_a",

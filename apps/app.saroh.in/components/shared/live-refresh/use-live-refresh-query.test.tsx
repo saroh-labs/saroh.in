@@ -302,7 +302,10 @@ describe("useLiveRefresh on a React Query page", () => {
 
 describe("the registries", () => {
     it("hold the routes moved so far, and the chrome list keeps its cap", () => {
-        expect(LIVE_QUERY_ROUTES).toEqual({ "/": ["home"] });
+        expect(LIVE_QUERY_ROUTES).toEqual({
+            "/": ["home"],
+            "/bookings/all": ["bookings"],
+        });
         expect(CHROME_REFRESH_ROUTES.length).toBeLessThanOrEqual(
             CHROME_REFRESH_CAP,
         );

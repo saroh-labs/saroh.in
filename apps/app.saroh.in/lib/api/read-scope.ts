@@ -10,6 +10,12 @@ interface Scope {
     memo: Map<string, Promise<Response>>;
     /** Which URLs are kept; absent, every GET. */
     only?: (url: string) => boolean;
+    /**
+     * The business this request works in, when the read route has already
+     * settled it (the tab's claim equals the cookie). The API checks
+     * membership and paused seats on every call, so the list isn't asked.
+     */
+    activeOrg?: string;
 }
 const scope = new AsyncLocalStorage<Scope>();
 
@@ -23,6 +29,17 @@ export function inReadScope<T>(
     only?: (url: string) => boolean,
 ): Promise<T> {
     return scope.run({ memo: new Map(), only }, fn);
+}
+
+/** Settle this scope's business (a read route, after its org check). */
+export function setScopedOrg(orgId: string): void {
+    const store = scope.getStore();
+    if (store) store.activeOrg = orgId;
+}
+
+/** The business a read route settled, if any. */
+export function scopedOrg(): string | undefined {
+    return scope.getStore()?.activeOrg;
 }
 
 /** The business list's URL, for `inReadScope`'s `only`. */

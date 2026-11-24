@@ -1,11 +1,10 @@
 "use client";
 
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
-import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { formatDateTime } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";
 import { rescheduleBooking } from "@/lib/services/actions";
@@ -73,7 +72,7 @@ function MoveDraft({
     timezone: string;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { save, saved } = useBookingSave();
     const [startAt, setStartAt] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [reload, setReload] = useState(0);
@@ -83,8 +82,8 @@ function MoveDraft({
 
     async function submit() {
         if (!startAt || busy) return;
-        const res = await runAction(
-            () => rescheduleBooking(booking.id, startAt),
+        const res = await save(
+            (...org) => rescheduleBooking(booking.id, startAt, ...org),
             { setBusy },
         );
         if (!res) return;
@@ -100,7 +99,7 @@ function MoveDraft({
             `Moved ${firstName(whoFor(booking)) || "the booking"} to ${formatDateTime(startAt, timezone, { weekday: "short", relative: "lower" })}.`,
         );
         onClose();
-        router.refresh();
+        saved();
     }
 
     return (
