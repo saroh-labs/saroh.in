@@ -11,6 +11,8 @@ export interface SegmentedOption<V extends string = string> {
     label: React.ReactNode;
     /** Link mode: choosing this option is an address. */
     href?: string;
+    /** Link mode: the link's `onNavigate`, to change the address in place. */
+    onNavigate?: (e: { preventDefault: () => void }) => void;
     /** A 16px glyph before the label. Decorative: the label names the option. */
     icon?: React.ReactNode;
     /** A tally after the label ("Open 4"). */
@@ -145,6 +147,7 @@ export function Segmented<V extends string = string>({
                         <Link
                             key={o.value}
                             href={o.href ?? "#"}
+                            onNavigate={o.onNavigate}
                             scroll={false}
                             aria-current={on ? "page" : undefined}
                             data-state={on ? "on" : "off"}

@@ -1,7 +1,11 @@
 "use client";
 
 import { showError } from "@saroh/ui/toast";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+    keepPreviousData,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { createContext, useContext } from "react";
 
@@ -12,9 +16,9 @@ import { useActionMutation } from "@/lib/query/use-action-mutation";
 
 import { calendarKeys } from "@/lib/calendar/queries";
 import { homeKeys } from "@/lib/home/queries";
-import type { BookingsAsk } from "./queries";
+import type { BookingsAsk, DiaryAsk } from "./queries";
 
-import { bookingsKeys, bookingsRead } from "./queries";
+import { bookingsKeys, bookingsRead, diaryRead } from "./queries";
 
 /**
  * The bookings list for the open business (DEC-259). A new date filter
@@ -23,6 +27,17 @@ import { bookingsKeys, bookingsRead } from "./queries";
 export function useBookingsList(ask: BookingsAsk) {
     return useQuery({
         ...bookingsRead.options(useOrgId(), ask),
+        placeholderData: keepPreviousData,
+    });
+}
+
+/**
+ * The diary for the days the address names (DEC-259). Another week keeps
+ * the last one on screen (greyed by the container) until it lands.
+ */
+export function useBookingsDiary(ask: DiaryAsk) {
+    return useQuery({
+        ...diaryRead.options(useOrgId(), ask),
         placeholderData: keepPreviousData,
     });
 }
@@ -40,6 +55,9 @@ type RunOptions = NonNullable<Parameters<typeof runAction>[1]>;
  * - `saved`: what the screen does after: on a screen still server-rendered
  *   (the diary, a booking's page) a `router.refresh()`; on the list,
  *   nothing, since `save` has already read the list again.
+ * - `refresh`: read the screen again after a write made some other way
+ *   (hours, time off, a refusal that says the time went): a
+ *   `router.refresh()` off React Query, else the bookings reads again.
  */
 export interface BookingSave {
     save: <R>(
@@ -47,6 +65,12 @@ export interface BookingSave {
         run?: RunOptions,
     ) => Promise<R | undefined>;
     saved: () => void;
+    refresh: () => void;
+    /**
+     * The open business, spread as a write's last argument when it is made
+     * outside `save` (`...org`); empty off React Query.
+     */
+    org: [] | [string];
 }
 
 export const BookingSaveContext = createContext<BookingSave | null>(null);
@@ -57,8 +81,11 @@ export function useBookingSave(): BookingSave {
     return (
         useContext(BookingSaveContext) ?? {
             save: (write, run) => runAction(() => write(), run),
-            // rq-refresh-ok: the diary and a booking's page are server-rendered until U15/U26.
+            // rq-refresh-ok: a booking's page and Hours are server-rendered until U25/U26.
             saved: () => router.refresh(),
+            // rq-refresh-ok: as above.
+            refresh: () => router.refresh(),
+            org: [],
         }
     );
 }
@@ -67,19 +94,22 @@ type Write = (orgId: string) => Promise<unknown>;
 const pass = (write: Write, orgId: string) => write(orgId);
 
 /**
- * The list's saves (DEC-259): through `useActionMutation`, so the action
- * gets the tab's business (and refuses a moved tab), then the list is read
- * once, and Home and the Business calendar are marked stale (not mounted
+ * The bookings screens' saves (DEC-259), the list's and the diary's:
+ * through `useActionMutation`, so the action gets the tab's business (and
+ * refuses a moved tab), then what is on screen is read once (the other
+ * bookings read marked stale), and Home and the Business calendar are marked stale (not mounted
  * here, so nothing else is read). A refused write invalidates nothing.
  */
 export function useBookingSaveWithQuery(): BookingSave {
     const orgId = useOrgId();
+    const client = useQueryClient();
+    const invalidates = [
+        bookingsKeys(orgId),
+        homeKeys(orgId),
+        calendarKeys(orgId),
+    ];
     const m = useActionMutation(pass, {
-        invalidates: [
-            bookingsKeys(orgId),
-            homeKeys(orgId),
-            calendarKeys(orgId),
-        ],
+        invalidates,
         // Said below, as the caller asked: per call, not per hook.
         quiet: true,
     });
@@ -99,5 +129,10 @@ export function useBookingSaveWithQuery(): BookingSave {
         },
         // The list was read again by `save` itself.
         saved: () => undefined,
+        refresh: () => {
+            for (const queryKey of invalidates)
+                void client.invalidateQueries({ queryKey });
+        },
+        org: [orgId],
     };
 }

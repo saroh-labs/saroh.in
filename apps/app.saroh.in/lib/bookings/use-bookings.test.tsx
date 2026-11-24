@@ -21,12 +21,17 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { UNREACHED } from "@/lib/api/unreached";
-import type { BookingsAsk, BookingsList } from "@/lib/bookings/queries";
-import { bookingsRead } from "@/lib/bookings/queries";
+import type {
+    BookingsAsk,
+    BookingsDiary,
+    BookingsList,
+} from "@/lib/bookings/queries";
+import { bookingsRead, diaryAsk, diaryRead } from "@/lib/bookings/queries";
 import type { BookingSave } from "@/lib/bookings/use-bookings";
 import {
     useBookingSave,
     useBookingSaveWithQuery,
+    useBookingsDiary,
     useBookingsList,
 } from "@/lib/bookings/use-bookings";
 import { domainKey } from "@/lib/query/keys";
@@ -193,9 +198,14 @@ describe("a save on the list", () => {
     });
 });
 
-describe("outside the list (the diary, a booking's page)", () => {
+describe("off React Query (a booking's page, Hours)", () => {
     it("saves as before, with no business, and refreshes the page after", async () => {
-        let save: BookingSave = { save: vi.fn(), saved: vi.fn() };
+        let save: BookingSave = {
+            save: vi.fn(),
+            saved: vi.fn(),
+            refresh: vi.fn(),
+            org: [],
+        };
         function Probe({ report }: { report: (s: BookingSave) => void }) {
             report(useBookingSave());
             return null;
@@ -211,8 +221,112 @@ describe("outside the list (the diary, a booking's page)", () => {
         expect(action).toHaveBeenCalledWith();
         save.saved();
         expect(refresh).toHaveBeenCalledTimes(1);
+        save.refresh();
+        expect(refresh).toHaveBeenCalledTimes(2);
+        expect(save.org).toEqual([]);
         expect(fetchMock).not.toHaveBeenCalled();
         unmount();
+    });
+});
+
+const DIARY = {
+    calendar: { timezone: "Asia/Kolkata", money: true, diaries: [] },
+    staff: [],
+    serviceHours: null,
+    googleBusy: null,
+    zone: "Asia/Kolkata",
+    now: 1,
+} as unknown as BookingsDiary;
+
+describe("the diary", () => {
+    const ask = diaryAsk("2026-11-25");
+    let diary: BookingSave;
+    let client: ReturnType<typeof hydrated>;
+    let unmount: () => void;
+    let setDate: (d: string) => void = () => undefined;
+    let placeholder = false;
+    const diaryReads = () =>
+        fetchMock.mock.calls.filter(
+            ([url]) =>
+                typeof url === "string" &&
+                url.startsWith("/api/bookings/diary"),
+        ).length;
+    beforeEach(async () => {
+        client = hydrated();
+        client.setQueryData(diaryRead.options(ORG, ask).queryKey, DIARY);
+        type Report = (
+            s: BookingSave,
+            set: (d: string) => void,
+            pending: boolean,
+        ) => void;
+        function Probe({ report }: { report: Report }) {
+            const [date, set] = useState("2026-11-25");
+            const q = useBookingsDiary(diaryAsk(date));
+            report(useBookingSaveWithQuery(), set, q.isPlaceholderData);
+            return null;
+        }
+        const report: Report = (s, set, pending) => {
+            diary = s;
+            setDate = set;
+            placeholder = pending;
+        };
+        ({ unmount } = renderWithQuery(<Probe report={report} />, {
+            client,
+            orgId: ORG,
+        }));
+        await tick();
+    });
+    afterEach(() => unmount());
+
+    it("reads a day's week and month once: another day in them reads nothing", async () => {
+        expect(ask).toEqual({
+            from: "2026-11-01",
+            to: "2026-11-30",
+            week: "2026-11-23",
+        });
+        act(() => setDate("2026-11-27"));
+        await tick();
+        expect(fetchMock).not.toHaveBeenCalled();
+        // Another week: one read, the last one kept meanwhile.
+        act(() => setDate("2026-12-02"));
+        expect(placeholder).toBe(true);
+        await tick();
+        expect(diaryReads()).toBe(1);
+        expect(fetchMock.mock.calls[0]?.[0]).toBe(
+            "/api/bookings/diary?from=2026-11-30&to=2026-12-31&week=2026-11-30",
+        );
+    });
+
+    it("a save reads the diary once and marks the list stale", async () => {
+        fetchMock.mockImplementation(() =>
+            Promise.resolve(
+                new Response(JSON.stringify(DIARY), { status: 200 }),
+            ),
+        );
+        const action = vi.fn((..._org: [] | [string]) =>
+            Promise.resolve({ ok: true as const }),
+        );
+        await act(() => diary.save(action));
+        expect(action).toHaveBeenCalledWith(ORG);
+        expect(diaryReads()).toBe(1);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(
+            client.getQueryState(bookingsRead.options(ORG, {}).queryKey)
+                ?.isInvalidated,
+        ).toBe(true);
+        diary.saved();
+        await tick();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("a write made some other way reads the diary once, never the page", async () => {
+        expect(diary.org).toEqual([ORG]);
+        diary.refresh();
+        await tick();
+        expect(diaryReads()).toBe(1);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(refresh).not.toHaveBeenCalled();
     });
 });
 

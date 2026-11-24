@@ -2,6 +2,7 @@ import "server-only";
 
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
+import { readCalendarBusy } from "@/lib/google-calendar/service";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { moduleAccess } from "@/lib/modules/guard";
 import { permitsFor } from "@/lib/organizations/permits";
@@ -13,10 +14,26 @@ import { canReadBookings } from "@/lib/services/access";
 import { withoutAmounts } from "@/lib/services/all-bookings";
 import { canTakeDeskPayments } from "@/lib/services/booking-money";
 import { readBookingsByDay } from "@/lib/services/bookings-by-day";
-import { flattenCalendar, readBookingsRegister } from "@/lib/services/service";
+import { addDays, dayBounds } from "@/lib/services/diary";
+import {
+    flattenCalendar,
+    listServices,
+    readBookingsCalendar,
+    readBookingsRegister,
+    readNow,
+} from "@/lib/services/service";
+import { readServiceHours } from "@/lib/services/service-hours-read";
+import type { StaffList } from "@/lib/staff/service";
+import { listStaff } from "@/lib/staff/service";
+import { withClosures } from "@/lib/staff/time-off";
 
-import type { BookingsAsk, BookingsList } from "./queries";
-import { bookingsRead } from "./queries";
+import type {
+    BookingsAsk,
+    BookingsDiary,
+    BookingsList,
+    DiaryAsk,
+} from "./queries";
+import { bookingsRead, diaryRead } from "./queries";
 
 /**
  * Who reads what on the bookings list (DEC-259), asked by the page and by
@@ -92,4 +109,67 @@ export async function readBookingsList(
 export const bookingsServer: ServerRead<BookingsAsk, BookingsList> = {
     read: bookingsRead,
     service: readBookingsList,
+};
+
+/** The longest stretch the diary reads: a month and the weeks around it. */
+const DIARY_MAX_DAYS = 45;
+
+/**
+ * The people, with the business's closures as everyone's time off (E3), so
+ * the diary offers no free time while the business is closed. Null when
+ * they can't be read: the bookings still show.
+ */
+async function readStaff(): Promise<StaffList | null> {
+    try {
+        const list = await listStaff();
+        return list ? withClosures(list) : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The diary's read (`/bookings`): what `diaryAsk` names, in the business's
+ * zone. Null (a 404) for days the diary never asks; throws when the
+ * bookings can't be read, since an empty diary would be a lie.
+ */
+export async function readBookingsDiary(
+    ask: DiaryAsk,
+): Promise<BookingsDiary | null> {
+    const span = (Date.parse(ask.to) - Date.parse(ask.from)) / 86_400_000;
+    if (!(span >= 0 && span <= DIARY_MAX_DAYS)) return null;
+    if (ask.week < ask.from || addDays(ask.week, 6) > ask.to) return null;
+    const [staffList, services] = await Promise.all([
+        readStaff(),
+        listServices(),
+    ]);
+    const zone = staffList?.timezone ?? DEFAULT_BUSINESS_ZONE;
+    const [calendar, serviceHours, googleBusy] = await Promise.all([
+        readBookingsCalendar(
+            dayBounds(ask.from, zone).from.toISOString(),
+            dayBounds(ask.to, zone).to.toISOString(),
+        ),
+        // With nobody on the diary, customers book each service in its own
+        // hours: the diary draws them (UX-023).
+        readServiceHours(services, staffList),
+        // Start and end only, never a title; a failed read draws none.
+        readCalendarBusy(
+            dayBounds(ask.week, zone).from.toISOString(),
+            dayBounds(addDays(ask.week, 7), zone).from.toISOString(),
+        ),
+    ]);
+    if (!calendar) throw new Error("Bookings: the diary couldn't be read");
+    return {
+        calendar,
+        staff: staffList?.staff ?? null,
+        serviceHours,
+        googleBusy,
+        zone,
+        now: readNow(),
+    };
+}
+
+export const diaryServer: ServerRead<DiaryAsk, BookingsDiary> = {
+    read: diaryRead,
+    service: readBookingsDiary,
 };

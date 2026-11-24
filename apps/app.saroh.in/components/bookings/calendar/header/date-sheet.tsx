@@ -20,6 +20,7 @@ import type { LocalDate } from "@/lib/services/diary";
 import { addDays, weekStartOf } from "@/lib/services/diary";
 
 import { BookingsViewSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
+import { useScreenLink } from "@/components/shared/page/screen-pending";
 import { HeaderOverlay } from "./header-overlay";
 import { usePhone } from "./use-phone";
 
@@ -71,6 +72,7 @@ export function DateSheet({
     onGo: (href: string) => void;
 }) {
     const phone = usePhone();
+    const screenLink = useScreenLink();
     const word = layout === "week" ? "week" : "day";
     return (
         <HeaderOverlay
@@ -118,6 +120,7 @@ export function DateSheet({
                 <BookingsViewSwitch
                     current={layout}
                     hrefFor={(l) => hrefFor(l, date)}
+                    link={screenLink}
                     className="w-full [&>*]:flex-1"
                 />
             </div>

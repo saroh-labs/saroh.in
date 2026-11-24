@@ -1,10 +1,10 @@
 "use client";
 
 import { Refusal } from "@/components/shared/states/refusal";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -72,7 +72,7 @@ export function AddPersonDialog({
      */
     hoursScreen?: boolean;
 }) {
-    const router = useRouter();
+    const { refresh } = useBookingSave();
     const ids = { name: useId(), title: useId() };
     const [name, setName] = useState("");
     const [title, setTitle] = useState("");
@@ -113,7 +113,7 @@ export function AddPersonDialog({
         setTried(false);
         onOpenChange(false);
         onAdded?.(res.data.id);
-        router.refresh();
+        refresh();
     }
 
     const sentence = hoursScreen

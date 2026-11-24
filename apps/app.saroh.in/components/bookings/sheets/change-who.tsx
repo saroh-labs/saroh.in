@@ -1,9 +1,9 @@
 "use client";
 
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 import { Skeleton } from "@saroh/ui/skeleton";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import type { SendHeld } from "@/components/bookings/sheets/cancel-sheet";
@@ -165,7 +165,7 @@ export function useChangeWho({
     /** The sheet closes once the change is held. */
     onDone: () => void;
 }) {
-    const router = useRouter();
+    const { refresh } = useBookingSave();
     const [picked, setPicked] = useState<{ id: string; name: string } | null>(
         null,
     );
@@ -225,7 +225,7 @@ export function useChangeWho({
                 if (!res.ok) return { ok: false, error: res.error };
                 // What Google does with it (DEC-233), said in the toast.
                 google = res.data.googleCalendar?.message ?? null;
-                router.refresh();
+                refresh();
                 return { ok: true };
             },
             sent: () => {

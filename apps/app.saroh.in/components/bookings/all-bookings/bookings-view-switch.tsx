@@ -17,6 +17,7 @@ export function BookingsViewSwitch({
     date,
     cancelled = false,
     hrefFor,
+    link,
     className,
 }: {
     current: CalendarLayout;
@@ -26,19 +27,27 @@ export function BookingsViewSwitch({
     cancelled?: boolean;
     /** The calendar's own address for a layout, when it keeps more. */
     hrefFor?: (layout: CalendarLayout) => string;
+    /** A layout's `onNavigate`: on the calendar, the address changes in place. */
+    link?: (href: string) => (e: { preventDefault: () => void }) => void;
     className?: string;
 }) {
     const to = (layout: CalendarLayout) =>
         hrefFor ? hrefFor(layout) : calendarHref(layout, date, { cancelled });
+    const option = (value: CalendarLayout, label: string) => ({
+        value,
+        href: to(value),
+        label,
+        onNavigate: link?.(to(value)),
+    });
     return (
         <Segmented
             label="Show as"
             className={className}
             value={current}
             options={[
-                { value: "day", href: to("day"), label: "Day" },
-                { value: "week", href: to("week"), label: "Week" },
-                { value: "agenda", href: to("agenda"), label: "Agenda" },
+                option("day", "Day"),
+                option("week", "Week"),
+                option("agenda", "Agenda"),
             ]}
         />
     );

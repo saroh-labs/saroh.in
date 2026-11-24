@@ -1,11 +1,11 @@
 "use client";
 
 import { Refusal } from "@/components/shared/states/refusal";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { formatClock, formatWeekday } from "@/lib/format/datetime";
 import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { cn } from "@saroh/ui/lib/utils";
 import { showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -104,7 +104,7 @@ function Form({
     today: LocalDate;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { refresh } = useBookingSave();
     const ids = { len: useId(), repeat: useId() };
     const { staff, date, from, windows, blocks } = target;
     const who = firstName(staff.name);
@@ -168,7 +168,7 @@ function Form({
             // sheet opened.
             const saved = res.data.staff.hours;
             onClose();
-            router.refresh();
+            refresh();
             showUndo(
                 `Opened ${range} for ${who}, every ${weekday}.`,
                 async () => {
@@ -176,7 +176,7 @@ function Form({
                         staff.id,
                         withoutRange(saved, weekdayOf(date), from, to),
                     );
-                    router.refresh();
+                    refresh();
                     return back;
                 },
             );
@@ -200,13 +200,13 @@ function Form({
                 x.endMinute === to,
         );
         onClose();
-        router.refresh();
+        refresh();
         showUndo(
             `Opened ${range} for ${who}${onTheDay(date, today)}`,
             async () => {
                 if (!added) return false;
                 const back = await removeExtraHours(staff.id, added.id);
-                router.refresh();
+                refresh();
                 return back;
             },
         );
