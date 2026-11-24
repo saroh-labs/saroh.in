@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { SiteEditorProps } from "@/components/sites/editor/site-editor-props";
 import type { EditorSheet } from "@/components/sites/editor/use-editor-layout";
@@ -19,6 +19,8 @@ import { SiteEditor } from "./site-editor";
  * for) and, when the server's new props arrive, remounts the editor on
  * them. Until then the editor stays as it was, never a blank in between.
  * The sheet open when it was asked (a phone's Brand) is open on the new one.
+ * Its promise resolves once the new editor is mounted, so what says the
+ * change is done (the starter content's toast) is said on the new editor.
  */
 export function SiteEditorHost(props: SiteEditorProps) {
     const router = useRouter();
@@ -28,6 +30,12 @@ export function SiteEditorHost(props: SiteEditorProps) {
     // The props the editor was last started on. The server's re-render
     // hands new ones; this component's own updates keep the same object.
     const [seen, setSeen] = useState(props);
+    const mounted = useRef<(() => void)[]>([]);
+    // After the fresh editor's own effects: it is on screen.
+    useEffect(() => {
+        const waiting = mounted.current.splice(0);
+        for (const resolve of waiting) resolve();
+    }, [generation]);
     if (seen !== props) {
         setSeen(props);
         if (awaiting) {
@@ -37,6 +45,9 @@ export function SiteEditorHost(props: SiteEditorProps) {
     }
 
     const reloadDraft = (pageId?: string, open?: EditorSheet) => {
+        const done = new Promise<void>((resolve) => {
+            mounted.current.push(resolve);
+        });
         setAwaiting(true);
         setSheet(open ?? null);
         if (pageId && pageId !== props.pageId) {
@@ -44,6 +55,7 @@ export function SiteEditorHost(props: SiteEditorProps) {
         } else {
             router.refresh();
         }
+        return done;
     };
 
     return (

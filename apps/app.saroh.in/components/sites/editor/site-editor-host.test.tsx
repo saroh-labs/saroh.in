@@ -70,7 +70,9 @@ describe("SiteEditorHost", () => {
         act(() => root.render(<SiteEditorHost {...props("Ours")} />));
         expect(editor.mounts).toBe(1);
 
-        act(() => editor.reload?.());
+        act(() => {
+            void editor.reload?.();
+        });
         expect(router.refresh).toHaveBeenCalled();
         // Nothing new from the server yet: the editor stays as it was.
         expect(editor.mounts).toBe(1);
@@ -82,10 +84,29 @@ describe("SiteEditorHost", () => {
         ]);
     });
 
+    it("resolves the reload only once the fresh editor is mounted", async () => {
+        act(() => root.render(<SiteEditorHost {...props("Ours")} />));
+        let done = false;
+        act(() => {
+            void editor.reload?.().then(() => {
+                done = true;
+            });
+        });
+        await act(() => Promise.resolve());
+        expect(done).toBe(false);
+
+        act(() => root.render(<SiteEditorHost {...props("Sample")} />));
+        await act(() => Promise.resolve());
+        expect(editor.mounts).toBe(2);
+        expect(done).toBe(true);
+    });
+
     it("starts the fresh editor with the sheet that was open (a phone's Brand)", () => {
         act(() => root.render(<SiteEditorHost {...props("Ours")} />));
         expect(editor.sheet).toBeNull();
-        act(() => editor.reload?.(undefined, "brand"));
+        act(() => {
+            void editor.reload?.(undefined, "brand");
+        });
         act(() => root.render(<SiteEditorHost {...props("Sample")} />));
         expect(editor.mounts).toBe(2);
         expect(editor.sheet).toBe("brand");
@@ -107,14 +128,18 @@ describe("SiteEditorHost", () => {
 
     it("opens another page by its address", () => {
         act(() => root.render(<SiteEditorHost {...props("Ours")} />));
-        act(() => editor.reload?.("p-about"));
+        act(() => {
+            void editor.reload?.("p-about");
+        });
         expect(router.push).toHaveBeenCalledWith("/sites/site-1?page=p-about");
         expect(router.refresh).not.toHaveBeenCalled();
     });
 
     it("reads this page again when it is the one asked for", () => {
         act(() => root.render(<SiteEditorHost {...props("Ours")} />));
-        act(() => editor.reload?.("p-home"));
+        act(() => {
+            void editor.reload?.("p-home");
+        });
         expect(router.refresh).toHaveBeenCalled();
         expect(router.push).not.toHaveBeenCalled();
     });
