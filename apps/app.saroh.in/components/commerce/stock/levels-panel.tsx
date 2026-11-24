@@ -1,11 +1,14 @@
 "use client";
 
-import { useScreenGo } from "@/components/shared/page/screen-pending";
+import {
+    useScreenGo,
+    useScreenLink,
+    useScreenPending,
+} from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Fragment, useTransition } from "react";
+import { Fragment } from "react";
 
 import {
     AttentionToggle,
@@ -61,17 +64,15 @@ export function LevelsPanel({
     /** The page on screen and its rows per page. */
     paging: StockListPage;
 }) {
-    const router = useRouter();
     // Filters and pages in the screen's transition: the rows grey.
     const go = useScreenGo();
+    const screenLink = useScreenLink();
 
     // The search follows typing into the address, a beat behind.
-    const [searching, startSearch] = useTransition();
+    const searching = useScreenPending();
     const search = (term: string) => {
         if (term === q) return;
-        startSearch(() =>
-            router.replace(href({ q: term || undefined }), { scroll: false }),
-        );
+        go(href({ q: term || undefined }), "replace");
     };
 
     // One storefront's view is what it sells or still holds: the API
@@ -182,7 +183,7 @@ export function LevelsPanel({
                             size="panel"
                             things="products"
                             cause="view"
-                            clearHref={href({ show: undefined })}
+                            onClear={() => go(href({ show: undefined }))}
                         />
                     )
                 }
@@ -193,7 +194,10 @@ export function LevelsPanel({
                 page={paging.page}
                 total={levels.total ?? 0}
                 size={paging.size}
-                to={(n) => ({ href: href({ page: n }) })}
+                to={(n) => {
+                    const to = href({ page: n });
+                    return { href: to, onNavigate: screenLink(to) };
+                }}
                 onSize={(size) => {
                     rememberPageSize(STOCK_LISTS.levels, size);
                     go(href({ size }));

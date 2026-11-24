@@ -6,7 +6,6 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { dismissToasts, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import type { EntryKind } from "@/lib/stock/screen";
@@ -19,6 +18,7 @@ import {
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { useStockSave } from "@/lib/stock/use-stock";
 import { ChipGroup } from "@saroh/ui/choice-group";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
 
@@ -36,7 +36,7 @@ export function EntrySheet({
     onOpenChange: (open: boolean) => void;
     storefronts: { id: string; name: string }[];
 }) {
-    const router = useRouter();
+    const stock = useStockSave();
     const targets = useStockTargets();
     const [kind, setKind] = useState<EntryKind>("RECEIVED");
     const [what, setWhat] = useState("");
@@ -84,15 +84,18 @@ export function EntrySheet({
         setSaving(true);
         let res: Awaited<ReturnType<typeof recordStockEntry>>;
         try {
-            res = await recordStockEntry({
-                kind,
-                storeId: store,
-                productId: row.productId,
-                variantId: row.variantId,
-                units: n,
-                note: note.trim() || undefined,
-                idempotencyKey: attempt.current,
-            });
+            res = await recordStockEntry(
+                {
+                    kind,
+                    storeId: store,
+                    productId: row.productId,
+                    variantId: row.variantId,
+                    units: n,
+                    note: note.trim() || undefined,
+                    idempotencyKey: attempt.current,
+                },
+                stock.orgId,
+            );
         } catch {
             // Keep the key: a retry of one that landed isn't made twice.
             setRefusal(STOCK_UNREACHABLE);
@@ -109,14 +112,17 @@ export function EntrySheet({
         onOpenChange(false);
         dismissToasts();
         showUndo(entrySaved(kind, n, res.data.shelf.onHand), async () => {
-            const u = await undoStock({
-                entryIds: [res.data.entry.id],
-                idempotencyKey: crypto.randomUUID(),
-            });
-            router.refresh();
+            const u = await undoStock(
+                {
+                    entryIds: [res.data.entry.id],
+                    idempotencyKey: crypto.randomUUID(),
+                },
+                stock.orgId,
+            );
+            if (u.ok) await stock.saved();
             return u;
         });
-        router.refresh();
+        await stock.saved();
     };
 
     const field = "h-9 rounded-[8px] text-[13px] coarse:h-11";

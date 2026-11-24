@@ -1,12 +1,14 @@
 "use client";
 
-import { useScreenGo } from "@/components/shared/page/screen-pending";
+import {
+    useScreenGo,
+    useScreenLink,
+} from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ListPaging } from "@/components/shared/lists/list-toolbar";
@@ -20,6 +22,7 @@ import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { runAction } from "@/lib/api/run-action";
+import { useStockSave } from "@/lib/stock/use-stock";
 import { PILL_TONE } from "./tones";
 
 const newKey = () => crypto.randomUUID();
@@ -36,16 +39,20 @@ export function ChecksList({
     checks,
     href,
     paging,
+    onRetry,
 }: {
     checks: StockChecks | "failed";
     /** The screen's address with these changed. */
     href: StockHref;
     /** The page on screen and its rows per page. */
     paging: StockListPage;
+    /** Read the checks again, after a failed read. */
+    onRetry: () => void;
 }) {
-    const router = useRouter();
+    const stock = useStockSave();
     // Filters and pages in the screen's transition: the rows grey.
     const go = useScreenGo();
+    const screenLink = useScreenLink();
     const [busy, setBusy] = useState<string | null>(null);
 
     const intro = (
@@ -68,7 +75,7 @@ export function ChecksList({
                     description={nothingChanged(
                         "This doesn't mean everything adds up.",
                     )}
-                    onRetry={() => router.refresh()}
+                    onRetry={onRetry}
                 />
             </div>
         );
@@ -78,9 +85,11 @@ export function ChecksList({
     const resolve = async (c: StockCheck) => {
         const res = await runAction(
             () =>
-                resolveStockCheck(c.key, {
-                    idempotencyKey: newKey(),
-                }),
+                resolveStockCheck(
+                    c.key,
+                    { idempotencyKey: newKey() },
+                    stock.orgId,
+                ),
             { setBusy: (on) => setBusy(on ? c.key : null) },
         );
         if (!res) return;
@@ -89,7 +98,7 @@ export function ChecksList({
             return;
         }
         showSuccess("Marked as checked.");
-        router.refresh();
+        await stock.saved();
     };
 
     const undoCount = async (c: StockCheck) => {
@@ -97,10 +106,10 @@ export function ChecksList({
         if (!entryId) return;
         const res = await runAction(
             () =>
-                undoStock({
-                    entryIds: [entryId],
-                    idempotencyKey: newKey(),
-                }),
+                undoStock(
+                    { entryIds: [entryId], idempotencyKey: newKey() },
+                    stock.orgId,
+                ),
             { setBusy: (on) => setBusy(on ? c.key : null) },
         );
         if (!res) return;
@@ -112,7 +121,7 @@ export function ChecksList({
             "Count undone.",
             `${c.storeName} is back to what the log said. Count it again when you can.`,
         );
-        router.refresh();
+        await stock.saved();
     };
 
     return (
@@ -164,7 +173,10 @@ export function ChecksList({
                 page={paging.page}
                 total={checks.total ?? checks.checks.length}
                 size={paging.size}
-                to={(n) => ({ href: href({ page: n }) })}
+                to={(n) => {
+                    const to = href({ page: n });
+                    return { href: to, onNavigate: screenLink(to) };
+                }}
                 onSize={(size) => {
                     rememberPageSize(STOCK_LISTS.checks, size);
                     go(href({ size }));

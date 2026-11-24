@@ -419,6 +419,11 @@ export function MoreFilters({
 export interface PageStep {
     /** Where the page is, for a list the server reads by address. */
     href?: string;
+    /**
+     * With `href`: the link's client navigation, for a list whose address
+     * changes in place (`preventDefault()` keeps Next's away).
+     */
+    onNavigate?: (e: { preventDefault: () => void }) => void;
     /** Or what to do, for a list that reads the page itself. */
     onClick?: () => void;
 }
@@ -560,6 +565,7 @@ function PageNumber({
             <Button variant="outline" className={look} asChild>
                 <Link
                     href={step.href}
+                    onNavigate={step.onNavigate}
                     scroll={false}
                     aria-label={`Page ${words}`}
                 >
@@ -592,7 +598,11 @@ function PageButton({ step, words }: { step: PageStep | null; words: string }) {
     if (step.href !== undefined) {
         return (
             <Button variant="outline" asChild>
-                <Link href={step.href} scroll={false}>
+                <Link
+                    href={step.href}
+                    onNavigate={step.onNavigate}
+                    scroll={false}
+                >
                     {words}
                 </Link>
             </Button>

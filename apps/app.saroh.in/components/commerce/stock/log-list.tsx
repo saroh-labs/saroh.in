@@ -1,13 +1,15 @@
 "use client";
 
-import { useScreenGo } from "@/components/shared/page/screen-pending";
+import {
+    useScreenGo,
+    useScreenLink,
+} from "@/components/shared/page/screen-pending";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { formatTime } from "@/lib/format/datetime";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
 import type { DateRange } from "@/lib/views/date-range";
@@ -73,6 +75,7 @@ export function LogList({
     products,
     href,
     paging,
+    onRetry,
 }: {
     log: StockLog | "failed";
     filter: { kind: LogKindId; store: string; product: string } & DateRange;
@@ -82,10 +85,12 @@ export function LogList({
     href: StockHref;
     /** The page on screen and its rows per page. */
     paging: StockListPage;
+    /** Read the log again, after a failed read. */
+    onRetry: () => void;
 }) {
-    const router = useRouter();
     // Filters and pages in the screen's transition: the rows grey.
     const go = useScreenGo();
+    const screenLink = useScreenLink();
     const narrowed =
         filter.kind !== "all" ||
         filter.store !== "all" ||
@@ -185,7 +190,7 @@ export function LogList({
                     description={nothingChanged(
                         "Every change is still recorded.",
                     )}
-                    onRetry={() => router.refresh()}
+                    onRetry={onRetry}
                 />
             </div>
         );
@@ -398,7 +403,10 @@ export function LogList({
                 page={paging.page}
                 total={log.total ?? log.entries.length}
                 size={paging.size}
-                to={(n) => ({ href: href({ page: n }) })}
+                to={(n) => {
+                    const to = href({ page: n });
+                    return { href: to, onNavigate: screenLink(to) };
+                }}
                 onSize={(size) => {
                     rememberPageSize(STOCK_LISTS.log, size);
                     go(href({ size }));

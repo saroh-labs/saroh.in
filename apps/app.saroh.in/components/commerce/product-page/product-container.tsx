@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { ComponentProps } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
@@ -37,6 +36,8 @@ import {
     useQuickEditsHost,
 } from "@/lib/products/use-products";
 import type { ShareSetup } from "@/lib/share-item/share";
+import { ALL_CHECKS, productLogAsk } from "@/lib/stock/queries";
+import { useStockChecks, useStockLog } from "@/lib/stock/use-stock";
 
 type StockTab = ComponentProps<typeof ProductStockTab>;
 type OverviewTab = ComponentProps<typeof ProductOverviewTab>;
@@ -46,9 +47,10 @@ type OverviewTab = ComponentProps<typeof ProductOverviewTab>;
  * every tab body draw from the product's query (its overview, and its
  * shelves where shown), so a quick edit (archive, publish, add stock,
  * price) shows at once everywhere on the page and a sheet's save reads it
- * again, never the whole page. What only the server reads for a tab (the
- * stock log, price history, collections) comes in as props; the Stock
- * tab's log is read again by the server after a stock change there.
+ * again, never the whole page. The Stock tab's log and checks are Stock's
+ * queries, read again with the product after a stock change there. What
+ * only the server reads for a tab (price history, collections) comes in as
+ * props.
  */
 export function ProductContainer({
     ask,
@@ -65,8 +67,6 @@ export function ProductContainer({
     collections,
     priceHistory,
     sellsFood,
-    log,
-    checks,
     waiting,
     now,
 }: {
@@ -87,20 +87,20 @@ export function ProductContainer({
     collections: ComponentProps<typeof ProductCollectionsTab>["collections"];
     priceHistory: OverviewTab["priceHistory"];
     sellsFood: boolean;
-    log: StockTab["log"];
-    checks: StockTab["checks"];
     waiting: StockTab["waiting"];
     now: Date;
 }) {
-    const router = useRouter();
     const saved = useProductsSaved();
-    const quick = useQuickEditsHost(
-        tab === "stock" && view === "team"
-            ? // rq-refresh-ok: the Stock tab's log and checks are server-read until U14.
-              () => router.refresh()
-            : undefined,
-    );
+    const quick = useQuickEditsHost();
     const { data } = useProduct(ask);
+    // The Stock tab's log and checks, only while it shows a counted product.
+    const onStock =
+        tab === "stock" &&
+        view === "team" &&
+        !!data &&
+        countsStock(data.overview.product.stockTracked, businessTracks);
+    const logRead = useStockLog(productLogAsk(ask.productId), onStock);
+    const checksRead = useStockChecks(ALL_CHECKS, onStock);
     // Hydrated by the page, so only a failed read again is missing: the
     // last answer stays (react-query keeps it), the segment says the rest.
     if (!data) return null;
@@ -121,6 +121,8 @@ export function ProductContainer({
         control: trackingControl(overview),
     };
     const store = overview.storefront;
+    // Unread, the tab says its changes couldn't be shown (null).
+    const log = logRead.data?.entries ?? null;
     const stock = data.stock;
     // The Offer card: a discount set on this product that is live now.
     const offer =
@@ -249,7 +251,13 @@ export function ProductContainer({
                                         stock={stock}
                                         log={log ? log.slice(0, 5) : null}
                                         week={log}
-                                        checks={checks}
+                                        checks={
+                                            checksRead.data?.checks.filter(
+                                                (c) =>
+                                                    c.productId ===
+                                                    overview.product.id,
+                                            ) ?? []
+                                        }
                                         retryHref={href("stock")}
                                         ordersHref={href("orders")}
                                         now={now}

@@ -46,6 +46,11 @@ export interface TabItem<V extends string = string> {
     /** Link mode: where this tab lives. */
     href?: string;
     /**
+     * Link mode: the link's client navigation, for a screen that changes
+     * its address in place (`preventDefault()` keeps Next's away).
+     */
+    onNavigate?: (e: { preventDefault: () => void }) => void;
+    /**
      * Shown after the label. `null` is a count that could not be read ("—");
      * leave it out for no count at all.
      */
@@ -158,6 +163,7 @@ export function TabStrip<V extends string = string>({
                         // A tab's name is Saroh's own words, as on `TabsTrigger`.
                         data-ph-unmask=""
                         href={t.href ?? "#"}
+                        onNavigate={t.onNavigate}
                         scroll={false}
                         aria-current={on ? "page" : undefined}
                         className={cn(cls, "relative")}

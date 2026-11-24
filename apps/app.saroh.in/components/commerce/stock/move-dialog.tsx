@@ -5,7 +5,6 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { dismissToasts, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { movedWords } from "@/lib/stock/levels";
@@ -14,6 +13,7 @@ import { moveNote, moveProblem, STOCK_UNREACHABLE } from "@/lib/stock/screen";
 import { moveStock, undoStock } from "@/lib/stock/screen-actions";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { useStockSave } from "@/lib/stock/use-stock";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
 
 /**
@@ -31,7 +31,7 @@ export function MoveDialog({
     onOpenChange: (open: boolean) => void;
     storefronts: { id: string; name: string }[];
 }) {
-    const router = useRouter();
+    const stock = useStockSave();
     const targets = useStockTargets();
     const [what, setWhat] = useState("");
     const [from, setFrom] = useState(storefronts[0]?.id ?? "");
@@ -86,14 +86,17 @@ export function MoveDialog({
         setSaving(true);
         let res: Awaited<ReturnType<typeof moveStock>>;
         try {
-            res = await moveStock({
-                fromStoreId: from,
-                toStoreId: to,
-                productId: row.productId,
-                variantId: row.variantId,
-                units: n,
-                idempotencyKey: attempt.current,
-            });
+            res = await moveStock(
+                {
+                    fromStoreId: from,
+                    toStoreId: to,
+                    productId: row.productId,
+                    variantId: row.variantId,
+                    units: n,
+                    idempotencyKey: attempt.current,
+                },
+                stock.orgId,
+            );
         } catch {
             // Saroh couldn't be reached. The same key goes with a retry, so
             // a move that did land isn't made twice.
@@ -112,14 +115,17 @@ export function MoveDialog({
         onOpenChange(false);
         dismissToasts();
         showUndo(movedWords(n, toName), async () => {
-            const u = await undoStock({
-                entryIds: res.data.entryIds,
-                idempotencyKey: crypto.randomUUID(),
-            });
-            router.refresh();
+            const u = await undoStock(
+                {
+                    entryIds: res.data.entryIds,
+                    idempotencyKey: crypto.randomUUID(),
+                },
+                stock.orgId,
+            );
+            if (u.ok) await stock.saved();
             return u;
         });
-        router.refresh();
+        await stock.saved();
     };
 
     const storeOptions = storefronts.map((s) => ({
