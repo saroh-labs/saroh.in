@@ -47,6 +47,22 @@ describe("PageLoading", () => {
         );
     });
 
+    it("draws the header and no grey in the none shape", () => {
+        const html = renderToStaticMarkup(
+            <PageLoading
+                shape="none"
+                width="full"
+                breadcrumb={["Sell", "Products"]}
+                title="Products"
+                label="Loading Products"
+            />,
+        );
+        expect(html).toMatch(/<h1[^>]*>Products<\/h1>/);
+        expect(count(html, 'role="status"')).toBe(1);
+        expect(count(html, "Loading Products")).toBe(1);
+        expect(html).not.toContain("skeleton-sweep");
+    });
+
     it("draws the page's real header: breadcrumb and title", () => {
         const html = renderToStaticMarkup(
             <PageLoading
