@@ -5,9 +5,8 @@ import { Button } from "@saroh/ui/button";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { Upload } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useTransition } from "react";
+import { useCallback } from "react";
 
 import { importCustomersHref, newCustomerHref } from "@/lib/customers/links";
 import type { CustomersPage, ListQuery } from "@/lib/customers/list";
@@ -45,7 +44,10 @@ export function CustomersList({
     canLink,
     tabs = null,
     banner = null,
+    pending = false,
 }: {
+    /** The page asked for is on its way: the last rows stay, greyed. */
+    pending?: boolean;
     query: ListQuery;
     page: CustomersPage;
     /** The business's open storefronts, for Add customer and Import. */
@@ -59,14 +61,11 @@ export function CustomersList({
     /** The one banner while removal requests are open (DEC-172). */
     banner?: ReactNode;
 }) {
-    const router = useRouter();
-    const [navigating, startNavigation] = useTransition();
+    // In place: the address is the list's key (no server render, DEC-259).
     const go = useCallback(
         (patch: Partial<ListQuery>) =>
-            startNavigation(() =>
-                router.replace(listHref(query, patch), { scroll: false }),
-            ),
-        [query, router],
+            window.history.replaceState(null, "", listHref(query, patch)),
+        [query],
     );
 
     const first = stores.at(0);
@@ -129,11 +128,11 @@ export function CustomersList({
                 query={query}
                 page={page}
                 go={go}
-                searching={navigating}
+                searching={pending}
                 count={page.total > page.pageSize ? pageText(page) : null}
             />
             {notice}
-            <PendingRegion pending={navigating}>
+            <PendingRegion pending={pending}>
                 <Rows
                     page={page}
                     empty={

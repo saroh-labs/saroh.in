@@ -8,9 +8,10 @@ import type { DetailNote } from "@/lib/customer-workspace/detail";
 
 import { Notes } from "./notes";
 
-const refresh = vi.fn();
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh }),
+// A save reads the customer again through React Query, never a page refresh.
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/customers/use-customers", () => ({
+    useCustomerSave: () => ({ orgId: "org_1", saved }),
 }));
 const addNoteAction = vi.fn();
 vi.mock("@/lib/customer-workspace/actions", () => ({
@@ -55,7 +56,7 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
-    refresh.mockReset();
+    saved.mockClear();
     addNoteAction.mockReset();
     showError.mockReset();
 });
@@ -195,15 +196,17 @@ describe("the Add note sheet", () => {
         type("Likes the corner table");
         await submit();
 
-        expect(addNoteAction).toHaveBeenCalledWith("c1", {
-            body: "Likes the corner table",
-        });
+        expect(addNoteAction).toHaveBeenCalledWith(
+            "c1",
+            { body: "Likes the corner table" },
+            "org_1",
+        );
         expect(showError).toHaveBeenCalledWith("Your role can't add notes.");
         expect(dialogName()).toBe("New note");
         expect(dialog()?.querySelector("textarea")?.value).toBe(
             "Likes the corner table",
         );
-        expect(refresh).not.toHaveBeenCalled();
+        expect(saved).not.toHaveBeenCalled();
     });
 
     it("closes on success and gives the keyboard back", async () => {
@@ -213,10 +216,12 @@ describe("the Add note sheet", () => {
         type("  Likes the corner table  ");
         await submit();
 
-        expect(addNoteAction).toHaveBeenCalledWith("c1", {
-            body: "Likes the corner table",
-        });
-        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(addNoteAction).toHaveBeenCalledWith(
+            "c1",
+            { body: "Likes the corner table" },
+            "org_1",
+        );
+        expect(saved).toHaveBeenCalledTimes(1);
         expect(dialog()).toBe(null);
         expect(document.activeElement).toBe(buttons("Add note")[0]);
     });
@@ -227,7 +232,7 @@ describe("the Add note sheet", () => {
         await press(buttons("Add note")[0]);
         type("Likes the corner table");
         await submit();
-        // The refresh brings the note back, and the empty state goes.
+        // The read brings the note back, and the empty state goes.
         render([note()]);
 
         expect(host.textContent).not.toContain("No notes yet");

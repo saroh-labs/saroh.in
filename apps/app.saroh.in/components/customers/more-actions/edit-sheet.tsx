@@ -2,7 +2,6 @@
 
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import {
@@ -25,6 +24,7 @@ import {
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 
 import { runAction } from "@/lib/api/run-action";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddressFields, PhoneField, TextField } from "./edit-fields";
 
@@ -59,7 +59,7 @@ export function EditSheet({
     /** Offer to merge with whoever holds the email (`customer:merge`). */
     onMerge?: (holder: EmailHolder) => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const india = useIndiaAddress();
     const country = useBusinessCountry();
     const [initial] = useState(() =>
@@ -91,7 +91,7 @@ export function EditSheet({
         setTried(true);
         if (blocked || saving) return;
         const res = await runAction(
-            () => saveDetailsAction(contact.id, patch),
+            () => saveDetailsAction(contact.id, patch, orgId),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -100,20 +100,20 @@ export function EditSheet({
                 setRefusal({
                     field: res.field as DetailsKey,
                     message: res.error,
-                    holder: res.holder,
+                    holder: "holder" in res ? res.holder : undefined,
                 });
                 return;
             }
             return showError(res.error);
         }
         onOpenChange(false);
-        router.refresh();
+        void saved();
         const before = Object.fromEntries(
             (Object.keys(patch) as DetailsKey[]).map((k) => [k, initial[k]]),
         ) as Partial<DetailsDraft>;
         showUndo("Details saved.", async () => {
-            const back = await saveDetailsAction(contact.id, before);
-            router.refresh();
+            const back = await saveDetailsAction(contact.id, before, orgId);
+            if (back.ok) await saved();
             return back;
         });
     }

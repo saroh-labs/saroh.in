@@ -251,6 +251,17 @@ const SORT_NEEDS: Record<CustomerSort, readonly string[]> = {
  * with more access shared shouldn't turn into an access-denied page — so
  * those fall back to their defaults and the list opens.
  */
+/**
+ * What the list may offer this person (a chip, a sort, "Bought at"), from
+ * the permissions the API resolved; without them the API decides. Asked by
+ * the page, its container and the route alike, so the key agrees.
+ */
+export function listMay(
+    actions: readonly string[] | null | undefined,
+): (action: string) => boolean {
+    return (action) => actions?.includes(action) ?? true;
+}
+
 export function allowedQuery(
     query: ListQuery,
     may: (action: string) => boolean,

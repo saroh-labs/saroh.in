@@ -4,9 +4,8 @@ import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { ShieldCheck } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import {
@@ -26,7 +25,6 @@ import {
     FILTER_LABEL,
     REQUEST_FILTERS,
     requesterLabel,
-    requestsHref,
     requestSub,
     STATUS_WORDS,
 } from "@/lib/customer-workspace/data-requests-view";
@@ -50,7 +48,16 @@ export function RequestsView({
     filter,
     rows,
     canRemove,
+    pending = false,
+    onFilter,
+    onChanged,
 }: {
+    /** Another filter's rows are on their way: the last stay, greyed. */
+    pending?: boolean;
+    /** Show another filter, in place. */
+    onFilter: (to: RequestFilter) => void;
+    /** Read the requests again: Try again, or after one was finished. */
+    onChanged: () => void;
     heading: ReactNode;
     tabs: ReactNode;
     filter: RequestFilter;
@@ -58,13 +65,8 @@ export function RequestsView({
     rows: DataRequestRow[] | null;
     canRemove: boolean;
 }) {
-    const router = useRouter();
-    const [pending, start] = useTransition();
     const [openId, setOpenId] = useState<string | null>(null);
     const opened = rows?.find((r) => r.id === openId) ?? null;
-    const go = (to: RequestFilter) =>
-        start(() => router.replace(requestsHref(to), { scroll: false }));
-    const refresh = () => start(() => router.refresh());
 
     return (
         <div>
@@ -78,7 +80,7 @@ export function RequestsView({
                         value={filter}
                         // Open is where the list starts; it narrows nothing.
                         narrowed={filter !== "open"}
-                        onValueChange={go}
+                        onValueChange={onFilter}
                         options={REQUEST_FILTERS.map((f) => ({
                             value: f,
                             label: FILTER_LABEL[f],
@@ -93,7 +95,7 @@ export function RequestsView({
                         size="panel"
                         title={couldntLoad("requests")}
                         description="Nothing has changed. The requests are still there."
-                        onRetry={refresh}
+                        onRetry={onChanged}
                     />
                 ) : rows.length === 0 ? (
                     <EmptyState
@@ -129,7 +131,7 @@ export function RequestsView({
                 onClose={() => setOpenId(null)}
                 onChanged={() => {
                     setOpenId(null);
-                    refresh();
+                    onChanged();
                 }}
             />
         </div>

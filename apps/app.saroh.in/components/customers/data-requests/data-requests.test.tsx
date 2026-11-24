@@ -21,10 +21,11 @@ vi.mock("@/lib/customer-workspace/data-request-actions", () => ({
     closeDataRequestAction: (...a: unknown[]) =>
         closeDataRequestAction(...a) as unknown,
 }));
+// A finished request reads Customers again (React Query), never a page refresh.
 const refresh = vi.fn();
-const replace = vi.fn();
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push: vi.fn(), replace, refresh }),
+const onFilter = vi.fn();
+vi.mock("@/lib/customers/use-customers", () => ({
+    useCustomerSave: () => ({ orgId: "org_1", saved: refresh }),
 }));
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
@@ -88,6 +89,8 @@ const view = (rows: DataRequestRow[] | null, filter: "open" | "all" = "open") =>
             filter={filter}
             rows={rows}
             canRemove
+            onFilter={onFilter}
+            onChanged={refresh}
         />,
     );
 const row = (name: RegExp) =>
@@ -118,7 +121,7 @@ async function pressAndSettle(name: string, el: ParentNode | null) {
 
 beforeEach(() => {
     s.mount();
-    for (const m of [closeDataRequestAction, refresh, replace, showSuccess])
+    for (const m of [closeDataRequestAction, refresh, onFilter, showSuccess])
         m.mockReset();
 });
 afterEach(() => s.unmount());
@@ -238,7 +241,7 @@ describe("Close without removal", () => {
         expect(closeDataRequestAction).toHaveBeenCalledWith(
             "cdr_1",
             "They asked us to keep it after all",
-            "c1",
+            "org_1",
         );
         expect(showSuccess).toHaveBeenCalledWith(
             "Request closed. We've emailed them.",

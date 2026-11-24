@@ -1,7 +1,6 @@
 "use client";
 
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -48,6 +47,7 @@ import { useMoreActions } from "@/components/customers/more-actions/more-actions
 import { runAction } from "@/lib/api/run-action";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
 import { requestsHref } from "@/lib/customer-workspace/data-requests-view";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
 import { Header, Tabs } from "./header";
@@ -162,7 +162,7 @@ export function CustomerDetailScreen({
      */
     dataRequest?: DataRequestRow | null;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const now = new Date(nowIso);
     const kind = kindOf(d);
     const tabs = withPersonTabs(tabsFor(d, thread, reviews), extra);
@@ -209,19 +209,20 @@ export function CustomerDetailScreen({
     };
 
     async function stop() {
-        const res = await runAction(() => stopOffersAction(d.contact.id), {
-            setBusy: setStopping,
-        });
+        const res = await runAction(
+            () => stopOffersAction(d.contact.id, orgId),
+            { setBusy: setStopping },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
-        router.refresh();
+        void saved();
         const said = `Recorded: no more offers to ${name}.`;
         // Undo puts back the yes they gave; with no yes on record there is
         // nothing to put back, and inventing one would be a false consent.
         if (d.consent?.status !== "GRANTED") return showSuccess(said);
         showUndo(said, async () => {
-            const back = await restoreOffersAction(d.contact.id);
-            router.refresh();
+            const back = await restoreOffersAction(d.contact.id, orgId);
+            if (back.ok) await saved();
             return back;
         });
     }

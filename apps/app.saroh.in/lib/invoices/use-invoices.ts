@@ -98,9 +98,29 @@ export function InvoiceSaveProvider({
 }
 
 /**
- * How an invoice part saves: Invoices' (inside `InvoiceSaveProvider`), or
- * as before on a screen still server-rendered (a customer's Invoices tab
- * records a payment): no business named, the page read again.
+ * Another React Query screen that draws invoice parts from its own read (a
+ * customer's Invoices tab records a payment): writes go as the tab's
+ * business, and `saved` is that screen's own reading again.
+ */
+export function InvoiceSaveFor({
+    saved,
+    children,
+}: {
+    saved: () => Promise<void>;
+    children: React.ReactNode;
+}) {
+    const orgId = useOrgId();
+    const value = useMemo<InvoiceSave>(
+        () => ({ orgId, saved }),
+        [orgId, saved],
+    );
+    return createElement(InvoiceSaveContext.Provider, { value }, children);
+}
+
+/**
+ * How an invoice part saves: Invoices' (inside `InvoiceSaveProvider`), a
+ * screen's own (`InvoiceSaveFor`), or as before on a screen still
+ * server-rendered: no business named, the page read again.
  */
 export function useInvoiceSave(): InvoiceSave {
     const router = useRouter();
@@ -109,7 +129,7 @@ export function useInvoiceSave(): InvoiceSave {
         provided ?? {
             orgId: undefined,
             saved: () => {
-                // rq-refresh-ok: a customer's page is server-rendered until U13; Invoices' screens provide their own.
+                // rq-refresh-ok: reached only outside a provider, on a server-rendered screen; React Query screens provide their own.
                 router.refresh();
                 return Promise.resolve();
             },

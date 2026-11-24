@@ -35,6 +35,7 @@ import {
 } from "@/lib/customer-workspace/merge";
 
 import { UNREACHED } from "@/lib/api/unreached";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Notice } from "@saroh/ui/notice";
 import { AccountBox, pickClass } from "./merge-parts";
@@ -77,6 +78,7 @@ export function MergeDialog({
     survivorHref?: (contactId: string) => string;
 }) {
     const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const [other, setOther] = useState<MergeTarget | null>(target);
     const [loaded, setLoaded] = useState<Loaded | null>(null);
     const [readFailed, setReadFailed] = useState<string | null>(null);
@@ -159,6 +161,7 @@ export function MergeDialog({
             hereId,
             otherId,
             mergeBody(preview, hereId, loaded.picks, carry, confirmed),
+            orgId,
         ).catch(() => ({
             ok: false as const,
             error: UNREACHED,
@@ -168,8 +171,11 @@ export function MergeDialog({
         const gone = loaded.keep === "here" ? names.there : names.here;
         onOpenChange(false);
         showSuccess(mergedToast(gone));
-        if (res.data.survivorId === hereId) router.refresh();
-        else router.push(survivorHref(res.data.survivorId));
+        // Both records changed: Customers, and what names them, read again.
+        void saved();
+        if (res.data.survivorId !== hereId) {
+            router.push(survivorHref(res.data.survivorId));
+        }
     }
 
     const otherName = names?.there ?? other?.name ?? "the other record";

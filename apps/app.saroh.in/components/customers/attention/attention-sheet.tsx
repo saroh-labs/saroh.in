@@ -1,12 +1,12 @@
 "use client";
 
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { UNREACHED } from "@/lib/api/unreached";
@@ -77,7 +77,7 @@ export function AttentionSheet({
     /** `customer:sensitive`: may mark a note sensitive (C13). */
     canSensitive?: boolean;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const id = useId();
     const [start] = useState(() =>
         entry ? draftFrom(entry, choices) : emptyDraft(canSensitive),
@@ -121,8 +121,8 @@ export function AttentionSheet({
         const input = toInput(draft, choices);
         const res = await (
             entry
-                ? updateAttentionAction(contactId, entry.id, input)
-                : addAttentionAction(contactId, input)
+                ? updateAttentionAction(contactId, entry.id, input, orgId)
+                : addAttentionAction(contactId, input, orgId)
         ).catch(() => ({
             ok: false as const,
             error: UNREACHED,
@@ -134,7 +134,7 @@ export function AttentionSheet({
             return;
         }
         onOpenChange(false);
-        router.refresh();
+        void saved();
         const tag = draftTag(draft, choices);
         showSuccess(
             entry ? `${tag} saved.` : `${tag} added to Needs attention.`,

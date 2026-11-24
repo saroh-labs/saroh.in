@@ -12,6 +12,7 @@ import type {
     DuplicateSuggestion,
     IdentitySuggestion,
 } from "@/lib/customer-workspace/service";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 
 /**
  * Confirm a customer identity link (#120). Saroh never merges people
@@ -45,14 +46,16 @@ export function IdentityLinkDialog({
     const open = controlled ?? own;
     const setOpen = onOpenChange ?? setOwn;
     const [pending, startTransition] = useTransition();
+    const { orgId, saved } = useCustomerSave();
 
     const confirm = (customerId: string) => {
         startTransition(async () => {
             const result = await runAction(() =>
-                linkCustomerAction(contactId, customerId),
+                linkCustomerAction(contactId, customerId, orgId),
             );
             if (!result) return;
             if (result.ok) {
+                await saved();
                 showSuccess("Customer linked.");
                 setOpen(false);
             } else {

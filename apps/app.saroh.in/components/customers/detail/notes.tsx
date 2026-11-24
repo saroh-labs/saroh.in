@@ -6,7 +6,6 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
@@ -18,6 +17,7 @@ import type { DetailNote } from "@/lib/customer-workspace/detail";
 import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 import { runAction } from "@/lib/api/run-action";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { Empty } from "./parts";
 
 /** The design's limit: a note is a line or two, not a document. */
@@ -48,7 +48,7 @@ export function Notes({
     timeZone: string;
     now: Date;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const [open, setOpen] = useState(false);
     const [gone, setGone] = useState<string[]>([]);
     const addRef = useRef<HTMLButtonElement>(null);
@@ -71,16 +71,22 @@ export function Notes({
 
     async function remove(n: DetailNote) {
         setGone((g) => [...g, n.id]);
-        const res = await deleteNoteAction(contactId, n.id);
+        const res = await deleteNoteAction(contactId, n.id, orgId);
         if (!res.ok) {
             setGone((g) => g.filter((x) => x !== n.id));
             return showError(res.error);
         }
-        router.refresh();
+        void saved();
         showUndo("Note deleted.", async () => {
-            const back = await addNoteAction(contactId, { body: n.body });
-            if (back.ok) setGone((g) => g.filter((x) => x !== n.id));
-            router.refresh();
+            const back = await addNoteAction(
+                contactId,
+                { body: n.body },
+                orgId,
+            );
+            if (back.ok) {
+                setGone((g) => g.filter((x) => x !== n.id));
+                await saved();
+            }
             return back;
         });
     }
@@ -186,7 +192,7 @@ function NoteForm({
     contactId: string;
     onDone: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const [draft, setDraft] = useState("");
     const [busy, setBusy] = useState(false);
     const [tried, setTried] = useState(false);
@@ -199,14 +205,15 @@ function NoteForm({
         setTried(true);
         if (!text || over) return;
         const res = await runAction(
-            () => addNoteAction(contactId, { body: text }),
+            () => addNoteAction(contactId, { body: text }, orgId),
             { setBusy },
         );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess("Note added.");
         onDone();
-        router.refresh();
+        // The list reads the note back: no page refresh (DEC-259).
+        void saved();
     }
 
     return (

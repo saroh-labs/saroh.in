@@ -1,18 +1,26 @@
 import { rememberedPageSize } from "@/lib/paging/remembered";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 
-import { CustomersTabs } from "@/components/customers/data-requests/customers-tabs";
-import { OpenRequestsBanner } from "@/components/customers/data-requests/open-requests-banner";
-import { RequestsView } from "@/components/customers/data-requests/requests-view";
-import { CustomersList } from "@/components/customers/list/customers-list";
+import { RequestsContainer } from "@/components/customers/data-requests/requests-container";
+import { CustomersContainer } from "@/components/customers/list/customers-container";
 import { ListHeading, ListLocked } from "@/components/customers/list/states";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { listContacts } from "@/lib/contacts/service";
-import { listDataRequests } from "@/lib/customer-workspace/data-requests";
 import { readRequestFilter } from "@/lib/customer-workspace/data-requests-view";
-import { allowedQuery, listHref, readListQuery } from "@/lib/customers/list";
-import { getCustomersPage } from "@/lib/customers/list-service";
+import {
+    customerRequestsServer,
+    customersListServer,
+} from "@/lib/customers/access-server";
+import {
+    allowedQuery,
+    listHref,
+    listMay,
+    readListQuery,
+} from "@/lib/customers/list";
+import { customersAsk, customersListRead } from "@/lib/customers/queries";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
 
@@ -31,6 +39,12 @@ import { listBusinessStores } from "@/lib/stores/service";
  * customer removal (`customer:remove`); they also see the list's banner
  * while any are open. A requests read that fails says so on its tab, and
  * leaves the list as it is.
+ *
+ * On React Query (DEC-259): the gate and the storefronts (Add customer,
+ * Import) are the page's; the page of the list as the address asks
+ * (`/api/customers`) and the open requests (`/api/customers/requests`) are
+ * prefetched and hydrated, and the containers read every later one in
+ * place.
  */
 export const metadata = { title: "Customers" };
 
@@ -59,79 +73,84 @@ export default async function CustomersPage({
         );
     }
 
+    if (!organization) {
+        throw new Error("No active business to list customers for");
+    }
+
     // Customers' removal requests (DEC-172): only for whoever can act on them.
     const canRemove = may("customer:remove");
-    // Read beside the list, not before it.
-    const reading = canRemove
-        ? listDataRequests("open")
-        : Promise.resolve(null);
-    const tabsFor = (
-        active: "customers" | "requests",
-        openCount: number | null,
-    ) =>
-        canRemove ? (
-            <CustomersTabs active={active} openRequests={openCount} />
-        ) : null;
+    const client = getServerQueryClient();
+    // The open requests: the Requests tab's count and the list's banner.
+    const openRequests = canRemove
+        ? prefetchRead(client, customerRequestsServer, organization.id, {
+              status: "open",
+          })
+        : null;
 
     if (canRemove && params.tab === "requests") {
-        const filter = readRequestFilter(params.status);
-        const [openRequests, others] = await Promise.all([
-            reading,
-            filter === "open" ? null : listDataRequests(filter),
+        const status = readRequestFilter(params.status);
+        await Promise.all([
+            openRequests,
+            status === "open"
+                ? null
+                : prefetchRead(
+                      client,
+                      customerRequestsServer,
+                      organization.id,
+                      {
+                          status,
+                      },
+                  ),
         ]);
-        const rows = filter === "open" ? openRequests : others;
         return (
             <PageContainer width="full">
-                <RequestsView
-                    heading={<ListHeading count={null} />}
-                    tabs={tabsFor(
-                        "requests",
-                        openRequests ? openRequests.length : null,
-                    )}
-                    filter={filter}
-                    rows={rows}
-                    canRemove={canRemove}
-                />
+                <HydrationBoundary state={dehydrate(client)}>
+                    <RequestsContainer
+                        heading={<ListHeading count={null} />}
+                        canRemove={canRemove}
+                    />
+                </HydrationBoundary>
             </PageContainer>
         );
     }
 
+    const defaultSize = await rememberedPageSize("customers");
+    const actions = organization.actions ?? null;
     const query = allowedQuery(
-        readListQuery(params, await rememberedPageSize("customers")),
-        may,
+        readListQuery(params, defaultSize),
+        listMay(actions),
     );
-    const [page, stores, openRequests] = await Promise.all([
-        getCustomersPage(query),
+    const ask = customersAsk(query);
+    const [stores] = await Promise.all([
         // Only for Add customer and Import; without it they are left out.
         listBusinessStores().catch(() => []),
-        reading,
+        prefetchRead(client, customersListServer, organization.id, ask),
+        openRequests,
     ]);
-    const openCount = openRequests ? openRequests.length : null;
-    if (!page) {
+    const state = client.getQueryState(
+        customersListRead.options(organization.id, ask).queryKey,
+    );
+    if (state?.status === "error") {
         // A storefront that isn't this business's is a 404 from the API:
         // no filter, rather than no page.
-        if (query.store) redirect(listHref(query, { store: null }));
-        throw new Error("No active business to list customers for");
+        const status = (state.error as { status?: number } | null)?.status;
+        if (query.store && status === 404) {
+            redirect(listHref(query, { store: null }));
+        }
+        throw state.error ?? new Error("The customers couldn't be read");
     }
-    // "Open Contacts (N)" only matters to a business with no customers.
-    const contacts =
-        page.everyone === 0
-            ? await listContacts()
-                  .then((c) => c.length)
-                  .catch(() => null)
-            : null;
 
     return (
         <PageContainer width="full">
-            <CustomersList
-                query={query}
-                page={page}
-                stores={stores.map((s) => ({ id: s.id, name: s.name }))}
-                contacts={contacts}
-                canLink={may("contact:write")}
-                tabs={tabsFor("customers", openCount)}
-                banner={<OpenRequestsBanner count={openCount} />}
-            />
+            <HydrationBoundary state={dehydrate(client)}>
+                <CustomersContainer
+                    defaultSize={defaultSize}
+                    actions={actions}
+                    canRemove={canRemove}
+                    stores={stores.map((s) => ({ id: s.id, name: s.name }))}
+                    canLink={may("contact:write")}
+                />
+            </HydrationBoundary>
         </PageContainer>
     );
 }

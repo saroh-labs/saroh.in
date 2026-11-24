@@ -3,7 +3,6 @@
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { revalidatePath } from "next/cache";
 
-import { personHref } from "@/lib/contacts/person-href";
 import { setConsent } from "@/lib/messages/service";
 
 import type { AttentionInput, SuggestionInput } from "./attention";
@@ -35,8 +34,12 @@ import {
 
 /**
  * Server actions for Customer Detail (#120, U18). Each forwards the session
- * to api.saroh.in, which enforces the role and the organization, and
- * revalidates the page so what changed is read again.
+ * to api.saroh.in, which enforces the role and the organization.
+ *
+ * On React Query (DEC-259): each write on a customer's page or the list
+ * takes the tab's business last (`orgId`, from `useCustomerSave`) and goes
+ * through `writeAsOrg`, which refuses a moved tab and revalidates nothing;
+ * the screen reads its own queries again.
  */
 /** Add customer (DEC-056, C14): a contact only; the list shows them. */
 export async function addCustomerAction(
@@ -50,52 +53,52 @@ export async function addCustomerAction(
 export async function linkCustomerAction(
     contactId: string,
     customerId: string,
+    orgId: string,
 ): Promise<WorkspaceResult> {
-    const result = await linkCustomer(contactId, customerId);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+    return writeAsOrg(orgId, () => linkCustomer(contactId, customerId));
 }
 
 /** The edit sheet's Save, and its Undo (C8). */
 export async function saveDetailsAction(
     contactId: string,
     input: Record<string, string>,
+    orgId: string,
 ) {
-    const result = await updateDetails(contactId, input);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+    return writeAsOrg(orgId, () => updateDetails(contactId, input));
 }
 
-export async function addNoteAction(contactId: string, input: NoteInput) {
-    const result = await createNote(contactId, input);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+export async function addNoteAction(
+    contactId: string,
+    input: NoteInput,
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => createNote(contactId, input));
 }
 
-export async function deleteNoteAction(contactId: string, noteId: string) {
-    const result = await deleteNote(contactId, noteId);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+export async function deleteNoteAction(
+    contactId: string,
+    noteId: string,
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => deleteNote(contactId, noteId));
 }
 
 /** Needs attention (C5): add an entry. */
 export async function addAttentionAction(
     contactId: string,
     input: AttentionInput,
+    orgId: string,
 ) {
-    const result = await createAttention(contactId, input);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+    return writeAsOrg(orgId, () => createAttention(contactId, input));
 }
 
 export async function updateAttentionAction(
     contactId: string,
     entryId: string,
     input: AttentionInput,
+    orgId: string,
 ) {
-    const result = await updateAttention(contactId, entryId, input);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+    return writeAsOrg(orgId, () => updateAttention(contactId, entryId, input));
 }
 
 /** A booking-page note, added to Needs attention (C12). */
@@ -103,10 +106,9 @@ export async function confirmAttentionAction(
     contactId: string,
     entryId: string,
     input: SuggestionInput,
+    orgId: string,
 ) {
-    const result = await confirmAttention(contactId, entryId, input);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+    return writeAsOrg(orgId, () => confirmAttention(contactId, entryId, input));
 }
 
 /**
@@ -116,38 +118,29 @@ export async function confirmAttentionAction(
 export async function removeAttentionAction(
     contactId: string,
     entryId: string,
+    orgId: string,
 ) {
-    const result = await removeAttention(contactId, entryId);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+    return writeAsOrg(orgId, () => removeAttention(contactId, entryId));
 }
 
 /**
  * "They asked to stop": offers by email are revoked — the one consent
  * change a merchant records for a customer. Only the customer says yes.
  */
-export async function stopOffersAction(contactId: string) {
-    const result = await setConsent({
-        contactId,
-        channel: "EMAIL",
-        status: "REVOKED",
-    });
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+export async function stopOffersAction(contactId: string, orgId: string) {
+    return writeAsOrg(orgId, () =>
+        setConsent({ contactId, channel: "EMAIL", status: "REVOKED" }),
+    );
 }
 
 /**
  * Undo of "They asked to stop" — only offered when the customer had said
  * yes, so this puts back their own answer and never invents one.
  */
-export async function restoreOffersAction(contactId: string) {
-    const result = await setConsent({
-        contactId,
-        channel: "EMAIL",
-        status: "GRANTED",
-    });
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+export async function restoreOffersAction(contactId: string, orgId: string) {
+    return writeAsOrg(orgId, () =>
+        setConsent({ contactId, channel: "EMAIL", status: "GRANTED" }),
+    );
 }
 
 /** What "This isn't them" would move, read when its confirm opens (A4). */
@@ -159,13 +152,8 @@ export async function unlinkPreviewAction(contactId: string) {
  * "This isn't them": the site account moves to a record of its own. Both
  * customers' pages change, so both are read again.
  */
-export async function unlinkAccountAction(contactId: string) {
-    const result = await unlinkAccount(contactId);
-    if (result.ok) {
-        revalidatePath(personHref(contactId));
-        revalidatePath(personHref(result.data.contactId));
-    }
-    return result;
+export async function unlinkAccountAction(contactId: string, orgId: string) {
+    return writeAsOrg(orgId, () => unlinkAccount(contactId));
 }
 
 /**
@@ -208,18 +196,14 @@ export async function mergeAction(
     contactId: string,
     otherId: string,
     body: MergeBody,
+    orgId: string,
 ) {
-    const result = await mergeContacts(contactId, otherId, body);
-    if (result.ok) {
-        revalidatePath(personHref(contactId));
-        revalidatePath(personHref(otherId));
-    }
-    return result;
+    return writeAsOrg(orgId, () => mergeContacts(contactId, otherId, body));
 }
 
-/** Messages opened (A13): nothing is re-read, the tab clears its own dot. */
-export async function markThreadReadAction(contactId: string) {
-    return markThreadRead(contactId);
+/** Messages opened (A13): the page reads itself again, clearing the dot. */
+export async function markThreadReadAction(contactId: string, orgId: string) {
+    return writeAsOrg(orgId, () => markThreadRead(contactId));
 }
 
 /**
@@ -231,8 +215,7 @@ export async function replyAction(
     text: string,
     orgId?: string,
 ) {
-    if (orgId) return writeAsOrg(orgId, () => replyToThread(contactId, text));
-    const result = await replyToThread(contactId, text);
-    if (result.ok) revalidatePath(personHref(contactId));
-    return result;
+    // Every caller is a React Query screen, which reads itself again.
+    if (!orgId) return replyToThread(contactId, text);
+    return writeAsOrg(orgId, () => replyToThread(contactId, text));
 }

@@ -5,8 +5,8 @@ import type { AttentionEntry } from "@/lib/customer-workspace/attention";
 
 import { AttentionSuggestions } from "./attention-suggestions";
 
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh: vi.fn() }),
+vi.mock("@/lib/customers/use-customers", () => ({
+    useCustomerSave: () => ({ orgId: "org_1", saved: vi.fn() }),
 }));
 vi.mock("@/lib/customer-workspace/actions", () => ({
     confirmAttentionAction: vi.fn(),

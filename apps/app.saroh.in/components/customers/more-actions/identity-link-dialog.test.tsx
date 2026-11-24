@@ -7,6 +7,9 @@ import { IdentityLinkDialog } from "./identity-link-dialog";
 vi.mock("@/lib/customer-workspace/actions", () => ({
     linkCustomerAction: vi.fn(),
 }));
+vi.mock("@/lib/customers/use-customers", () => ({
+    useCustomerSave: () => ({ orgId: "org_1", saved: vi.fn() }),
+}));
 // The dialog's parts drawn in place: a portal draws nothing on the server.
 vi.mock("@saroh/ui/dialog", () => {
     const Pass = ({ children }: { children?: ReactNode }) => <>{children}</>;

@@ -3,11 +3,12 @@
 import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
+
+import { useCustomerSave } from "@/lib/customers/use-customers";
 
 import { CloseRequestDialog } from "./close-request-dialog";
 import { CLOSED_TOAST } from "./request-sheet";
@@ -31,7 +32,7 @@ export function RequestBanner({
     /** Opens "Remove their details"; absent without `customer:remove`. */
     onReview?: () => void;
 }) {
-    const router = useRouter();
+    const { saved } = useCustomerSave();
     const [closing, setClosing] = useState(false);
     return (
         <>
@@ -72,7 +73,8 @@ export function RequestBanner({
                     onClosed={() => {
                         setClosing(false);
                         showSuccess(CLOSED_TOAST);
-                        router.refresh();
+                        // The banner goes: their page reads again.
+                        void saved();
                     }}
                 />
             ) : null}
