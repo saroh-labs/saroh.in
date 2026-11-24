@@ -13,7 +13,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Organization } from "@/lib/organizations/service";
 import { announce } from "@/lib/query/broadcast";
-import { getBrowserQueryClient } from "@/lib/query/client";
+import {
+    getBrowserQueryClient,
+    onReadError,
+    ReadFailed,
+    resetReadErrorGuard,
+} from "@/lib/query/client";
 import { invalidateOrganizations } from "@/lib/query/invalidate";
 import { domainKey, ORGANIZATIONS_KEY } from "@/lib/query/keys";
 import { useOrgId } from "@/lib/query/org";
@@ -38,6 +43,7 @@ beforeEach(() => {
     document.body.appendChild(host);
     root = createRoot(host);
     refresh.mockReset();
+    resetReadErrorGuard();
     qc().clear();
 });
 afterEach(() => {
@@ -77,6 +83,16 @@ describe("QueryProvider", () => {
         expect(
             qc().getQueryData<Organization[]>(ORGANIZATIONS_KEY)?.[0]?.name,
         ).toBe("Renamed again");
+    });
+
+    it("a 403 on a read marks the held list stale, so the next render's replaces it", () => {
+        draw([org("o1", "Northwind"), org("o2", "Left")]);
+        act(() => onReadError(qc(), new ReadFailed(403)));
+        expect(refresh).toHaveBeenCalledTimes(1);
+        draw([org("o1", "Northwind")]);
+        expect(qc().getQueryData<Organization[]>(ORGANIZATIONS_KEY)).toEqual([
+            org("o1", "Northwind"),
+        ]);
     });
 
     it("another tab's switch clears this one and draws it again", async () => {

@@ -42,6 +42,9 @@ describe("middleware matcher", () => {
             "/orders",
             "/sites/new",
             "/settings/modules",
+            // Read routes (DEC-259): signed out, the gate's redirect.
+            "/api/orders",
+            "/api/probe/list",
         ]) {
             expect(gated(page)).toBe(true);
         }
