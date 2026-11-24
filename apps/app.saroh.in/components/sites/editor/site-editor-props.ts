@@ -143,9 +143,10 @@ export interface SiteEditorProps {
      * named or this one (`SiteEditorHost`): after a write that changed the
      * draft on the server, as a look's starter content does (DEC-182).
      * Absent, nothing offers such a write. `sheet` is the sheet open when
-     * it was asked, opened again on the fresh editor.
+     * it was asked, opened again on the fresh editor. Resolves once the
+     * fresh editor is mounted.
      */
-    reloadDraft?: (pageId?: string, sheet?: EditorSheet) => void;
+    reloadDraft?: (pageId?: string, sheet?: EditorSheet) => Promise<void>;
     /** The sheet open when the editor was last started afresh. */
     initialSheet?: EditorSheet;
     /**

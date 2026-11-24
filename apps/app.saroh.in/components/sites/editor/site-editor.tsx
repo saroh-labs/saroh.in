@@ -509,7 +509,7 @@ export function SiteEditor({
             if (unsavedNow.current || !reloadDraft) return;
             // Undo in the top bar takes Ask AI's words back too.
             edits.carry();
-            reloadDraft(pageId);
+            void reloadDraft(pageId);
         };
         window.addEventListener(SITE_DRAFT_CHANGED, onChanged);
         return () => window.removeEventListener(SITE_DRAFT_CHANGED, onChanged);
@@ -578,7 +578,7 @@ export function SiteEditor({
         jumpToNote,
         trail,
         scrollToSection: scrollToBlock,
-        reloadDraft: reloadDraft ? (page) => reloadDraft(page) : undefined,
+        reloadDraft: reloadDraft ? (page) => void reloadDraft(page) : undefined,
         businessPhone: readOnly ? null : businessPhone,
         openAskAi: askAiHere.open,
     };

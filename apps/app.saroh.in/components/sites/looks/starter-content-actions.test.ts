@@ -89,6 +89,24 @@ describe("starterContentActions", () => {
         );
     });
 
+    it("says it is done only once the fresh editor is up", async () => {
+        actions.copyStarterContent.mockResolvedValue({
+            ok: true,
+            data: COPIED,
+        });
+        const { s, reloadDraft } = starter();
+        let mounted: () => void = () => undefined;
+        reloadDraft.mockReturnValue(
+            new Promise<void>((resolve) => {
+                mounted = resolve;
+            }),
+        );
+        await s.copy("live", false);
+        expect(toast.showUndo).not.toHaveBeenCalled();
+        mounted();
+        await vi.waitFor(() => expect(toast.showUndo).toHaveBeenCalled());
+    });
+
     it("sends Classic as classic", async () => {
         actions.copyStarterContent.mockResolvedValue({
             ok: true,

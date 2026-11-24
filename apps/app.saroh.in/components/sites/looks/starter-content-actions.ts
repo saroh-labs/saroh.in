@@ -93,7 +93,8 @@ export function starterContentActions({
     homePageId: string | null;
     unsaved: boolean;
     settleUndo: () => void;
-    reloadDraft: (pageId?: string) => void;
+    /** Resolves once the fresh editor is on screen, when it can tell. */
+    reloadDraft: (pageId?: string) => void | Promise<void>;
 }): StarterContentActions {
     /** The editor afresh on `pageId`, and the one Undo on screen. */
     const changed = (
@@ -102,19 +103,22 @@ export function starterContentActions({
         description: string | undefined,
         pageId?: string,
     ) => {
-        reloadDraft(pageId);
-        // One Undo on screen: the editor's older ones are for a draft that
-        // is gone.
-        dismissToasts();
-        showUndo(
-            message,
-            async () => {
-                const undone = await undoStarterContent(siteId, snapshotId);
-                if (undone.ok) reloadDraft();
-                return undone;
-            },
-            { description },
-        );
+        // Said once the fresh editor is up: said sooner, the old one's
+        // controls are still there and a tap on them is lost to the remount.
+        void Promise.resolve(reloadDraft(pageId)).then(() => {
+            // One Undo on screen: the editor's older ones are for a draft
+            // that is gone.
+            dismissToasts();
+            showUndo(
+                message,
+                async () => {
+                    const undone = await undoStarterContent(siteId, snapshotId);
+                    if (undone.ok) void reloadDraft();
+                    return undone;
+                },
+                { description },
+            );
+        });
     };
 
     const copyInto = async (
