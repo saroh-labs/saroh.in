@@ -37,6 +37,7 @@ import type { LimitVerdict } from "./phone-limits";
 import {
     checkFailures,
     claimStart,
+    OUR_FAILURE,
     START_COOLDOWN_SECONDS,
 } from "./phone-limits";
 import { isSarohStaff } from "./saroh-staff";
@@ -190,6 +191,15 @@ export class AccountPhoneService {
                 details: { code: "CHALLENGE" },
             });
         }
+        // WhatsApp refused for every number just now: say so before anything
+        // is counted, the same for every number (owner, 24 Nov).
+        if (input.channel === "whatsapp" && (await this.health.paused())) {
+            this.blocked("start", "whatsapp_paused", keys);
+            throw new UnprocessableEntityException({
+                message: "Couldn't send on WhatsApp. Try SMS instead.",
+                details: { code: "WHATSAPP_FAILED" },
+            });
+        }
         // Checked and recorded in one locked step (pentest 28 Oct, H1). A
         // signed-in person adding a phone is counted too (03-M1).
         const verdict = await claimStart({
@@ -235,7 +245,7 @@ export class AccountPhoneService {
               : null;
         if (!answer) {
             this.blocked("start", "unavailable", keys);
-            await releaseStart(eventId, "unavailable");
+            await releaseStart(eventId, `${OUR_FAILURE}unavailable`);
             throw new ServiceUnavailableException({
                 message:
                     "Phone sign-in isn't available right now. Use your email.",
@@ -496,7 +506,7 @@ export class AccountPhoneService {
     private async underCeiling(keys: Keys, eventId: string): Promise<void> {
         if (await this.ceiling.allows()) return;
         this.blocked("start", "whatsapp_ceiling", keys);
-        await releaseStart(eventId, "whatsapp_ceiling");
+        await releaseStart(eventId, `${OUR_FAILURE}whatsapp_ceiling`);
         throw new UnprocessableEntityException({
             message: "Couldn't send on WhatsApp. Try SMS instead.",
             details: { code: "WHATSAPP_FAILED" },
@@ -528,8 +538,8 @@ export class AccountPhoneService {
     /**
      * Send a code from Saroh's number (signing in, its hash is saved before
      * the call; adding a phone, after it succeeds). A send that
-     * fails is still a start for the daily and address caps, but not for
-     * the 30-second cooldown: it was our failure, not the person's.
+     * fails on Saroh's side counts toward none of the person's limits: it
+     * was our failure, not theirs (owner, 24 Nov). The ceiling still counts it.
      * Signing in (`account` given), Saroh staff get nothing (DEC-198).
      */
     private async sendWhatsapp(
@@ -571,8 +581,14 @@ export class AccountPhoneService {
             // Signing in, the failure must look like an unknown number: the
             // cooldown holds and the saved row stands as a decoy (02 A-1, A-2).
             if (!account) {
-                // Our own failure doesn't hold the cooldown; it still counts.
-                await releaseStart(eventId, `whatsapp_${reason}`);
+                // Not on WhatsApp is the number's; anything else was ours and
+                // counts toward no limit (owner, 24 Nov).
+                await releaseStart(
+                    eventId,
+                    reason === "not_on_whatsapp"
+                        ? `whatsapp_${reason}`
+                        : `${OUR_FAILURE}whatsapp_${reason}`,
+                );
             }
             throw new UnprocessableEntityException({
                 message: "Couldn't send on WhatsApp. Try SMS instead.",

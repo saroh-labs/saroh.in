@@ -2,11 +2,14 @@ import type { Provider } from "@nestjs/common";
 import { Logger } from "@nestjs/common";
 
 import { declaredNodeEnv, env } from "../../../env";
+import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
+import { FlagKey } from "../../feature-flags/flags";
 import { FakeMessagingProvider } from "./fake-messaging-provider";
 import type { MessagingProvider } from "./messaging-provider.port";
 import { MESSAGING_PROVIDER } from "./messaging-provider.port";
 import { MetaCloudProvider } from "./meta-cloud.provider";
 import { Msg91Provider } from "./msg91.provider";
+import { SwitchedWhatsappProvider } from "./switched-whatsapp.provider";
 
 type Source = Pick<
     typeof env,
@@ -30,10 +33,15 @@ type Source = Pick<
  * The fake is never used outside development and test, even when asked
  * for: a send there fails naming the missing variable rather than quietly
  * sending nothing.
+ *
+ * With `viaMeta` (the app's own wiring), `meta` only makes Meta available:
+ * each WhatsApp send asks it, and goes through MSG91 when it says no
+ * ({@link SwitchedWhatsappProvider}, the admin switch, owner 24 Nov).
  */
 export function createMessagingProvider(
     source: Source,
     nodeEnv: string | undefined,
+    viaMeta?: () => Promise<boolean>,
 ): MessagingProvider {
     const devOrTest = nodeEnv === "development" || nodeEnv === "test";
     if (source.MESSAGING_PROVIDER === "fake") {
@@ -59,7 +67,7 @@ export function createMessagingProvider(
         baseUrl: source.MSG91_BASE_URL,
     });
     if (source.MESSAGING_PROVIDER !== "meta") return msg91;
-    return new MetaCloudProvider(
+    const meta = new MetaCloudProvider(
         {
             phoneNumberId: source.META_WA_PHONE_NUMBER_ID,
             token: source.META_WA_TOKEN,
@@ -73,6 +81,7 @@ export function createMessagingProvider(
         },
         msg91,
     );
+    return viaMeta ? new SwitchedWhatsappProvider(meta, msg91, viaMeta) : meta;
 }
 
 /** `booking_confirmed=saroh_booking_v1,order_ready=saroh_order_ready` → a map. */
@@ -88,6 +97,10 @@ export function parseTemplateList(list?: string): Record<string, string> {
 /** Nest provider exposing the {@link MessagingProvider} under {@link MESSAGING_PROVIDER}. */
 export const messagingProviderProvider: Provider = {
     provide: MESSAGING_PROVIDER,
-    useFactory: (): MessagingProvider =>
-        createMessagingProvider(env, declaredNodeEnv),
+    useFactory: (): MessagingProvider => {
+        const flags = new FeatureFlagService();
+        return createMessagingProvider(env, declaredNodeEnv, () =>
+            flags.isEnabled(FlagKey.WHATSAPP_VIA_META),
+        );
+    },
 };

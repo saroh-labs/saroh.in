@@ -16,6 +16,9 @@ const ALLOWED_DIR = "apps/api.saroh.in/src/modules/messaging/";
 /** Files outside it that may name the provider, and why. */
 const ALLOWED: Record<string, string> = {
     "apps/api.saroh.in/src/env.ts": "the provider's environment names",
+    // The admin switch between the two senders says what "off" sends through.
+    "apps/api.saroh.in/src/modules/feature-flags/flags.ts":
+        "the WhatsApp sender switch's admin wording",
     "apps/api.saroh.in/.env.example": "the provider's environment names",
     "apps/api.saroh.in/src/common/env.spec.ts":
         "checks the provider's base URL is refused in production",

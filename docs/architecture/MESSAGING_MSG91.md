@@ -204,8 +204,25 @@ again.
 1. Put the `META_*` values on the server (values only in its secret store).
 2. Set the callback URL and verify token in the Meta app, subscribe the app
    to the WhatsApp account and the fields above.
-3. Set `MESSAGING_PROVIDER=meta`, redeploy, and send one code to the
-   owner's number. Unset it to go back to MSG91.
+3. Set `MESSAGING_PROVIDER=meta` and redeploy. That only makes Meta
+   available: WhatsApp still goes through MSG91 until the admin console's
+   **Flags › WhatsApp through Meta** (`WHATSAPP_VIA_META`, global default)
+   is on. Turn it on and send one code to the owner's number; turn it off
+   to go back to MSG91 at once, no redeploy (owner, 24 Nov). It is asked on
+   every send; if it can't be read, MSG91.
+
+### When WhatsApp fails on Saroh's side
+
+A send the provider refuses, or the ceiling stops, counts toward none of
+the person's start limits: the released start's reason begins `ours_`
+(`account-phone/phone-limits.ts`). Not on WhatsApp is the number's, not
+ours, and still counts. As a backstop, 10 of our failures for one number,
+person or address within 2 hours block further starts until the window
+turns (owner, 24 Nov). An account-level refusal (`accountLevel` in
+`messaging/whatsapp-signin-health.ts`: the token, a permission such as
+Meta's code 10, payment, registration, the template) pauses WhatsApp codes
+for every number for 5 minutes: each start is told to use SMS before
+anything is counted, the same answer for every number (owner, 24 Nov).
 
 ## Moving SMS to Saroh's own DLT templates
 
