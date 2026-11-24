@@ -58,10 +58,14 @@ describe("WhatsApp receipt", () => {
         };
         offer.onClick();
         expect(share).toHaveBeenCalled();
-        expect(shareInvoice).toHaveBeenCalledWith("inv_1", {
-            channel: "WHATSAPP",
-            kind: "RECEIPT",
-        });
+        expect(shareInvoice).toHaveBeenCalledWith(
+            "inv_1",
+            {
+                channel: "WHATSAPP",
+                kind: "RECEIPT",
+            },
+            undefined,
+        );
     });
 
     it("opens the share sheet on the receipt when one is given (U11)", () => {
@@ -89,10 +93,14 @@ describe("WhatsApp receipt", () => {
             },
         });
         expect(await openWhatsAppShare("inv_1", "RECEIPT")).toBe(true);
-        expect(shareInvoice).toHaveBeenCalledWith("inv_1", {
-            channel: "WHATSAPP",
-            kind: "RECEIPT",
-        });
+        expect(shareInvoice).toHaveBeenCalledWith(
+            "inv_1",
+            {
+                channel: "WHATSAPP",
+                kind: "RECEIPT",
+            },
+            undefined,
+        );
         expect(tab.location.href).toBe(
             "https://wa.me/919845012345?text=Thanks",
         );

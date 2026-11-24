@@ -22,6 +22,8 @@ export async function openWhatsAppShare(
     kind: ShareResult["kind"],
     /** A tab opened by the press already, for a share after another call. */
     opened?: Window | null,
+    /** The tab's business, on Invoices' React Query screens (DEC-259). */
+    orgId?: string,
 ): Promise<boolean> {
     const tab =
         opened !== undefined
@@ -31,7 +33,11 @@ export async function openWhatsAppShare(
               : null;
     let res: Awaited<ReturnType<typeof shareInvoice>>;
     try {
-        res = await shareInvoice(invoiceId, { channel: "WHATSAPP", kind });
+        res = await shareInvoice(
+            invoiceId,
+            { channel: "WHATSAPP", kind },
+            orgId,
+        );
     } catch {
         tab?.close();
         showError("Couldn't open WhatsApp. Try again.");
@@ -79,13 +85,14 @@ export function offerWhatsAppReceipt(
     who: string,
     afterMs: number,
     share?: () => boolean,
+    orgId?: string,
 ): () => void {
     const timer = setTimeout(() => {
         showSuccess(`Receipt ready for ${who}.`, undefined, {
             label: SHARE_RECEIPT_ON_WHATSAPP,
             onClick: () => {
                 if (share?.()) return;
-                void openWhatsAppShare(invoiceId, "RECEIPT");
+                void openWhatsAppShare(invoiceId, "RECEIPT", undefined, orgId);
             },
         });
     }, afterMs);

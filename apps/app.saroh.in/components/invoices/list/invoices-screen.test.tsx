@@ -17,6 +17,7 @@ import type { InvoiceSummary } from "@/lib/invoices/summary";
 
 import { InvoicesScreen } from "./invoices-screen";
 
+// The router never moves the list: the address changes in place (DEC-259).
 const replace = vi.fn();
 let search = "";
 vi.mock("next/navigation", () => ({
@@ -179,12 +180,16 @@ const ALL: ListQuery = {
 };
 
 const s = stage();
+let moved: ReturnType<typeof vi.fn<History["replaceState"]>>;
 beforeEach(() => {
     search = "";
+    moved = vi.fn<History["replaceState"]>();
+    vi.spyOn(window.history, "replaceState").mockImplementation(moved);
     s.mount();
 });
 afterEach(() => {
     s.unmount();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
 });
 
@@ -208,7 +213,12 @@ const rows = () =>
     ).map((r) => r.dataset.invoiceRow);
 const figure = (key: string) =>
     document.querySelector<HTMLButtonElement>(`[data-figure="${key}"]`);
-const lastAddress = () => replace.mock.calls.at(-1)?.[0] as string | undefined;
+const lastAddress = () => {
+    // In place, never through the router (no server render of the list).
+    expect(replace).not.toHaveBeenCalled();
+    const to = moved.mock.calls.at(-1)?.[2];
+    return to === undefined || to === null ? undefined : String(to);
+};
 
 describe("InvoicesScreen: the strip's figures are filters", () => {
     it("shows every invoice, with the money said once: no overdue banner", () => {

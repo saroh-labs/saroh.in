@@ -623,7 +623,13 @@ test.describe("change and cancel on order detail (B9)", () => {
         const sheet = page.getByRole("dialog", {
             name: "Change how it's fulfilled",
         });
+        // The ways load with the sheet: read them once they're drawn.
+        await expect(sheet.getByRole("radio").first()).toBeVisible();
         const other = sheet.locator('[role="radio"][aria-checked="false"]');
+        test.skip(
+            (await other.count()) === 0,
+            "Northwind's storefront offers one way only for this product.",
+        );
         const label = (await other.first().textContent()) ?? "";
         await other.first().click();
         if (/delivery|shipping/i.test(label)) {

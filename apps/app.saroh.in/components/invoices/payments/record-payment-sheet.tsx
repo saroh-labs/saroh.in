@@ -11,7 +11,6 @@ import { Notice } from "@saroh/ui/notice";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess, showUndo, UNDO_MS } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -41,6 +40,7 @@ import {
     toPaise,
 } from "@/lib/invoices/record-payment";
 import type { Invoice, InvoicePaymentMethod } from "@/lib/invoices/service";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import { RECORD_PAYMENT } from "@/lib/invoices/words";
 import { ChipGroup } from "@saroh/ui/choice-group";
 import { FormSheet } from "@saroh/ui/form-sheet";
@@ -301,7 +301,12 @@ function RecordPaymentForm({
     onShareReceipt?: (invoiceId: string) => boolean;
     returnFocusTo?: string | (() => HTMLElement | null | undefined);
 }) {
-    const router = useRouter();
+    // On Invoices' screens the write goes as the tab's business and reads
+    // Invoices again; on a customer's page, as before (`useInvoiceSave`).
+    const { orgId, saved } = useInvoiceSave();
+    /** After a write: the caller reads it again, else Invoices (or the page). */
+    const changed = (invoice: Invoice) =>
+        onRecorded ? onRecorded(invoice) : void saved();
     const ids = {
         amount: useId(),
         method: useId(),
@@ -384,24 +389,28 @@ function RecordPaymentForm({
 
         const res = await runAction(
             () =>
-                recordPayment(target.id, {
-                    method,
-                    idempotencyKey,
-                    amount: fromPaise(check.paise),
-                    receivedAt: receivedAt.toISOString(),
-                    ...(reference.trim()
-                        ? { reference: reference.trim() }
-                        : {}),
-                    ...(note.trim() ? { note: note.trim() } : {}),
-                    ...(cheque
-                        ? {
-                              chequeNumber: chequeNumber.trim(),
-                              ...(chequeBank.trim()
-                                  ? { chequeBank: chequeBank.trim() }
-                                  : {}),
-                          }
-                        : {}),
-                }),
+                recordPayment(
+                    target.id,
+                    {
+                        method,
+                        idempotencyKey,
+                        amount: fromPaise(check.paise),
+                        receivedAt: receivedAt.toISOString(),
+                        ...(reference.trim()
+                            ? { reference: reference.trim() }
+                            : {}),
+                        ...(note.trim() ? { note: note.trim() } : {}),
+                        ...(cheque
+                            ? {
+                                  chequeNumber: chequeNumber.trim(),
+                                  ...(chequeBank.trim()
+                                      ? { chequeBank: chequeBank.trim() }
+                                      : {}),
+                              }
+                            : {}),
+                    },
+                    orgId,
+                ),
             { setBusy },
         );
         if (!res) return;
@@ -427,8 +436,7 @@ function RecordPaymentForm({
 
         onOpenChange(false);
         const recorded = res.data;
-        onRecorded?.(recorded);
-        router.refresh();
+        changed(recorded);
 
         // A retry of a record already made: nothing new was written, so
         // there is nothing to Undo and no receipt to offer again.
@@ -448,6 +456,7 @@ function RecordPaymentForm({
                       onShareReceipt
                           ? () => onShareReceipt(target.id)
                           : undefined,
+                      orgId,
                   )
                 : () => undefined;
         const words = recordedToast({
@@ -470,11 +479,9 @@ function RecordPaymentForm({
                     target.id,
                     paymentId,
                     UNDONE_REASON,
+                    orgId,
                 );
-                if (undone.ok) {
-                    onRecorded?.(undone.data);
-                    router.refresh();
-                }
+                if (undone.ok) changed(undone.data);
                 return undone;
             },
             { description: words.description },

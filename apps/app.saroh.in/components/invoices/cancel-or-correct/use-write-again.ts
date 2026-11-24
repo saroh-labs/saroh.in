@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { writeInvoiceAgain } from "@/lib/invoices/actions";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 
 /**
  * "Write again" on a void invoice nobody wrote again (DEC-173, U13): the
@@ -18,13 +19,17 @@ import { writeInvoiceAgain } from "@/lib/invoices/actions";
  */
 export function useWriteAgain() {
     const router = useRouter();
+    const { orgId } = useInvoiceSave();
     const [busy, setBusy] = useState(false);
 
     async function run(invoice: { id: string; number: string | null }) {
         if (busy) return;
-        const res = await runAction(() => writeInvoiceAgain(invoice.id), {
-            setBusy,
-        });
+        const res = await runAction(
+            () => writeInvoiceAgain(invoice.id, orgId),
+            {
+                setBusy,
+            },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(

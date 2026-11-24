@@ -53,6 +53,7 @@ import {
     whatsappOff,
 } from "@/lib/invoices/share";
 import { billedTo } from "@/lib/invoices/status";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import {
     COPY_MESSAGE,
     EMAIL_OWN_PROVIDER,
@@ -203,6 +204,7 @@ export function ShareSheet({
         who,
         total: formatMoneyMajor(invoice.total, invoice.currency),
     };
+    const { orgId } = useInvoiceSave();
     const sending = useInvoiceSend({
         invoice: ref,
         send: can.write ? (invoice.send ?? null) : null,
@@ -239,6 +241,7 @@ export function ShareSheet({
                         invoice.id,
                         { channel: "WHATSAPP", kind: k },
                         invoice.updatedAt,
+                        orgId,
                     ),
                 ),
             { setBusy },
@@ -302,6 +305,7 @@ export function ShareSheet({
                         invoice.id,
                         { channel: "LINK", kind },
                         invoice.updatedAt,
+                        orgId,
                     ),
                 ),
             { setBusy },
@@ -333,10 +337,11 @@ export function ShareSheet({
         hold(`invoice-receipt:${invoice.id}`, {
             description: `The receipt goes to ${first} from your own email.`,
             run: async () => {
-                const res = await shareInvoice(invoice.id, {
-                    channel: "EMAIL",
-                    kind: "RECEIPT",
-                });
+                const res = await shareInvoice(
+                    invoice.id,
+                    { channel: "EMAIL", kind: "RECEIPT" },
+                    orgId,
+                );
                 if (!res.ok) return { ok: false, error: res.error };
                 onDone?.();
                 return { ok: true };
@@ -349,7 +354,7 @@ export function ShareSheet({
     /** PDF and print are logged where a share could be; quietly. */
     function logPaper(channel: "PDF" | "PRINT") {
         if (!logsPaper(invoice, can)) return;
-        void shareInvoice(invoice.id, { channel, kind })
+        void shareInvoice(invoice.id, { channel, kind }, orgId)
             .then((res) => {
                 if (res.ok) onDone?.();
             })

@@ -18,6 +18,7 @@ import {
 } from "@/lib/invoices/actions";
 import { sendLabel } from "@/lib/invoices/send";
 import type { CreditExpect, InvoiceStanding } from "@/lib/invoices/service";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { FormDialog } from "@saroh/ui/form-dialog";
@@ -53,10 +54,10 @@ export function IssueDialog({
     canSend?: boolean;
     /** Its link takes payment (`payOnline`), so there is a payment link to copy. */
     payOnline?: boolean;
-    /** It was issued: the details sheet reads it again (U9). */
+    /** It was issued: the details read it again (U9); left out, Invoices does. */
     onDone?: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useInvoiceSave();
     // No registered address yet (DEC-068): asked here, then it issues.
     const details = useBusinessDetailsStep({
         then: "issue it",
@@ -68,19 +69,19 @@ export function IssueDialog({
     const rates = useGstRateStep({
         then: "issue this invoice",
         continueLabel: "Save and issue",
-        saveLines: (chosen) => setInvoiceLineRates(invoice.id, chosen),
+        saveLines: (chosen) => setInvoiceLineRates(invoice.id, chosen, orgId),
     });
 
     async function issue(): Promise<ConfirmResult> {
         const res = await rates.run(() =>
-            details.run(() => issueInvoice(invoice.id)),
+            details.run(() => issueInvoice(invoice.id, orgId)),
         );
         // A sheet was closed without saving: still a draft.
         if (!res) return true;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${res.data.number ?? "Invoice"} issued.`);
-        router.refresh();
-        onDone?.();
+        if (onDone) onDone();
+        else await saved();
     }
 
     return (
@@ -126,16 +127,18 @@ export function DeleteDraftDialog({
     onDeleted?: () => void;
 }) {
     const router = useRouter();
+    const { orgId, saved } = useInvoiceSave();
 
     async function remove(): Promise<ConfirmResult> {
-        const res = await deleteInvoice(invoice.id);
+        const res = await deleteInvoice(invoice.id, orgId);
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Draft deleted.");
-        // The action's revalidatePath already redraws the list. A second
-        // refresh raced it and, on a slow machine, Next fell back to a full
-        // page load that took the toast with it (gate, 1 Nov).
-        if (onDeleted) onDeleted();
-        else router.push("/billing/invoices");
+        // The sheet closes first, so the gone draft isn't read again; then
+        // the list behind it is. From its page, the list is drawn afresh.
+        if (onDeleted) {
+            onDeleted();
+            void saved();
+        } else router.push("/billing/invoices");
     }
 
     return (
@@ -174,10 +177,10 @@ export function RefundInvoiceDialog({
     invoice: InvoiceRef;
     /** What the screen showed, checked again by the API (#2 review). */
     expect?: CreditExpect;
-    /** It was refunded: the details sheet reads it again (U9). */
+    /** It was refunded: the details read it again (U9); left out, Invoices does. */
     onDone?: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useInvoiceSave();
     const reasonId = useId();
     const [reason, setReason] = useState("");
     const [tried, setTried] = useState(false);
@@ -188,7 +191,7 @@ export function RefundInvoiceDialog({
         setTried(true);
         if (!reason.trim()) return;
         const res = await runAction(
-            () => creditInvoice(invoice.id, reason.trim(), expect),
+            () => creditInvoice(invoice.id, reason.trim(), expect, orgId),
             { setBusy },
         );
         if (!res) return;
@@ -199,8 +202,8 @@ export function RefundInvoiceDialog({
         showSuccess(
             `${`${invoice.number ?? "Invoice"} cancelled with credit note ${res.data.number ?? ""}`.trim()}.`,
         );
-        router.refresh();
-        onDone?.();
+        if (onDone) onDone();
+        else await saved();
     }
 
     return (

@@ -4,8 +4,8 @@ import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 import { BulkRemindSheet } from "@/components/invoices/bulk-remind/bulk-remind-sheet";
 import { InvoiceDetailsSheet } from "@/components/invoices/details/invoice-details-sheet";
@@ -50,6 +50,7 @@ import {
 import type { InvoiceTab } from "@/lib/invoices/status";
 import { inTab, INVOICE_TABS, paidSinceRows } from "@/lib/invoices/status";
 import type { InvoiceSummary, SummaryFilter } from "@/lib/invoices/summary";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import { invoiceZone } from "@/lib/invoices/zone";
 import type { DateRange } from "@/lib/views/date-range";
 import { NO_DATE_RANGE } from "@/lib/views/date-range";
@@ -96,6 +97,10 @@ export type { InvoiceBusinessTax } from "./gst-status-line";
  * Overdue is worked out from the due date by the API, never stored. A
  * credit note sits under the invoice it corrects and never counts as
  * owed; an order's own paper is owed on the order.
+ *
+ * On React Query (DEC-259, `invoices-container.tsx`): a filter changes the
+ * address in place and the container reads what it asks, the last rows
+ * greyed (`pending`) until it lands.
  */
 export function InvoicesScreen({
     invoices,
@@ -112,7 +117,10 @@ export function InvoicesScreen({
     summary,
     businessName = "This business",
     paymentsOn = true,
+    pending = false,
 }: {
+    /** What the address asks is on its way: the last rows stay, greyed. */
+    pending?: boolean;
     /** Invoices sit under Payments only while it is on (DEC-070). */
     paymentsOn?: boolean;
     /** The business's name as it signs its messages, for a reminder's preview. */
@@ -157,10 +165,10 @@ export function InvoicesScreen({
     /** The money strip's read; null when it couldn't be read. */
     summary: InvoiceSummary | null;
 }) {
-    const router = useRouter();
     const pathname = usePathname();
     const params = useSearchParams();
-    const [busy, start] = useTransition();
+    const busy = pending;
+    const { saved } = useInvoiceSave();
     // What the list is showing: the address's, and what was just picked
     // before the address catches up, so a figure or a status answers at
     // once.
@@ -195,10 +203,11 @@ export function InvoicesScreen({
     const [reminded, setReminded] = useState<
         Partial<Record<string, RemindedBy>>
     >({});
-    const rowShare = useRowShare({ onDone: () => router.refresh() });
+    const rowShare = useRowShare({ onDone: () => void saved() });
 
+    // In place: the address is the list's key (no server render).
     const go = (next: URLSearchParams) =>
-        start(() => router.replace(hrefOf(pathname, next), { scroll: false }));
+        window.history.replaceState(null, "", hrefOf(pathname, next));
     // Every move of the list closes the sheet: its `?invoice=` goes too.
     const here = () => {
         const q = new URLSearchParams(params.toString());

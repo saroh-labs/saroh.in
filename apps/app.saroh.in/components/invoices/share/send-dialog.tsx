@@ -2,7 +2,6 @@
 
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Send } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -15,6 +14,7 @@ import { issueInvoice, setInvoiceLineRates } from "@/lib/invoices/actions";
 import { remindWithLink, sendWithLink } from "@/lib/invoices/link-actions";
 import { sendConfirmLine, sendOutcome } from "@/lib/invoices/send";
 import type { InvoiceSend } from "@/lib/invoices/service";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
@@ -43,7 +43,10 @@ export function useInvoiceSend({
     send: InvoiceSend | null;
     /** It went: the link shown before is dead, so the screen drops it. */
     onSent?: () => void;
-    /** Something changed (sent, or issued): the details sheet reads it again. */
+    /**
+     * Something changed (sent, or issued): the details read it again; left
+     * out, Invoices does (`useInvoiceSave`).
+     */
     onDone?: () => void;
 }): {
     /** Send it, or send a reminder: held ten seconds with Undo. */
@@ -53,7 +56,7 @@ export function useInvoiceSend({
     /** The draft's confirm and the steps it may open. Render once. */
     overlays: ReactNode;
 } {
-    const router = useRouter();
+    const { orgId, saved } = useInvoiceSave();
     const { send: hold } = useHold();
     const [asking, setAsking] = useState(false);
     const first = invoice.who.split(" ")[0] || invoice.who;
@@ -67,8 +70,13 @@ export function useInvoiceSend({
     const rates = useGstRateStep({
         then: "issue and send this invoice",
         continueLabel: "Save and send",
-        saveLines: (chosen) => setInvoiceLineRates(invoice.id, chosen),
+        saveLines: (chosen) => setInvoiceLineRates(invoice.id, chosen, orgId),
     });
+
+    async function changed() {
+        if (onDone) onDone();
+        else await saved();
+    }
 
     /** Send it now; what was said comes back for whoever asked. */
     async function deliver(
@@ -76,12 +84,13 @@ export function useInvoiceSend({
     ): Promise<{ ok: true; message: string } | (HeldResult & { ok: false })> {
         if (!send) return { ok: false, error: "", said: true };
         const res = await details.run(() =>
-            reminder ? remindWithLink(invoice.id) : sendWithLink(invoice.id),
+            reminder
+                ? remindWithLink(invoice.id, orgId)
+                : sendWithLink(invoice.id, orgId),
         );
         // The details sheet was closed without saving: nothing was sent.
         if (!res) return { ok: false, error: "", said: true };
-        router.refresh();
-        onDone?.();
+        await changed();
         if (!res.ok) return { ok: false, error: res.error };
         onSent?.();
         const out = sendOutcome(
@@ -111,15 +120,16 @@ export function useInvoiceSend({
 
     async function issueAndSend(): Promise<ConfirmResult> {
         const issued = await rates.run(() =>
-            details.run(() => issueInvoice(invoice.id)),
+            details.run(() => issueInvoice(invoice.id, orgId)),
         );
         // A sheet was closed without saving: still a draft, nothing sent.
         if (!issued) return true;
         if (!issued.ok) return { ok: false, error: issued.error };
         const number = issued.data.number ?? invoice.number;
         const res = await deliver(false);
-        router.refresh();
-        onDone?.();
+        // Issued but not sent on (`said`): read once for the issue; a send
+        // that was tried has read already.
+        if (!res.ok && res.said) await changed();
         if (res.ok) showSuccess(res.message);
         else if (!res.said) {
             // Issued, so the confirm is done: what didn't go is said.

@@ -119,6 +119,7 @@ export function AddContactDialog({
             onClick: () => router.push(personHref(id)),
         });
         if (openOnArrival) router.replace("/contacts");
+        // rq-refresh-ok: Contacts is server-rendered until U19; the invoice editor passes onAdded.
         router.refresh();
     }
 

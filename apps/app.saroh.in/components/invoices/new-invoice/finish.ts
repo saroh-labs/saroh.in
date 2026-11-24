@@ -27,7 +27,10 @@ export async function finishInvoice({
     run,
     withLink,
     push,
+    orgId,
 }: {
+    /** The tab's business, on Invoices' React Query screens (DEC-259). */
+    orgId?: string;
     want: "issue" | "draft";
     saved: Invoice;
     /** The business-details step was answered (#838). */
@@ -45,7 +48,9 @@ export async function finishInvoice({
         return;
     }
     // No registered address yet (DEC-068): asked here, then it issues.
-    const issued = detailsReady ? await run(() => issueInvoice(id)) : null;
+    const issued = detailsReady
+        ? await run(() => issueInvoice(id, orgId))
+        : null;
     if (!issued) {
         showSuccess("Saved as a draft. Issue it once your address is in.");
         push(to);
@@ -63,7 +68,7 @@ export async function finishInvoice({
         push(to);
         return;
     }
-    const link = await newPayLink(id, issued.data.updatedAt);
+    const link = await newPayLink(id, issued.data.updatedAt, orgId);
     if (!link.ok) {
         if (link.plan) {
             // Issued; only the payment link is the plan's to refuse.

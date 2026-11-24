@@ -34,7 +34,7 @@ import { getAskAiState } from "@/lib/ask-ai/service";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHomeRail } from "@/lib/home/rail";
-import { listModules } from "@/lib/modules/service";
+import { modulesOrUnknown } from "@/lib/modules/guard";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import { closingOrNull } from "@/lib/organizations/closing-service";
@@ -159,7 +159,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         websiteArea,
     ] = await Promise.all([
         unreadNotificationCount(),
-        listModules().catch(() => null),
+        // The request's one read, shared with the page's module gates.
+        modulesOrUnknown(),
         // The rail's work counts come from the same ranked actions Home ranks,
         // so the two can never disagree, through the rail's own read: none of
         // what only Home's page draws (review #16). Non-fatal: a rail without

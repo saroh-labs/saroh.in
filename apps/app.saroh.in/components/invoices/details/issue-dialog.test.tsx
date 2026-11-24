@@ -49,6 +49,11 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }),
 }));
+// Invoices are read again through their queries (DEC-259), never the page.
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/invoices/use-invoices", () => ({
+    useInvoiceSave: () => ({ orgId: "org_a", saved }),
+}));
 const toast = { showError: vi.fn(), showSuccess: vi.fn() };
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
@@ -100,7 +105,7 @@ beforeEach(() => {
         actions.issueInvoice,
         actions.setInvoiceLineRates,
         saveGstRates,
-        refresh,
+        saved,
         toast.showError,
         toast.showSuccess,
     ]) {
@@ -181,14 +186,18 @@ describe("issuing a draft with a line that has no GST rate", () => {
         await press("Save and issue");
 
         // Exempt is a rate: 0 is saved on the line, by its place.
-        expect(actions.setInvoiceLineRates).toHaveBeenCalledWith("inv_1", {
-            1: "0",
-        });
+        expect(actions.setInvoiceLineRates).toHaveBeenCalledWith(
+            "inv_1",
+            {
+                1: "0",
+            },
+            "org_a",
+        );
         // A typed line has no item to save a rate on.
         expect(saveGstRates).not.toHaveBeenCalled();
         expect(actions.issueInvoice).toHaveBeenCalledTimes(2);
         expect(toast.showSuccess).toHaveBeenCalledWith("RC/26-27/0007 issued.");
-        expect(refresh).toHaveBeenCalled();
+        expect(saved).toHaveBeenCalled();
     });
 
     it("issues nothing until a rate is chosen", async () => {

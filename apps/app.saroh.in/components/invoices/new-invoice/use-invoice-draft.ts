@@ -11,6 +11,7 @@ import { createInvoice, updateInvoice } from "@/lib/invoices/actions";
 import type { InvoiceFormValues } from "@/lib/invoices/new-invoice";
 import { draftInput, invoiceFormSchema } from "@/lib/invoices/new-invoice";
 import type { Invoice } from "@/lib/invoices/service";
+import { useInvoiceSave } from "@/lib/invoices/use-invoices";
 
 /** What one save answers: the invoice as the API now has it. */
 interface Saved {
@@ -74,6 +75,9 @@ export function useInvoiceDraft({
     /** The business's zone: a due day ends at its midnight. */
     zone: string;
 }): InvoiceDraft {
+    // The editor holds its own draft: a save goes as the tab's business and
+    // only marks Invoices stale (nothing of it is on this screen).
+    const invoices = useInvoiceSave();
     const [id, setId] = useState<string | null>(draft?.id ?? null);
     const [saved, setSaved] = useState<Invoice | null>(draft ?? null);
     const [state, setState] = useState<SaveState>(() => initialSave(0));
@@ -84,9 +88,16 @@ export function useInvoiceDraft({
         currency,
         zone,
         draftDueAt: draft?.dueAt,
+        invoices,
     });
     useEffect(() => {
-        ctx.current = { registered, currency, zone, draftDueAt: draft?.dueAt };
+        ctx.current = {
+            registered,
+            currency,
+            zone,
+            draftDueAt: draft?.dueAt,
+            invoices,
+        };
     });
 
     const [autosave] = useState(
@@ -103,13 +114,15 @@ export function useInvoiceDraft({
             ready: (values) => invoiceFormSchema.safeParse(values).success,
             send: async (values): Promise<EditorResult<Saved>> => {
                 const current = idRef.current;
+                const { invoices: on, ...asked } = ctx.current;
                 const input = draftInput(values, {
-                    ...ctx.current,
+                    ...asked,
                     saved: current !== null,
                 });
                 const res = current
-                    ? await updateInvoice(current, input)
-                    : await createInvoice(input);
+                    ? await updateInvoice(current, input, on.orgId)
+                    : await createInvoice(input, on.orgId);
+                if (res.ok && on.orgId) void on.saved();
                 if (!res.ok) {
                     if (isNamedField(res.field)) {
                         form.setError(res.field, { message: res.error });

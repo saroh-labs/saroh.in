@@ -59,6 +59,7 @@ describe("putBack", () => {
                 chequeNumber: "004512",
                 chequeBank: "HDFC Bank",
             }),
+            undefined,
         );
         expect(actions.chequeCleared).not.toHaveBeenCalled();
         expect(actions.chequeBounced).not.toHaveBeenCalled();

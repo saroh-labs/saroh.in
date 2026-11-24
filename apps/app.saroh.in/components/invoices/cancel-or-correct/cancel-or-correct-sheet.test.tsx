@@ -66,6 +66,11 @@ vi.mock(
 );
 const router = { refresh: vi.fn(), push: vi.fn(), replace: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+// Invoices are read again through their queries (DEC-259), never the page.
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/invoices/use-invoices", () => ({
+    useInvoiceSave: () => ({ orgId: "org_a", saved }),
+}));
 const toast = { showError: vi.fn(), showSuccess: vi.fn() };
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
@@ -111,7 +116,7 @@ beforeEach(() => {
     root = createRoot(host);
     for (const fn of [
         ...Object.values(actions),
-        router.refresh,
+        saved,
         router.push,
         toast.showError,
         toast.showSuccess,
@@ -270,12 +275,13 @@ describe("Cancel or correct, GST-registered", () => {
             "inv_106",
             "Wrong amount",
             { expectStatus: "OVERDUE", expectPaidSoFar: "0.00" },
+            "org_a",
         );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "RC/26-27/0106 cancelled with credit note RCCN/26-27/0002.",
         );
         expect(onOpenChange).toHaveBeenCalledWith(false);
-        expect(router.refresh).toHaveBeenCalled();
+        expect(saved).toHaveBeenCalled();
         expect(router.push).not.toHaveBeenCalled();
     });
 
@@ -295,6 +301,7 @@ describe("Cancel or correct, GST-registered", () => {
             "inv_106",
             "Wrong person",
             { expectStatus: "OVERDUE", expectPaidSoFar: "0.00" },
+            "org_a",
         );
         expect(actions.creditInvoice).not.toHaveBeenCalled();
         expect(toast.showSuccess).toHaveBeenCalledWith(
@@ -322,7 +329,7 @@ describe("Cancel or correct, GST-registered", () => {
             draftId: "draft_9",
         });
         expect(router.push).not.toHaveBeenCalled();
-        expect(router.refresh).not.toHaveBeenCalled();
+        expect(saved).not.toHaveBeenCalled();
     });
 
     it("a refusal stays open with what was typed, and says why", async () => {
@@ -398,9 +405,10 @@ describe("Cancel or correct, not registered", () => {
         expect(actions.voidInvoice).toHaveBeenCalledWith(
             "inv_106",
             "Typo in the amount",
+            "org_a",
         );
         expect(toast.showSuccess).toHaveBeenCalledWith("RC/26-27/0106 voided.");
-        expect(router.refresh).toHaveBeenCalled();
+        expect(saved).toHaveBeenCalled();
     });
 
     it("Void and write again: the corrected draft opens", async () => {
@@ -415,6 +423,7 @@ describe("Cancel or correct, not registered", () => {
         expect(actions.reissueInvoice).toHaveBeenCalledWith(
             "inv_106",
             "Wrong person",
+            "org_a",
         );
         expect(router.push).toHaveBeenCalledWith(
             "/billing/invoices/draft_4/edit",
@@ -574,6 +583,7 @@ describe("Refund… on a paid invoice, unchanged", () => {
             "inv_106",
             "Returned",
             { expectStatus: "PAID", expectPaidSoFar: "8400.00" },
+            "org_a",
         );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "RC/26-27/0106 cancelled with credit note RCCN/26-27/0005.",
@@ -597,7 +607,10 @@ describe("Write again on a void invoice", () => {
         await act(async () => {
             await run({ id: "inv_void", number: "PF-0007" });
         });
-        expect(actions.writeInvoiceAgain).toHaveBeenCalledWith("inv_void");
+        expect(actions.writeInvoiceAgain).toHaveBeenCalledWith(
+            "inv_void",
+            "org_a",
+        );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "PF-0007 written again. A draft with its lines is open.",
         );
