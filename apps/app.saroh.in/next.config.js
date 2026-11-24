@@ -119,6 +119,17 @@ const nextConfig = {
     // experimental in Next 16.3; see docs/architecture/DEV_LEARNINGS.md.
     experimental: {
         authInterrupts: true,
+        /*
+         * A page opened again within 30 s is drawn from the router's own copy
+         * instead of asking the server again. Next 16 keeps none by default.
+         * Safe because every way the copy could go stale clears it: a Server
+         * Action that calls revalidatePath/updateTag/refresh() or sets a
+         * cookie (the business switch), `router.refresh()`, another tab's
+         * switch (it refreshes), and sign-out (a full page load). A write
+         * that does none of these would show its old page for up to 30 s.
+         * Experimental: re-check on every Next upgrade.
+         */
+        staleTimes: { dynamic: 30 },
     },
     /*
      * Sell's Storefronts became Locations (DEC-069, L9). The screens moved to
