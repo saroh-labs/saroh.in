@@ -9,7 +9,10 @@ import type { CustomerDetail } from "@/lib/customer-workspace/detail";
 import { useMoreActions } from "./more-actions";
 
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+    useRouter: () => ({ push: vi.fn() }),
+}));
+vi.mock("@/lib/customers/use-customers", () => ({
+    useCustomerSave: () => ({ orgId: "org_1", saved: vi.fn() }),
 }));
 vi.mock("@/lib/contacts/actions", () => ({ deleteContact: vi.fn() }));
 vi.mock("@/lib/customer-workspace/actions", () => ({}));

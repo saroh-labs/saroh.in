@@ -17,6 +17,7 @@ import {
     removalBody,
 } from "@/lib/contacts/removal";
 import type { RemovalPreview } from "@/lib/contacts/service";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 
@@ -42,6 +43,7 @@ export function RemoveDetailsDialog({
     onOpenChange: (open: boolean) => void;
     onRemoved: () => void;
 }) {
+    const { orgId } = useCustomerSave();
     const inputId = useId();
     const [preview, setPreview] = useState<RemovalPreview | null>(null);
     const [readFailed, setReadFailed] = useState<string | null>(null);
@@ -78,12 +80,15 @@ export function RemoveDetailsDialog({
         setTried(true);
         if (!canRemove || removing) return;
         setFailure(null);
-        const res = await runAction(() => removeDetailsAction(contactId), {
-            setBusy: setRemoving,
-            // Said in the dialog, beside what it was about to remove.
-            quiet: true,
-            onUnreached: setFailure,
-        });
+        const res = await runAction(
+            () => removeDetailsAction(contactId, orgId),
+            {
+                setBusy: setRemoving,
+                // Said in the dialog, beside what it was about to remove.
+                quiet: true,
+                onUnreached: setFailure,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             setFailure(asSentence(res.error));

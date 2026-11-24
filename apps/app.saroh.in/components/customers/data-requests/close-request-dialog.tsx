@@ -17,6 +17,7 @@ import { Refusal } from "@/components/shared/states/refusal";
 import { closeDataRequestAction } from "@/lib/customer-workspace/data-request-actions";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
 import { MAX_CLOSE_REASON } from "@/lib/customer-workspace/data-requests-view";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 import { useState } from "react";
 
@@ -53,6 +54,7 @@ export function CloseRequestDialog({
     onOpenChange: (open: boolean) => void;
     onClosed: (row: DataRequestRow) => void;
 }) {
+    const { orgId } = useCustomerSave();
     const [failure, setFailure] = useState<string | null>(null);
     const form = useForm<Values>({
         resolver: zodResolver(schema),
@@ -71,7 +73,7 @@ export function CloseRequestDialog({
         const res = await closeDataRequestAction(
             request.id,
             values.reason,
-            request.contactId,
+            orgId,
         ).catch(() => ({
             ok: false as const,
             error: "Couldn't reach Saroh. Nothing has changed.",

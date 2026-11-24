@@ -1,25 +1,19 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
-import { personHref } from "@/lib/contacts/person-href";
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 
 import { closeDataRequest } from "./data-requests";
 
 /**
  * Close a customer's removal request without removing their details
  * (DEC-172, #1107). `customer:remove` and the reason's length are the
- * API's to enforce; Customers and the customer's page are read again.
+ * API's to enforce. As the tab's business (`writeAsOrg`, DEC-259): the
+ * screen reads Customers again itself.
  */
 export async function closeDataRequestAction(
     requestId: string,
     reason: string,
-    contactId: string | null,
+    orgId: string,
 ) {
-    const result = await closeDataRequest(requestId, reason.trim());
-    if (result.ok) {
-        revalidatePath("/commerce/customers");
-        if (contactId) revalidatePath(personHref(contactId));
-    }
-    return result;
+    return writeAsOrg(orgId, () => closeDataRequest(requestId, reason.trim()));
 }

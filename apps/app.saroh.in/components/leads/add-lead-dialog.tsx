@@ -156,6 +156,7 @@ export function AddLeadDialog({
             label: "Open lead",
             onClick: () => router.push(`/leads/${id}`),
         });
+        // rq-refresh-ok: shared with a server-rendered list; on a customer's page it also redraws the tabs drawn there (Leads, Courses, packs, plans) and hydrates the customer read again (until U19/U20 and their units).
         router.refresh();
     }
 

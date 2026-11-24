@@ -12,7 +12,6 @@ import { FormSheet } from "@saroh/ui/form-sheet";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -23,6 +22,7 @@ import { loadUnlinkedCustomers } from "@/lib/customers/actions";
 import { customerHref } from "@/lib/customers/links";
 import type { UnlinkedCustomer, UnlinkedPage } from "@/lib/customers/list";
 import { rowName, unlinkedText } from "@/lib/customers/list";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { TextLink } from "@saroh/ui/text-link";
 
 /**
@@ -92,7 +92,7 @@ function UnlinkedSheet({
     store: string | null;
     canLink: boolean;
 }) {
-    const router = useRouter();
+    const { saved } = useCustomerSave();
     const [page, setPage] = useState(1);
     const [read, setRead] = useState<Read>({ state: "loading" });
     /** Linked while the sheet is open: customer id → the contact's name. */
@@ -202,7 +202,7 @@ function UnlinkedSheet({
                                 }));
                                 // The count, the notice and the rows
                                 // are read again behind the sheet.
-                                router.refresh();
+                                void saved();
                             }}
                         />
                     ))}
@@ -224,6 +224,7 @@ function UnlinkedItem({
     onLinked: (name: string) => void;
 }) {
     const [pending, start] = useTransition();
+    const { orgId } = useCustomerSave();
     const holder = c.holder;
     const holderName = holder ? rowName(holder) : null;
     const reach = [c.email, c.phone].filter(Boolean).join(" · ");
@@ -232,7 +233,7 @@ function UnlinkedItem({
         if (!holder || !holderName) return;
         start(async () => {
             const res = await runAction(() =>
-                linkCustomerAction(holder.contactId, c.customerId),
+                linkCustomerAction(holder.contactId, c.customerId, orgId),
             );
             if (!res) return;
             if (res.ok) {

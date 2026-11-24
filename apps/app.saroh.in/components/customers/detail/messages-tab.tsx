@@ -6,7 +6,6 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
@@ -26,6 +25,7 @@ import {
 } from "@/lib/customer-workspace/thread";
 
 import { UNREACHED } from "@/lib/api/unreached";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { Field } from "@saroh/ui/field";
 import { Empty } from "./parts";
 
@@ -53,7 +53,7 @@ export function MessagesTab({
     timeZone: string;
     now: Date;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const id = useId();
     const [draft, setDraft] = useState("");
     const [busy, setBusy] = useState(false);
@@ -67,15 +67,15 @@ export function MessagesTab({
     useEffect(() => {
         if (marked.current || thread.unread === 0) return;
         marked.current = true;
-        void markThreadReadAction(contactId).then((res) => {
-            if (res.ok) router.refresh();
+        void markThreadReadAction(contactId, orgId).then((res) => {
+            if (res.ok) void saved();
         });
-    }, [contactId, thread.unread, router]);
+    }, [contactId, thread.unread, orgId, saved]);
 
     async function reply() {
         if (off) return;
         setBusy(true);
-        const res = await replyAction(contactId, text).catch(() => ({
+        const res = await replyAction(contactId, text, orgId).catch(() => ({
             ok: false as const,
             error: UNREACHED,
         }));
@@ -83,7 +83,7 @@ export function MessagesTab({
         if (!res.ok) return showError(res.error);
         setSent((list) => [...list, res.data]);
         setDraft("");
-        router.refresh();
+        void saved();
     }
 
     // What the server read, and what was sent since (until it reads again).

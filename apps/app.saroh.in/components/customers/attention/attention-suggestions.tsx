@@ -1,5 +1,6 @@
 "use client";
 
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -11,7 +12,6 @@ import {
     showSuccess,
     showUndo,
 } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { UNREACHED } from "@/lib/api/unreached";
@@ -93,7 +93,7 @@ export function AttentionSuggestions({
     /** `customer:sensitive`: may mark a note sensitive (C13). */
     canSensitive?: boolean;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const [gone, setGone] = useState<string[]>([]);
     const slotRef = useRef<HoldSlot | null>(null);
 
@@ -111,7 +111,11 @@ export function AttentionSuggestions({
         const slot = (slotRef.current ??= createHoldSlot());
         const held = slot.start({
             commit: async () => {
-                const res = await removeAttentionAction(contactId, entry.id);
+                const res = await removeAttentionAction(
+                    contactId,
+                    entry.id,
+                    orgId,
+                );
                 if (!res.ok) {
                     refused = res.error;
                     throw new Error(res.error);
@@ -121,7 +125,7 @@ export function AttentionSuggestions({
             onChange: (state) => {
                 if (state.status === "held") return;
                 if (toastId !== null) dismissToast(toastId);
-                if (state.status === "committed") router.refresh();
+                if (state.status === "committed") void saved();
                 if (state.status === "failed") {
                     back();
                     showError(
@@ -187,7 +191,7 @@ function SuggestionCard({
     canSensitive: boolean;
     sensitiveRoles: string[] | null;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const id = useId();
     const [draft, setDraft] = useState<AttentionDraft>(() =>
         suggestionDraft(entry, choices),
@@ -221,6 +225,7 @@ function SuggestionCard({
             contactId,
             entry.id,
             toSuggestionInput(draft, choices),
+            orgId,
         ).catch(() => ({
             ok: false as const,
             error: UNREACHED,
@@ -231,7 +236,7 @@ function SuggestionCard({
             setFailed({ field: fieldOf(res.field), message: res.error });
             return;
         }
-        router.refresh();
+        void saved();
         showSuccess(`${draftTag(draft, choices)} added to Needs attention.`);
     }
 

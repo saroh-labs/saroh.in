@@ -1,5 +1,6 @@
 "use client";
 
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -8,7 +9,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showError, showUndo } from "@saroh/ui/toast";
 import { Lock } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { removeAttentionAction } from "@/lib/customer-workspace/actions";
@@ -46,7 +46,7 @@ export function useAttention({
     contactId: string;
     attention: DetailAttention | null | undefined;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const [gone, setGone] = useState<string[]>([]);
     const [sheet, setSheet] = useState<{
         key: number;
@@ -69,7 +69,11 @@ export function useAttention({
         const slot = (slotRef.current ??= createHoldSlot());
         const held = slot.start({
             commit: async () => {
-                const res = await removeAttentionAction(contactId, entry.id);
+                const res = await removeAttentionAction(
+                    contactId,
+                    entry.id,
+                    orgId,
+                );
                 if (!res.ok) {
                     refused = res.error;
                     throw new Error(res.error);
@@ -79,7 +83,7 @@ export function useAttention({
             onChange: (state) => {
                 if (state.status === "held") return;
                 if (toastId !== null) dismissToast(toastId);
-                if (state.status === "committed") router.refresh();
+                if (state.status === "committed") void saved();
                 if (state.status === "failed") {
                     back();
                     showError(

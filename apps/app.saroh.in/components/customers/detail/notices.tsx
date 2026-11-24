@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import {
@@ -9,6 +8,7 @@ import {
     duplicateLine,
 } from "@/lib/customer-workspace/merge";
 import type { DuplicateSuggestion } from "@/lib/customer-workspace/service";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import { Notice } from "@saroh/ui/notice";
 
 /**
@@ -129,7 +129,7 @@ export function PartialNotice({
     first: string;
     missing: string[];
 }) {
-    const router = useRouter();
+    const { saved } = useCustomerSave();
     const [pending, start] = useTransition();
     if (!missing.length) return null;
     return (
@@ -145,7 +145,7 @@ export function PartialNotice({
                 <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => start(() => router.refresh())}
+                    onClick={() => start(() => saved())}
                     busy={pending}
                     busyLabel="Trying…"
                 >

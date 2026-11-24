@@ -30,6 +30,7 @@ import {
     unlinkConfirm,
     unlinkedLine,
 } from "@/lib/customer-workspace/site-account";
+import { useCustomerSave } from "@/lib/customers/use-customers";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
@@ -86,6 +87,7 @@ export function useMoreActions({
     dialogs: React.ReactNode;
 } {
     const router = useRouter();
+    const { orgId, saved } = useCustomerSave();
     const [editing, setEditing] = useState(0);
     const [linking, setLinking] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -111,16 +113,19 @@ export function useMoreActions({
     }
 
     async function separate(preview: UnlinkPreview): Promise<ConfirmResult> {
-        const res = await unlinkAccountAction(d.contact.id);
+        const res = await unlinkAccountAction(d.contact.id, orgId);
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(unlinkedLine(signsInWith(preview)));
-        router.refresh();
+        // Both records changed: Customers is read again.
+        await saved();
     }
 
     async function remove(): Promise<ConfirmResult> {
         const res = await deleteContact(d.contact.id);
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(deletedLine(name, res.data));
+        // Gone from the lists it was on.
+        void saved();
         router.push(back);
     }
 
@@ -129,6 +134,7 @@ export function useMoreActions({
     function removedDetails() {
         setRemovingDetails(false);
         showSuccess(REMOVED_TOAST);
+        void saved();
         router.push(removedHref ?? back);
     }
 
