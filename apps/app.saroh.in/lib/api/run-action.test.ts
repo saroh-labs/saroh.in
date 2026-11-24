@@ -21,6 +21,11 @@ vi.mock("next/navigation", () => ({
     },
 }));
 
+import { QueryObserver } from "@tanstack/react-query";
+
+import { getBrowserQueryClient } from "@/lib/query/client";
+import { domainKey } from "@/lib/query/keys";
+
 import { runAction } from "./run-action";
 import { UNREACHED } from "./unreached";
 
@@ -90,6 +95,46 @@ describe("runAction", () => {
 
     it("works with no options at all", async () => {
         expect(await runAction(() => Promise.resolve("done"))).toBe("done");
+    });
+
+    it("staleOrg: a save that worked marks that business's reads stale, reading none again", async () => {
+        vi.stubGlobal("window", {});
+        try {
+            const client = getBrowserQueryClient();
+            let reads = 0;
+            const queryFn = () => ++reads;
+            const mine = domainKey("orders", "org_a", "list");
+            const theirs = domainKey("orders", "org_b", "list");
+            for (const queryKey of [mine, theirs]) {
+                await client.fetchQuery({
+                    queryKey,
+                    queryFn,
+                    staleTime: Infinity,
+                });
+                new QueryObserver(client, {
+                    queryKey,
+                    queryFn,
+                    staleTime: Infinity,
+                }).subscribe(() => undefined);
+            }
+            reads = 0;
+            const stale = (k: readonly unknown[]) =>
+                client.getQueryState(k)?.isInvalidated;
+
+            await runAction(() => Promise.resolve({ ok: false }), {
+                staleOrg: "org_a",
+            });
+            expect(stale(mine)).toBe(false);
+
+            await runAction(() => Promise.resolve({ ok: true }), {
+                staleOrg: "org_a",
+            });
+            await vi.waitFor(() => expect(stale(mine)).toBe(true));
+            expect(stale(theirs)).toBe(false);
+            expect(reads).toBe(0);
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 });
 

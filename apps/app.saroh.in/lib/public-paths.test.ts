@@ -14,6 +14,10 @@ describe("isPublicPath", () => {
             "/social/deletion",
             "/social/deletion/a/b",
             "/",
+            // Read routes (DEC-259): each also checks the session itself.
+            "/api/orders",
+            "/api/probe/list",
+            "/api/social/deletion/abc",
         ]) {
             expect(isPublicPath(path), path).toBe(false);
         }
