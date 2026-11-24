@@ -37,6 +37,18 @@ export const FAILS_PER_PHONE_PER_DAY = 10;
 /** Failed verifies from one address in a day. */
 export const FAILS_PER_ADDRESS_PER_DAY = 20;
 
+/**
+ * A released START's reason starts with this when the failure was Saroh's
+ * (the provider refused, the ceiling, nothing to hand out): it counts toward
+ * no one's limits (owner, 24 Nov). The ceiling still bounds the sends.
+ */
+export const OUR_FAILURE = "ours_";
+
+/** Every START except one released for Saroh's own failure. */
+const notOurFailure: Prisma.AccountPhoneEventWhereInput = {
+    OR: [{ reason: null }, { reason: { not: { startsWith: OUR_FAILURE } } }],
+};
+
 export type LimitReason =
     | "phone_cooldown"
     | "phone_burst"
@@ -84,7 +96,7 @@ function startRules({ phoneHash, ipHash, userId }: LimitKeys): Rule[] {
             reason: "phone_daily",
             max: STARTS_PER_PHONE_PER_DAY,
             windowSeconds: DAY,
-            where: { kind, phoneHash },
+            where: { kind, phoneHash, ...notOurFailure },
         },
         ...(userId
             ? [
@@ -92,7 +104,7 @@ function startRules({ phoneHash, ipHash, userId }: LimitKeys): Rule[] {
                       reason: "user_daily" as const,
                       max: STARTS_PER_USER_PER_DAY,
                       windowSeconds: DAY,
-                      where: { kind, userId },
+                      where: { kind, userId, ...notOurFailure },
                   },
               ]
             : []),
@@ -102,7 +114,7 @@ function startRules({ phoneHash, ipHash, userId }: LimitKeys): Rule[] {
                       reason: "address_hourly" as const,
                       max: STARTS_PER_ADDRESS_PER_HOUR,
                       windowSeconds: HOUR,
-                      where: { kind, ipHash },
+                      where: { kind, ipHash, ...notOurFailure },
                   },
               ]
             : []),

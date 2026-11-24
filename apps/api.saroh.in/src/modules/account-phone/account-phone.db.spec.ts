@@ -750,7 +750,7 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         ).resolves.toMatchObject({ phoneE164: p });
     });
 
-    it("a failed send while adding says try SMS, doesn't hold the cooldown, and still counts toward the day", async () => {
+    it("a failed send while adding says try SMS and counts toward no limit", async () => {
         const me = await person();
         const p = phone();
         fake.failNext("template_paused");
@@ -769,6 +769,57 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
             startWa(p, { purpose: "add", userId: me.id }),
         ).resolves.toHaveProperty("whatsapp");
         await expect(events("START", p)).resolves.toBe(2);
+    });
+
+    // Owner, 24 Nov: Saroh's own failures never use up a person's tries.
+    it("failed sends on Saroh's side don't fill the day's starts", async () => {
+        const me = await person();
+        const p = phone();
+        const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        await prisma.accountPhoneEvent.createMany({
+            data: Array.from({ length: STARTS_PER_PHONE_PER_DAY }, () => ({
+                kind: "START" as const,
+                phoneHash: numberHash(p),
+                ipHash: null,
+                reason: "ours_whatsapp_unauthorized",
+                createdAt: hourAgo,
+            })),
+        });
+        await expect(
+            startWa(p, { purpose: "add", userId: me.id }),
+        ).resolves.toHaveProperty("whatsapp");
+    });
+
+    it("refuses WhatsApp for every number alike while paused, counting nothing", async () => {
+        const health = new WhatsappSignInHealth(
+            new MemoryHealthStore(),
+            { send: jest.fn().mockResolvedValue(1) },
+            5,
+            30,
+            "saroh_login_code",
+        );
+        service = new AccountPhoneService(
+            new MessagingService(fake),
+            challenge,
+            new FeatureFlagService(),
+            undefined,
+            health,
+        );
+        jest.spyOn(Logger.prototype, "error").mockImplementation(() => {});
+        await health.failed("whatsapp_10");
+        const known = phone();
+        await person(known);
+        const unknown = phone();
+        for (const p of [known, unknown]) {
+            await expect(startWa(p)).rejects.toMatchObject({
+                status: 422,
+                response: { details: { code: "WHATSAPP_FAILED" } },
+            });
+            expect(lastWarning(p)).toContain("reason=whatsapp_paused");
+            await expect(events("START", p)).resolves.toBe(0);
+        }
+        await health.resume();
+        await expect(startWa(known)).resolves.toHaveProperty("whatsapp");
     });
 
     // Signing in, the answer can't wait for the send (owner, 18 Nov).

@@ -10,6 +10,8 @@ const MINUTE_MS = 60_000;
 const WINDOW_MS = 15 * MINUTE_MS;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
+/** How long WhatsApp codes stay paused after an account-level refusal. */
+export const PAUSE_MS = 5 * MINUTE_MS;
 
 /** Defaults when `WHATSAPP_FAILURES_MIN` / `_PERCENT` are unset. */
 export const DEFAULT_FAILURES_MIN = 5;
@@ -306,6 +308,20 @@ export class WhatsappSignInHealth {
             await this.store.claim(`${KEY}:msg:${messageId}`, DAY_MS);
     }
 
+    /**
+     * Paused after an account-level refusal, for {@link PAUSE_MS}: WhatsApp
+     * codes are refused up front for every number alike, then the next one
+     * tries again.
+     */
+    async paused(): Promise<boolean> {
+        return (await this.store.get(`${KEY}:paused`)) !== null;
+    }
+
+    /** Lifts the pause, as when the provider is switched. */
+    async resume(): Promise<void> {
+        await this.store.take(`${KEY}:paused`);
+    }
+
     /** Meta's `failed` status for a message: counted once, if it was ours. */
     async deliveryFailed(
         messageId: string,
@@ -326,6 +342,9 @@ export class WhatsappSignInHealth {
         await this.store.swap(`${KEY}:last-error`, reason, DAY_MS);
 
         const meaning = accountLevel(reason);
+        // Every send would fail the same way: pause WhatsApp codes for
+        // everyone, so nobody spends tries on them (owner, 24 Nov).
+        if (meaning) await this.store.swap(`${KEY}:paused`, reason, PAUSE_MS);
         if (
             meaning &&
             (await this.store.claim(`${KEY}:alerted:${reason}`, HOUR_MS))

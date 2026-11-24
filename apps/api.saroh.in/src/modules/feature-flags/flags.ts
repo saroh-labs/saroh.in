@@ -141,6 +141,16 @@ export const FlagKey = {
     PHONE_REQUIRED_FOR_ACCOUNTS: "PHONE_REQUIRED_FOR_ACCOUNTS",
 
     /**
+     * Which sender Saroh's WhatsApp messages go through (owner, 24 Nov).
+     * Platform-wide: read with no organization. On, Meta's Cloud API
+     * (DEC-213); off or unset, MSG91. Asked on every send, so it switches
+     * at once. Matters only where `MESSAGING_PROVIDER=meta`; otherwise
+     * everything is MSG91 already. SMS and the OTP widget stay on MSG91.
+     * One reader: `messaging/providers/messaging-provider.factory.ts`.
+     */
+    WHATSAPP_VIA_META: "WHATSAPP_VIA_META",
+
+    /**
      * Taking payment through a business's own Stripe account (DEC-208).
      * Off for everyone until a Stripe test-mode run has paid, refunded and
      * cancelled through the checkout window. Off, Stripe can't be connected,
@@ -392,6 +402,16 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-06-30",
         removeWhen:
             "It has been on everywhere for a release and the phone is simply part of sign-up, with the step's one reader asking no flag.",
+    },
+    WHATSAPP_VIA_META: {
+        shownAs: "WhatsApp through Meta",
+        group: "safety",
+        purpose:
+            "Picks the sender for Saroh's WhatsApp messages, sign-in codes included. Platform-wide: set the global default, not a business. On, they go straight through Meta's Cloud API; off, through MSG91. Takes effect on the next message, no redeploy. Only on an API where Meta is set up (MESSAGING_PROVIDER=meta); elsewhere everything is MSG91 whatever this says. SMS always goes through MSG91.",
+        owner: "Platform owner",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Meta has sent every WhatsApp message for a release with no switch back, and MSG91's WhatsApp path is removed.",
     },
     WEB_ADDRESS_CHANGE: {
         shownAs: "Change web address",

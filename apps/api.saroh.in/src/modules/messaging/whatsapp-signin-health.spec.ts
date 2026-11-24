@@ -125,6 +125,20 @@ describe("WhatsApp sign-in health", () => {
         expect(send).toHaveBeenCalledTimes(3);
     });
 
+    // Owner, 24 Nov: every send would fail alike, so nobody spends tries.
+    it("pauses WhatsApp codes for five minutes on an account-level error only", async () => {
+        const { made } = health();
+        await made.failed("whatsapp_131026", clock);
+        await expect(made.paused()).resolves.toBe(false);
+        await made.failed("whatsapp_10", clock);
+        await expect(made.paused()).resolves.toBe(true);
+        clock += 5 * 60_000 + 1;
+        await expect(made.paused()).resolves.toBe(false);
+        await made.failed("unauthorized", clock);
+        await made.resume();
+        await expect(made.paused()).resolves.toBe(false);
+    });
+
     it("counts Meta's failed status only for a sign-in message, and only once", async () => {
         const { made } = health();
         await made.sent("wamid.ours", clock);
