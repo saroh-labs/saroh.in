@@ -2,9 +2,8 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight, RotateCw } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { ComponentPropsWithRef } from "react";
-import { useId, useState, useTransition } from "react";
+import { useId, useState } from "react";
 
 import { phoneChequesAt, totalWithCheques } from "@/lib/home/cheques";
 import type { GroupLine } from "@/lib/home/group-words";
@@ -25,6 +24,7 @@ import type {
     HomeNeedGroup,
     HomeUnavailable,
 } from "@/lib/home/service";
+import { useHomeReadAgain } from "@/lib/home/use-home";
 
 import { PhoneChequesLine } from "@/components/home/needs-you/cheques-line";
 import { GROUP_ICONS } from "@/components/home/needs-you/need-group";
@@ -240,17 +240,20 @@ export function PhoneNeedLine({
 /**
  * "Couldn't check bills just now · Try again" (`HPStates`): the part of
  * Home that couldn't be read, said once, at the top of the list. Pressed,
- * the page reads again and the rest stays where it was.
+ * Home is read again and the rest stays where it was.
  */
 function CouldntCheck({ text }: { text: string }) {
-    const router = useRouter();
-    const [pending, start] = useTransition();
+    const readAgain = useHomeReadAgain();
+    const [pending, setPending] = useState(false);
     return (
         <button
             type="button"
             data-couldnt-check=""
             disabled={pending}
-            onClick={() => start(() => router.refresh())}
+            onClick={() => {
+                setPending(true);
+                void readAgain?.().finally(() => setPending(false));
+            }}
             className={LINE}
         >
             <RotateCw

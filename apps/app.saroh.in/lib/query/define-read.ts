@@ -30,6 +30,9 @@ export interface Read<P, T> {
     };
 }
 
+/** How long a read just made (by the page's prefetch) counts as fresh. */
+export const HYDRATED_FRESH_MS = 5_000;
+
 export function defineRead<T>() {
     return <S extends z.ZodRawShape>(def: {
         key: (orgId: string, params: z.output<z.ZodObject<S>>) => DomainKey;
@@ -43,6 +46,9 @@ export function defineRead<T>() {
                 queryKey: def.key(orgId, params),
                 queryFn: ({ signal }) =>
                     apiRead<T>(def.route.path, params, { orgId, signal }),
+                // The page's prefetch is fresh for a moment, so mounting
+                // over it reads nothing (KTD-4); an invalidation still reads.
+                staleTime: HYDRATED_FRESH_MS,
             }),
     });
 }

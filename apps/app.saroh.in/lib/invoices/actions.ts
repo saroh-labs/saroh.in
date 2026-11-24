@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { revalidatePath } from "next/cache";
 
 import { linesWithRates } from "./line-rates";
@@ -227,7 +228,9 @@ export async function sendInvoice(id: string) {
     return res;
 }
 
-export async function remindInvoice(id: string) {
+export async function remindInvoice(id: string, orgId?: string) {
+    // From Home on React Query (DEC-259): Home reads itself again.
+    if (orgId) return writeAsOrg(orgId, () => api.remindInvoice(id));
     const res = await api.remindInvoice(id);
     if (res.ok) refresh(id);
     return res;
@@ -239,7 +242,9 @@ export async function previewReminders(ask: ReminderAsk) {
 }
 
 /** Remind all: Home and the invoices read again, with the reminders sent. */
-export async function sendReminders(ask: ReminderAsk) {
+export async function sendReminders(ask: ReminderAsk, orgId?: string) {
+    // From Home on React Query (DEC-259): Home reads itself again.
+    if (orgId) return writeAsOrg(orgId, () => api.sendReminders(ask));
     const res = await api.sendReminders(ask);
     if (res.ok) {
         refresh();

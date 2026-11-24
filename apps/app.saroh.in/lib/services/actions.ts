@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import type { BookingMoney } from "./booking-money";
 import type { DeskPaymentInput } from "./desk-pay";
 import type { PeekPerson } from "./peek";
@@ -65,7 +66,10 @@ export async function takeDeskPayment(
 }
 
 /** "Send a payment link" for a booking just made (E4). */
-export async function createBookingPayLink(bookingId: string) {
+export async function createBookingPayLink(bookingId: string, orgId?: string) {
+    if (orgId) {
+        return writeAsOrg(orgId, () => createBookingPayLinkApi(bookingId));
+    }
     return createBookingPayLinkApi(bookingId);
 }
 
@@ -118,7 +122,8 @@ export async function cancelBooking(
  * only while it still awaits its money; `paid` when the customer paid in
  * the meantime.
  */
-export async function turnDownBooking(bookingId: string) {
+export async function turnDownBooking(bookingId: string, orgId?: string) {
+    if (orgId) return writeAsOrg(orgId, () => turnDownBookingApi(bookingId));
     return turnDownBookingApi(bookingId);
 }
 
@@ -178,8 +183,10 @@ export async function readBookingPerson(
 export async function recordBookingOutcome(
     bookingId: string,
     outcome: BookingOutcome,
+    orgId?: string,
 ) {
-    return recordBookingOutcomeApi(bookingId, outcome);
+    const write = () => recordBookingOutcomeApi(bookingId, outcome);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /**

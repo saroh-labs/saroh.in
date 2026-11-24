@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { revalidatePath } from "next/cache";
 
 import { personHref } from "@/lib/contacts/person-href";
@@ -221,8 +222,16 @@ export async function markThreadReadAction(contactId: string) {
     return markThreadRead(contactId);
 }
 
-/** Answer the customer in their thread (A13). */
-export async function replyAction(contactId: string, text: string) {
+/**
+ * Answer the customer in their thread (A13). `orgId`: from Home on React
+ * Query (DEC-259), which reads itself again.
+ */
+export async function replyAction(
+    contactId: string,
+    text: string,
+    orgId?: string,
+) {
+    if (orgId) return writeAsOrg(orgId, () => replyToThread(contactId, text));
     const result = await replyToThread(contactId, text);
     if (result.ok) revalidatePath(personHref(contactId));
     return result;

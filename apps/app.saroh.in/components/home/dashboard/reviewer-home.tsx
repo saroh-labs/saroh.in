@@ -22,7 +22,14 @@ const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
  *
  * A read that failed is named, never shown as "Nothing sent to you".
  */
-export function ReviewerHome({ home }: { home: HomeModel }) {
+export function ReviewerHome({
+    home,
+    onRetry,
+}: {
+    home: HomeModel;
+    /** Try again: Home read again (absent, the page is). */
+    onRetry?: () => void;
+}) {
     const sites = home.reviews ?? [];
     const failed = home.unavailable.length > 0;
     const zone = home.lastDay?.zone ?? DEFAULT_BUSINESS_ZONE;
@@ -36,6 +43,7 @@ export function ReviewerHome({ home }: { home: HomeModel }) {
         <div className="grid min-w-0 gap-5">
             {failed ? (
                 <PartialRead
+                    onRetry={onRetry}
                     things={formatList(
                         home.unavailable.map((part) => part.label),
                     )}

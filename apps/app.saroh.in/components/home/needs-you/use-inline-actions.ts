@@ -11,7 +11,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { makePayLink } from "@/components/bookings/booking-page/pay-link-panel";
-import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { replyAction } from "@/lib/customer-workspace/actions";
 import { formatTime, viewerTimeZone } from "@/lib/format/datetime";
 import type { HoldSlot, HoldState } from "@/lib/hold-undo";
@@ -34,6 +34,7 @@ import {
     resultWords,
 } from "@/lib/home/remind-all";
 import type { HomeInline, HomeNeed } from "@/lib/home/service";
+import { useHomeSave } from "@/lib/home/use-home";
 import { sendReminders } from "@/lib/invoices/actions";
 import { remindWithLink } from "@/lib/invoices/link-actions";
 import { forgetLink } from "@/lib/invoices/minted-links";
@@ -104,9 +105,12 @@ function nowWords(): string {
  *
  * A done row stays where it was, struck through, with what happened and its
  * Undo while there is one — as the design draws it — until Home is next
- * read.
+ * read. Each goes through `useHomeSave` (DEC-259) with the open business;
+ * a write that changes Home (`reread`) has Home read again, as its old
+ * revalidation did, and one that didn't leaves the row as it is.
  */
 export function useInlineActions() {
+    const save = useHomeSave();
     const [open, setOpen] = useState<string | null>(null);
     const [drafts, setDrafts] = useState<Record<string, string>>({});
     const [done, setDoneMap] = useState<Record<string, DoneRow>>({});
@@ -167,12 +171,14 @@ export function useInlineActions() {
     }
 
     async function markSent(need: HomeNeed, inline: HomeInline) {
-        const res = await runAction(
-            () =>
-                moveStage(inline.target, {
-                    to: inline.stage as KitchenStage,
-                }),
-            { setBusy: (on) => setBusy(on ? need.id : null) },
+        const res = await save(
+            (...org) =>
+                moveStage(
+                    inline.target,
+                    { to: inline.stage as KitchenStage },
+                    ...org,
+                ),
+            { reread: false, setBusy: (on) => setBusy(on ? need.id : null) },
         );
         if (!res) return;
         if (!res.ok) {
@@ -183,7 +189,11 @@ export function useInlineActions() {
         const at = nowWords();
         let told = false;
         const takeBack = async () => {
-            const back = await undoStage(inline.target, eventId);
+            const back = await save(
+                (...org) => undoStage(inline.target, eventId, ...org),
+                { reread: false, quiet: true },
+            );
+            if (!back) throw new Error(UNREACHED);
             if (!back.ok) throw new Error(back.error);
             told = back.data.told ?? false;
         };
@@ -236,23 +246,38 @@ export function useInlineActions() {
         let result = inline.done;
         hold(need, inline, {
             commit: async () => {
+                // Each read Home again before (its revalidation): still so.
+                const sent = { reread: true, quiet: true };
                 if (inline.kind === "REVIEW_REPLY") {
-                    const res = await replyToReview(inline.target, text);
-                    if (!res.ok) {
-                        refused = res.error;
-                        throw new Error(res.error);
+                    const res = await save(
+                        (...org) => replyToReview(inline.target, text, ...org),
+                        sent,
+                    );
+                    if (!res?.ok) {
+                        refused = res?.error ?? UNREACHED;
+                        throw new Error(refused);
                     }
                     return;
                 }
                 if (inline.kind === "REPLY") {
-                    const res = await replyAction(inline.target, text);
-                    if (!res.ok) {
-                        refused = res.error;
-                        throw new Error(res.error);
+                    const res = await save(
+                        (...org) => replyAction(inline.target, text, ...org),
+                        sent,
+                    );
+                    if (!res?.ok) {
+                        refused = res?.error ?? UNREACHED;
+                        throw new Error(refused);
                     }
                     return;
                 }
-                const res = await remindWithLink(inline.target);
+                const res = await save(
+                    (...org) => remindWithLink(inline.target, ...org),
+                    sent,
+                );
+                if (!res) {
+                    refused = UNREACHED;
+                    throw new Error(refused);
+                }
                 if (!res.ok) {
                     refused = res.error;
                     throw new Error(res.error);
@@ -305,7 +330,14 @@ export function useInlineActions() {
         hold(need, inline, {
             text: heldText(inline),
             commit: async () => {
-                const res = await turnDownBooking(inline.target);
+                const res = await save(
+                    (...org) => turnDownBooking(inline.target, ...org),
+                    { reread: false, quiet: true },
+                );
+                if (!res) {
+                    refused = UNREACHED;
+                    throw new Error(refused);
+                }
                 if (!res.ok && "paid" in res) {
                     // Not a failure: they paid, and the booking stands.
                     result = JUST_PAID_ROW;
@@ -353,7 +385,14 @@ export function useInlineActions() {
         hold(need, inline, {
             text: heldText(inline),
             commit: async () => {
-                const res = await makePayLink(inline.target);
+                const res = await save(
+                    (...org) => makePayLink(inline.target, ...org),
+                    { reread: false, quiet: true },
+                );
+                if (!res) {
+                    refused = UNREACHED;
+                    throw new Error(refused);
+                }
                 if (!res.ok) {
                     // The plan's own notice has already been shown.
                     refused = res.plan ? null : res.error;
@@ -384,9 +423,14 @@ export function useInlineActions() {
     }
 
     async function retry(need: HomeNeed, inline: HomeInline) {
-        const res = await runAction(
-            () => retrySubscription(inline.target, inline.via ?? "PAY_LINK"),
-            { setBusy: (on) => setBusy(on ? need.id : null) },
+        const res = await save(
+            (...org) =>
+                retrySubscription(
+                    inline.target,
+                    inline.via ?? "PAY_LINK",
+                    ...org,
+                ),
+            { reread: true, setBusy: (on) => setBusy(on ? need.id : null) },
         );
         if (!res) return;
         if (!res.ok) {
@@ -420,9 +464,13 @@ export function useInlineActions() {
      * refund is on its way; the order or invoice stays as it was.
      */
     async function refund(need: HomeNeed, inline: HomeInline) {
-        const res = await runAction(() => refundMismatch(inline.target), {
-            setBusy: (on) => setBusy(on ? need.id : null),
-        });
+        const res = await save(
+            (...org) => refundMismatch(inline.target, ...org),
+            {
+                reread: true,
+                setBusy: (on) => setBusy(on ? need.id : null),
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(failedText(inline), res.error);
@@ -454,10 +502,23 @@ export function useInlineActions() {
         };
         const held = slot().start({
             commit: async () => {
-                const res = await sendReminders({
-                    invoiceIds: pick.invoiceIds,
-                    ...(pick.quietDays ? { quietDays: pick.quietDays } : {}),
-                });
+                const res = await save(
+                    (...org) =>
+                        sendReminders(
+                            {
+                                invoiceIds: pick.invoiceIds,
+                                ...(pick.quietDays
+                                    ? { quietDays: pick.quietDays }
+                                    : {}),
+                            },
+                            ...org,
+                        ),
+                    { reread: true, quiet: true },
+                );
+                if (!res) {
+                    refused = UNREACHED;
+                    throw new Error(refused);
+                }
                 if (!res.ok) {
                     refused = res.error;
                     throw new Error(res.error);

@@ -51,9 +51,14 @@ export type PayLinkResult =
  * shown as the plan's notice, with the way up (`showPlanRefusal`), as
  * every other screen shows one — not as a plain error.
  */
-export async function makePayLink(bookingId: string): Promise<PayLinkResult> {
+export async function makePayLink(
+    bookingId: string,
+    orgId?: string,
+): Promise<PayLinkResult> {
     try {
-        const res = await createBookingPayLink(bookingId);
+        const res = await (orgId
+            ? createBookingPayLink(bookingId, orgId)
+            : createBookingPayLink(bookingId));
         if (res.ok) return { ok: true, url: res.data.url };
         if (res.plan) {
             showPlanRefusal(res.plan);

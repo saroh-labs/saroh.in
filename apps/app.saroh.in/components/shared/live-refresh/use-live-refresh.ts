@@ -48,8 +48,9 @@ const MIN_GAP_MS = 2_000;
  *
  * On a page moved to React Query (`lib/query/live-routes.ts`) the refresh
  * invalidates that page's domains for the open business instead, so its
- * shown queries read again; `router.refresh()` too only where the page's
- * chrome is server-rendered (`chrome-refresh.ts`). There it also waits
+ * shown queries read again; where the page's chrome is server-rendered
+ * (`chrome-refresh.ts`), `router.refresh()` instead, whose render
+ * prefetches and hydrates those queries, so each is read once. There it also waits
  * while those queries are still reading or a save is on its way.
  */
 export function useLiveRefresh({
@@ -95,8 +96,14 @@ export function useLiveRefresh({
             if (client.isFetching({ predicate }) > 0) return;
             if (client.isMutating() > 0) return;
             startedAt.current = Date.now();
-            void client.invalidateQueries({ predicate });
-            if (!isChromeRefresh(path)) return;
+            if (!isChromeRefresh(path)) {
+                void client.invalidateQueries({ predicate });
+                return;
+            }
+            // A chrome page renders again on the server, whose prefetch
+            // hydrates its queries with the new rows: marked stale only, so
+            // they aren't read twice.
+            void client.invalidateQueries({ predicate, refetchType: "none" });
         } else {
             startedAt.current = Date.now();
         }

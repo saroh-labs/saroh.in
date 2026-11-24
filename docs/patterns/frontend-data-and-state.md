@@ -152,9 +152,16 @@ cache.
 - **On a React Query route** (`lib/query/live-routes.ts`, route glob →
   domains) the same triggers and guards invalidate that route's domains for
   the open business instead, so its shown queries read again; it also waits
-  while those queries are reading or any save is on its way. It calls
-  `router.refresh()` too only for a route in `lib/query/chrome-refresh.ts`
-  (capped at 6). A route on neither list keeps the path above.
+  while those queries are reading or any save is on its way. A route in
+  `lib/query/chrome-refresh.ts` (capped at 6) calls `router.refresh()` instead
+  and only marks its queries stale: its render's prefetch hydrates them, so
+  each is read once. Such a page prefetches every query it shows. A route on
+  neither list keeps the path above.
+- **Outside a render, `cache()` doesn't share.** A read route's handler runs in
+  `inReadScope` (`lib/api/read-scope.ts`, via `readRoute`), one API answer per
+  URL; a Server Action called from a React Query screen takes the tab's
+  `orgId` last and goes through `writeAsOrg`, which refuses a moved tab, reads
+  the business list once, and revalidates nothing (the screen invalidates).
 - **A row that arrived by itself** enters and wears an edge until touched:
   `useArrivals(ids, scope)` and `arrivalProps` (`use-arrivals.ts`,
   `.wk-arrived`). Orders and Home's Needs you use it. `scope` is what the

@@ -46,8 +46,8 @@ export async function sendWithLink(id: string) {
 }
 
 /** A reminder, the same way. */
-export async function remindWithLink(id: string) {
-    const res = await remindInvoice(id);
+export async function remindWithLink(id: string, orgId?: string) {
+    const res = await (orgId ? remindInvoice(id, orgId) : remindInvoice(id));
     if (res.ok) forgetLink(id);
     return res;
 }

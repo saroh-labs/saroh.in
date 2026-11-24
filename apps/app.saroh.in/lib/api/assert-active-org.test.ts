@@ -9,7 +9,7 @@ vi.mock("@/lib/api/http", () => ({
     getActiveOrgId: () => Promise.resolve(active.id),
 }));
 
-import { assertActiveOrg, ORG_MOVED } from "./assert-active-org";
+import { assertActiveOrg, ORG_MOVED, writeAsOrg } from "./assert-active-org";
 
 /** An action as a migrated screen writes it. */
 const write = vi.fn();
@@ -38,5 +38,18 @@ describe("assertActiveOrg", () => {
             error: ORG_MOVED,
         });
         expect(write).not.toHaveBeenCalled();
+    });
+});
+
+describe("writeAsOrg", () => {
+    it("writes for the open business, refuses another without writing", async () => {
+        active.id = "org_a";
+        const save = vi.fn(() => Promise.resolve({ ok: true as const }));
+        await expect(writeAsOrg("org_a", save)).resolves.toEqual({ ok: true });
+        await expect(writeAsOrg("org_b", save)).resolves.toEqual({
+            ok: false,
+            error: ORG_MOVED,
+        });
+        expect(save).toHaveBeenCalledTimes(1);
     });
 });

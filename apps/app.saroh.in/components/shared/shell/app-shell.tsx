@@ -33,7 +33,7 @@ import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { getAskAiState } from "@/lib/ask-ai/service";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
-import { getHomeRail } from "@/lib/home/service";
+import { getHomeRail } from "@/lib/home/rail";
 import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";

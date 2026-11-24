@@ -7,8 +7,9 @@
  * Keys are route globs: an exact path, with `[param]` for one segment
  * (`/commerce/orders/[orderId]`). Pure and client-safe.
  */
-export const LIVE_QUERY_ROUTES: Readonly<Record<string, readonly string[]>> =
-    {};
+export const LIVE_QUERY_ROUTES: Readonly<Record<string, readonly string[]>> = {
+    "/": ["home"],
+};
 
 /** Whether `pathname` is the route `glob` names. */
 export function matchRoute(glob: string, pathname: string): boolean {

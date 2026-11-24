@@ -64,7 +64,10 @@ export function HomeDashboard({
     invoicing,
     insights = false,
     news = null,
+    onRetry,
 }: {
+    /** Try again on what couldn't be read: Home read again (absent, the page is). */
+    onRetry?: () => void;
     home: HomeModel;
     /** Read only for a business with nothing on — the first-run question. */
     modules: ModuleView[] | null;
@@ -114,6 +117,7 @@ export function HomeDashboard({
             {home.unavailable.length > 0 ? (
                 <div className="hidden sm:block">
                     <PartialRead
+                        onRetry={onRetry}
                         things={formatList(
                             home.unavailable.map((part) => part.label),
                         )}

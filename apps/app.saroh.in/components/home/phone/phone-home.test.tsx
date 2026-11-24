@@ -19,6 +19,7 @@ import type {
     HomeNeedGroup,
     HomeTiles,
 } from "@/lib/home/service";
+import { HomeReadAgain } from "@/lib/home/use-home";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
 import { HomeDashboard } from "@/components/home/dashboard/home-dashboard";
@@ -576,8 +577,31 @@ describe("the phone Home's states", () => {
             "Couldn't check overdue invoices just now",
         );
         expect(couldnt?.textContent).toContain("Try again");
-        await press(couldnt);
-        expect(refresh).toHaveBeenCalled();
+        // Home's reads again (DEC-259), as the container gives them.
+        const readAgain = vi.fn(() => Promise.resolve());
+        act(() =>
+            root.render(
+                <HomeReadAgain.Provider value={readAgain}>
+                    <PhoneHome
+                        home={home({
+                            needGroups: [ORDERS],
+                            needGroupsTotal: 13,
+                            unavailable: [
+                                {
+                                    moduleKey: "PAYMENTS",
+                                    label: "Overdue invoices",
+                                },
+                            ],
+                        })}
+                        setup={null}
+                        now={new Date()}
+                        insights
+                    />
+                </HomeReadAgain.Provider>,
+            ),
+        );
+        await press(host.querySelector<HTMLElement>("[data-couldnt-check]"));
+        expect(readAgain).toHaveBeenCalled();
     });
 
     it("getting set up leads with the setup card and says what will show", async () => {

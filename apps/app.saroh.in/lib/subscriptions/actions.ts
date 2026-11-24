@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { revalidatePath } from "next/cache";
 
 import { voidInvoice as voidInvoiceApi } from "@/lib/invoices/service";
@@ -54,7 +55,10 @@ export async function setPlanChargeTiming(
 export async function retrySubscription(
     id: string,
     via: api.RetryVia = "PAY_LINK",
+    orgId?: string,
 ) {
+    // From Home on React Query (DEC-259): Home reads itself again.
+    if (orgId) return writeAsOrg(orgId, () => api.retrySubscription(id, via));
     return then(api.retrySubscription(id, via));
 }
 /**

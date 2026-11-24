@@ -2,7 +2,7 @@
 /**
  * `useLiveRefresh` on a page moved to React Query (DEC-259): the refresh
  * invalidates the page's domains for the open business instead of reading
- * the page again, `router.refresh()` too only for a chrome page, under the
+ * the page again (a chrome page: `router.refresh()` instead), under the
  * same guards plus a read or a save still on its way. Pages off the
  * registry keep today's path (`use-live-refresh.test.tsx`).
  */
@@ -173,10 +173,15 @@ afterEach(() => {
 });
 
 describe("useLiveRefresh on a React Query page", () => {
-    it("invalidates the page's domains for the open business, and refreshes a chrome page once", async () => {
+    it("on a chrome page, refreshes it once and leaves the reads to its render's prefetch", async () => {
         await ready();
         comeBack();
-        expect(reads.count("home", "org_1")).toBe(2);
+        // Read once (mount); the server render hydrates the new rows.
+        expect(reads.count("home", "org_1")).toBe(1);
+        expect(
+            client.getQueryState(domainKey("home", "org_1", "summary"))
+                ?.isInvalidated,
+        ).toBe(true);
         expect(reads.count("orders", "org_1")).toBe(1);
         expect(h.refresh).toHaveBeenCalledTimes(1);
     });
@@ -257,6 +262,7 @@ describe("useLiveRefresh on a React Query page", () => {
     });
 
     it("a second trigger during an in-flight invalidation does nothing", async () => {
+        h.chrome = [];
         await ready();
         comeBack();
         expect(reads.count("home", "org_1")).toBe(2);
@@ -264,7 +270,7 @@ describe("useLiveRefresh on a React Query page", () => {
         comeBack();
         act(() => void window.dispatchEvent(new Event("online")));
         expect(reads.count("home", "org_1")).toBe(2);
-        expect(h.refresh).toHaveBeenCalledTimes(1);
+        expect(h.refresh).not.toHaveBeenCalled();
         // Once it has landed, the next one goes.
         await reads.settle();
         later();
@@ -273,6 +279,7 @@ describe("useLiveRefresh on a React Query page", () => {
     });
 
     it("a business switch mid-refresh leaves the new business alone", async () => {
+        h.chrome = [];
         await ready("org_1");
         comeBack();
         expect(reads.count("home", "org_1")).toBe(2);
@@ -294,8 +301,8 @@ describe("useLiveRefresh on a React Query page", () => {
 });
 
 describe("the registries", () => {
-    it("start empty, and the chrome list keeps its cap", () => {
-        expect(LIVE_QUERY_ROUTES).toEqual({});
+    it("hold the routes moved so far, and the chrome list keeps its cap", () => {
+        expect(LIVE_QUERY_ROUTES).toEqual({ "/": ["home"] });
         expect(CHROME_REFRESH_ROUTES.length).toBeLessThanOrEqual(
             CHROME_REFRESH_CAP,
         );

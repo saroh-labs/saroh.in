@@ -2,11 +2,11 @@
 
 import { canShare, copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 
 import { readyRows } from "@/components/settings/ready/ready-rows";
 import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import { noteShared } from "@/components/shared/share-link/note-shared";
+import { useHomeReadAgain } from "@/lib/home/use-home";
 import type { FirstSteps } from "@/lib/settings/ready";
 import { FIRST_STEPS_WORDS, firstStepsLead } from "@/lib/settings/ready";
 import type { ShareLink } from "@/lib/sites/share-links";
@@ -38,7 +38,7 @@ export function FirstStepsChecklist({
     businessId: string;
 }) {
     const hidden = useSetupHidden(businessId);
-    const router = useRouter();
+    const readAgain = useHomeReadAgain();
     if (!firstStepsLead(first)) return null;
 
     const press = async (link: ShareLink) => {
@@ -56,7 +56,8 @@ export function FirstStepsChecklist({
             return;
         }
         await noteShared();
-        router.refresh();
+        // The step ticks: Home's setup read again (DEC-259).
+        await readAgain?.();
     };
 
     const rows = readyRows(first.steps).map((row) =>
