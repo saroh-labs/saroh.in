@@ -60,6 +60,13 @@ There is no global client store. React Query holds server state only, in
   fails the typecheck. Each mutation declares `invalidates`; invalidation fires
   only on `ok !== false`, and the mutation resolves after the refetch settles.
   Optimistic updates only where DEC-259 names them.
+- **A screen whose address is its key** (the calendar's `?month`, `?view`):
+  its links stay `<Link>`s and change the address in place
+  (`<ScreenPending inPlace>`, `history.pushState`, no server render); the
+  container reads `useSearchParams`, keys the query on what it asks for,
+  holds the last answer greyed (`keepPreviousData`) until the new one lands,
+  and Back draws a seen one from the cache. The page and the container turn
+  the address into the key through one pure function (`calendarAt`).
 - **Business switch and sign-out** call `clear()` and announce it on a
   `BroadcastChannel`, so every tab drops the cache.
 - **`staleTime: 0`** for every domain until the epic's close-out; `retry: false`,

@@ -22,11 +22,29 @@ interface ScreenPendingValue {
 
 const ScreenPendingContext = createContext<ScreenPendingValue | null>(null);
 
-export function ScreenPending({ children }: { children: ReactNode }) {
+export function ScreenPending({
+    inPlace,
+    children,
+}: {
+    /**
+     * A screen on React Query whose address is its query key (DEC-259): the
+     * address changes in place, no server render, and the region greys
+     * while the new key's read is on its way (`pending`).
+     */
+    inPlace?: { pending: boolean };
+    children: ReactNode;
+}) {
     const router = useRouter();
-    const [pending, start] = useTransition();
+    const [transition, start] = useTransition();
     const go = (href: string, how: "push" | "replace" = "push") =>
-        start(() => router[how](href, { scroll: false }));
+        inPlace
+            ? window.history[how === "push" ? "pushState" : "replaceState"](
+                  null,
+                  "",
+                  href,
+              )
+            : start(() => router[how](href, { scroll: false }));
+    const pending = inPlace ? inPlace.pending : transition;
     return (
         <ScreenPendingContext.Provider value={{ pending, go }}>
             {children}

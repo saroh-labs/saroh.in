@@ -146,15 +146,20 @@ export interface CalendarUnavailable {
 export interface CalendarMonth {
     month: string;
     timezone: string;
-    timezoneSource: "business" | "service" | "fallback";
-    from: string;
-    to: string;
+    /**
+     * The API's, which the screen doesn't draw: left out of what the read
+     * route sends (`access.ts`).
+     */
+    timezoneSource?: "business" | "service" | "fallback";
+    from?: string;
+    to?: string;
     /** The layers this viewer gets, in the API's order. */
     layers: LayerKey[];
     /** The month's count per layer; null when the layer could not be read. */
     totals: Partial<Record<LayerKey, number | null>>;
     days: CalendarDay[];
-    toActOn: {
+    /** The API's; the screen counts problems per day instead. */
+    toActOn?: {
         kind: "renewal_failed" | "invoice_overdue";
         date: string;
         title: string;

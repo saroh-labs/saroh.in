@@ -7,7 +7,10 @@ import { defaultShouldDehydrateQuery } from "@tanstack/react-query";
  * named here: billing secrets, API keys, tokens and provider credentials
  * are never dehydrated.
  */
-export const DEHYDRATE_DOMAINS: ReadonlySet<string> = new Set<string>(["home"]);
+export const DEHYDRATE_DOMAINS: ReadonlySet<string> = new Set<string>([
+    "home",
+    "calendar",
+]);
 
 /** Done or still pending (an un-awaited prefetch must cross too), and allowed. */
 export function shouldDehydrateQuery(query: Query): boolean {
