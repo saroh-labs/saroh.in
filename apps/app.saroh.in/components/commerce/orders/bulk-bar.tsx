@@ -2,7 +2,6 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import type { CrmResult } from "@/lib/api/http";
@@ -29,6 +28,7 @@ import {
     printTicketsLabel,
     ticketsHref,
 } from "@/lib/orders/tickets";
+import { useOrderSave } from "@/lib/orders/use-orders";
 import { Tip } from "@saroh/ui/tooltip";
 
 /**
@@ -42,7 +42,8 @@ import { Tip } from "@saroh/ui/tooltip";
  * hold (`lib/hold-undo.ts`, `onLeave: "drop"`). Start preparing and the
  * handover go through at once, with Undo all on the toast, as the design
  * has them. Every result is said in words: what moved, what couldn't and
- * why, and whether a customer had already been told.
+ * why, and whether a customer had already been told. A batch that went
+ * through reads the list once, after the whole batch (`useOrderSave`).
  *
  * "Print tickets (N)" opens the selected orders' tickets in a new tab, one
  * to a page, oldest first (`/commerce/orders/tickets`), so the selection
@@ -75,7 +76,7 @@ export function BulkBar({
     selected: OrderRow[];
     onClear: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const [busy, startTransition] = useTransition();
     const [held, setHeld] = useState<Held | null>(null);
     const hold = useRef<Hold | null>(null);
@@ -105,11 +106,11 @@ export function BulkBar({
         res: CrmResult<StageBatch>,
         action: BulkAction,
     ): void {
-        router.refresh();
         if (!res.ok) {
             showError(res.error);
             return;
         }
+        void saved();
         const said = commitSummary(res.data, action.kind, action.skipped);
         if (!anyMoved(res.data)) {
             showInfo(said);
@@ -121,11 +122,16 @@ export function BulkBar({
             said,
             () =>
                 startTransition(async () => {
-                    const back = await runAction(() => undoBatch(batchId));
+                    const back = await runAction(() =>
+                        undoBatch(batchId, orgId),
+                    );
                     if (!back) return;
-                    if (!back.ok) showError(back.error);
-                    else showInfo(undoSummary(back.data, nameOf));
-                    router.refresh();
+                    if (!back.ok) {
+                        showError(back.error);
+                        return;
+                    }
+                    showInfo(undoSummary(back.data, nameOf));
+                    await saved();
                 }),
             { duration: HOLD_UNDO_MS },
         );
@@ -135,9 +141,9 @@ export function BulkBar({
     async function post(action: BulkAction, batchId: string, now: boolean) {
         const input = { batchId, lines: action.lines, now };
         try {
-            return await holdBatch(input);
+            return await holdBatch(input, orgId);
         } catch {
-            return holdBatch(input);
+            return holdBatch(input, orgId);
         }
     }
 
@@ -148,10 +154,9 @@ export function BulkBar({
             const res = await runAction(() =>
                 post(action, batchId, !action.hold),
             );
-            if (!res) return router.refresh();
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
-                router.refresh();
                 return;
             }
             onClear();
@@ -163,17 +168,20 @@ export function BulkBar({
             const started = startHold({
                 onLeave: "drop",
                 commit: async () => {
-                    reportCommit(await sendBatchNow(batchId), action);
+                    reportCommit(await sendBatchNow(batchId, orgId), action);
                 },
                 undo: async () => {
                     // The hold words a failed Undo from what is thrown.
-                    const back = await runAction(() => undoBatch(batchId), {
-                        quiet: true,
-                    });
+                    const back = await runAction(
+                        () => undoBatch(batchId, orgId),
+                        {
+                            quiet: true,
+                        },
+                    );
                     if (!back) throw new Error(UNREACHED);
                     if (!back.ok) throw new Error(back.error);
                     showInfo(undoSummary(back.data, nameOf));
-                    router.refresh();
+                    await saved();
                 },
                 onChange: (state) => {
                     if (state.status === "held") return;

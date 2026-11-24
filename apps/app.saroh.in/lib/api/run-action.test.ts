@@ -158,6 +158,8 @@ const CATCHES_ITSELF = [
     "await copy(",
     // `useBookingSave().save`: `runAction`, or `useActionMutation` over it.
     "await bookingSave(",
+    // `useOrderSave().saved`: reads the screen's queries again, never throws.
+    "await saved(",
 ];
 
 function sources(dir: string): string[] {

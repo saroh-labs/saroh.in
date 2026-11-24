@@ -1,5 +1,3 @@
-import { joinDeliveryPlace } from "@saroh/block-contract";
-
 import type {
     AttentionKind,
     AttentionSource,
@@ -138,10 +136,6 @@ export interface DeliveryAddress {
     /** A Global delivery's ISO country (DEC-207); India's is null. */
     country?: string | null;
 }
-
-/** Past the city: India's state, or a Global delivery's "Texas, United States". */
-export const deliveryPlace = (a: Pick<DeliveryAddress, "state" | "country">) =>
-    joinDeliveryPlace(a.state, a.country) || null;
 
 export interface OrderReadMoney {
     currency: string;

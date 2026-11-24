@@ -3,45 +3,50 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { recordPayment, updateOrder } from "./actions";
 
 /**
- * Record as paid reads the order page again (UX-063): a successful write
- * revalidates the order and the list, so the money panel doesn't keep
- * saying "Still due" until a reload. A refused one revalidates nothing.
+ * Recording a payment from an Orders screen (DEC-259): the write goes as
+ * the tab's business (`writeAsOrg`), so a tab left on another business
+ * writes nothing, and the screen reads its queries again itself: nothing
+ * is revalidated on the server.
  */
-const { revalidatePath, updateOrderApi, recordOrderPayment } = vi.hoisted(
-    () => ({
-        revalidatePath: vi.fn(),
-        updateOrderApi: vi.fn(),
-        recordOrderPayment: vi.fn(),
-    }),
-);
-vi.mock("next/cache", () => ({ revalidatePath }));
+const { writeAsOrg, updateOrderApi, recordOrderPayment } = vi.hoisted(() => ({
+    writeAsOrg: vi.fn(),
+    updateOrderApi: vi.fn(),
+    recordOrderPayment: vi.fn(),
+}));
+vi.mock("@/lib/api/assert-active-org", () => ({ writeAsOrg }));
 vi.mock("./service", () => ({ updateOrder: updateOrderApi }));
 vi.mock("./kitchen-service", () => ({ recordOrderPayment }));
 
 beforeEach(() => {
-    revalidatePath.mockReset();
+    vi.clearAllMocks();
+    writeAsOrg.mockReset();
+    writeAsOrg.mockImplementation(
+        (orgId: string, write: () => Promise<unknown>) =>
+            orgId === "org_a"
+                ? write()
+                : Promise.resolve({ ok: false, error: "moved" }),
+    );
+    updateOrderApi.mockResolvedValue({ ok: true, data: { id: "o1" } });
+    recordOrderPayment.mockResolvedValue({
+        ok: true,
+        data: { amountCents: 100 },
+    });
 });
 
-describe("recording a payment refreshes the order (UX-063)", () => {
-    it("revalidates the order page and the list after Record as paid", async () => {
-        updateOrderApi.mockResolvedValue({ ok: true, data: { id: "o1" } });
-        await updateOrder("s1", "o1", { paymentStatus: "PAID" });
-        expect(revalidatePath).toHaveBeenCalledWith("/commerce/orders/o1");
-        expect(revalidatePath).toHaveBeenCalledWith("/commerce/orders");
-    });
-
-    it("revalidates after the counter's Paid in cash", async () => {
-        recordOrderPayment.mockResolvedValue({
-            ok: true,
-            data: { amountCents: 100 },
+describe("an order's payment, written as the tab's business", () => {
+    it("records it through writeAsOrg with the tab's business", async () => {
+        await updateOrder("s1", "o1", { paymentStatus: "PAID" }, "org_a");
+        expect(writeAsOrg).toHaveBeenCalledWith("org_a", expect.any(Function));
+        expect(updateOrderApi).toHaveBeenCalledWith("s1", "o1", {
+            paymentStatus: "PAID",
         });
-        await recordPayment("o1", "CASH");
-        expect(revalidatePath).toHaveBeenCalledWith("/commerce/orders/o1");
+        await recordPayment("o1", "CASH", "org_a");
+        expect(recordOrderPayment).toHaveBeenCalledWith("o1", "CASH");
     });
 
-    it("leaves the page alone when the write is refused", async () => {
-        updateOrderApi.mockResolvedValue({ ok: false, error: "No" });
-        await updateOrder("s1", "o1", { paymentStatus: "PAID" });
-        expect(revalidatePath).not.toHaveBeenCalled();
+    it("writes nothing for a tab left on another business", async () => {
+        const res = await recordPayment("o1", "CASH", "org_b");
+        expect(res).toEqual({ ok: false, error: "moved" });
+        expect(recordOrderPayment).not.toHaveBeenCalled();
     });
 });

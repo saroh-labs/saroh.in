@@ -1,39 +1,26 @@
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
-import { cache } from "react";
 
-import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
+import { OrderDetailContainer } from "@/components/commerce/order-detail/order-detail-container";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
-import { OrderReviews } from "@/components/stores/reviews/order-reviews";
 import { ownAccountsRoom, takesOnlinePayment } from "@/lib/billing/access";
-import { personHref } from "@/lib/contacts/person-href";
-import { customerHref } from "@/lib/customers/links";
-import { businessModeOf } from "@/lib/gst/price-mode";
-import { getInvoiceBusiness, hasPaymentProvider } from "@/lib/invoices/tax";
+import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
     orderLockedText,
     orderPowers,
     ordersAccess,
 } from "@/lib/orders/access";
-import { allergyNotesOf } from "@/lib/orders/attention";
-import {
-    getAttentionAllergies,
-    getOrderRead,
-} from "@/lib/orders/kitchen-service";
-import type { AllergyNote } from "@/lib/orders/read";
+import { orderServer, readOrderOnce } from "@/lib/orders/access-server";
+import { orderRead } from "@/lib/orders/queries";
 import { arrivalOf } from "@/lib/orders/row-menu";
-import { sellablesOf } from "@/lib/orders/sellables";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
 import { refundsOnlineOrUnknown } from "@/lib/payments/refunds-online";
-import { getOrderPayments } from "@/lib/payments/service";
-import { invitationState } from "@/lib/product-reviews/service";
-import { listProducts } from "@/lib/products/service";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
-
-// One read for the tab's title and the page.
-const readOrder = cache((orderId: string) => getOrderRead(orderId));
 
 /** "Order #1042" in the tab: its number, never who it is for or its total. */
 export async function generateMetadata({
@@ -43,7 +30,7 @@ export async function generateMetadata({
 }) {
     const { orderId } = await params;
     return recordTitle(
-        () => readOrder(orderId),
+        () => readOrderOnce(orderId),
         (order) => `Order #${order.orderId}`,
         "Order",
     );
@@ -55,20 +42,18 @@ export async function generateMetadata({
  *
  * Reads the organization-scoped order (`GET organizations/:org/orders/:id`),
  * which a Member at the counter reaches with `order:stage` and which leaves
- * money out, in the API, for anyone without a money read. The old
- * store-scoped read sent prices and totals to every role that can read the
- * store, so this page no longer uses it. `?storefront=` in older links is
- * ignored: the organization scopes the read.
- *
- * The allergy check reads the customer's Needs attention from the order
- * read itself (B15), so the kitchen's view has it too. Beside it, each read
- * on its own so one failing costs only its panel: the provider's payment
- * attempts (money roles) and the review invitation (`order:read`) — and,
- * from an API before B15 only, the contact's Needs attention (C1).
+ * money out, in the API, for anyone without a money read. `?storefront=` in
+ * older links is ignored: the organization scopes the read.
  *
  * Someone holding neither `order:read` nor `order:stage` gets the design's
  * locked card before the order is read (B7), rather than the generic denial
  * its 403 would bring.
+ *
+ * On React Query (DEC-259): the gates and what this person may do are
+ * decided here; the order's read (`/api/orders/[orderId]`: the order, its
+ * allergy check, payments, review invitation and "Add an item", each failing
+ * on its own, `lib/orders/access-server.ts`) is prefetched and hydrated, and
+ * `OrderDetailContainer` draws the page from it.
  */
 export default async function OrderPage({
     params,
@@ -86,8 +71,19 @@ export default async function OrderPage({
     if (organization && !ordersAccess(organization).open) {
         return <OrderLocked text={orderLockedText(organization)} />;
     }
-    const order = await readOrder(orderId);
-    if (!order) notFound();
+    const client = getServerQueryClient();
+    const ask = { orderId };
+    const [, billing] = await Promise.all([
+        organization
+            ? prefetchRead(client, orderServer, organization.id, ask)
+            : null,
+        billingAccessOrNull(),
+    ]);
+    const view = organization
+        ? client.getQueryData(orderRead.options(organization.id, ask).queryKey)
+        : undefined;
+    if (!view) notFound();
+    const { order } = view;
 
     const may = permitsFor(organization);
     // What this person may do to it, each the power its endpoint asks (B16).
@@ -95,128 +91,51 @@ export default async function OrderPage({
     // (R33): elsewhere the order is paid in cash or at the counter, and no
     // link is drawn at all.
     const powers = orderPowers(organization);
-    const billing = await billingAccessOrNull();
     const linkable = powers.payLink && takesOnlinePayment(billing);
     // With no provider and a plan that can't connect one (DEC-091), "Connect
     // one" would lead to a key form the connect refuses (UX-017): no block.
     const connectable = ownAccountsRoom(billing);
-
-    const contactId = order.customer?.contactId ?? null;
-    // A payment link (B11) is offered only to someone who may take or change
-    // orders, on an order that shows money, and only while a provider can
-    // open the checkout window (DEC-054).
-    const payOnline =
+    const [canPayOnline, refundOnline] = await Promise.all([
+        // A payment link (B11) is offered only to someone who may take or
+        // change orders, on an order that shows money, and only while a
+        // provider can open the checkout window (DEC-054).
         linkable && order.money
             ? hasPaymentProvider().catch(() => false)
-            : Promise.resolve(false);
-    // The allergy check reads the order's own Needs attention (B15), which
-    // reaches the kitchen too; an API before B15 sends none, and the
-    // contact's Needs attention is read instead (Z2a: never the notes).
-    const fromOrder = allergyNotesOf(order.attention);
-    const [notes, payments, reviewState, canPayOnline, addable, refundOnline] =
-        await Promise.all([
-            fromOrder !== undefined
-                ? Promise.resolve(fromOrder)
-                : contactId
-                  ? getAttentionAllergies(contactId)
-                  : Promise.resolve<AllergyNote[]>([]),
-            order.money
-                ? getOrderPayments(order.id).catch(() => null)
-                : Promise.resolve(null),
-            // Unknown on failure: the section is left out rather than guessing.
-            may("order:read")
-                ? invitationState(order.id).catch(() => null)
-                : Promise.resolve(null),
-            payOnline,
-            // "Add an item" (B8): only while items can change, for someone who
-            // may change them — from the order's own storefront (DEC-032).
-            powers.edit && order.next.editable
-                ? Promise.all([
-                      listProducts({ storefront: order.store.id }),
-                      // How the business's prices carry GST, as New order
-                      // reads it: unread charges the typed price.
-                      getInvoiceBusiness().catch(() => null),
-                  ])
-                      .then(([products, business]) =>
-                          // Set to Not sold (archived): nobody orders it.
-                          sellablesOf(
-                              products
-                                  .filter((p) => p.status !== "ARCHIVED")
-                                  .map((p) => ({
-                                      id: p.id,
-                                      name: p.name,
-                                      price: p.price,
-                                      variants: p.variants,
-                                      soldOut:
-                                          p.soldOut === true ||
-                                          (p.inventory !== null &&
-                                              p.inventory.quantity <= 0),
-                                      gstRate: p.gstRate,
-                                      gstPriceMode: p.gstPriceMode,
-                                  })),
-                              // Priced as the API will charge it: GST on
-                              // top where the business, or the product,
-                              // has "GST is added".
-                              {
-                                  registered: business?.registered ?? false,
-                                  mode: businessModeOf(business?.priceMode),
-                              },
-                          ),
-                      )
-                      .catch(() => "unavailable" as const)
-                : Promise.resolve(null),
-            // Whether a refund can still go back online (DEC-120): asked
-            // only of someone who may refund an order that shows money.
-            powers.refund && order.money
-                ? refundsOnlineOrUnknown()
-                : Promise.resolve(undefined),
-        ]);
+            : false,
+        // Whether a refund can still go back online (DEC-120): asked only
+        // of someone who may refund an order that shows money.
+        powers.refund && order.money ? refundsOnlineOrUnknown() : undefined,
+    ]);
 
     return (
-        <OrderDetail
-            order={order}
-            notes={notes ?? "unavailable"}
-            payments={payments}
-            can={{
-                stage: powers.stage,
-                edit: powers.edit,
-                record: powers.record,
-                payLink: linkable && (canPayOnline || connectable),
-                refund: powers.refund,
-                payOnline: canPayOnline,
-                refundOnline,
-                manageProviders: may("payment:manage"),
-                contact: may("contact:read"),
-                // A treatment's visits (B14): open one, book the next.
-                bookingRead: may("booking:read"),
-                bookingWrite: may("booking:write"),
-            }}
-            customerHref={
-                contactId
-                    ? personHref(contactId)
-                    : order.customer
-                      ? customerHref(order.store.id, order.customer.id)
-                      : null
-            }
-            addable={addable}
-            // From the Orders list's row menu or quick view (B5): open the
-            // refund or courier panel, or print the ticket, once.
-            arrival={arrivalOf(query)}
-            aside={
-                reviewState ? (
-                    <OrderReviews
-                        orderId={order.id}
-                        state={reviewState}
-                        canWrite={
-                            may("product-review:write") && may("order:read")
-                        }
-                        may={{
-                            connect: may("comms:manage"),
-                            plans: may("billing:read"),
-                        }}
-                    />
-                ) : null
-            }
-        />
+        <HydrationBoundary state={dehydrate(client)}>
+            <OrderDetailContainer
+                ask={ask}
+                can={{
+                    stage: powers.stage,
+                    edit: powers.edit,
+                    record: powers.record,
+                    payLink: linkable && (canPayOnline || connectable),
+                    refund: powers.refund,
+                    payOnline: canPayOnline,
+                    refundOnline,
+                    manageProviders: may("payment:manage"),
+                    contact: may("contact:read"),
+                    // A treatment's visits (B14): open one, book the next.
+                    bookingRead: may("booking:read"),
+                    bookingWrite: may("booking:write"),
+                }}
+                // From the Orders list's row menu or quick view (B5): open
+                // the refund or courier panel, or print the ticket, once.
+                arrival={arrivalOf(query)}
+                reviews={{
+                    canWrite: may("product-review:write") && may("order:read"),
+                    may: {
+                        connect: may("comms:manage"),
+                        plans: may("billing:read"),
+                    },
+                }}
+            />
+        </HydrationBoundary>
     );
 }

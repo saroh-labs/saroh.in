@@ -2,11 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess, showWarning } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
 import { runAction } from "@/lib/api/run-action";
+import { useOrderSave } from "@/lib/orders/use-orders";
 import { inviteReviews } from "@/lib/product-reviews/actions";
 import {
     invitationSentence,
@@ -33,7 +33,7 @@ export function OrderReviews({
     /** May connect a provider; may see the plans. */
     may: { connect: boolean; plans: boolean };
 }) {
-    const router = useRouter();
+    const { saved } = useOrderSave();
     const [pending, startTransition] = useTransition();
     const verb = state.state === "none" ? "Invite a review" : "Resend";
     const note =
@@ -59,7 +59,7 @@ export function OrderReviews({
             } else if (result) {
                 showWarning(result.message);
             }
-            router.refresh();
+            await saved();
         });
     };
 

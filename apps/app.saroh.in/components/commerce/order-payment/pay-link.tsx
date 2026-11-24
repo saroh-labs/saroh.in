@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, Link2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import {
@@ -13,6 +12,7 @@ import {
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { makeOrderPayLink } from "@/lib/orders/actions";
+import { useOrderSave } from "@/lib/orders/use-orders";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { ProviderDisconnectedState } from "@saroh/ui/data-state";
@@ -43,7 +43,7 @@ export function usePayLink({
      */
     shownIn?: string;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useOrderSave();
     const [url, setUrl] = useState<string | null>(null);
     const [confirming, setConfirming] = useState(false);
     const [busy, startTransition] = useTransition();
@@ -56,11 +56,11 @@ export function usePayLink({
                 : `Payment link ready. Copy it from ${shownIn}.`,
             "Nothing is sent by Saroh. The order shows paid once they pay.",
         );
-        router.refresh();
+        await saved();
     };
     const make = () => {
         startTransition(async () => {
-            const res = await runAction(() => makeOrderPayLink(orderId));
+            const res = await runAction(() => makeOrderPayLink(orderId, orgId));
             if (!res) return;
             if (!res.ok) {
                 reportFailure(res);
@@ -71,7 +71,7 @@ export function usePayLink({
     };
     /** From the confirm, which waits and stays open on a refusal. */
     const replaceNow = async (): Promise<ConfirmResult> => {
-        const res = await makeOrderPayLink(orderId);
+        const res = await makeOrderPayLink(orderId, orgId);
         if (!res.ok) return refusedResult(res);
         await made(res.data.url);
     };

@@ -306,6 +306,9 @@ describe("the registries", () => {
             "/": ["home"],
             "/bookings/all": ["bookings"],
             "/commerce/products": ["products"],
+            "/commerce/orders": ["orders"],
+            "/commerce/orders/[orderId]": ["orders"],
+            "/commerce/orders/tickets": ["orders"],
         });
         expect(CHROME_REFRESH_ROUTES.length).toBeLessThanOrEqual(
             CHROME_REFRESH_CAP,

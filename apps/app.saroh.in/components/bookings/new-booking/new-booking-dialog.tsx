@@ -25,6 +25,7 @@ export function NewBookingDialog({
     visit,
     triggerClassName,
     primaryTrigger = false,
+    onBooked,
 }: {
     /** The treatment's service: the first is booked. */
     services: {
@@ -44,6 +45,11 @@ export function NewBookingDialog({
      * header) rather than the booking page's outline button.
      */
     primaryTrigger?: boolean;
+    /**
+     * After it is booked, on a React Query screen (Order Detail): read
+     * its queries again. Absent, the page is read again.
+     */
+    onBooked?: () => void;
 }) {
     const router = useRouter();
     const service = services.at(0);
@@ -99,6 +105,8 @@ export function NewBookingDialog({
             `Visit ${visit.visitNumber} of ${visit.visits} for ${visit.who}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}.`,
         );
         close();
+        if (onBooked) return onBooked();
+        // rq-refresh-ok: the booking page is server-rendered until U26; Order Detail passes onBooked.
         router.refresh();
     }
 

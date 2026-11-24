@@ -14,6 +14,7 @@ import { shipmentOf } from "@/lib/orders/courier";
 import {
     allergenWords,
     allergyCheck,
+    deliveryPlace,
     goesToAddress,
     headerStep,
     isOpen,
@@ -25,7 +26,6 @@ import type { StepTone } from "@/lib/orders/list-row";
 import { onlinePaymentWords } from "@/lib/orders/online-payment";
 import { handoverPayment } from "@/lib/orders/pay-on-handover";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
-import { deliveryPlace } from "@/lib/orders/read";
 import type { Arrival } from "@/lib/orders/row-menu";
 import type { Sellable } from "@/lib/orders/sellables";
 import { orderTimelineSteps } from "@/lib/orders/timeline-steps";

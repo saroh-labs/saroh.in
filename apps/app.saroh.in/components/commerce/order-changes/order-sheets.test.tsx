@@ -52,9 +52,13 @@ const saveGstRates = vi.fn();
 vi.mock("@/lib/gst-rates/actions", () => ({
     saveGstRates: (...a: unknown[]) => saveGstRates(...a) as unknown,
 }));
-const refresh = vi.fn();
+// The order is read again through its query (DEC-259), never the page.
+const refresh = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/orders/use-orders", () => ({
+    useOrderSave: () => ({ orgId: "org_a", saved: refresh }),
+}));
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }),
+    useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock("next/link", () => ({
     default: ({ href, children }: { href: string; children?: ReactNode }) => (
@@ -527,9 +531,13 @@ describe("a refusal", () => {
         await press(button("One more Seeded loaf", dialog()));
         await press(button("Save (₹120 more due)", dialog()));
 
-        expect(actions.editBeforePreparing).toHaveBeenCalledWith("o1", {
-            lines: [{ itemId: "l1", quantity: 3 }],
-        });
+        expect(actions.editBeforePreparing).toHaveBeenCalledWith(
+            "o1",
+            {
+                lines: [{ itemId: "l1", quantity: 3 }],
+            },
+            "org_a",
+        );
         expect(toast.showError).toHaveBeenCalledWith("Preparing has started.");
         expect(dialogName()).toBe("Edit #1063");
         expect(quantity(0)).toBe("3");
@@ -571,9 +579,13 @@ describe("a refusal", () => {
         type(field("Tracking number"), "1487 2290 3314");
         await press(button("Save", dialog()));
 
-        expect(actions.saveCourier).toHaveBeenCalledWith("o1", {
-            trackingNumber: "1487 2290 3314",
-        });
+        expect(actions.saveCourier).toHaveBeenCalledWith(
+            "o1",
+            {
+                trackingNumber: "1487 2290 3314",
+            },
+            "org_a",
+        );
         expect(toast.showError).toHaveBeenCalledWith(
             "That number is too long.",
         );
@@ -655,11 +667,15 @@ describe("a save", () => {
         type(field("Tracking number"), "BD 9920 1140");
         await press(button("Mark handed over", dialog()));
 
-        expect(actions.moveStage).toHaveBeenCalledWith("o1", {
-            to: "HANDED_TO_COURIER",
-            courierName: "Delhivery",
-            trackingNumber: "BD 9920 1140",
-        });
+        expect(actions.moveStage).toHaveBeenCalledWith(
+            "o1",
+            {
+                to: "HANDED_TO_COURIER",
+                courierName: "Delhivery",
+                trackingNumber: "BD 9920 1140",
+            },
+            "org_a",
+        );
         expect(dialog()).toBe(null);
         expect(toast.showUndo).toHaveBeenCalledWith(
             "Handed to Delhivery · BD 9920 1140.",
@@ -796,6 +812,7 @@ describe("a refund and a cancel are held on the page, with Undo", () => {
                 reason: null,
                 goodwill: null,
             }),
+            "org_a",
         );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Refunded ₹240. The rest of the order stands.",
@@ -875,7 +892,11 @@ describe("Ready says what the customer hears, and Undo takes it back (U5)", () =
         render(preparing("EMAIL"));
         await markReadyNow();
 
-        expect(actions.moveStage).toHaveBeenCalledWith("o1", { to: "READY" });
+        expect(actions.moveStage).toHaveBeenCalledWith(
+            "o1",
+            { to: "READY" },
+            "org_a",
+        );
         expect(toast.showSuccess).not.toHaveBeenCalled();
         expect(toast.showUndo).toHaveBeenCalledWith(
             "Marked ready.",
@@ -890,7 +911,7 @@ describe("Ready says what the customer hears, and Undo takes it back (U5)", () =
             undo();
             await new Promise((r) => setTimeout(r, 0));
         });
-        expect(actions.undoStage).toHaveBeenCalledWith("o1", "e9");
+        expect(actions.undoStage).toHaveBeenCalledWith("o1", "e9", "org_a");
         expect(toast.showInfo).toHaveBeenCalledWith(
             "Back to preparing. Not sent.",
         );

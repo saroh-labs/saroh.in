@@ -8,9 +8,8 @@ import { useEffect, useRef } from "react";
 
 import { BusinessDate } from "@/components/shared/dates/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
-import { goesToAddress } from "@/lib/orders/lifecycle";
+import { deliveryPlace, goesToAddress } from "@/lib/orders/lifecycle";
 import type { OrderRead } from "@/lib/orders/read";
-import { deliveryPlace } from "@/lib/orders/read";
 import {
     ticketAttention,
     ticketLine,
