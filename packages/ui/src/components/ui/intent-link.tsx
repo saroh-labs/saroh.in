@@ -1,8 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import type { ComponentProps } from "react";
-import { useState } from "react";
+import type { ComponentProps, ReactNode } from "react";
+import { createContext, useContext, useState } from "react";
+
+/**
+ * When links fetch ahead: `"intent"` (a pointer, touch or focus) or
+ * `"never"`. The merchant app says never: a hovered prefetch there cost two
+ * Worker requests and made the click no faster, because the click still
+ * fetched the page and the section's `loading.tsx` already paints at once
+ * (owner, 24 Nov 2026: only what's needed is loaded). saroh.in keeps intent.
+ */
+export type LinkPrefetch = "intent" | "never";
+const PrefetchMode = createContext<LinkPrefetch>("intent");
+
+export function LinkPrefetchProvider({
+    mode,
+    children,
+}: {
+    mode: LinkPrefetch;
+    children: ReactNode;
+}) {
+    return (
+        <PrefetchMode.Provider value={mode}>{children}</PrefetchMode.Provider>
+    );
+}
 
 /**
  * A `<Link>` that fetches its page ahead only once someone shows they may
@@ -27,10 +49,11 @@ export function IntentLink({
     ...props
 }: Omit<ComponentProps<typeof Link>, "prefetch">) {
     const [intent, setIntent] = useState(false);
+    const never = useContext(PrefetchMode) === "never";
     return (
         <Link
             {...props}
-            prefetch={intent ? null : false}
+            prefetch={intent && !never ? null : false}
             onPointerEnter={(e) => {
                 setIntent(true);
                 onPointerEnter?.(e);

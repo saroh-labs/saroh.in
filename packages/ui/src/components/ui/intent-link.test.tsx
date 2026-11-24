@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { IntentLink } from "./intent-link";
+import { IntentLink, LinkPrefetchProvider } from "./intent-link";
 
 // The prefetch Next is asked for, as the link last rendered it.
 const prefetchOf = vi.hoisted(() => new Map<string, unknown>());
@@ -38,5 +38,17 @@ describe("IntentLink", () => {
         expect(prefetchOf.get("/calendar")).toBeNull();
         // The caller's own handler still runs.
         expect(own).toHaveBeenCalledTimes(1);
+    });
+
+    it("never fetches ahead under a never provider, even on intent", () => {
+        render(
+            <LinkPrefetchProvider mode="never">
+                <IntentLink href="/orders">Orders</IntentLink>
+            </LinkPrefetchProvider>,
+        );
+        const link = screen.getByRole("link", { name: "Orders" });
+        fireEvent.pointerEnter(link);
+        fireEvent.focus(link);
+        expect(prefetchOf.get("/orders")).toBe(false);
     });
 });

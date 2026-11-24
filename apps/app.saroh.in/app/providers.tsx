@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkPrefetchProvider } from "@saroh/ui/intent-link";
 import { brandToastOptions } from "@saroh/ui/sonner";
 import { setRefusalTest } from "@saroh/ui/toast";
 import { useEffect } from "react";
@@ -50,7 +51,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 mobileOffset={mobileOffset}
                 toastOptions={brandToastOptions}
             />
-            {children}
+            {/* No link fetches its page ahead, even on hover (owner, 24 Nov). */}
+            <LinkPrefetchProvider mode="never">{children}</LinkPrefetchProvider>
         </IntlProvider>
     );
 }

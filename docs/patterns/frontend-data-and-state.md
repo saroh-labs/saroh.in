@@ -405,10 +405,15 @@ storage, and a signed-in customer's phone comes back from their account.
   from their last placed order (`GET public/sites/:siteId/checkout/address`)
   and nothing new is stored for it.
 
-## Links fetch ahead on intent, never on sight — **Current** (24 Nov 2026)
+## Links never fetch ahead in the merchant app — **Current** (24 Nov 2026)
 
-Owner, 24 Nov: nothing in the merchant app is prefetched automatically; a
-page is fetched ahead only when the person shows intent.
+Owner, 24 Nov: nothing in the merchant app is prefetched; only what's
+needed is loaded. A hovered prefetch was measured to cost two more Worker
+requests and make the click no faster (the click still fetches the page,
+and the section's `loading.tsx` already paints at once), so the app's root
+`providers.tsx` sets `<LinkPrefetchProvider mode="never">`: an
+`IntentLink` there never prefetches, even on hover or focus. saroh.in and
+the other sites keep the default, prefetch on intent.
 
 - **Every in-app link is `IntentLink`** (`@saroh/ui/intent-link`):
   `prefetch={false}` until a pointer enters, a touch starts or it takes
