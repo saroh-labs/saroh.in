@@ -24,12 +24,9 @@ import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { readShareSetup } from "@/lib/share-item/read";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
-import {
-    getStockChecks,
-    getStockLog,
-    getWaitingCount,
-    stockTrackingOnce,
-} from "@/lib/stock/service";
+import { stockChecksServer, stockLogServer } from "@/lib/stock/access";
+import { ALL_CHECKS, productLogAsk } from "@/lib/stock/queries";
+import { getWaitingCount, stockTrackingOnce } from "@/lib/stock/service";
 
 /** The product's own name in the tab; "Product" when it can't be read. */
 export async function generateMetadata({
@@ -65,8 +62,9 @@ const ROLE_WORD = {
  * carries the product, its panels and its collections; orders, reviews and
  * discounts fail — or are withheld from a role — on their own. Its stock at
  * every storefront comes from the Stock API's levels read, filtered to it;
- * the Stock tab adds its log and checks. Each of those is optional: one that
- * fails is said where it would have been, never shown as a zero.
+ * the Stock tab adds its log and checks (Stock's queries). Each of those
+ * is optional: one that fails is said where it would have been, never
+ * shown as a zero.
  *
  * The tab is in the address (`?tab=stock`; `?tab=variants` still opens it)
  * so a notification, a link in chat or Back lands on the same view.
@@ -161,8 +159,6 @@ export default async function ProductPage({
     const onCollections = view === "team" && tab === "collections";
     const onOverview = view === "team" && tab === "overview";
     const [
-        log,
-        checks,
         categories,
         collections,
         priceHistory,
@@ -170,10 +166,6 @@ export default async function ProductPage({
         waiting,
         shareSetup,
     ] = await Promise.all([
-        onStock
-            ? getStockLog({ product: productId, limit: 100 }).catch(() => null)
-            : Promise.resolve(null),
-        onStock ? getStockChecks().catch(() => null) : Promise.resolve(null),
         // The details sheet picks a category; only a writer opens it. The
         // Collections tab says which category put it in an automatic one.
         overview.canWrite || onCollections
@@ -199,6 +191,24 @@ export default async function ProductPage({
             : Promise.resolve(null),
         // Share as a post (#1375): only for a page that is live.
         shopUrl ? readShareSetup(web) : Promise.resolve(null),
+        // The Stock tab's log and checks (Stock's queries): a failed read
+        // is said on the tab.
+        onStock && organization
+            ? prefetchRead(
+                  client,
+                  stockLogServer,
+                  organization.id,
+                  productLogAsk(productId),
+              )
+            : null,
+        onStock && organization
+            ? prefetchRead(
+                  client,
+                  stockChecksServer,
+                  organization.id,
+                  ALL_CHECKS,
+              )
+            : null,
     ]);
     const may = (action: string) =>
         organization?.actions
@@ -222,11 +232,6 @@ export default async function ProductPage({
                 collections={collections}
                 priceHistory={priceHistory}
                 sellsFood={(allergens?.length ?? 0) > 0}
-                log={log ? log.entries : null}
-                checks={
-                    checks?.checks.filter((c) => c.productId === productId) ??
-                    []
-                }
                 waiting={waiting}
                 now={new Date()}
             />

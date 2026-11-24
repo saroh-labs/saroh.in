@@ -84,6 +84,7 @@ function render(
                     : "/commerce/stock?tab=log"
             }
             paging={{ page, size: 50 }}
+            onRetry={() => undefined}
         />,
     );
 }

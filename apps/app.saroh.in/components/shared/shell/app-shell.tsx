@@ -49,7 +49,7 @@ import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
-import { stockTrackingOnce } from "@/lib/stock/service";
+import { stockTrackingOnce } from "@/lib/stock/access";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
 import { usageSharingOrNull } from "@/lib/usage-sharing/service";
 import { Button } from "@saroh/ui/button";

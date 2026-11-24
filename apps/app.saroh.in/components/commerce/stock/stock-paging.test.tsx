@@ -16,6 +16,9 @@ import { LevelsPanel } from "./levels-panel";
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }));
+vi.mock("@/lib/stock/use-stock", () => ({
+    useStockSave: () => ({ orgId: "org_1", saved: vi.fn() }),
+}));
 vi.mock("@/lib/stock/screen-actions", () => ({
     resolveStockCheck: vi.fn(),
     undoStock: vi.fn(),
@@ -158,6 +161,7 @@ function drawChecks(total: number, shown: number, page = 1) {
             checks={checks}
             href={hrefAt("checks", page, 25)}
             paging={{ page, size: 25 }}
+            onRetry={() => undefined}
         />,
     );
 }

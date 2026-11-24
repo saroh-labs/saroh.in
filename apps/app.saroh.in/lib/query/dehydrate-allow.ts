@@ -15,6 +15,7 @@ export const DEHYDRATE_DOMAINS: ReadonlySet<string> = new Set<string>([
     "orders",
     "invoices",
     "customers",
+    "stock",
 ]);
 
 /** Done or still pending (an un-awaited prefetch must cross too), and allowed. */

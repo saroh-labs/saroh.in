@@ -11,6 +11,7 @@ import { useMemo } from "react";
 import type { QuickEdits } from "@/components/commerce/quick-edits/quick-edits";
 import { homeKeys } from "@/lib/home/queries";
 import { useOrgId } from "@/lib/query/org";
+import { stockKeys } from "@/lib/stock/queries";
 
 import type { QuickPatch } from "./cache";
 import { applyQuick } from "./cache";
@@ -35,7 +36,9 @@ export function useProduct(ask: ProductAsk) {
 
 /**
  * After a save: every Products read of the business again (the active
- * ones now), Home marked stale. Resolves once they are back, so a busy
+ * ones now), and the Stock reads on screen (a product's Stock tab shows
+ * its log and checks; elsewhere they are only marked stale), Home marked
+ * stale. Resolves once they are back, so a busy
  * state lasts until the screen has changed, as before.
  */
 export function useProductsSaved(): () => Promise<void> {
@@ -44,6 +47,7 @@ export function useProductsSaved(): () => Promise<void> {
     return () =>
         Promise.all([
             qc.invalidateQueries({ queryKey: productsKeys(orgId) }),
+            qc.invalidateQueries({ queryKey: stockKeys(orgId) }),
             qc.invalidateQueries({
                 queryKey: homeKeys(orgId),
                 refetchType: "none",
@@ -63,10 +67,9 @@ interface Vars {
  * business (it refuses a moved tab); an error or any answer that is not
  * `ok` puts the snapshot back, and the caller says the refusal as before.
  * After a save that landed, Products is read again once; a refused one
- * reads nothing. `after`: the screen reads itself again instead (a tab
- * still drawn by the server), its queries only marked stale.
+ * reads nothing.
  */
-export function useQuickEditsHost(after?: () => void): QuickEdits {
+export function useQuickEditsHost(): QuickEdits {
     const qc = useQueryClient();
     const orgId = useOrgId();
     const saved = useProductsSaved();
@@ -82,17 +85,7 @@ export function useQuickEditsHost(after?: () => void): QuickEdits {
                 throw error;
             }
             if (results.some((r) => !r.ok)) undo();
-            if (results.some((r) => r.ok)) {
-                if (after) {
-                    // The screen reads itself again (`after`): marked
-                    // stale only, so nothing is read twice.
-                    await qc.invalidateQueries({
-                        queryKey: productsKeys(orgId),
-                        refetchType: "none",
-                    });
-                    after();
-                } else await saved();
-            }
+            if (results.some((r) => r.ok)) await saved();
             return results;
         },
     });

@@ -1,38 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import { loadStockTargets } from "@/lib/stock/screen-actions";
 import type { StockLevelRow, StockLevels } from "@/lib/stock/service";
+import { useStockLevels } from "@/lib/stock/use-stock";
 
 export type Targets =
     | { state: "loading" }
     | { state: "failed"; error: string }
     | { state: "ready"; levels: StockLevels };
 
+const COULDNT_LOAD = "Stock couldn't be loaded. Try again.";
+
 /**
  * Every shelf the business counts, read when a dialog mounts (Move stock,
- * the entries sheet) — the Levels table may hold only a page of them. The
- * screen mounts a dialog only while it is open, so each opening reads
- * afresh.
+ * the entries sheet) — the Levels table may hold only a page of them. A
+ * query (DEC-259): each opening reads afresh unless it was just read. A
+ * failure is a sentence to show, never an empty list.
  */
 export function useStockTargets(): Targets {
-    const [targets, setTargets] = useState<Targets>({ state: "loading" });
-    useEffect(() => {
-        let live = true;
-        void loadStockTargets().then((res) => {
-            if (!live) return;
-            setTargets(
-                res.ok
-                    ? { state: "ready", levels: res.data }
-                    : { state: "failed", error: res.error },
-            );
-        });
-        return () => {
-            live = false;
-        };
-    }, []);
-    return targets;
+    const { data, isError } = useStockLevels({});
+    if (data) return { state: "ready", levels: data };
+    return isError
+        ? { state: "failed", error: COULDNT_LOAD }
+        : { state: "loading" };
 }
 
 /** A row's key and name, for a "What" picker. */

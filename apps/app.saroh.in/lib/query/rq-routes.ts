@@ -28,6 +28,7 @@ export const RQ_ROUTES: readonly string[] = [
     "/billing/invoices/[invoiceId]/edit",
     "/commerce/customers",
     "/contacts/[contactId]",
+    "/commerce/stock",
 ];
 
 export const RQ_DOMAINS: readonly string[] = [
@@ -38,4 +39,5 @@ export const RQ_DOMAINS: readonly string[] = [
     "orders",
     "invoices",
     "customers",
+    "stock",
 ];

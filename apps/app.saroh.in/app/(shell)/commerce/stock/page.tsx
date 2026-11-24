@@ -1,6 +1,7 @@
-import { redirect, unstable_rethrow } from "next/navigation";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { redirect } from "next/navigation";
 
-import { StockScreen } from "@/components/commerce/stock/stock-screen";
+import { StockContainer } from "@/components/commerce/stock/stock-container";
 import {
     StockLocked,
     StockTrackingOff,
@@ -8,20 +9,24 @@ import {
 import { PageContainer } from "@/components/shared/page/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { rememberedPageSize } from "@/lib/paging/remembered";
-import { listProducts } from "@/lib/products/service";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
-import type { StockAddress, StockTab } from "@/lib/stock/list-query";
-import { readStockPages, STOCK_LISTS, stockHref } from "@/lib/stock/list-query";
-import { logKindId, logKinds } from "@/lib/stock/log";
-import type { StockChecks, StockLog } from "@/lib/stock/service";
 import {
-    getStockChecks,
-    getStockLevels,
-    getStockLog,
-    getStockTracking,
-} from "@/lib/stock/service";
+    stockChecksServer,
+    stockLevelsServer,
+    stockLogServer,
+} from "@/lib/stock/access";
+import type { StockTab } from "@/lib/stock/list-query";
+import { STOCK_LISTS, stockHref } from "@/lib/stock/list-query";
+import {
+    stockChecksRead,
+    stockLevelsRead,
+    stockLogRead,
+    stockView,
+} from "@/lib/stock/queries";
+import { getStockTracking } from "@/lib/stock/service";
 import { listStorefronts } from "@/lib/stores/storefronts";
-import { dateRangeAsk, readDateRange } from "@/lib/views/date-range";
 
 export const metadata = { title: "Stock" };
 
@@ -32,23 +37,6 @@ function roleWords(org: { role: string; roleLabel?: string | null }) {
     return (
         org.roleLabel ?? org.role.charAt(0) + org.role.slice(1).toLowerCase()
     );
-}
-
-const one = (v: string | string[] | undefined) =>
-    typeof v === "string" ? v : undefined;
-
-/**
- * An optional read of the screen: a failure is named where it would have
- * shown ("failed"), never an empty list — and a refusal or a redirect still
- * reaches its boundary.
- */
-async function optional<T>(read: () => Promise<T | null>) {
-    try {
-        return (await read()) ?? ("failed" as const);
-    } catch (error) {
-        unstable_rethrow(error);
-        return "failed" as const;
-    }
 }
 
 /**
@@ -63,6 +51,11 @@ async function optional<T>(read: () => Promise<T | null>) {
  * browser last chose for it. Levels is the page's own read: it failing
  * fails the page. The log and the checks fail on their own, named where
  * they show.
+ *
+ * On React Query (DEC-259): the gates (who may read stock, Track stock on)
+ * and the storefronts are the page's; the levels, the checks and, on its
+ * tab, the log as the address asks (`stockView`) are prefetched and
+ * hydrated, and `StockContainer` reads every later one in place.
  */
 export default async function StockPage({
     searchParams,
@@ -99,113 +92,66 @@ export default async function StockPage({
         );
     }
 
-    const tab: StockTab =
-        query.tab === "log" || query.tab === "checks" ? query.tab : "levels";
-    const show = one(query.show) ?? "all";
-    const q = (one(query.q) ?? "").trim().slice(0, 100);
-    const kind = logKindId(one(query.kind));
-    const logStore = one(query.store);
-    const logProduct = one(query.product);
-    const pages = readStockPages(query, {
-        levels: levelsSize,
-        log: logSize,
-        checks: checksSize,
-    });
-    const dates = readDateRange(query);
-    const address: StockAddress = {
-        ...dates,
-        tab,
-        show,
-        q,
-        kind,
-        store: logStore ?? "all",
-        product: logProduct ?? "",
-        pages,
-    };
+    if (!organization) {
+        // No business to read.
+        return <StockLocked business="this business" role="a member" />;
+    }
 
     // The business's open storefronts, first made first — the same list the
-    // levels read names — so `show` is checked before the one levels read.
+    // levels read names — so `show` is checked before the levels read.
     const storefronts = (await listStorefronts()).map((s) => ({
         id: s.id,
         name: s.name,
     }));
-    const storefront = storefronts.some((s) => s.id === show)
-        ? show
-        : undefined;
-
-    const [levels, checks, log, products] = await Promise.all([
-        // Off its tab, Levels is read for the header and the tab's count
-        // alone (who may write, how many need you): one product is enough.
-        getStockLevels({
-            storefront,
-            q: q || undefined,
-            needs: show === "needs",
-            ...(tab === "levels" ? pages.levels : { limit: 1 }),
-        }),
-        // And the checks, off their tab, for the tab's count.
-        optional<StockChecks>(() =>
-            getStockChecks(tab === "checks" ? pages.checks : { limit: 1 }),
-        ),
+    const sizes = { levels: levelsSize, log: logSize, checks: checksSize };
+    const view = stockView(query, sizes, storefronts);
+    const { tab } = view.address;
+    const client = getServerQueryClient();
+    const org = organization.id;
+    await Promise.all([
+        prefetchRead(client, stockLevelsServer, org, view.levels),
+        prefetchRead(client, stockChecksServer, org, view.checks),
         tab === "log"
-            ? optional<StockLog>(() =>
-                  getStockLog({
-                      kind: logKinds(kind),
-                      storefront: storefronts.some((s) => s.id === logStore)
-                          ? logStore
-                          : undefined,
-                      product: logProduct,
-                      ...dateRangeAsk(dates),
-                      ...pages.log,
-                  }),
-              )
-            : Promise.resolve(null),
-        // The log's product filter: the business's catalogue.
-        tab === "log" ? listProducts().catch(() => []) : Promise.resolve([]),
+            ? prefetchRead(client, stockLogServer, org, view.log)
+            : null,
     ]);
-    if (!levels) {
-        // No business to read (no active organization).
-        return (
-            <StockLocked
-                business={organization?.name ?? "this business"}
-                role={organization ? roleWords(organization) : "a member"}
-            />
-        );
+    const levels = client.getQueryState(
+        stockLevelsRead.options(org, view.levels).queryKey,
+    );
+    // Levels is the page's own read: it failing fails the page.
+    if (levels?.status === "error") {
+        throw levels.error ?? new Error("Stock couldn't be read");
     }
 
     // A page past the end (the list has since got shorter, or the address
     // was typed): start again at the first page rather than show an empty
     // one with nothing to press.
-    const pastTheEnd =
-        pages[tab].page > 1 &&
-        (tab === "levels"
-            ? levels.rows.length === 0
-            : tab === "log"
-              ? log !== null && log !== "failed" && log.entries.length === 0
-              : checks !== "failed" && checks.checks.length === 0);
-    if (pastTheEnd) redirect(stockHref(address, { page: 1 }));
+    const rows = (
+        {
+            levels: () => levels?.data?.rows,
+            log: () =>
+                client.getQueryData(
+                    stockLogRead.options(org, view.log).queryKey,
+                )?.entries,
+            checks: () =>
+                client.getQueryData(
+                    stockChecksRead.options(org, view.checks).queryKey,
+                )?.checks,
+        } satisfies Record<StockTab, () => unknown[] | undefined>
+    )[tab]();
+    if (view.address.pages[tab].page > 1 && rows?.length === 0) {
+        redirect(stockHref(view.address, { page: 1 }));
+    }
 
     return (
         <PageContainer width="full">
-            <StockScreen
-                business={organization?.name ?? null}
-                tab={tab}
-                show={show}
-                q={q}
-                levels={levels}
-                needsYou={levels.needsYou ?? 0}
-                storefronts={storefronts}
-                checks={checks}
-                log={log}
-                logFilter={{
-                    kind,
-                    store: logStore ?? "all",
-                    product: logProduct ?? "",
-                    ...dates,
-                }}
-                products={products.map((p) => ({ id: p.id, name: p.name }))}
-                canWrite={levels.canWrite}
-                pages={pages}
-            />
+            <HydrationBoundary state={dehydrate(client)}>
+                <StockContainer
+                    business={organization.name}
+                    storefronts={storefronts}
+                    sizes={sizes}
+                />
+            </HydrationBoundary>
         </PageContainer>
     );
 }
