@@ -32,6 +32,10 @@ const actions = vi.hoisted(() => ({
     updateCourse: vi.fn(),
 }));
 vi.mock("@/lib/courses/actions", () => actions);
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/courses/use-courses", () => ({
+    useCourseSave: () => ({ orgId: "org_a", saved }),
+}));
 vi.mock("@saroh/ui/toast", async (importOriginal) => ({
     ...(await importOriginal<object>()),
     showSuccess: vi.fn(),
@@ -204,13 +208,17 @@ describe("the course form's GST", () => {
         expect(text()).not.toContain("SAC code");
 
         await save();
-        expect(actions.updateCourse).toHaveBeenCalledWith("crs_1", {
-            name: "Wheel throwing",
-            description: null,
-            price: "5000",
-            currency: "INR",
-            seats: 6,
-        });
+        expect(actions.updateCourse).toHaveBeenCalledWith(
+            "crs_1",
+            {
+                name: "Wheel throwing",
+                description: null,
+                price: "5000",
+                currency: "INR",
+                seats: 6,
+            },
+            "org_a",
+        );
     });
 
     it("asks a registered business for the rate, with the quiet select and the SAC code", () => {
@@ -257,16 +265,20 @@ describe("the course form's GST", () => {
         pick("GST on this price", "ADDED");
         type("SAC code", "9992 93");
         await save();
-        expect(actions.updateCourse).toHaveBeenCalledWith("crs_1", {
-            name: "Wheel throwing",
-            description: null,
-            price: "5000",
-            currency: "INR",
-            seats: 6,
-            gstRate: "18",
-            sacCode: "999293",
-            gstPriceMode: "ADDED",
-        });
+        expect(actions.updateCourse).toHaveBeenCalledWith(
+            "crs_1",
+            {
+                name: "Wheel throwing",
+                description: null,
+                price: "5000",
+                currency: "INR",
+                seats: 6,
+                gstRate: "18",
+                sacCode: "999293",
+                gstPriceMode: "ADDED",
+            },
+            "org_a",
+        );
     });
 
     it("takes exempt (0%), and sends null for the same as the business and no SAC code", async () => {
@@ -280,6 +292,7 @@ describe("the course form's GST", () => {
                 sacCode: null,
                 gstPriceMode: null,
             }),
+            "org_a",
         );
     });
 

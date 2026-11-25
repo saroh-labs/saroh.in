@@ -1,48 +1,43 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { voidInvoice as voidInvoiceApi } from "@/lib/invoices/service";
 
 import type { CourseInput } from "./service";
 import * as api from "./service";
 
-/** Thin: the API decides who may, and what a course may become. */
+/**
+ * Thin: the API decides who may, and what a course may become. Each write
+ * takes the tab's business last and runs as it (`writeAsOrg`); the screen
+ * reads Courses again (`useCourseSave`), so nothing is revalidated here.
+ */
 
-function refresh(id?: string) {
-    revalidatePath("/courses");
-    if (id) revalidatePath(`/courses/${id}`);
-    // Enrolling books sessions and may issue an invoice.
-    revalidatePath("/bookings");
-    revalidatePath("/billing/invoices");
+export async function createCourse(input: CourseInput, orgId: string) {
+    return writeAsOrg(orgId, () => api.createCourse(input));
 }
-
-async function then<T extends { ok: boolean }>(
-    res: Promise<T>,
-    id?: string,
-): Promise<T> {
-    const r = await res;
-    if (r.ok) refresh(id);
-    return r;
+export async function updateCourse(
+    id: string,
+    input: CourseInput,
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => api.updateCourse(id, input));
 }
-
-export async function createCourse(input: CourseInput) {
-    return then(api.createCourse(input));
+export async function addSession(id: string, startAt: string, orgId: string) {
+    return writeAsOrg(orgId, () => api.addSession(id, startAt));
 }
-export async function updateCourse(id: string, input: CourseInput) {
-    return then(api.updateCourse(id, input), id);
-}
-export async function addSession(id: string, startAt: string) {
-    return then(api.addSession(id, startAt), id);
-}
-export async function removeSession(id: string, sessionId: string) {
-    return then(api.removeSession(id, sessionId), id);
+export async function removeSession(
+    id: string,
+    sessionId: string,
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => api.removeSession(id, sessionId));
 }
 export async function enrol(
     id: string,
     input: { contactId: string; price?: string },
+    orgId: string,
 ) {
-    return then(api.enrol(id, input), id);
+    return writeAsOrg(orgId, () => api.enrol(id, input));
 }
 
 /**
@@ -53,16 +48,16 @@ export async function enrol(
 export async function cancelEnrollment(
     id: string,
     enrollmentId: string,
-    voidInvoiceId?: string,
+    voidInvoiceId: string | undefined,
+    orgId: string,
 ) {
-    const res = await api.cancelEnrollment(id, enrollmentId);
-    if (!res.ok) return res;
-    if (voidInvoiceId) {
+    return writeAsOrg(orgId, async () => {
+        const res = await api.cancelEnrollment(id, enrollmentId);
+        if (!res.ok || !voidInvoiceId) return res;
         const voided = await voidInvoiceApi(
             voidInvoiceId,
             "Enrolment cancelled",
         );
-        refresh(id);
         if (!voided.ok) {
             return {
                 ok: false as const,
@@ -70,7 +65,5 @@ export async function cancelEnrollment(
             };
         }
         return res;
-    }
-    refresh(id);
-    return res;
+    });
 }

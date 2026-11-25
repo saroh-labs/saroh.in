@@ -1,19 +1,15 @@
 import { notFound } from "next/navigation";
-import { cache } from "react";
 
-import { CoursePage } from "@/components/courses/course-page";
-import { PageContainer } from "@/components/shared/page/page-container";
+import { CourseDetailContainer } from "@/components/courses/course-detail-container";
 import { canWriteCourses } from "@/lib/courses/access";
-import { getCourse } from "@/lib/courses/service";
+import { readCourseOnce } from "@/lib/courses/access-server";
 import { readGstAsk } from "@/lib/gst-rates/service";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
-import { readPriceHistory } from "@/lib/price-history/service";
 import { requireSession } from "@/lib/session";
 
-// One read for the tab's title and the page.
-const readCourse = cache((courseId: string) => getCourse(courseId));
+import Loading from "./loading";
 
 /** The course's own name in the tab; "Course" when it can't be read. */
 export async function generateMetadata({
@@ -23,13 +19,21 @@ export async function generateMetadata({
 }) {
     const { courseId } = await params;
     return recordTitle(
-        () => readCourse(courseId),
+        () => readCourseOnce(courseId),
         (course) => course.name,
         "Course",
     );
 }
 
-/** One course: its sessions, its roster, and enrolling someone. */
+/**
+ * One course: its sessions, its roster, and enrolling someone. On React
+ * Query (DEC-259): missing, or another business's, is this page's 404 from
+ * the read the tab's title shares (`readCourseOnce`); who may change it
+ * and what the enrol sheet offers (the people, the GST standing) are the
+ * page's; the course with its price history (`/api/courses/[courseId]`) is
+ * `CourseDetailContainer`'s query, read from the browser behind the
+ * route's loader and again after every save.
+ */
 export default async function CourseDetailPage({
     params,
 }: {
@@ -38,30 +42,24 @@ export default async function CourseDetailPage({
     await requireSession();
     const { courseId } = await params;
     const [course, organization] = await Promise.all([
-        readCourse(courseId),
+        readCourseOnce(courseId),
         resolveActiveOrganization(),
     ]);
     if (!course) notFound();
     const canWrite = canWriteCourses(organization);
-    const [contacts, gst, priceHistory] = await Promise.all([
+    const [contacts, gst] = await Promise.all([
         canWrite ? contactPickerOptions() : Promise.resolve([]),
         // For the enrol dialog's amount to pay; unread says the price typed.
         canWrite ? readGstAsk() : Promise.resolve(null),
-        // What it has cost (12 Oct 2026). Optional: a read that fails is
-        // said in its place.
-        readPriceHistory("courses", courseId).catch(() => null),
     ]);
 
     return (
-        <PageContainer width="full">
-            <CoursePage
-                course={course}
-                contacts={contacts}
-                canWrite={canWrite}
-                now={new Date().toISOString()}
-                gst={gst}
-                priceHistory={priceHistory}
-            />
-        </PageContainer>
+        <CourseDetailContainer
+            ask={{ courseId }}
+            skeleton={<Loading />}
+            contacts={contacts}
+            canWrite={canWrite}
+            gst={gst}
+        />
     );
 }

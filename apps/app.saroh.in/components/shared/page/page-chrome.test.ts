@@ -77,6 +77,7 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     ".": "full", // `HomeContainer`
     "billing/invoices": "full", // `InvoicesContainer`
     "billing/invoices/[invoiceId]": "full", // `InvoiceDetailContainer`
+    "courses/[courseId]": "full", // `CourseDetailContainer`
     "commerce/stock": "full", // `StockContainer`
     "commerce/locations": "full", // `LocationsContainer`
     "contacts/[contactId]": "full", // `CustomerDetailContainer`

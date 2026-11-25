@@ -26,9 +26,9 @@ vi.mock("@/lib/courses/actions", () => ({
     removeSession: vi.fn(),
     updateCourse: vi.fn(),
 }));
-const refresh = vi.fn();
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push: vi.fn(), refresh }),
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/courses/use-courses", () => ({
+    useCourseSave: () => ({ orgId: "org_a", saved }),
 }));
 const showSuccess = vi.fn();
 const showError = vi.fn();
@@ -133,8 +133,7 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
-    for (const m of [addSession, refresh, showSuccess, showError])
-        m.mockReset();
+    for (const m of [addSession, saved, showSuccess, showError]) m.mockReset();
 });
 
 afterEach(() => {
@@ -268,6 +267,8 @@ describe("adding a session", () => {
         await press(buttons("Add session", d)[0]);
         expect(addSession).toHaveBeenCalledTimes(1);
         expect(addSession.mock.calls[0]?.[0]).toBe("course_1");
+        // The tab's business goes last (`writeAsOrg`).
+        expect(addSession.mock.calls[0]?.[2]).toBe("org_a");
         expect(showError).toHaveBeenCalledWith(
             "Pottery already has a class then.",
         );
@@ -275,7 +276,8 @@ describe("adding a session", () => {
         expect(dialog()?.querySelector("[data-day]")?.textContent).toBe(
             "2026-10-21",
         );
-        expect(refresh).not.toHaveBeenCalled();
+        // A refusal reads nothing.
+        expect(saved).not.toHaveBeenCalled();
     });
 
     it("closes once the session is added, and the list is read again", async () => {
@@ -285,7 +287,8 @@ describe("adding a session", () => {
         await press(buttons("Add session", d)[0]);
         expect(showSuccess).toHaveBeenCalledWith("Session added.");
         expect(dialog()).toBe(null);
-        expect(refresh).toHaveBeenCalledTimes(1);
+        // Courses read once again (`coursesSaved`).
+        expect(saved).toHaveBeenCalledTimes(1);
     });
 
     it("Cancel closes it and adds nothing", () => {

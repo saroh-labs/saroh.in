@@ -6,13 +6,13 @@ import { DatePicker } from "@saroh/ui/date-picker";
 import { Label } from "@saroh/ui/label";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { addSession } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
+import { useCourseSave } from "@/lib/courses/use-courses";
 import { FormDialog } from "@saroh/ui/form-dialog";
 
 /** A week after the last session, at the same time; 18:30 with none yet. */
@@ -40,7 +40,7 @@ export function AddSessionDialog({
     onOpenChange: (open: boolean) => void;
     course: CourseDetail;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCourseSave();
     const ids = { day: useId(), time: useId() };
     const [day, setDay] = useState(() => nextSession(course).day);
     const [time, setTime] = useState(() => nextSession(course).time);
@@ -65,18 +65,23 @@ export function AddSessionDialog({
         setTried(true);
         if (!day) return;
         const res = await runAction(
-            () => addSession(course.id, wallClockToIso(ymd(day), time, tz)),
+            () =>
+                addSession(
+                    course.id,
+                    wallClockToIso(ymd(day), time, tz),
+                    orgId,
+                ),
             { setBusy },
         );
         if (!res) return;
         if (!res.ok) return showError(res.error);
+        await saved();
         showSuccess(
             on > 0
                 ? `Session added. ${count(on, "person is", "people are")} booked on it.`
                 : "Session added.",
         );
         onOpenChange(false);
-        router.refresh();
     }
 
     return (

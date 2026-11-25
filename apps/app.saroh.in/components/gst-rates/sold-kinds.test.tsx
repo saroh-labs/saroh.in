@@ -53,6 +53,9 @@ const desk = vi.hoisted(() => ({
 vi.mock("@/lib/subscriptions/actions", () => ({ subscribe: desk.subscribe }));
 vi.mock("@/lib/class-packs/actions", () => ({ sellPack: desk.sellPack }));
 vi.mock("@/lib/courses/actions", () => ({ enrol: desk.enrol }));
+vi.mock("@/lib/courses/use-courses", () => ({
+    useCourseSave: () => ({ orgId: "org_a", saved: () => Promise.resolve() }),
+}));
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -541,9 +544,11 @@ describe("enrolling someone on a course", () => {
             { kind: "COURSE", id: "c_wheel", rate: "18" },
         ]);
         expect(desk.enrol).toHaveBeenCalledTimes(2);
-        expect(desk.enrol).toHaveBeenLastCalledWith("c_wheel", {
-            contactId: "c_asha",
-        });
+        expect(desk.enrol).toHaveBeenLastCalledWith(
+            "c_wheel",
+            { contactId: "c_asha" },
+            "org_a",
+        );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Asha Rao enrolled.",
             "6 sessions booked.",
