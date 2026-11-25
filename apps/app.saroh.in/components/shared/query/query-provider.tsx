@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import type { Organization } from "@/lib/organizations/service";
 import { listen } from "@/lib/query/broadcast";
 import { getBrowserQueryClient, setReadErrorHooks } from "@/lib/query/client";
-import { dropLeftBusinesses } from "@/lib/query/invalidate";
+import { dropLeftBusinesses, invalidateSettings } from "@/lib/query/invalidate";
 import { ORGANIZATIONS_KEY } from "@/lib/query/keys";
 import { OrgProvider } from "@/lib/query/org";
 
@@ -18,7 +18,8 @@ import { OrgProvider } from "@/lib/query/org";
  *
  * It holds the business list the server already read for this render
  * (`['organizations']`), and hears the other tabs: a business switched
- * there draws this tab's page again under it; a sign-out there clears it.
+ * there draws this tab's page again under it; a setting saved there reads
+ * this tab's settings again; a sign-out there clears it.
  */
 export function QueryProvider({
     orgId,
@@ -48,6 +49,11 @@ export function QueryProvider({
         const stop = listen((kind) => {
             if (kind === "switch") {
                 router.refresh();
+                return;
+            }
+            // A setting changed in another tab: read ours again.
+            if (kind === "settings") {
+                void invalidateSettings(client);
                 return;
             }
             // Signed out elsewhere: drop it all and reload so this tab's

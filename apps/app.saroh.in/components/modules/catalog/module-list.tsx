@@ -31,6 +31,7 @@ import {
     setupActionLabel,
 } from "@/lib/modules/switch-plan";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { Notice } from "@saroh/ui/notice";
 
 /**
@@ -254,6 +255,8 @@ function ModuleRow({
                     showError(refusalSentence(result));
                     return;
                 }
+                // The rail and the shell's settings read the change.
+                afterSettingsSave();
             }
             onDone();
         });

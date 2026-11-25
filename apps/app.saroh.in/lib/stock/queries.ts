@@ -43,6 +43,7 @@ export const stockLevelsRead = defineRead<StockLevels>()({
             size,
         },
     },
+    tier: "records",
 });
 
 export type StockLevelsAsk = Parameters<typeof stockLevelsRead.options>[1];
@@ -73,6 +74,7 @@ export const stockLogRead = defineRead<StockLogView>()({
             names: z.literal("1").optional(),
         },
     },
+    tier: "records",
 });
 
 export type StockLogAsk = Parameters<typeof stockLogRead.options>[1];
@@ -81,6 +83,7 @@ export type StockLogAsk = Parameters<typeof stockLogRead.options>[1];
 export const stockChecksRead = defineRead<StockChecks>()({
     key: (orgId, ask) => domainKey("stock", orgId, "checks", ask),
     route: { path: "/api/stock/checks", params: { page, size } },
+    tier: "records",
 });
 
 export type StockChecksAsk = Parameters<typeof stockChecksRead.options>[1];

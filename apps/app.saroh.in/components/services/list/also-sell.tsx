@@ -10,6 +10,7 @@ import { UNREACHED } from "@/lib/api/unreached";
 import { setModuleStatusAction } from "@/lib/modules/actions";
 import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import { alsoSellToast } from "@/lib/services/also-sell";
 import { CheckRow } from "@saroh/ui/check-row";
@@ -51,6 +52,7 @@ export function AlsoSell({
                 showError(refusalSentence(res));
                 return;
             }
+            afterSettingsSave();
             router.refresh();
             showUndo(alsoSellToast(f.label, false), async () => {
                 const back = await runAction(() => set(f.key, true), {

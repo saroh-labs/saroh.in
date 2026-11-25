@@ -41,6 +41,7 @@ interface Row {
 const rows = defineRead<Row[]>()({
     key: (orgId, p) => domainKey("probe", orgId, "list", p),
     route: { path: "/api/probe", params: { q: searchText, size: pageSize } },
+    tier: "records",
 });
 
 const service =
@@ -271,6 +272,7 @@ describe("readRoute", () => {
         const one = defineRead<Row[]>()({
             key: (orgId, p) => domainKey("probe", orgId, "one", p),
             route: { path: "/api/probe/[id]", params: { id: searchText } },
+            tier: "records",
         });
         const seen = vi.fn((p: { id?: string }) =>
             Promise.resolve(p.id === "r1" ? [] : null),

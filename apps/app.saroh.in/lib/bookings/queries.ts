@@ -65,6 +65,7 @@ export const bookingsRead = defineRead<BookingsList>()({
             to: day,
         },
     },
+    tier: "live",
 });
 
 /**
@@ -115,6 +116,7 @@ export const diaryRead = defineRead<BookingsDiary>()({
         path: "/api/bookings/diary",
         params: { from: localDay, to: localDay, week: localDay },
     },
+    tier: "live",
 });
 
 export interface DiaryAsk {

@@ -284,7 +284,8 @@ jobs:
 
       # React Query's boundary (DEC-259): keys from domainKey in a queries
       # file, fetchers that send the key's org, read routes built only with
-      # readRoute, and no router.refresh() on a React Query route.
+      # readRoute, every read with its freshness tier, and no router.refresh()
+      # on a React Query route.
       - name: Query keys
         run: pnpm run check:query-keys
       - name: Read routes

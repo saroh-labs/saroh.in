@@ -70,6 +70,7 @@ export const ordersListRead = defineRead<OrdersListView>()({
             size: word,
         },
     },
+    tier: "live",
 });
 
 export type OrdersAsk = Parameters<typeof ordersListRead.options>[1];
@@ -95,6 +96,7 @@ export interface OrdersOptions {
 export const ordersOptionsRead = defineRead<OrdersOptions>()({
     key: (orgId, ask) => domainKey("orders", orgId, "options", ask),
     route: { path: "/api/orders/options", params: { product: word } },
+    tier: "records",
 });
 
 export type OrdersOptionsAsk = Parameters<typeof ordersOptionsRead.options>[1];
@@ -117,6 +119,7 @@ const ID = z.string().regex(/^[\w-]{1,64}$/);
 export const orderRead = defineRead<OrderView>()({
     key: (orgId, { orderId }) => domainKey("orders", orgId, "order", orderId),
     route: { path: "/api/orders/[orderId]", params: { orderId: ID } },
+    tier: "live",
 });
 
 export type OrderAsk = Parameters<typeof orderRead.options>[1];
@@ -137,6 +140,7 @@ export const ticketsRead = defineRead<TicketsView>()({
         // 50 ids (TICKETS_MAX), comma-separated.
         params: { ids: z.string().max(1700) },
     },
+    tier: "live",
 });
 
 export type TicketsAsk = Parameters<typeof ticketsRead.options>[1];

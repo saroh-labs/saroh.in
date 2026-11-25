@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import { announce } from "@/lib/query/broadcast";
 import { getBrowserQueryClient } from "@/lib/query/client";
+import { isSettingsQuery } from "@/lib/query/freshness";
 import { isOrgKey, ORGANIZATIONS_KEY } from "@/lib/query/keys";
 
 /** Drop everything this tab holds: another business, or no one, is next. */
@@ -66,4 +67,24 @@ export function markOrgStale(orgId: string): Promise<void> {
         predicate: (q) => isOrgKey(q.queryKey, orgId),
         refetchType: "none",
     });
+}
+
+/**
+ * Every settings read this tab holds is read again (the shown ones now, the
+ * rest on their next use): kept for the visit, they change only when told
+ * (`freshness.ts`).
+ */
+export function invalidateSettings(client: QueryClient): Promise<void> {
+    return client.invalidateQueries({ predicate: isSettingsQuery });
+}
+
+/**
+ * A save changed a setting the shell draws (a module on or off, the plan,
+ * a site, a storefront, Track stock, Ask AI): this tab reads its settings
+ * again, and the other tabs are told to. Call it after the save worked.
+ */
+export function afterSettingsSave(): void {
+    if (typeof window === "undefined") return;
+    void invalidateSettings(getBrowserQueryClient());
+    announce("settings");
 }

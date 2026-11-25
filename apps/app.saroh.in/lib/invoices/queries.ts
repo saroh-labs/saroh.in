@@ -46,6 +46,7 @@ export const invoicesListRead = defineRead<InvoicesListView>()({
             since: word,
         },
     },
+    tier: "records",
 });
 
 export type InvoicesAsk = Parameters<typeof invoicesListRead.options>[1];
@@ -96,6 +97,7 @@ export function invoicesAsk(params: SearchParams): InvoicesAsk {
 export const invoicesSummaryRead = defineRead<InvoiceSummary>()({
     key: (orgId) => domainKey("invoices", orgId, "summary"),
     route: { path: "/api/invoices/summary", params: {} },
+    tier: "records",
 });
 
 const ID = z.string().regex(/^[\w-]{1,64}$/);
@@ -105,6 +107,7 @@ export const invoiceRead = defineRead<InvoiceDetails>()({
     key: (orgId, { invoiceId }) =>
         domainKey("invoices", orgId, "invoice", invoiceId),
     route: { path: "/api/invoices/[invoiceId]", params: { invoiceId: ID } },
+    tier: "records",
 });
 
 export type InvoiceAsk = Parameters<typeof invoiceRead.options>[1];

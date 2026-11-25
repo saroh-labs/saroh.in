@@ -13,6 +13,7 @@ import { navFor, navPathname } from "@/components/shared/navigation/nav-items";
 import type { MobileTab } from "@/lib/nav/mobile-nav";
 import { buildMobileNav } from "@/lib/nav/mobile-nav";
 import { CountBadge } from "@saroh/ui/count-badge";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { TabBarSheet } from "./tab-bar-sheet";
 
 /**
@@ -39,7 +40,10 @@ export function TabBar({
     storefronts = null,
     stockTracked = null,
     kind,
+    pending = false,
 }: {
+    /** The modules aren't read yet: the tabs are skeleton pieces. */
+    pending?: boolean;
     /** What is being set up (DEC-070); see `navFor`. */
     kind?: string | null;
     /** The role as stored; see `navFor`. */
@@ -86,10 +90,15 @@ export function TabBar({
                 "min-[760px]:hidden print:hidden",
             )}
         >
-            {nav.tabs.map((tab) => (
-                <TabLink key={tab.key} tab={tab} />
-            ))}
-            {nav.more ? (
+            {pending
+                ? Array.from({ length: 5 }, (_, i) => (
+                      <span key={i} aria-hidden className={tabClass(false)}>
+                          <Skeleton className="size-[21px] rounded-md" />
+                          <Skeleton className="h-2.5 w-10" />
+                      </span>
+                  ))
+                : nav.tabs.map((tab) => <TabLink key={tab.key} tab={tab} />)}
+            {nav.more && !pending ? (
                 <TabBarSheet
                     groups={nav.groups}
                     note={nav.note}

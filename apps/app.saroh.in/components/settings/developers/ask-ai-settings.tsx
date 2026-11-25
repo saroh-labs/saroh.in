@@ -19,6 +19,7 @@ import { PROVIDER_WHERE } from "@/components/ask-ai/words";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { MARKETING_URL } from "@/lib/help/links";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { saveAskAiOn } from "@/lib/settings/ask-ai-actions";
 
 /** Team › Roles, where "Use Ask AI" is given. */
@@ -278,6 +279,7 @@ function BusinessSwitch({ business, on }: { business: string; on: boolean }) {
                 showError(result.error, "Ask AI is as it was.");
                 return;
             }
+            afterSettingsSave();
             showSuccess(
                 next
                     ? `Ask AI is on for ${business}`

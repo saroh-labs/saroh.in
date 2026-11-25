@@ -11,6 +11,7 @@ import {
 } from "@/lib/modules/actions";
 import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { TextLink } from "@saroh/ui/text-link";
 
 /**
@@ -63,6 +64,7 @@ function ProjectModuleRow({
             );
             if (!result) return;
             if (result.ok) {
+                afterSettingsSave();
                 showSuccess(
                     next
                         ? `${module.label} added to this project.`

@@ -12,6 +12,7 @@ import type { AddonRow } from "@/lib/saroh-billing/plan-view";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 
 import { runAction } from "@/lib/api/run-action";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { card } from "./styles";
 
 /**
@@ -47,6 +48,7 @@ export function AddonsCard({
                 showError(res.error);
                 return;
             }
+            afterSettingsSave();
             // A plan paid one month at a time (stage 9): a whole month of
             // it is paid now, and it's held once the payment lands.
             const handoff = res.data.payment?.handoff;

@@ -53,6 +53,7 @@ export const productsListRead = defineRead<CataloguePage>()({
             sort: z.enum(CATALOGUE_SORTS).optional(),
         },
     },
+    tier: "records",
 });
 
 /** A product's page: its overview, and its shelves where the view shows them. */
@@ -76,6 +77,7 @@ export const productRead = defineRead<ProductRead>()({
             shelves: z.literal("1").optional(),
         },
     },
+    tier: "records",
 });
 
 export type ProductAsk = Parameters<typeof productRead.options>[1];

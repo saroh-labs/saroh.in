@@ -13,14 +13,19 @@ import { planName } from "./words";
  * The way into Ask AI (board 2): a labelled "Ask AI" button right of
  * Search on a desk, dark while the panel is open; a spark beside Search in
  * a phone's header. On a plan without it, a lock, and it still opens the
- * panel, which says why: never a dead click (board 8).
+ * panel, which says why: never a dead click (board 8). Until the shell
+ * has read Ask AI's state (`pending`) it is drawn in its place but can't
+ * be pressed, so it never opens a panel that doesn't know the plan yet.
  */
 export function AskAiButton({
     locked,
     upgradeTo,
+    pending = false,
 }: {
     locked: boolean;
     upgradeTo?: string | null;
+    /** Ask AI's state isn't read yet: drawn, not pressable. */
+    pending?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     useEffect(() => {
@@ -42,6 +47,8 @@ export function AskAiButton({
                 aria-current={here ? "page" : undefined}
                 aria-label={locked ? name : undefined}
                 aria-keyshortcuts="Meta+J Control+J"
+                disabled={pending}
+                aria-busy={pending || undefined}
                 data-on={on ? "" : undefined}
                 onClick={openAskAi}
                 className="hidden h-9 gap-[7px] rounded-[9px] px-3 text-[13.5px] min-[760px]:inline-flex"
@@ -59,6 +66,8 @@ export function AskAiButton({
                 label={name}
                 icon={locked ? <Lock /> : <Sparkles />}
                 aria-expanded={open}
+                disabled={pending}
+                aria-busy={pending || undefined}
                 onClick={openAskAi}
                 className="min-[760px]:hidden"
             />

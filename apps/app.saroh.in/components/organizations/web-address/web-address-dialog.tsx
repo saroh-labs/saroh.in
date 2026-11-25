@@ -33,6 +33,7 @@ import {
     checkWebAddress,
     saveWebAddress,
 } from "@/lib/organizations/web-address-actions";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 
 const schema = z.object({
     address: z.string().min(1, { error: "Enter a web address" }),
@@ -153,6 +154,8 @@ function ChangeForm({
         );
         onChanged?.(res.data);
         onDone();
+        afterSettingsSave();
+        // rq-refresh-ok: the address is drawn by the server pages it is on.
         router.refresh();
     }
 

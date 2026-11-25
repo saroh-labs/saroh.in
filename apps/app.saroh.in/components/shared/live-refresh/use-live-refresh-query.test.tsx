@@ -191,6 +191,27 @@ describe("useLiveRefresh on a React Query page", () => {
         expect(h.refresh).not.toHaveBeenCalled();
     });
 
+    it("reads the shell's bell and badges again on every refresh, on any page", async () => {
+        const live = domainKey("shell", "org_1", "live");
+        client.setQueryData(live, { unread: 0, counts: {} });
+        client.setQueryData(domainKey("shell", "org_1", "settings"), {});
+        await ready();
+        comeBack();
+        expect(client.getQueryState(live)?.isInvalidated).toBe(true);
+        // The settings are not on the live refresh.
+        expect(
+            client.getQueryState(domainKey("shell", "org_1", "settings"))
+                ?.isInvalidated,
+        ).toBe(false);
+        // A page off React Query: the same, beside its `router.refresh()`.
+        client.setQueryData(live, { unread: 1, counts: {} });
+        h.nav.pathname = "/settings";
+        mount();
+        later();
+        comeBack();
+        expect(client.getQueryState(live)?.isInvalidated).toBe(true);
+    });
+
     it("never touches another business's cached queries", async () => {
         client.setQueryData(domainKey("home", "org_2", "summary"), "theirs");
         await ready();

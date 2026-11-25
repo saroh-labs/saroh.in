@@ -36,10 +36,12 @@ export interface HomeScreen extends HomeModel {
 export const homeRead = defineRead<HomeScreen>()({
     key: (orgId) => domainKey("home", orgId, "home"),
     route: { path: "/api/home", params: {} },
+    tier: "live",
 });
 
 /** "Finish setup" (F8): owners and admins only, so a read of its own. */
 export const homeSetupRead = defineRead<HomeSetup>()({
     key: (orgId) => domainKey("home", orgId, "setup"),
     route: { path: "/api/home/setup", params: {} },
+    tier: "records",
 });

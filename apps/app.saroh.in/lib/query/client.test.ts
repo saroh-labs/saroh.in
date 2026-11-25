@@ -15,7 +15,7 @@ import {
     resetReadErrorGuard,
     setReadErrorHooks,
 } from "@/lib/query/client";
-import { ORGANIZATIONS_KEY } from "@/lib/query/keys";
+import { domainKey, ORGANIZATIONS_KEY } from "@/lib/query/keys";
 
 describe("which client", () => {
     afterEach(() => vi.unstubAllGlobals());
@@ -89,6 +89,30 @@ describe("a failed read", () => {
         onReadError(client, new ReadFailed(401));
         expect(client.getQueryData(ORGANIZATIONS_KEY)).toBeUndefined();
         expect(signIn).toHaveBeenCalledTimes(1);
+    });
+
+    it("any refusal marks the settings reads stale, at most once in 10 s", () => {
+        const settings = domainKey("shell", "o1", "settings");
+        const records = domainKey("products", "o1", "list");
+        client.getQueryCache().build(client, {
+            queryKey: settings,
+            meta: { tier: "settings" },
+        });
+        client.setQueryData(settings, { moduleKeys: ["COMMERCE"] });
+        client.setQueryData(records, [1]);
+        const stale = () => client.getQueryState(settings)?.isInvalidated;
+        // A module turned off elsewhere: the gate's no is the role's.
+        onReadError(client, new ReadFailed(403, ROLE_DENIED));
+        expect(stale()).toBe(true);
+        expect(client.getQueryState(records)?.isInvalidated).toBe(false);
+        // Read again, then refused again within 10 s: not again.
+        client.setQueryData(settings, { moduleKeys: [] });
+        onReadError(client, new ReadFailed(403));
+        expect(stale()).toBe(false);
+        // A failure that isn't a refusal never does.
+        resetReadErrorGuard();
+        onReadError(client, new ReadFailed(503));
+        expect(stale()).toBe(false);
     });
 
     it("anything else is the screen's failed state", () => {

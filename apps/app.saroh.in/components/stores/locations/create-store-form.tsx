@@ -19,6 +19,7 @@ import { z } from "zod";
 
 import { trimmedOr } from "@/lib/forms/values";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { createStore } from "@/lib/stores/actions";
 import { storefrontHref } from "@/lib/stores/links";
 import { lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
@@ -56,6 +57,8 @@ export function CreateStoreForm() {
             }
             return;
         }
+        // The rail's Locations and the menu's "New storefront".
+        afterSettingsSave();
         router.push(storefrontHref(res.data.id));
     }
 

@@ -41,6 +41,7 @@ import { decodeSetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
 import { connectLockFor } from "@/lib/providers/connect-lock";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import type { SuggestionBasis } from "@/lib/sites/template-picker";
 import { moduleStatesWith } from "@/lib/sites/template-picker";
 import { templateChoiceOn } from "@/lib/sites/templates-switch";
@@ -274,7 +275,11 @@ export function useTurnOn({
                         : why,
                 );
                 // What did turn on shows behind the sheet.
-                if (onAlready.length > 0) router.refresh();
+                if (onAlready.length > 0) {
+                    afterSettingsSave();
+                    // rq-refresh-ok: a module on changes the page's server gates.
+                    router.refresh();
+                }
                 return;
             }
             done.current.push({ key, view: res.module });
@@ -282,6 +287,8 @@ export function useTurnOn({
         }
         setSaving(false);
         onClose();
+        // The rail, the sites and the shell's settings read the change.
+        afterSettingsSave();
         const names = plan.order.map((k) => moduleName(k, modules));
         showSuccess(
             turnedOnToast(
@@ -299,6 +306,7 @@ export function useTurnOn({
             firstRun ? { siteId: siteId.current } : undefined,
         );
         if (href) router.push(href);
+        // rq-refresh-ok: a module on changes the page's server gates.
         else router.refresh();
     };
 

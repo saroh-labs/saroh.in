@@ -122,6 +122,7 @@ export function useAskAi({
         const href = askPageHref(conversationId);
         if (window.location.pathname + window.location.search !== href) {
             window.history.replaceState(null, "", href);
+            // rq-refresh-ok: only on the Ask AI page (`page`), never Home's.
             router.refresh();
         }
     }, [page, conversationId, router]);
@@ -285,6 +286,7 @@ export function useAskAi({
         // again, so Back from a card's link shows this turn and its card.
         if (page) {
             void loadHistory();
+            // rq-refresh-ok: only on the Ask AI page (`page`), never Home's.
             router.refresh();
         }
     };
