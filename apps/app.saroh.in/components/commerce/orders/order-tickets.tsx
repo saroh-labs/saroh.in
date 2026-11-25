@@ -18,6 +18,8 @@ import {
 } from "@/lib/orders/tickets";
 import { Notice } from "@saroh/ui/notice";
 
+import { PageLoading, TitleBar } from "@/components/shared/page/page-loading";
+
 /**
  * Several orders' tickets, one to a printed page (plan B, B6), from the
  * Orders list's bulk "Print tickets (N)", after the "Saroh Orders Screen"
@@ -36,26 +38,29 @@ export function OrderTickets({
     noTicket,
     failed,
 }: {
-    /** Oldest first, each with a ticket to print. */
-    orders: OrderRead[];
+    /**
+     * Oldest first, each with a ticket to print; null while they are read
+     * (the header and Orders are drawn, the tickets are skeletons).
+     */
+    orders: OrderRead[] | null;
     /** Asked for, but their way of leaving prints nothing. */
     noTicket: number;
     /** Asked for, but they couldn't be read. */
     failed: number;
 }) {
     const summary = ticketsSummary({
-        printed: orders.length,
+        printed: orders?.length ?? 0,
         noTicket,
         failed,
     });
     const printed = useRef(false);
     useEffect(() => {
-        if (printed.current || orders.length === 0) return;
+        if (printed.current || !orders?.length) return;
         printed.current = true;
         // After the page has painted, so every ticket prints whole.
         const timer = window.setTimeout(() => window.print(), 300);
         return () => window.clearTimeout(timer);
-    }, [orders.length]);
+    }, [orders?.length]);
 
     return (
         <main className="ticket-print w-full px-4 pb-[26px] pt-5 sm:px-[26px]">
@@ -73,9 +78,15 @@ export function OrderTickets({
                     </IntentLink>,
                     "Tickets",
                 ]}
-                title={summary.title}
+                title={
+                    orders ? (
+                        summary.title
+                    ) : (
+                        <TitleBar label="Loading the tickets" />
+                    )
+                }
                 description={`Oldest first, one to a page.${
-                    summary.notes.length > 0
+                    orders && summary.notes.length > 0
                         ? ` ${summary.notes.join(" ")}`
                         : ""
                 }`}
@@ -87,9 +98,10 @@ export function OrderTickets({
                                 Orders
                             </IntentLink>
                         </Button>
-                        {orders.length > 0 ? (
+                        {orders === null || orders.length > 0 ? (
                             <Button
                                 type="button"
+                                disabled={!orders}
                                 onClick={() => window.print()}
                             >
                                 <Printer aria-hidden className="size-4" />
@@ -99,7 +111,15 @@ export function OrderTickets({
                     </>
                 }
             />
-            {orders.length === 0 ? (
+            {!orders ? (
+                <PageLoading
+                    bare
+                    width="full"
+                    shape="rows"
+                    rows={3}
+                    label="Loading the tickets"
+                />
+            ) : orders.length === 0 ? (
                 <Notice role="status">
                     Nothing to print.{" "}
                     {summary.notes.join(" ") ||

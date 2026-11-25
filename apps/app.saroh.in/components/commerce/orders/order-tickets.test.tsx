@@ -151,3 +151,16 @@ describe("OrderTickets", () => {
         expect(html).toContain("1 order couldn&#x27;t be loaded.");
     });
 });
+
+describe("Print tickets before they are read (owner, 25 Nov)", () => {
+    it("draws the header and Orders at once, the tickets as skeletons, Print waiting", () => {
+        const html = renderToStaticMarkup(
+            <OrderTickets orders={null} noTicket={0} failed={0} />,
+        );
+        expect(html).toContain("Oldest first, one to a page.");
+        expect(html).toContain('href="/commerce/orders"');
+        expect(html).toContain('data-shape="rows"');
+        expect(html).toMatch(/<button[^>]*disabled=""[^>]*>.*Print/);
+        expect(html).not.toContain("Nothing to print");
+    });
+});

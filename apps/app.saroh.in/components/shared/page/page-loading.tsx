@@ -196,7 +196,7 @@ export function FigureLoading({ className }: { className?: string }) {
 }
 
 /** A record's name, not read yet: a bar the height of the title. */
-function TitleBar({ label }: { label: string }) {
+export function TitleBar({ label }: { label: string }) {
     return (
         <>
             <span className="sr-only">{label}</span>
