@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 
+import { bumpGateEpoch } from "@/lib/access/gate-epoch";
 import { announce } from "@/lib/query/broadcast";
 import { getBrowserQueryClient } from "@/lib/query/client";
 import { isSettingsQuery } from "@/lib/query/freshness";
@@ -50,6 +51,9 @@ export function dropLeftBusinesses(
  */
 export function invalidateOrganizations(): void {
     if (typeof window === "undefined") return;
+    // A role or membership may have changed: the server's kept gate answers
+    // for this browser are passed over (`gate-epoch.ts`).
+    bumpGateEpoch();
     void getBrowserQueryClient().invalidateQueries({
         queryKey: ORGANIZATIONS_KEY,
     });
@@ -85,6 +89,8 @@ export function invalidateSettings(client: QueryClient): Promise<void> {
  */
 export function afterSettingsSave(): void {
     if (typeof window === "undefined") return;
+    // Before the reads below: they must miss the server's kept gate answers.
+    bumpGateEpoch();
     void invalidateSettings(getBrowserQueryClient());
     announce("settings");
 }

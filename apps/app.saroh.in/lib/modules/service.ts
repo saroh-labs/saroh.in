@@ -1,4 +1,5 @@
-import { apiFetch, orgBase, readError } from "@/lib/api/http";
+import { remembered } from "@/lib/access/gate-memo";
+import { apiFetch, getActiveOrgId, orgBase, readError } from "@/lib/api/http";
 
 import { moduleErrorSentence, ROLE_REFUSAL } from "./blocker-copy";
 import type {
@@ -26,8 +27,19 @@ export type ModuleMutationResult =
     | { ok: true; data: ModuleView }
     | { ok: false; error: string; blockers?: ModuleBlocker[] };
 
-/** List every module with effective state for the active org (± a Project). */
+/**
+ * List every module with effective state for the active org (± a Project).
+ * The business's own list is the gate's answer, kept a short while per
+ * person and business (`gate-memo.ts`); a save that changes it forgets it.
+ */
 export async function listModules(projectId?: string): Promise<ModuleView[]> {
+    if (projectId) return readModules(projectId);
+    const orgId = await getActiveOrgId();
+    if (!orgId) return [];
+    return remembered(orgId, "modules", () => readModules());
+}
+
+async function readModules(projectId?: string): Promise<ModuleView[]> {
     const base = await orgBase();
     if (!base) return [];
     const qs = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";

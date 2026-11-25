@@ -246,6 +246,25 @@ Every `app/api/<area>/route.ts` is built with `readRoute(...)` and nothing else:
   (`lib/<domain>/access.ts`) its page uses, run before the service. Each route
   has a test that proves the gate across owner, member, Reviewer, calendar-only,
   signed-out and another organization's id.
+- The gate's two answers, the person's membership row (`/organizations/:id/me`)
+  and the business's modules (`listModules()` without a project), are kept
+  for `GATE_MEMO_TTL_MS` (30 s) per isolate by `lib/access/gate-memo.ts`, so
+  a cold page's reads and the document render ask once per window. Keyed by
+  a SHA-256 of the session cookie plus the `gate_epoch` cookie, and the
+  business id; successes only; one read in flight is shared (a sharer waits
+  5 s at most, then reads itself); 500 entries, least recently used dropped.
+  The document's business list seeds the `/me` entry. It is not a security
+  boundary: the API checks membership and role on every data call, so a kept
+  answer only shapes an early refusal or which fields a role sees, and
+  nothing may depend on a hit (Workers reuse an isolate per location, never
+  globally). A Server Action that changes role, membership, modules, plan or
+  add-ons calls `forgetGate` / `forgetGateAfter` (`lib/access/gate-memo.ts`):
+  the business's entries go in this isolate, and the browser sets a new
+  epoch as the save lands (`afterSettingsSave`, `invalidateOrganizations`;
+  `lib/access/gate-epoch.ts`), so no isolate serves it an old answer. Never
+  set that cookie in the action: a cookie set in a Server Action re-renders
+  the page on the server. Someone else's changed role
+  reaches them within 30 s; the API refuses them meanwhile.
 
 ## Rules
 

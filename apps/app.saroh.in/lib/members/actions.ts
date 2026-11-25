@@ -1,5 +1,6 @@
 "use server";
 
+import { forgetGateAfter } from "@/lib/access/gate-memo";
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 
 import type { MemberRole } from "./service";
@@ -33,7 +34,12 @@ export async function updateMemberRole(
     role: MemberRole,
     orgId: string,
 ) {
-    return writeAsOrg(orgId, () => updateMemberRoleApi(storeId, userId, role));
+    return forgetGateAfter(
+        await writeAsOrg(orgId, () =>
+            updateMemberRoleApi(storeId, userId, role),
+        ),
+        orgId,
+    );
 }
 
 export async function removeMember(
@@ -41,7 +47,10 @@ export async function removeMember(
     userId: string,
     orgId: string,
 ) {
-    return writeAsOrg(orgId, () => removeMemberApi(storeId, userId));
+    return forgetGateAfter(
+        await writeAsOrg(orgId, () => removeMemberApi(storeId, userId)),
+        orgId,
+    );
 }
 
 export async function revokeInvitation(
