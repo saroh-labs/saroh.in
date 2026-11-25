@@ -191,10 +191,15 @@ export function ArrivalLoading({ label = "Loading" }: { label?: string }) {
  */
 export function FigureLoading({ className }: { className?: string }) {
     return (
-        <Skeleton
+        // A span, not `Skeleton`'s div: it sits inside a <p>, a heading or a
+        // button, where a div breaks hydration (React #418).
+        <span
             aria-hidden
             data-slot="figure-loading"
-            className={cn("inline-block h-3 w-14 align-middle", className)}
+            className={cn(
+                "skeleton-sweep inline-block h-3 w-14 rounded-md bg-muted align-middle",
+                className,
+            )}
         />
     );
 }
@@ -204,9 +209,9 @@ export function TitleBar({ label }: { label: string }) {
     return (
         <>
             <span className="sr-only">{label}</span>
-            <Skeleton
+            <span
                 aria-hidden
-                className="inline-block h-[30px] w-56 max-w-full align-bottom"
+                className="skeleton-sweep inline-block h-[30px] w-56 max-w-full rounded-md bg-muted align-bottom"
             />
         </>
     );
@@ -262,21 +267,27 @@ function MoneyListBody(rows = 6) {
 /** The money strip's four figures (two in view on a phone). */
 function FiguresBody(cards = 4) {
     return (
-        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-            {Array.from({ length: cards }, (_, i) => (
-                <div
-                    key={i}
-                    className={cn(
-                        CARD,
-                        "space-y-2 px-3.5 py-3",
-                        i > 1 && "max-sm:hidden",
-                    )}
-                >
-                    <Skeleton className="h-3 w-20" />
-                    <Skeleton className="h-5 w-24" />
-                    <Skeleton className="h-3 w-16" />
-                </div>
-            ))}
+        // The strip's own 2px inset and card heights (`MoneyStrip`), and on a
+        // phone the room of its "Swipe for more" line, so the list under it
+        // doesn't move when the figures land.
+        <div>
+            <div className="grid grid-cols-2 gap-2.5 p-0.5 lg:grid-cols-4">
+                {Array.from({ length: cards }, (_, i) => (
+                    <div
+                        key={i}
+                        className={cn(
+                            CARD,
+                            "min-h-[88px] space-y-2 px-3.5 py-3 sm:min-h-24",
+                            i > 1 && "max-sm:hidden",
+                        )}
+                    >
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-3 w-16" />
+                    </div>
+                ))}
+            </div>
+            <div className="h-[26px] sm:hidden" />
         </div>
     );
 }
@@ -607,7 +618,7 @@ function CalendarBody(weeks = 5) {
     return (
         <div className="grid gap-[18px] min-[1100px]:grid-cols-[minmax(0,1fr)_360px] min-[1100px]:items-start">
             <div className={CARD}>
-                <div className="h-7 border-b border-border bg-muted/60" />
+                <div className="h-7 border-b border-border bg-muted/60 min-[760px]:h-[34px]" />
                 <div className="grid grid-cols-7">
                     {Array.from({ length: weeks * 7 }, (_, i) => (
                         <div

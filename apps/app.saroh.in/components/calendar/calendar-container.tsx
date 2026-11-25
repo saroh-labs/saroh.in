@@ -89,7 +89,12 @@ export function CalendarContainer({
         return (
             <PageContainer width="full">
                 <ScreenPending inPlace={{ pending: false }}>
-                    <CalendarReading at={at} now={now} team={team} />
+                    <CalendarReading
+                        at={at}
+                        now={now}
+                        team={team}
+                        money={can.money ?? true}
+                    />
                 </ScreenPending>
             </PageContainer>
         );
@@ -154,13 +159,20 @@ function CalendarReading({
     at,
     now,
     team,
+    money,
 }: {
     at: CalendarAt;
     now: CalendarNow;
     team?: string;
+    /** The month's money strip is drawn for them: its room is kept. */
+    money: boolean;
 }) {
+    // What to show's button, at its own height, so the toolbar doesn't grow.
     const filter = (
-        <Skeleton aria-hidden className="h-8 w-[132px] max-[759px]:w-full" />
+        <Skeleton
+            aria-hidden
+            className="h-[38px] w-[132px] rounded-full max-[759px]:h-11 max-[759px]:w-full max-[759px]:rounded-[10px]"
+        />
     );
     let toolbar: React.ReactNode;
     if (at.view === "week") {
@@ -241,14 +253,36 @@ function CalendarReading({
     return (
         <>
             {toolbar}
+            {money && at.view !== "week" ? (
+                // The month's money strip's room (`MonthStrip`).
+                <div
+                    aria-hidden
+                    className="flex h-[21px] items-center max-[759px]:h-[198px] max-[759px]:rounded-xl max-[759px]:border max-[759px]:border-border max-[759px]:bg-card max-[759px]:px-3.5"
+                >
+                    <Skeleton className="h-3 w-[420px] max-w-full" />
+                </div>
+            ) : null}
             <div className="!mt-3.5">
                 <PageLoading
                     bare
                     width="full"
                     shape="calendar"
+                    rows={
+                        at.view === "week"
+                            ? undefined
+                            : weeksIn(at.span.from.slice(0, 7))
+                    }
                     label="Loading the calendar"
                 />
             </div>
         </>
     );
+}
+
+/** How many Monday-first weeks the month's grid draws. */
+function weeksIn(month: string): number {
+    const [y, m] = month.split("-").map(Number);
+    const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+    const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return Math.ceil((lead + days) / 7);
 }

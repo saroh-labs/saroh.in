@@ -12,7 +12,10 @@ import { cn } from "@saroh/ui/lib/utils";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 
 import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
-import { PageLoading } from "@/components/shared/page/page-loading";
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import type { DateRange } from "@/lib/views/date-range";
 import { dateRangeOn } from "@/lib/views/date-range";
 
@@ -175,9 +178,12 @@ export function LogList({
             }
             onClear={narrowed ? () => go(cleared) : undefined}
             count={
-                log && log !== "failed"
-                    ? logCountWords(log.total ?? log.entries.length)
-                    : null
+                log && log !== "failed" ? (
+                    logCountWords(log.total ?? log.entries.length)
+                ) : log ? null : (
+                    // Its room on a phone, where it is a line of its own.
+                    <FigureLoading />
+                )
             }
         />
     );

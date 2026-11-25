@@ -372,7 +372,11 @@ export function OrdersScreen({
                               })
                         : undefined
                 }
-                count={range ? `Showing ${range}` : null}
+                // The range's room while the page is on its way: on a phone
+                // it is a line of its own above the rows.
+                count={
+                    range ? `Showing ${range}` : page ? null : <FigureLoading />
+                }
             />
 
             {/* From Home's "Last 24 hours" (F6): the list is narrowed, and

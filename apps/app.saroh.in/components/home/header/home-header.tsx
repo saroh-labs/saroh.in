@@ -122,6 +122,18 @@ export function HomeHeader({
                                     </TextLink>
                                 ))}
                             </div>
+                        ) : reading ? (
+                            // The "Last 24 hours" line's room, so the tiles
+                            // don't move down when it lands.
+                            <div
+                                aria-hidden
+                                className={cn(
+                                    "mt-2 flex h-5 items-center",
+                                    !sinceOnPhone && "max-sm:hidden",
+                                )}
+                            >
+                                <FigureLoading className="w-48" />
+                            </div>
                         ) : null}
                     </>
                 }

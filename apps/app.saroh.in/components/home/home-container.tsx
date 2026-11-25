@@ -69,6 +69,9 @@ export function HomeContainer({
             <PageContainer width="full">
                 <HomeHeader
                     reading
+                    // A phone with a module on hides the 24 hours line
+                    // (the usual case); its room is kept on the desk only.
+                    sinceOnPhone={false}
                     lastDay={null}
                     name={name}
                     businessName={businessName}
