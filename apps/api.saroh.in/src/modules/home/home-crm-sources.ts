@@ -12,6 +12,21 @@ import { EVIDENCE_LIMIT, overdueTag, personName } from "./home-model";
 
 type Db = typeof prisma;
 
+const overdueWhere = (organizationId: string, now: Date) => ({
+    organizationId,
+    dueAt: { lt: now },
+    completedAt: null,
+});
+
+/** The shell's badge: how many {@link overdueFollowUps} counts, rows unread. */
+export function overdueFollowUpCount(
+    db: Db,
+    organizationId: string,
+    now: Date,
+): Promise<number> {
+    return db.activity.count({ where: overdueWhere(organizationId, now) });
+}
+
 /**
  * Overdue follow-up tasks, oldest due date first, with the lead and person
  * each one is about.
@@ -21,11 +36,7 @@ export async function overdueFollowUps(
     organizationId: string,
     now: Date,
 ): Promise<{ count: number; evidence: HomeEvidence[] }> {
-    const where = {
-        organizationId,
-        dueAt: { lt: now },
-        completedAt: null,
-    };
+    const where = overdueWhere(organizationId, now);
 
     const [count, rows] = await Promise.all([
         db.activity.count({ where }),

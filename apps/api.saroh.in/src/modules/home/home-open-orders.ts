@@ -56,6 +56,23 @@ export function todayCutoff(now: Date, zone: string): Date {
 }
 
 /**
+ * The shell's badge (Orders): how many {@link readOpenOrders} counts, the
+ * same predicate and storefronts, without picking or reading any rows.
+ */
+export async function countSoonOrders(
+    db: Db,
+    organizationId: string,
+    view: { now: Date; zone: string; storeIds?: readonly string[] | null },
+): Promise<number> {
+    const rows = await db.$queryRaw<{ total: number }[]>(Prisma.sql`
+    SELECT (COUNT(*) FILTER (WHERE ${lateSql(soonCutoff(view.now, view.zone))}))::int AS total
+    FROM "Order" o
+    ${lateSettingsJoin()}
+    WHERE ${openOrderSql(organizationId)}${storeSql(view.storeIds, "o")}`);
+    return rows.length > 0 ? rows[0].total : 0;
+}
+
+/**
  * Open orders (the Orders list's own predicate, `open-orders.ts`) that need
  * attention soon (DEC-163): late, or due today or tomorrow. "Due" is the
  * moment it turns late, so "late by the day after tomorrow" is `lateSql`

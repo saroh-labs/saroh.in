@@ -17,10 +17,21 @@ const h = vi.hoisted(() => ({
     unread: vi.fn<() => Promise<number>>(),
     rail: vi.fn<() => Promise<unknown>>(),
     askAiOn: true,
+    // `/home/badges`: what the API answers, and every path asked.
+    badges: { status: 200, body: {} },
+    asked: [] as string[],
 }));
 vi.mock("@/lib/api/http", () => ({
     ACTIVE_ORG_COOKIE: "active_org",
     getActiveOrgId: () => Promise.resolve(h.active),
+    orgBase: () =>
+        Promise.resolve(h.active ? `/organizations/${h.active}` : null),
+    apiFetch: (path: string) => {
+        h.asked.push(path);
+        return Promise.resolve(
+            Response.json(h.badges.body, { status: h.badges.status }),
+        );
+    },
 }));
 vi.mock("@/lib/organizations/service", () => ({
     activeOrganizationOnce: () => h.member(),
@@ -91,6 +102,11 @@ beforeEach(() => {
     ]);
     h.askAi.mockResolvedValue(ASK);
     h.unread.mockResolvedValue(3);
+    h.asked = [];
+    h.badges = {
+        status: 200,
+        body: { unread: 5, counts: { "/leads": 4, "/commerce/orders": 2 } },
+    };
     h.rail.mockResolvedValue({
         actions: [
             { href: "/commerce/orders", severity: "OVERDUE", count: 2 },
@@ -197,27 +213,93 @@ describe("/api/shell", () => {
 });
 
 describe("/api/shell/live", () => {
-    it("the unread count and only OVERDUE work with a count as badges", async () => {
+    const live = () =>
+        liveGET(readRequest("/api/shell/live", { orgId: "org_a" }));
+
+    it("answers the bell and the badges from one API call, and nothing else", async () => {
         await expectReadContract(shellLiveServer, liveGET, "org_a", {});
-        const res = await liveGET(
-            readRequest("/api/shell/live", { orgId: "org_a" }),
-        );
+        h.asked = [];
+        h.member.mockClear();
+        h.badges.body = {
+            unread: 5,
+            counts: { "/leads": 4, "/commerce/orders": 0, "/x": "7" },
+            secret: "never",
+        };
+        const res = await live();
         expect(await res.json()).toEqual({
-            unread: 3,
-            counts: { "/commerce/orders": 2 },
+            unread: 5,
+            counts: { "/leads": 4 },
         });
+        expect(res.headers.get("cache-control")).toBe("private,no-store");
+        expect(h.asked).toEqual(["/organizations/org_a/home/badges"]);
+        // No `/me`, no rail, no unread-count: the API's guards decide.
+        expect(h.member).not.toHaveBeenCalled();
+        expect(h.rail).not.toHaveBeenCalled();
+        expect(h.unread).not.toHaveBeenCalled();
     });
 
-    it("a rail that can't be read is no badges; a removed member a 403", async () => {
-        h.rail.mockRejectedValue(new Error("GET home rail failed: 503"));
-        const res = await liveGET(
-            readRequest("/api/shell/live", { orgId: "org_a" }),
+    it("anyone the API counts in the business; never another's, never signed out", async () => {
+        await expectAuthzMatrix(
+            {
+                owner: { as: as(OWNER), status: 200 },
+                reviewer: { as: as(REVIEWER), status: 200 },
+                // Removed or a paused seat: the API refuses the badges.
+                "no longer a member": {
+                    as: () => {
+                        as(OWNER)();
+                        h.badges = { status: 403, body: {} };
+                    },
+                    status: 403,
+                },
+                "no business": {
+                    as: () => {
+                        as(OWNER)();
+                        h.active = null;
+                    },
+                    status: 401,
+                },
+                "another business's id": {
+                    as: () => {
+                        as(OWNER)();
+                        h.active = "org_b";
+                    },
+                    status: 409,
+                },
+            },
+            live,
         );
-        expect(await res.json()).toEqual({ unread: 3, counts: {} });
-        as("refused")();
-        const refused = await liveGET(
-            readRequest("/api/shell/live", { orgId: "org_a" }),
-        );
-        expect(refused.status).toBe(403);
+    });
+
+    it("a failing API is a 503 with no words of its own", async () => {
+        h.badges = { status: 500, body: { message: "db down" } };
+        const res = await live();
+        expect(res.status).toBe(503);
+        expect(await res.json()).toEqual({ code: "unavailable" });
+    });
+
+    describe.each([404, 405])("an API without /home/badges (%i)", (status) => {
+        beforeEach(() => {
+            h.badges = { status, body: {} };
+        });
+
+        it("answers from the rail as before: only OVERDUE work with a count", async () => {
+            const res = await live();
+            expect(await res.json()).toEqual({
+                unread: 3,
+                counts: { "/commerce/orders": 2 },
+            });
+        });
+
+        it("a rail that can't be read is no badges; a removed member a 403", async () => {
+            h.rail.mockRejectedValue(new Error("GET home rail failed: 503"));
+            expect(await (await live()).json()).toEqual({
+                unread: 3,
+                counts: {},
+            });
+            as("refused")();
+            expect((await live()).status).toBe(403);
+            as(null)();
+            expect((await live()).status).toBe(403);
+        });
     });
 });
