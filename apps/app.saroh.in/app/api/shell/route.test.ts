@@ -68,7 +68,11 @@ import {
     expectReadContract,
     readRequest,
 } from "@/lib/query/test-utils";
-import { shellLiveServer, shellSettingsServer } from "@/lib/shell/access";
+import {
+    shellLiveServer,
+    shellSettingsServer,
+    startShellSeed,
+} from "@/lib/shell/access";
 
 import { GET as liveGET } from "./live/route";
 import { GET, POST } from "./route";
@@ -301,5 +305,34 @@ describe("/api/shell/live", () => {
             as(null)();
             expect((await live()).status).toBe(403);
         });
+    });
+});
+
+describe("the layout's seed (startShellSeed)", () => {
+    const doc = new Headers({ "sec-fetch-dest": "document" });
+
+    it("on a full load, answers what the two routes answer, field for field", async () => {
+        const seed = startShellSeed(doc);
+        expect(await seed?.settings).toEqual(await body());
+        expect(await seed?.live).toEqual(
+            await (
+                await liveGET(
+                    readRequest("/api/shell/live", { orgId: "org_a" }),
+                )
+            ).json(),
+        );
+    });
+
+    it("starts nothing for a client render (refresh, Server Action)", () => {
+        expect(
+            startShellSeed(new Headers({ "sec-fetch-dest": "empty" })),
+        ).toBeNull();
+        expect(startShellSeed(new Headers())).toBeNull();
+        expect(h.asked).toEqual([]);
+    });
+
+    it("a read that failed is null, never a rejection", async () => {
+        h.badges = { status: 500, body: {} };
+        expect(await startShellSeed(doc)?.live).toBeNull();
     });
 });
