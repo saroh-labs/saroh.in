@@ -134,16 +134,18 @@ export default async function PersonPage({
     // New order and New booking for them (#247): the module on and the
     // role allowed, each as its own flow's button asks.
     const opens = personNewActions(organization, modules);
-    // Courses and what Subscribe offers come from the contact's holdings;
-    // the rest is in the detail read.
+    // What Subscribe offers comes from the contact's holdings; Courses is
+    // its panel's own query (`CoursesPanel`); the rest is in the detail read.
     const panels = contactPanels(organization, modules);
+    const coursesShown = panels.panels.includes("courses");
     const holdingsPlan = {
         ...panels,
-        panels: panels.panels.filter((p) => p === "courses"),
+        panels: [],
         canAct: {
             ...panels.canAct,
             subscriptions: acts.subscribe && detail.subscriptions !== undefined,
             packs: false,
+            courses: false,
             invoices: false,
         },
     };
@@ -225,19 +227,16 @@ export default async function PersonPage({
             ),
         });
     }
-    if (holdingsPlan.panels.includes("courses")) {
-        const enrollments = holdings.courses ?? null;
+    if (coursesShown) {
         extra.push({
             key: "crs",
             label: "Courses",
-            count: enrollments ? enrollments.length : null,
+            // Their seats are the panel's query; the panel says how many.
+            count: null,
             panel: (
                 <CoursesPanel
                     contact={person}
-                    enrollments={enrollments}
-                    courses={holdings.choices.courses}
                     invoicesOnEnrol={panels.paymentsOn}
-                    gst={holdings.choices.gst}
                     mentionInvoices={panels.mentionInvoices}
                 />
             ),
@@ -281,7 +280,6 @@ export default async function PersonPage({
             {
                 subscriptions: detail.subscriptions?.rows,
                 packs: detail.packs?.rows,
-                courses: holdings.courses,
             },
             now,
         ),

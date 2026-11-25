@@ -21,6 +21,10 @@ const actions = vi.hoisted(() => ({
     updateCourse: vi.fn(),
 }));
 vi.mock("@/lib/courses/actions", () => actions);
+const saved = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/courses/use-courses", () => ({
+    useCourseSave: () => ({ orgId: "org_a", saved }),
+}));
 vi.mock("@saroh/ui/toast", async (importOriginal) => ({
     ...(await importOriginal<object>()),
     showSuccess: vi.fn(),
@@ -59,6 +63,7 @@ beforeEach(() => {
     document.body.appendChild(host);
     root = createRoot(host);
     push.mockReset();
+    saved.mockClear();
     actions.createCourse.mockReset().mockResolvedValue({
         ok: true,
         data: { id: "crs_2" },
@@ -143,6 +148,9 @@ describe("Enter in the course form", () => {
             name: "Wheel throwing",
             status: "OPEN",
         });
+        // As the tab's business, and Courses marked to read again.
+        expect(actions.createCourse.mock.calls[0]?.[1]).toBe("org_a");
+        expect(saved).toHaveBeenCalledTimes(1);
     });
 
     it("Save as draft is its own press, and keeps a draft", async () => {

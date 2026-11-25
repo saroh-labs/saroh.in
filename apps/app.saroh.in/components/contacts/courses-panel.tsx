@@ -8,8 +8,8 @@ import { useState } from "react";
 
 import { EnrolDialog } from "@/components/courses/enrol-dialog";
 import type { ContactOption } from "@/components/shared/fields/contact-picker";
-import type { Course, Enrollment } from "@/lib/courses/service";
-import type { GstAsk } from "@/lib/gst/item-words";
+import { PageLoading } from "@/components/shared/page/page-loading";
+import { useContactCourses } from "@/lib/courses/use-courses";
 
 import { ContactPanelSection, ROW_BODY, ROW_RULE } from "./contact-panel";
 
@@ -27,26 +27,43 @@ const STANDING_WORD = {
  * whether they are still on it — each row opens the course. "Enrol" opens
  * the course page's enrol dialog with this person chosen, asking which of
  * the open courses with a seat left (one they are not already on).
+ *
+ * On React Query (DEC-259): their seats, the open courses and the GST
+ * standing are one read (`/api/courses/contact/[contactId]`), read again
+ * after an enrolment (`useCourseSave`).
  */
 export function CoursesPanel({
     contact,
-    enrollments,
-    courses,
     invoicesOnEnrol,
     mentionInvoices,
-    gst = null,
 }: {
-    /** The business's GST standing, for the enrol dialog's amount to pay. */
-    gst?: GstAsk | null;
     contact: ContactOption;
-    /** Null when they could not be read. */
-    enrollments: Enrollment[] | null;
-    /** Open courses; null when this person may not enrol, or they failed. */
-    courses: Course[] | null;
     invoicesOnEnrol: boolean;
     mentionInvoices: boolean;
 }) {
     const [enrolling, setEnrolling] = useState(false);
+    const read = useContactCourses({ contactId: contact.id });
+    if (!read.data && !read.isError) {
+        return (
+            <PageLoading
+                bare
+                width="full"
+                shape="rows"
+                rows={2}
+                label="Loading their courses"
+            />
+        );
+    }
+    // A failed read is said in the panel, as each part failing is.
+    const {
+        enrollments,
+        open: courses,
+        gst,
+    } = read.data ?? {
+        enrollments: null,
+        open: null,
+        gst: null,
+    };
     const rows = enrollments
         ? [...enrollments].sort(
               (a, b) =>

@@ -11,7 +11,6 @@ import { Label } from "@saroh/ui/label";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/fields/contact-picker";
@@ -28,6 +27,7 @@ import {
     TAB_LABEL,
 } from "@/lib/courses/seats";
 import type { CourseDetail, Enrollment } from "@/lib/courses/service";
+import { useCourseSave } from "@/lib/courses/use-courses";
 import {
     formatMonth,
     formatTimeRange,
@@ -88,20 +88,21 @@ export function CoursePage({
     /** When the page was read, so "done" and "booked" agree with the server. */
     now: string;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCourseSave();
     const [enrolling, setEnrolling] = useState(false);
     const [cancelling, setCancelling] = useState<Enrollment | null>(null);
     const [busy, setBusy] = useState(false);
     const tab = courseTab({ ...course, sessions: course.sessions });
 
     async function setStatus(status: CourseDetail["status"], done: string) {
-        const res = await runAction(() => updateCourse(course.id, { status }), {
-            setBusy,
-        });
+        const res = await runAction(
+            () => updateCourse(course.id, { status }, orgId),
+            { setBusy },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
+        await saved();
         showSuccess(done);
-        router.refresh();
     }
 
     const statusAction = !canWrite
@@ -261,7 +262,7 @@ function Sessions({
     canWrite: boolean;
     now: string;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCourseSave();
     const [adding, setAdding] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const refocus = useRef(false);
@@ -296,12 +297,15 @@ function Sessions({
             `session:${sessionId}`,
             "Session removed.",
             async () => {
-                const res = await removeSession(course.id, sessionId);
+                const res = await runAction(() =>
+                    removeSession(course.id, sessionId, orgId),
+                );
+                if (!res) return back();
                 if (!res.ok) {
                     showError("The session wasn't removed.", res.error);
                     back();
                 }
-                router.refresh();
+                await saved();
             },
             back,
             course.enrolled > 0
@@ -588,7 +592,7 @@ function CancelEnrolmentDialog({
     enrollment: Enrollment;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCourseSave();
     const voidId = useId();
     const [voidToo, setVoidToo] = useState(false);
     const open =
@@ -600,20 +604,21 @@ function CancelEnrolmentDialog({
     const n = enrollment.upcoming;
 
     async function confirm(): Promise<ConfirmResult> {
+        // A throw is the dialog's to say (`ConfirmDialog`).
         const res = await cancelEnrollment(
             course.id,
             enrollment.id,
             voidToo && open ? open.id : undefined,
+            orgId,
         );
-        if (!res.ok) {
-            router.refresh();
-            return { ok: false, error: res.error };
-        }
+        // Read again either way: cancelled with its invoice left open is
+        // a change too.
+        await saved();
+        if (!res.ok) return { ok: false, error: res.error };
         showSuccess(
             "Enrolment cancelled.",
             `${enrollment.contact.name} is off the course${n > 0 ? `, and ${count(n, "session is", "sessions are")} cancelled` : ""}.`,
         );
-        router.refresh();
     }
 
     return (

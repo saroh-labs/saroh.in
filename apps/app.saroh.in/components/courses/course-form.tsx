@@ -40,6 +40,7 @@ import {
 } from "@/lib/courses/course-form";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
+import { useCourseSave } from "@/lib/courses/use-courses";
 import { formatDate, formatTimeRange } from "@/lib/format/datetime";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { addedGst, addedGstWords, NOT_ASKED } from "@/lib/gst/item-words";
@@ -95,6 +96,7 @@ export function CourseForm({
     defaultCurrency: string;
 }) {
     const router = useRouter();
+    const { orgId, saved } = useCourseSave();
     const [busy, setBusy] = useState(false);
     const first = services.at(0);
     // The schema's problems and the GST fields' own, in one pass.
@@ -175,13 +177,16 @@ export function CourseForm({
         const res = await runAction(
             () =>
                 course
-                    ? updateCourse(course.id, input)
-                    : createCourse({
-                          ...input,
-                          serviceId: values.serviceId,
-                          sessions,
-                          status: open ? "OPEN" : "DRAFT",
-                      }),
+                    ? updateCourse(course.id, input, orgId)
+                    : createCourse(
+                          {
+                              ...input,
+                              serviceId: values.serviceId,
+                              sessions,
+                              status: open ? "OPEN" : "DRAFT",
+                          },
+                          orgId,
+                      ),
             { setBusy },
         );
         if (!res) return false;
@@ -195,6 +200,8 @@ export function CourseForm({
             }
             return false;
         }
+        // Courses read again where they are next drawn (`coursesSaved`).
+        await saved();
         showSuccess(
             course
                 ? "Course saved."

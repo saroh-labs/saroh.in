@@ -4,7 +4,6 @@ import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
@@ -14,6 +13,7 @@ import { runAction } from "@/lib/api/run-action";
 import { enrol } from "@/lib/courses/actions";
 import { booksLine, seatsLeftLine } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
+import { useCourseSave } from "@/lib/courses/use-courses";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { addedGst, addedGstWords } from "@/lib/gst/item-words";
 import { Field } from "@saroh/ui/field";
@@ -75,7 +75,7 @@ export function EnrolDialog({
     initialContactId?: string;
     invoicesOnEnrol: boolean;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCourseSave();
     const ids = { who: useId(), course: useId(), price: useId() };
     const first = courses.at(0);
     const [courseId, setCourseId] = useState(first?.id ?? "");
@@ -122,25 +122,30 @@ export function EnrolDialog({
         const res = await runAction(
             () =>
                 rates.run(() =>
-                    enrol(course.id, {
-                        contactId,
-                        ...(price.trim() !== course.price
-                            ? { price: price.trim() }
-                            : {}),
-                    }),
+                    enrol(
+                        course.id,
+                        {
+                            contactId,
+                            ...(price.trim() !== course.price
+                                ? { price: price.trim() }
+                                : {}),
+                        },
+                        orgId,
+                    ),
                 ),
             { setBusy },
         );
         // Unreached, or the rate sheet was closed: nobody was enrolled.
         if (!res) return;
         if (!res.ok) return showError(res.error);
+        // The course and a customer's page read again; bookings and
+        // invoices are marked stale (`coursesSaved`).
+        await saved();
         showSuccess(
             `${person?.name ?? "They"} enrolled${choosing ? ` on ${course.name}` : ""}.`,
             `${count(n, "session")} booked.`,
         );
         onOpenChange(false);
-        // rq-refresh-ok: shared with a server-rendered list; on a customer's page it also redraws the tabs drawn there (Leads, Courses, packs, plans) and hydrates the customer read again (until U19/U20 and their units).
-        router.refresh();
     }
 
     return (
