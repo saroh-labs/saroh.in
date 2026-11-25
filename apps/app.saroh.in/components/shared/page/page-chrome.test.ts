@@ -203,6 +203,10 @@ describe("a page's title is the page header's", () => {
         // Bookings' calendar: header C's date is the page's title and the
         // button that opens Go to a day (bookings U2, #1018).
         "components/bookings/calendar/header/calendar-header.tsx",
+        // Bookings' List shares the Calendar's phone bar (DEC-260):
+        // "All bookings" is its title for screen readers only, as board
+        // BKVListBPhone keeps it; the desk frame draws it the same way.
+        "components/bookings/all-bookings/list-page-header.tsx",
         // The Calendar month: the month between ‹ and › is the page's
         // title, in the row that moves it (bookings U13, #1029).
         "components/calendar/month-toolbar.tsx",
