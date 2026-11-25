@@ -41,6 +41,8 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "class-packs/new": "full",
     // `BookingDetail` draws its own `PageContainer`.
     "bookings/[bookingId]": "default",
+    // `DiscountContainer` draws its own `PageContainer` once the code lands.
+    "commerce/discounts/[discountId]": "form",
     // Order Detail and the tickets draw their own <main> at the full width.
     "commerce/orders/[orderId]": "full",
     "commerce/orders/tickets": "full",

@@ -1,13 +1,4 @@
-import { PageHeader } from "@saroh/ui/page-header";
-import { notFound } from "next/navigation";
-
-import { PageContainer } from "@/components/shared/page/page-container";
-import { DiscountForm } from "@/components/stores/discounts/discount-form";
-import { DiscountReadView } from "@/components/stores/discounts/discount-read-view";
-import { canOrUnknown } from "@/lib/access/require-can";
-import { loadReachOptions } from "@/lib/discounts/options";
-import { getDiscount } from "@/lib/discounts/service";
-import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { DiscountContainer } from "@/components/stores/discounts/discounts-container";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Discount code" };
@@ -17,6 +8,11 @@ export const metadata = { title: "Discount code" };
  *
  * Someone who reads discounts without `discount:write` (what the API asks
  * of the save) gets the code as text, not a form whose Save is refused.
+ *
+ * On React Query (DEC-259), loaded in the browser: the section's gate is
+ * the layout's; the code, and the form's choices only for
+ * `discount:write` (`/api/discounts/[discountId]`), are
+ * `DiscountContainer`'s query. Another business's code, or none, is a 404.
  */
 export default async function DiscountPage({
     params,
@@ -25,38 +21,5 @@ export default async function DiscountPage({
 }) {
     await requireSession();
     const { discountId } = await params;
-    const [discount, organization] = await Promise.all([
-        getDiscount(discountId),
-        resolveActiveOrganization(),
-    ]);
-    if (!discount) notFound();
-
-    const header = (
-        <PageHeader
-            holdsData
-            breadcrumb={["Sell", "Discount codes", discount.code]}
-            title={<span className="font-mono">{discount.code}</span>}
-        />
-    );
-
-    if (!canOrUnknown(organization, "discount:write")) {
-        return (
-            <PageContainer width="form">
-                {header}
-                <DiscountReadView discount={discount} />
-            </PageContainer>
-        );
-    }
-
-    const { options, defaultCurrency } = await loadReachOptions();
-    return (
-        <PageContainer width="form">
-            {header}
-            <DiscountForm
-                discount={discount}
-                options={options}
-                defaultCurrency={defaultCurrency}
-            />
-        </PageContainer>
-    );
+    return <DiscountContainer ask={{ discountId }} />;
 }
