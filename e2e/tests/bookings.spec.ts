@@ -283,9 +283,15 @@ test.describe("bookings calendar", () => {
                 name: "Pick a day of the week",
             });
             await expect(strip.getByRole("radio")).toHaveCount(7);
-            // Wednesday: picked at once, kept in the address, and the
-            // list's count is the strip's.
-            const wed = strip.getByRole("radio", { name: /^Wed / });
+            // Wednesday (Thursday when today is Wednesday, which is picked
+            // already and so never goes into the address): picked at once,
+            // kept in the address, and the list's count is the strip's.
+            const wednesday = strip.getByRole("radio", { name: /^Wed / });
+            const isToday =
+                (await wednesday.getAttribute("aria-checked")) === "true";
+            const wed = isToday
+                ? strip.getByRole("radio", { name: /^Thu / })
+                : wednesday;
             // Pressed before hydration, a day does nothing: press until picked.
             await pressUntil(
                 wed,
