@@ -6,6 +6,8 @@ import type { HomeLastDay } from "@/lib/home/service";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 
+import { FigureLoading } from "@/components/shared/page/page-loading";
+
 import { NewMenu } from "./new-menu";
 import { NewSheet } from "./new-sheet";
 
@@ -32,7 +34,13 @@ export function HomeHeader({
     subject = null,
     newMenu = null,
     sinceOnPhone = true,
+    reading = false,
 }: {
+    /**
+     * Home is on its way (owner, 25 Nov): New is here and works; the
+     * greeting and date line, which follow the business's day, are bars.
+     */
+    reading?: boolean;
     lastDay: HomeLastDay | null;
     /** The viewer's own name, from their session. */
     name: string | null | undefined;
@@ -68,18 +76,29 @@ export function HomeHeader({
                 className="mb-0 max-sm:[&_[data-slot=page-side]]:hidden"
                 // No crumb: Home is the top, the greeting says where you are
                 // (HPHomeDesk).
-                title={greeting(lastDay, name)}
+                title={
+                    reading ? (
+                        <FigureLoading className="h-[30px] w-56 max-w-full align-bottom" />
+                    ) : (
+                        greeting(lastDay, name)
+                    )
+                }
                 actions={offersNew ? <NewMenu {...newMenu} /> : undefined}
                 description={
                     <>
                         <p>
-                            {dateLine(
-                                lastDay,
-                                businessName,
-                                only,
-                                kind,
-                                subject,
-                            )}
+                            {reading ? (
+                                <FigureLoading className="h-3 w-64 max-w-full" />
+                            ) : null}
+                            {reading
+                                ? null
+                                : dateLine(
+                                      lastDay,
+                                      businessName,
+                                      only,
+                                      kind,
+                                      subject,
+                                  )}
                         </p>
                         {links.length > 0 ? (
                             <div
