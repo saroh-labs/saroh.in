@@ -268,9 +268,8 @@ describe("the first day", () => {
     it("is not shown once anything is booked, or to someone who can't book", () => {
         draw(busy);
         expect(host.querySelector("[data-first-day]")).toBeNull();
-        expect(host.textContent).toContain(
-            "Swipe the calendar left or right to change day.",
-        );
+        // No swipe help in its place (critique, 25 Nov).
+        expect(host.textContent).not.toContain("Swipe");
         draw(nothing, { can: { book: false, hours: false } });
         expect(host.querySelector("[data-first-day]")).toBeNull();
     });

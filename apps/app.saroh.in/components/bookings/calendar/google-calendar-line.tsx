@@ -2,7 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
-import { Notice } from "@saroh/ui/notice";
+import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { showError } from "@saroh/ui/toast";
 import { CalendarDays, X } from "lucide-react";
@@ -15,6 +15,9 @@ import {
     GC_WORDS,
     GOOGLE_CALENDAR_HREF,
 } from "@/lib/google-calendar/words";
+
+/** The one line's words; the whole pitch is its title. */
+const GC_LINE = "Put your bookings on Google Calendar";
 
 type Line = NonNullable<ReturnType<typeof bookingsCalendarLine>>;
 
@@ -81,57 +84,61 @@ export function GoogleCalendarLine({
             icon={<X />}
             variant="ghost"
             onClick={() => dismiss(key)}
+            className="shrink-0"
         />
     );
+    // One line (DEC-234, BKVGoogle): a phone keeps the diary in sight.
+    const LINE =
+        "flex min-h-11 items-center gap-2 rounded-[10px] border border-border bg-card py-0.5 pl-3 pr-0.5 text-[13px]";
     if (line.kind === "lapsed") {
         return (
-            <Notice
-                tone="warning"
-                align="center"
+            <div
                 data-google-calendar-line=""
-                action={
-                    <>
-                        <TextLink
-                            data-ph-unmask=""
-                            href={GOOGLE_CALENDAR_HREF}
-                            className="font-semibold coarse:min-h-11"
-                        >
-                            Manage
-                        </TextLink>
-                        {close}
-                    </>
-                }
+                className={cn(LINE, "border-warning/40")}
             >
-                <p className="text-pretty">
-                    Google stopped Saroh&apos;s access to {line.email}, so your
-                    bookings don&apos;t reach it.
+                <CalendarDays
+                    aria-hidden
+                    className="size-4 shrink-0 text-warning"
+                />
+                <p className="m-0 min-w-0 flex-1 truncate">
+                    Google stopped Saroh&apos;s access to {line.email}
                 </p>
-            </Notice>
+                <TextLink
+                    data-ph-unmask=""
+                    href={GOOGLE_CALENDAR_HREF}
+                    className="shrink-0 font-semibold coarse:min-h-11"
+                >
+                    Manage
+                </TextLink>
+                {close}
+            </div>
         );
     }
     return (
-        <Notice
-            tone="info"
-            align="center"
-            data-google-calendar-line=""
-            icon={<CalendarDays />}
-            action={
-                <>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        aria-label={busy ? undefined : GC_WORDS.connect}
-                        onClick={() => void go()}
-                    >
-                        {busy ? GC_WORDS.connecting : "Connect"}
-                    </Button>
-                    {close}
-                </>
-            }
-        >
-            <p className="text-pretty">{GC_PITCH}</p>
-        </Notice>
+        <div data-google-calendar-line="" className={LINE}>
+            <CalendarDays
+                aria-hidden
+                className="size-4 shrink-0 text-muted-foreground"
+            />
+            <p
+                data-ph-unmask=""
+                title={GC_PITCH}
+                className="m-0 min-w-0 flex-1 truncate"
+            >
+                {GC_LINE}
+            </p>
+            <Button
+                type="button"
+                size="sm"
+                variant="link"
+                disabled={busy}
+                aria-label={busy ? undefined : GC_WORDS.connect}
+                onClick={() => void go()}
+                className="shrink-0 font-semibold coarse:min-h-11"
+            >
+                {busy ? GC_WORDS.connecting : "Connect"}
+            </Button>
+            {close}
+        </div>
     );
 }

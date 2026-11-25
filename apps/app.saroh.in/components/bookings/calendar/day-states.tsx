@@ -293,16 +293,20 @@ export function ServiceHoursNote({ onAdd }: { onAdd?: () => void }) {
 
 // ── Under a phone's day ─────────────────────────────────────────────────────
 
-/** The one line under the day on a phone: how to move about, or the key. */
+/**
+ * The one line under the first day on a phone: what green means. The
+ * "swipe to change day" help is cut (critique, 25 Nov): the week strip and
+ * the date are in sight.
+ */
 export function DayFoot({ first }: { first: boolean }) {
+    if (!first) return null;
     return (
         <p
             data-ph-unmask=""
             className="mb-0 mt-2.5 text-[12.5px] leading-normal text-muted-foreground min-[760px]:hidden"
         >
-            {first
-                ? "Free times show in green, so you can see at a glance where a booking fits."
-                : "Swipe the calendar left or right to change day. Tap the date at the top for any day, Week or List."}
+            Free times show in green, so you can see at a glance where a booking
+            fits.
         </p>
     );
 }

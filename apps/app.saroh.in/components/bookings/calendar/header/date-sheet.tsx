@@ -107,10 +107,10 @@ export function DateSheet({
                 onPick={(d) => onGo(hrefFor(layout, d))}
             />
             <p className={HELP}>
-                Numbers and dots show how many bookings a day has.{" "}
+                Numbers and dots show how many sessions a day has.
                 {phone
-                    ? `Swipe the calendar left or right to go a ${word} back or on.`
-                    : `The arrows beside the date go a ${word} back or on.`}
+                    ? null
+                    : ` The arrows beside the date go a ${word} back or on.`}
             </p>
             <div data-ph-unmask="" className={cn(LABEL, "mt-3.5")}>
                 Show as
