@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
@@ -65,9 +66,11 @@ for (const size of SIZES) {
 
             await page.goto(`/sites/${site.id}/posts/new`);
             test.skip(
-                !page.url().includes("/write/new"),
+                !(await websiteAreaOn(page)),
                 "The Website area is off: today's post editor",
             );
+            // A streamed redirect (a loading boundary above): it can land after load.
+            await page.waitForURL((u) => u.href.includes("/write/new"));
             const editor = page.locator("[data-phone-post-editor]");
             const bar = editor.locator("[data-post-bar]");
             const tools = editor.getByRole("toolbar", {

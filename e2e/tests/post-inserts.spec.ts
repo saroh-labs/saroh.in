@@ -2,6 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { northwind, stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
@@ -37,9 +38,11 @@ test("Add: the / menu's new blocks save, Find opens, search and sharing in the c
     try {
         await page.goto(`/sites/${site.id}/posts/${made.id}`);
         test.skip(
-            !page.url().includes(`/write/${made.id}`),
+            !(await websiteAreaOn(page)),
             "The Website area is off: today's post editor",
         );
+        // A streamed redirect (a loading boundary above): it can land after load.
+        await page.waitForURL((u) => u.href.includes(`/write/${made.id}`));
 
         // W1: "/" on the empty last line opens the menu, and filters.
         const body = page.locator("[data-writing-surface] .ProseMirror");

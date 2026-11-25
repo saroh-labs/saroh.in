@@ -275,12 +275,15 @@ test.describe("change who a booking is with (#1157)", () => {
 
                 // Then for real.
                 await pressUntil(block, look);
-                await look
-                    .getByRole("button", { name: /^Assign someone/ })
-                    .click();
-                await look
-                    .getByRole("radio", { name: new RegExp(`^${meera.name}`) })
-                    .click();
+                // The look redraws as it reopens: press until the list shows.
+                const meeraRow = look.getByRole("radio", {
+                    name: new RegExp(`^${meera.name}`),
+                });
+                await pressUntil(
+                    look.getByRole("button", { name: /^Assign someone/ }),
+                    meeraRow,
+                );
+                await meeraRow.click();
                 await look
                     .getByRole("button", { name: `Assign ${meera.first}` })
                     .click();

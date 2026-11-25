@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
@@ -99,16 +100,20 @@ for (const size of [
 
             await page.goto(`/sites/${site.id}/posts/new`);
             test.skip(
-                !page.url().includes("/write/new"),
+                !(await websiteAreaOn(page)),
                 "The Website area is off: today's post editor",
             );
+            // A streamed redirect (a loading boundary above): it can land after load.
+            await page.waitForURL((u) => u.href.includes("/write/new"));
             const bar = page.locator("[data-post-bar]");
             await expect(
                 bar.getByRole("link", { name: "Back to Website" }),
             ).toBeVisible();
 
             // Publish post with no title asks for one and sends nothing.
-            await bar.getByRole("button", { name: "Publish post" }).click();
+            await bar
+                .getByRole("button", { name: "Publish post", exact: true })
+                .click();
             await expect(page.getByRole("alert")).toContainText(
                 "A post needs a title.",
             );
