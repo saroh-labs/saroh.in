@@ -70,7 +70,8 @@ export function WeekStrip({
                             {c.closed
                                 ? "Closed"
                                 : c.count === null
-                                  ? " "
+                                  ? // Unknown yet: the line keeps its room.
+                                    "\u00a0"
                                   : c.count > 0
                                     ? c.count
                                     : "–"}

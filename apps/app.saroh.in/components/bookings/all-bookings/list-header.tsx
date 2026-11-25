@@ -8,6 +8,7 @@ import { ChevronDown, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { HeaderOverlay } from "@/components/bookings/calendar/header/header-overlay";
+import { FigureLoading } from "@/components/shared/page/page-loading";
 import type { ViewId } from "@/lib/services/all-bookings";
 import { cancelledWord, VIEWS } from "@/lib/services/all-bookings";
 
@@ -26,7 +27,8 @@ export function ShowingPicker({
     onChange,
 }: {
     view: ViewId;
-    counts: Record<ViewId, number>;
+    /** Null while the list is on its way: a bar, never a 0. */
+    counts: Record<ViewId, number> | null;
     onChange: (view: ViewId) => void;
 }) {
     const [open, setOpen] = useState(false);
@@ -42,16 +44,20 @@ export function ShowingPicker({
                 <button
                     type="button"
                     data-showing=""
-                    aria-label={`Showing: ${now.label}, ${counts[view]}. Change`}
+                    aria-label={`Showing: ${now.label}${counts ? `, ${counts[view]}` : ""}. Change`}
                     className={BUTTON}
                 >
                     <span data-ph-unmask="" className="text-muted-foreground">
                         Showing:
                     </span>
                     <span className="font-semibold">{now.label}</span>
-                    <span className="tabular-nums opacity-70">
-                        {counts[view]}
-                    </span>
+                    {counts ? (
+                        <span className="tabular-nums opacity-70">
+                            {counts[view]}
+                        </span>
+                    ) : (
+                        <FigureLoading className="w-5" />
+                    )}
                     <ChevronDown aria-hidden className="size-4" />
                 </button>
             }
@@ -68,7 +74,8 @@ export function ShowingPicker({
                     label: (
                         <span className="inline-flex items-center gap-1.5">
                             {v.label}
-                            {v.id === "outcome" && counts.outcome > 0 ? (
+                            {v.id === "outcome" &&
+                            (counts?.outcome ?? 0) > 0 ? (
                                 <span
                                     aria-hidden
                                     className="size-1.5 rounded-full bg-warning"
@@ -78,7 +85,7 @@ export function ShowingPicker({
                     ),
                     aside: (
                         <span className="tabular-nums text-muted-foreground">
-                            {counts[v.id]}
+                            {counts?.[v.id]}
                         </span>
                     ),
                 }))}

@@ -23,8 +23,6 @@ import { requireSession } from "@/lib/session";
 import { readOrderPlaces } from "@/lib/stores/location-reads";
 import { listBusinessStores } from "@/lib/stores/service";
 
-import Loading from "./loading";
-
 /**
  * Sell → Orders: every order in the business, a page at a time (plan B, B3).
  *
@@ -45,8 +43,9 @@ import Loading from "./loading";
  * On React Query (DEC-259), loaded in the browser: the gates and what New
  * order offers are decided here; the page of the list and what its filter
  * bar offers are `OrdersContainer`'s queries (`lib/orders/access-server.ts`),
- * read from the browser behind the route's loader, and every later one in
- * place. No order is in the page's HTML.
+ * read from the browser into the screen's frame, drawn at once with its
+ * rows as skeletons, and every later one in place. No order is in the
+ * page's HTML.
  */
 export const metadata = { title: "Orders" };
 
@@ -121,7 +120,6 @@ export default async function OrdersPage({
     // container's, from its first read (`readOrdersList`).
     return (
         <OrdersContainer
-            skeleton={<Loading />}
             defaultSize={remembered}
             // Under the page's header, never above its title.
             notices={

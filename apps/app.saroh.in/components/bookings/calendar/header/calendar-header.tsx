@@ -2,6 +2,7 @@
 
 import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
 import {
     ChevronDown,
     ChevronLeft,
@@ -88,17 +89,24 @@ export function CalendarHeader({
     layout: CalendarLayout;
     date: LocalDate;
     today: LocalDate;
-    /** The one line: "5 booked · 3 free times · ₹2,400 booked". */
-    summary: string;
+    /**
+     * The one line: "5 booked · 3 free times · ₹2,400 booked"; a bar while
+     * the diary is on its way.
+     */
+    summary: ReactNode;
     /** The business's zone, short: "IST". */
     zone: string;
-    /** Everyone, then each person on the diary; empty with nobody to pick. */
-    choices: readonly PersonChoice[];
+    /**
+     * Everyone, then each person on the diary; empty with nobody to pick;
+     * null while the diary is on its way (a placeholder chip).
+     */
+    choices: readonly PersonChoice[] | null;
     /** Whose bookings are shown: a staff id or `EVERYONE`. */
     picked: string;
     facts: (d: LocalDate) => DayFacts;
     cancelled: {
-        count: number;
+        /** Null while the diary is on its way: not said, never "None". */
+        count: number | null;
         shown: boolean;
         onChange: (on: boolean) => void;
     };
@@ -159,8 +167,9 @@ export function CalendarHeader({
               ? "This agenda"
               : "This day";
 
-    const person = choices.find((c) => c.key === picked) ?? choices.at(0);
-    const others = choices.filter((c) => c.key !== EVERYONE);
+    const loadingPeople = choices === null;
+    const person = choices?.find((c) => c.key === picked) ?? choices?.at(0);
+    const others = (choices ?? []).filter((c) => c.key !== EVERYONE);
     // One person in the business: no chip, the title alone (U2).
     const showChip = others.length > 1;
     const everyone = picked === EVERYONE || person === undefined;
@@ -312,6 +321,12 @@ export function CalendarHeader({
                 {VIEW_NAME[layout]}
             </span>
 
+            {loadingPeople ? (
+                <Skeleton
+                    aria-hidden
+                    className="order-3 h-[38px] w-32 rounded-full max-[759px]:h-11"
+                />
+            ) : null}
             {showChip && chip ? (
                 <div className="order-3">
                     <PeopleSheet
@@ -320,7 +335,7 @@ export function CalendarHeader({
                         trigger={chip}
                         period={period}
                         periodWord={periodWord}
-                        choices={choices}
+                        choices={choices ?? []}
                         picked={everyone ? EVERYONE : picked}
                         showFor={opens.showFor}
                         onPick={pickPerson}
@@ -368,9 +383,11 @@ export function CalendarHeader({
                         shown: cancelled.shown,
                         onChange: cancelled.onChange,
                         line:
-                            cancelled.count > 0
-                                ? `${cancelled.count} cancelled ${periodWord}`
-                                : `None cancelled ${periodWord}`,
+                            cancelled.count === null
+                                ? `Cancelled ${periodWord}`
+                                : cancelled.count > 0
+                                  ? `${cancelled.count} cancelled ${periodWord}`
+                                  : `None cancelled ${periodWord}`,
                     }}
                     hours={{ href: hoursHref, label: hoursLabel }}
                     start={opens.start}

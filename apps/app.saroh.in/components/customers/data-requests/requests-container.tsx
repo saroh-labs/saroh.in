@@ -21,17 +21,16 @@ import { RequestsView } from "./requests-view";
  * Sell › Customers › Requests on React Query (DEC-259): the rows with the
  * address's status and the open ones (the tab's count), each a query. A
  * filter changes the address in place; a request finished reads them again.
- * Read in the browser, behind the route's loader (`skeleton`).
+ * Read in the browser into the frame drawn at once (owner, 25 Nov): the
+ * heading, the tabs and Show work before the rows land, as skeletons; the
+ * tab's count is left out until it is read.
  */
 export function RequestsContainer({
     heading,
     canRemove,
-    skeleton,
 }: {
     heading: ReactNode;
     canRemove: boolean;
-    /** The route's loader, until both are read. */
-    skeleton: ReactNode;
 }) {
     const filter = readRequestFilter(useSearchParams().get("status"));
     const open = useCustomerRequests({ status: "open" });
@@ -41,7 +40,6 @@ export function RequestsContainer({
         window.history.replaceState(null, "", requestsHref(to));
 
     if (rows.isError && !rows.data) throw rows.error;
-    if (!rows.data || open.isPending) return skeleton;
 
     return (
         <PageContainer width="full">
@@ -51,12 +49,16 @@ export function RequestsContainer({
                     <CustomersTabs
                         active="requests"
                         openRequests={
-                            open.data?.rows ? open.data.rows.length : null
+                            open.isPending
+                                ? undefined
+                                : open.data?.rows
+                                  ? open.data.rows.length
+                                  : null
                         }
                     />
                 }
                 filter={filter}
-                rows={rows.data.rows}
+                rows={rows.data ? rows.data.rows : undefined}
                 canRemove={canRemove}
                 pending={rows.isPlaceholderData}
                 onFilter={go}

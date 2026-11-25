@@ -17,8 +17,10 @@ type Screen = ComponentProps<typeof OrdersScreen>;
 /**
  * Sell → Orders on React Query (DEC-259): the same `OrdersScreen`, its page
  * a query keyed on what the address asks for, read in the browser; the
- * route's loader (`skeleton`) stands in until the first page lands. A
- * tab, filter or search changes the address in place and the key; the last
+ * screen's whole frame (header, New order, search, filters) is drawn at
+ * once and works, its rows skeletons until the first page lands (owner,
+ * 25 Nov). A tab, filter or search changes the address in place and the
+ * key; the last
  * rows stay, greyed, until the new ones land. What the filter bar offers is
  * its own read, keyed on the product filter alone, so a tab or page change
  * doesn't read it again. A save reads the page once (`useOrderSave`).
@@ -26,7 +28,6 @@ type Screen = ComponentProps<typeof OrdersScreen>;
 export function OrdersContainer({
     defaultSize,
     notices,
-    skeleton,
     ...screen
 }: Omit<
     Screen,
@@ -41,8 +42,6 @@ export function OrdersContainer({
     /** Rows per page when the address names none (the remembered size). */
     defaultSize: number;
     notices: ReactNode;
-    /** The route's loader, until the first page is read. */
-    skeleton: ReactNode;
 }) {
     const search = useSearchParams();
     const query = useMemo(
@@ -67,7 +66,6 @@ export function OrdersContainer({
 
     // A failed read is the page failing (`error.tsx`), never an empty list.
     if (list.isError && !page) throw list.error;
-    if (!page) return skeleton;
 
     return (
         <PageContainer width="full">
@@ -76,17 +74,17 @@ export function OrdersContainer({
                 notices={
                     <>
                         {notices}
-                        {page.moment ? (
+                        {page?.moment ? (
                             <Moment moment={page.moment} className="mb-4" />
                         ) : null}
                     </>
                 }
                 query={query}
-                page={page}
+                page={page ?? null}
                 filterOptions={options.data?.filters ?? null}
                 openByStore={options.data?.openByStore ?? null}
                 pending={list.isPlaceholderData}
-                share={page.share}
+                share={page?.share ?? null}
                 onRetry={() => void list.refetch()}
             />
         </PageContainer>

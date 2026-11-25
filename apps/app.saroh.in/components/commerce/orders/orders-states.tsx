@@ -43,8 +43,11 @@ export function OrdersHeading({
     count,
 }: {
     actions?: ReactNode;
-    /** "12 orders", every order the business has; nothing at none. */
-    count?: string;
+    /**
+     * "12 orders", every order the business has; nothing at none; a bar
+     * while the list is on its way.
+     */
+    count?: ReactNode;
 }) {
     return (
         <PageHeader

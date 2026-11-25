@@ -30,6 +30,10 @@ import { OpenHoursDialog } from "@/components/bookings/free-time/open-hours-dial
 import { useGapTargets } from "@/components/bookings/free-time/use-gap-targets";
 import { BookingQuickLook } from "@/components/bookings/quick-look/booking-quick-look";
 import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
+import {
     PendingRegion,
     useScreenGo,
 } from "@/components/shared/page/screen-pending";
@@ -74,7 +78,7 @@ export function CalendarScreen({
     today,
     now,
     timezone,
-    calendar: read,
+    calendar: given,
     staff,
     services,
     rules,
@@ -100,7 +104,12 @@ export function CalendarScreen({
     today: LocalDate;
     now: number;
     timezone: string;
-    calendar: BookingsCalendar;
+    /**
+     * Null until the first read lands (owner, 25 Nov): the header and its
+     * controls are here and work, the diary is its skeleton, the summary
+     * and the counts wait.
+     */
+    calendar: BookingsCalendar | null;
     /** Null when the staff read failed: no hours, so no free times. */
     staff: StaffView[] | null;
     services: Service[];
@@ -164,6 +173,11 @@ export function CalendarScreen({
     /** The Google layer in What to show: everyone's, just mine, or hidden. */
     googleShow?: GoogleShow;
 }) {
+    const loading = given === null;
+    const read = useMemo(
+        () => given ?? { ...NO_CALENDAR, timezone },
+        [given, timezone],
+    );
     // Flipped here and written to the address without a round trip; a
     // navigation that changes what the address says wins.
     const [cancelledShown, setCancelledShown] = useState(showCancelled);
@@ -351,18 +365,18 @@ export function CalendarScreen({
                 layout={layout}
                 date={date}
                 today={today}
-                summary={summary}
+                summary={loading ? <FigureLoading className="w-48" /> : summary}
                 zone={timeZoneName(
                     timezone,
                     "short",
                     new Date(now),
                     PROFILE.numberLocale,
                 )}
-                choices={choices}
+                choices={loading ? null : choices}
                 picked={person}
                 facts={facts}
                 cancelled={{
-                    count: cancelledCount,
+                    count: loading ? null : cancelledCount,
                     shown: cancelledShown,
                     onChange: showCancelledBookings,
                 }}
@@ -387,7 +401,15 @@ export function CalendarScreen({
                     {limitNotice ? (
                         <div className="mb-3">{limitNotice}</div>
                     ) : null}
-                    {staff === null ? (
+                    {loading ? (
+                        <PageLoading
+                            bare
+                            width="full"
+                            shape={layout === "agenda" ? "rows" : "diary"}
+                            label="Loading the calendar"
+                        />
+                    ) : null}
+                    {!loading && staff === null ? (
                         <PartialRead
                             className="mb-3"
                             things="hours and time off"
@@ -422,12 +444,13 @@ export function CalendarScreen({
                     nobody on the diary come first, and the first day's
                     help (U4). */}
                     {calendarLine &&
+                    !loading &&
                     staff !== null &&
                     !nobodyYet &&
                     !firstDay ? (
                         <div className="mb-3">{calendarLine}</div>
                     ) : null}
-                    {layout === "day" ? (
+                    {layout === "day" && !loading ? (
                         <>
                             {firstDay ? (
                                 <FirstDayHelp
@@ -470,7 +493,7 @@ export function CalendarScreen({
                         </>
                     ) : null}
 
-                    {layout === "week" ? (
+                    {layout === "week" && !loading ? (
                         <>
                             <div className="max-[759px]:hidden">
                                 <WeekView
@@ -512,7 +535,7 @@ export function CalendarScreen({
                         </>
                     ) : null}
 
-                    {layout === "agenda" ? (
+                    {layout === "agenda" && !loading ? (
                         <ListView
                             blocks={dayBlocks}
                             columns={columns}
@@ -592,3 +615,12 @@ export function CalendarScreen({
         </div>
     );
 }
+
+/** Nothing read yet: no days, so no day knows its count (`dayFactsOf`). */
+const NO_CALENDAR: BookingsCalendar = {
+    from: "",
+    to: "",
+    timezone: "",
+    money: false,
+    diaries: [],
+};

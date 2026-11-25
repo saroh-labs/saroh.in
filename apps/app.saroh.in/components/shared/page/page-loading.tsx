@@ -19,6 +19,15 @@ export type PageShape =
     | "settings"
     | "home"
     | "money-list"
+    // Data regions of a screen whose real frame is drawn at once (owner,
+    // 25 Nov): the list's rows, the money strip's figures, a record's panels.
+    | "rows"
+    | "figures"
+    | "panels"
+    // The Bookings diary's day or week: a column strip over hour rows.
+    | "diary"
+    // The Calendar's month grid and its day panel, under its toolbar.
+    | "calendar"
     // The header alone: the shell's own loader, before a section's.
     | "none"
     // Regions of an editor, drawn `bare` inside the frame that stays.
@@ -176,14 +185,33 @@ export function ArrivalLoading({ label = "Loading" }: { label?: string }) {
     );
 }
 
+/**
+ * A figure that comes with the data (a count in a header, a total) while it
+ * is on its way: a short bar, never a 0.
+ */
+export function FigureLoading({ className }: { className?: string }) {
+    return (
+        // A span, not `Skeleton`'s div: it sits inside a <p>, a heading or a
+        // button, where a div breaks hydration (React #418).
+        <span
+            aria-hidden
+            data-slot="figure-loading"
+            className={cn(
+                "skeleton-sweep inline-block h-3 w-14 rounded-md bg-muted align-middle",
+                className,
+            )}
+        />
+    );
+}
+
 /** A record's name, not read yet: a bar the height of the title. */
-function TitleBar({ label }: { label: string }) {
+export function TitleBar({ label }: { label: string }) {
     return (
         <>
             <span className="sr-only">{label}</span>
-            <Skeleton
+            <span
                 aria-hidden
-                className="inline-block h-[30px] w-56 max-w-full align-bottom"
+                className="skeleton-sweep inline-block h-[30px] w-56 max-w-full rounded-md bg-muted align-bottom"
             />
         </>
     );
@@ -196,20 +224,27 @@ function ListBody(rows = 6) {
     return (
         <div className="space-y-[14px]">
             <Skeleton className="h-[38px] w-full max-w-[320px]" />
-            <div className={CARD}>
-                <div className="h-[38px] border-b border-border bg-muted/60" />
-                {Array.from({ length: rows }, (_, i) => (
-                    <div
-                        key={i}
-                        className="flex items-center gap-4 border-b border-border/70 px-4 py-3.5 last:border-b-0"
-                    >
-                        <Skeleton className="h-3 w-[28%]" />
-                        <Skeleton className="hidden h-3 w-[16%] sm:block" />
-                        <Skeleton className="hidden h-3 w-[12%] sm:block" />
-                        <Skeleton className="ml-auto h-3 w-16" />
-                    </div>
-                ))}
-            </div>
+            {RowsBody(rows)}
+        </div>
+    );
+}
+
+/** A table's header strip and rows: the list's data region alone. */
+function RowsBody(rows = 6) {
+    return (
+        <div className={CARD}>
+            <div className="h-[38px] border-b border-border bg-muted/60" />
+            {Array.from({ length: rows }, (_, i) => (
+                <div
+                    key={i}
+                    className="flex items-center gap-4 border-b border-border/70 px-4 py-3.5 last:border-b-0"
+                >
+                    <Skeleton className="h-3 w-[28%]" />
+                    <Skeleton className="hidden h-3 w-[16%] sm:block" />
+                    <Skeleton className="hidden h-3 w-[12%] sm:block" />
+                    <Skeleton className="ml-auto h-3 w-16" />
+                </div>
+            ))}
         </div>
     );
 }
@@ -223,13 +258,26 @@ function MoneyListBody(rows = 6) {
     return (
         <div className="space-y-3.5">
             <Skeleton className="h-3 w-72 max-w-full" />
-            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-                {Array.from({ length: 4 }, (_, i) => (
+            {FiguresBody()}
+            {ListBody(rows)}
+        </div>
+    );
+}
+
+/** The money strip's four figures (two in view on a phone). */
+function FiguresBody(cards = 4) {
+    return (
+        // The strip's own 2px inset and card heights (`MoneyStrip`), and on a
+        // phone the room of its "Swipe for more" line, so the list under it
+        // doesn't move when the figures land.
+        <div>
+            <div className="grid grid-cols-2 gap-2.5 p-0.5 lg:grid-cols-4">
+                {Array.from({ length: cards }, (_, i) => (
                     <div
                         key={i}
                         className={cn(
                             CARD,
-                            "space-y-2 px-3.5 py-3",
+                            "min-h-[88px] space-y-2 px-3.5 py-3 sm:min-h-24",
                             i > 1 && "max-sm:hidden",
                         )}
                     >
@@ -239,7 +287,7 @@ function MoneyListBody(rows = 6) {
                     </div>
                 ))}
             </div>
-            {ListBody(rows)}
+            <div className="h-[26px] sm:hidden" />
         </div>
     );
 }
@@ -248,14 +296,51 @@ function MoneyListBody(rows = 6) {
 function DetailBody(panels = 3) {
     return (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
-                {Array.from({ length: panels }, (_, i) => (
-                    <Panel key={i} />
-                ))}
-            </div>
+            {PanelsBody(panels)}
             <div className="space-y-4">
                 <Panel />
             </div>
+        </div>
+    );
+}
+
+/**
+ * The Bookings diary's grid: its people (or days) across the top, hour
+ * rows down, a booking's block here and there.
+ */
+function DiaryBody(hours = 8) {
+    return (
+        <div className={CARD}>
+            <div className="flex h-[46px] items-center gap-4 border-b border-border bg-muted/60 px-4">
+                {Array.from({ length: 3 }, (_, i) => (
+                    <Skeleton
+                        key={i}
+                        className={cn("h-3 w-24", i > 0 && "max-sm:hidden")}
+                    />
+                ))}
+            </div>
+            {Array.from({ length: hours }, (_, i) => (
+                <div
+                    key={i}
+                    className="flex h-14 items-center gap-4 border-b border-border/70 px-4 last:border-b-0"
+                >
+                    <Skeleton className="h-3 w-10 shrink-0" />
+                    {i % 3 === 1 ? (
+                        <Skeleton className="h-9 w-[40%] rounded-lg" />
+                    ) : null}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/** A record's panels without its side column. */
+function PanelsBody(panels = 3) {
+    return (
+        <div className="space-y-4">
+            {Array.from({ length: panels }, (_, i) => (
+                <Panel key={i} />
+            ))}
         </div>
     );
 }
@@ -525,6 +610,33 @@ function InspectorBody(rows = 5) {
     );
 }
 
+/**
+ * The Calendar (bookings U13): the month's grid, five weeks of seven days
+ * at MonthGrid's heights, and the day's panel beside it from a wide desk.
+ */
+function CalendarBody(weeks = 5) {
+    return (
+        <div className="grid gap-[18px] min-[1100px]:grid-cols-[minmax(0,1fr)_360px] min-[1100px]:items-start">
+            <div className={CARD}>
+                <div className="h-7 border-b border-border bg-muted/60 min-[760px]:h-[34px]" />
+                <div className="grid grid-cols-7">
+                    {Array.from({ length: weeks * 7 }, (_, i) => (
+                        <div
+                            key={i}
+                            className="flex h-[52px] justify-center border-b border-r border-border/70 pt-2 min-[760px]:h-[104px] min-[760px]:justify-start min-[760px]:px-2.5"
+                        >
+                            <Skeleton className="h-3 w-5" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="max-[1099px]:hidden">
+                <Panel />
+            </div>
+        </div>
+    );
+}
+
 const REGION = { writing: true, canvas: true, inspector: true };
 
 const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
@@ -537,6 +649,11 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     settings: SettingsBody,
     home: HomeBody,
     "money-list": MoneyListBody,
+    rows: RowsBody,
+    figures: FiguresBody,
+    panels: PanelsBody,
+    diary: DiaryBody,
+    calendar: CalendarBody,
     none: () => null,
     writing: WritingBody,
     canvas: CanvasBody,

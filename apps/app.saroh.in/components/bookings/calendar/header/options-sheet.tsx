@@ -70,7 +70,7 @@ export function OptionsSheet({
     trigger: ReactElement;
     /** "This day", "This week", "This list". */
     title: string;
-    summary: string;
+    summary: ReactNode;
     cancelled: {
         shown: boolean;
         onChange: (on: boolean) => void;
@@ -135,7 +135,7 @@ export function OptionsSheet({
             onOpenChange={onOpenChange}
             trigger={trigger}
             title={title}
-            subtitle={summary}
+            subtitle={typeof summary === "string" ? summary : undefined}
             width={380}
             align="end"
         >

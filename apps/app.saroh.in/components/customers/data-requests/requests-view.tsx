@@ -16,6 +16,7 @@ import {
     ListToolbar,
 } from "@/components/shared/lists/list-toolbar";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import type {
     DataRequestRow,
     RequestFilter,
@@ -61,8 +62,8 @@ export function RequestsView({
     heading: ReactNode;
     tabs: ReactNode;
     filter: RequestFilter;
-    /** Null: the read failed. */
-    rows: DataRequestRow[] | null;
+    /** Null: the read failed; undefined: on its way (skeleton rows). */
+    rows: DataRequestRow[] | null | undefined;
     canRemove: boolean;
 }) {
     const [openId, setOpenId] = useState<string | null>(null);
@@ -89,7 +90,15 @@ export function RequestsView({
                 }
             />
             <div aria-busy={pending}>
-                {rows === null ? (
+                {rows === undefined ? (
+                    <PageLoading
+                        bare
+                        width="full"
+                        shape="rows"
+                        rows={3}
+                        label="Loading requests"
+                    />
+                ) : rows === null ? (
                     <FailedState
                         data-ph-unmask=""
                         size="panel"

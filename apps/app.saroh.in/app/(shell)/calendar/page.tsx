@@ -10,8 +10,6 @@ import { businessZone } from "@/lib/format/business-zone";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
-import Loading from "./loading";
-
 export const metadata = { title: "Business calendar" };
 
 /**
@@ -33,8 +31,8 @@ export const metadata = { title: "Business calendar" };
  *
  * On React Query (DEC-259), loaded in the browser: the gates are awaited
  * here; the container reads the month or week, the first and every later
- * one, from the address in place (`calendar-container.tsx`), behind the
- * route's loader the first time.
+ * one, from the address in place (`calendar-container.tsx`); the first
+ * time its toolbar is drawn at once and the grid waits as a skeleton.
  *
  * A role that reads none of the layers is told so before anything is read,
  * and again if the API refuses it (E20's 403).
@@ -53,7 +51,6 @@ export default async function CalendarPage() {
     const zone = businessZone(organization);
     return (
         <CalendarContainer
-            skeleton={<Loading />}
             now={{ today: todayIn(zone), thisMonth: monthNow(zone) }}
             can={calendarCan(organization)}
         />

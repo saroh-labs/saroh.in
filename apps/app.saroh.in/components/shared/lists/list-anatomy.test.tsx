@@ -410,6 +410,7 @@ describe("a list filtered on the server through DataView: Products", () => {
     const filters = (q = query) =>
         html(
             <CatalogueFilters
+                stores={[]}
                 query={q}
                 go={go}
                 storefronts={{
@@ -466,6 +467,7 @@ describe("a list filtered on the server through DataView: Products", () => {
     it("a list of choices that couldn't be read says so, with Try again, in the filter's place", () => {
         const out = html(
             <CatalogueFilters
+                stores={[]}
                 query={query}
                 go={go}
                 storefronts={{ everywhere: 3, byStorefront: [] }}

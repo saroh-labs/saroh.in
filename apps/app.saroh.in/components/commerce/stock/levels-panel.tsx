@@ -16,6 +16,7 @@ import {
     ListPaging,
     ListToolbar,
 } from "@/components/shared/lists/list-toolbar";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 
 import { productHref } from "@/lib/products/links";
@@ -50,10 +51,12 @@ export function LevelsPanel({
     onValue,
     paging,
 }: {
-    levels: StockLevels;
+    /** Null while the first read is on its way: skeleton rows. */
+    levels: StockLevels | null;
     /** Every open storefront, for the chips and the footer. */
     allStorefronts: { id: string; name: string }[];
-    needsYou: number;
+    /** Null until the levels are read: the toggle shows no count. */
+    needsYou: number | null;
     show: string;
     q: string;
     /** The screen's address with these changed. */
@@ -141,58 +144,67 @@ export function LevelsPanel({
                 }
             />
 
-            <LevelsTable
-                storefronts={levels.storefronts}
-                rows={levels.rows}
-                timezone={levels.timezone ?? DEFAULT_BUSINESS_ZONE}
-                counting={counting}
-                values={values}
-                onValue={onValue}
-                empty={
-                    show === "needs" && !q ? (
-                        <EmptyState
-                            size="panel"
-                            title="Nothing needs you"
-                            description="Every size has more than its warning level."
-                        />
-                    ) : q ? (
-                        <EmptyState
-                            kind="no-results"
-                            size="panel"
-                            things="products"
-                            query={q}
-                            onClear={() => search("")}
-                        />
-                    ) : show === "all" ? (
-                        <EmptyState
-                            size="panel"
-                            icon={<Boxes />}
-                            title="No stock counted yet"
-                            description="Turn on “Track stock” on a product and it shows here."
-                            action={
-                                <Button asChild variant="outline">
-                                    <IntentLink href="/commerce/products">
-                                        Go to Products
-                                    </IntentLink>
-                                </Button>
-                            }
-                        />
-                    ) : (
-                        <EmptyState
-                            kind="no-results"
-                            size="panel"
-                            things="products"
-                            cause="view"
-                            onClear={() => go(href({ show: undefined }))}
-                        />
-                    )
-                }
-            />
+            {!levels ? (
+                <PageLoading
+                    bare
+                    width="full"
+                    shape="rows"
+                    label="Loading stock"
+                />
+            ) : (
+                <LevelsTable
+                    storefronts={levels.storefronts}
+                    rows={levels.rows}
+                    timezone={levels.timezone ?? DEFAULT_BUSINESS_ZONE}
+                    counting={counting}
+                    values={values}
+                    onValue={onValue}
+                    empty={
+                        show === "needs" && !q ? (
+                            <EmptyState
+                                size="panel"
+                                title="Nothing needs you"
+                                description="Every size has more than its warning level."
+                            />
+                        ) : q ? (
+                            <EmptyState
+                                kind="no-results"
+                                size="panel"
+                                things="products"
+                                query={q}
+                                onClear={() => search("")}
+                            />
+                        ) : show === "all" ? (
+                            <EmptyState
+                                size="panel"
+                                icon={<Boxes />}
+                                title="No stock counted yet"
+                                description="Turn on “Track stock” on a product and it shows here."
+                                action={
+                                    <Button asChild variant="outline">
+                                        <IntentLink href="/commerce/products">
+                                            Go to Products
+                                        </IntentLink>
+                                    </Button>
+                                }
+                            />
+                        ) : (
+                            <EmptyState
+                                kind="no-results"
+                                size="panel"
+                                things="products"
+                                cause="view"
+                                onClear={() => go(href({ show: undefined }))}
+                            />
+                        )
+                    }
+                />
+            )}
 
             <ListPaging
                 label={STOCK_PAGES_LABEL.levels}
                 page={paging.page}
-                total={levels.total ?? 0}
+                total={levels?.total ?? 0}
                 size={paging.size}
                 to={(n) => {
                     const to = href({ page: n });
@@ -204,7 +216,7 @@ export function LevelsPanel({
                 }}
             />
 
-            {levels.untracked.length > 0 ? (
+            {levels && levels.untracked.length > 0 ? (
                 <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
                     <span>{untrackedLine(levels.untracked.length)}</span>
                     {levels.untracked.map((p, i) => {
