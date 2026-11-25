@@ -2,7 +2,6 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { QuickSheet } from "@/components/commerce/product-page/quick-sheet";
@@ -11,6 +10,7 @@ import { saveProductCollections } from "@/lib/collections/actions";
 import type { MembershipRow } from "@/lib/collections/rules";
 import { membershipRows, pickedIds, sameList } from "@/lib/collections/rules";
 import type { CollectionSummary } from "@/lib/collections/service";
+import { useCollectionSave } from "@/lib/collections/use-collections";
 import type { ProductPlacement } from "@/lib/products/overview-rules";
 import { CheckRow } from "@saroh/ui/check-row";
 
@@ -20,7 +20,8 @@ import { CheckRow } from "@saroh/ui/check-row";
  * takes it or lets it go; an automatic one is locked and says why — it
  * follows the product's category. Saving puts it in exactly the ticked
  * hand-picked ones; the API refuses a full one and says so. Undo puts the
- * hand-picked set back as it was.
+ * hand-picked set back as it was. Either reads the product's page and
+ * the collections again (`collectionsSaved`, DEC-259).
  */
 export function ProductCollectionsSheet({
     open,
@@ -37,7 +38,7 @@ export function ProductCollectionsSheet({
     all: CollectionSummary[];
     placement: ProductPlacement;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCollectionSave();
     const start = membershipRows(all, placement);
     const [rows, setRows] = useState<MembershipRow[]>(start);
     const [saving, setSaving] = useState(false);
@@ -53,7 +54,8 @@ export function ProductCollectionsSheet({
         // The hand-picked set as it was, for Undo to put back.
         const previous = pickedIds(start, all);
         const res = await runAction(
-            () => saveProductCollections(productId, pickedIds(rows, all)),
+            () =>
+                saveProductCollections(productId, pickedIds(rows, all), orgId),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -62,12 +64,14 @@ export function ProductCollectionsSheet({
             return;
         }
         onOpenChange(false);
-        // rq-refresh-ok: a product's Collections tab moves in U24.
-        router.refresh();
+        await saved();
         showUndo("Collections saved.", async () => {
-            const undo = await saveProductCollections(productId, previous);
-            // rq-refresh-ok: a product's Collections tab moves in U24.
-            router.refresh();
+            const undo = await saveProductCollections(
+                productId,
+                previous,
+                orgId,
+            );
+            if (undo.ok) await saved();
             return undo;
         });
     }

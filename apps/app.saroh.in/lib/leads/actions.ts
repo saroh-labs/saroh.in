@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import type { CreateLeadInput, UpdateLeadInput } from "./service";
 import {
     completeTask as completeTaskApi,
@@ -18,35 +20,48 @@ import {
  * action is what the pipeline board + lead detail call to advance a lead's
  * stage; the api validates the target stage + logs a STAGE_CHANGED activity
  * atomically. Client components call these — never the api or the DB directly.
+ *
+ * Each takes the tab's business last (DEC-259): refused when another one
+ * was opened since (`writeAsOrg`); nothing is revalidated, the screens read
+ * their queries again (`useLeadsSave`).
  */
 
-export async function createLead(input: CreateLeadInput) {
-    return createLeadApi(input);
+export async function createLead(input: CreateLeadInput, orgId: string) {
+    return writeAsOrg(orgId, () => createLeadApi(input));
 }
 
-export async function updateLead(leadId: string, input: UpdateLeadInput) {
-    return updateLeadApi(leadId, input);
+export async function updateLead(
+    leadId: string,
+    input: UpdateLeadInput,
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => updateLeadApi(leadId, input));
 }
 
-export async function deleteLead(leadId: string) {
-    return deleteLeadApi(leadId);
+export async function deleteLead(leadId: string, orgId: string) {
+    return writeAsOrg(orgId, () => deleteLeadApi(leadId));
 }
 
-export async function moveLead(leadId: string, stageId: string) {
-    return moveLeadApi(leadId, stageId);
+export async function moveLead(leadId: string, stageId: string, orgId: string) {
+    return writeAsOrg(orgId, () => moveLeadApi(leadId, stageId));
 }
 
-export async function logActivity(leadId: string, body: string) {
-    return logActivityApi(leadId, body);
+export async function logActivity(leadId: string, body: string, orgId: string) {
+    return writeAsOrg(orgId, () => logActivityApi(leadId, body));
 }
 
 export async function createTask(
     leadId: string,
     input: { body: string; dueAt: string },
+    orgId: string,
 ) {
-    return createTaskApi(leadId, input);
+    return writeAsOrg(orgId, () => createTaskApi(leadId, input));
 }
 
-export async function completeTask(leadId: string, activityId: string) {
-    return completeTaskApi(leadId, activityId);
+export async function completeTask(
+    leadId: string,
+    activityId: string,
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => completeTaskApi(leadId, activityId));
 }

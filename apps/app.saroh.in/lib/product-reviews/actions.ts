@@ -1,7 +1,6 @@
 "use server";
 
 import { writeAsOrg } from "@/lib/api/assert-active-org";
-import { revalidatePath } from "next/cache";
 
 import {
     inviteReviews as inviteReviewsApi,
@@ -10,27 +9,27 @@ import {
 } from "./service";
 
 /**
- * Thin: the API decides who may reply, hide or invite. Each revalidates the
- * whole layout — a reply or hide clears a notification, which the rail
- * counts.
+ * Thin: the API decides who may reply, hide or invite. Every caller is on
+ * React Query (DEC-259) and reads itself again (`reviewsSaved`, the bell
+ * included); the tab's business goes last (`writeAsOrg`), refusing a tab
+ * whose business has since changed. Nothing is revalidated.
  */
 
-export async function inviteReviews(orderIds: string[]) {
-    const res = await inviteReviewsApi(orderIds);
-    if (res.ok) revalidatePath("/", "layout");
-    return res;
+const asOrg = <R>(orgId: string | undefined, write: () => Promise<R>) =>
+    orgId ? writeAsOrg(orgId, write) : write();
+
+export async function inviteReviews(orderIds: string[], orgId?: string) {
+    return asOrg(orgId, () => inviteReviewsApi(orderIds));
 }
 
-/** `orgId`: from Home on React Query (DEC-259), which reads itself again. */
 export async function replyToReview(id: string, reply: string, orgId?: string) {
-    if (orgId) return writeAsOrg(orgId, () => replyToReviewApi(id, reply));
-    const res = await replyToReviewApi(id, reply);
-    if (res.ok) revalidatePath("/", "layout");
-    return res;
+    return asOrg(orgId, () => replyToReviewApi(id, reply));
 }
 
-export async function setReviewHidden(id: string, hidden: boolean) {
-    const res = await setReviewHiddenApi(id, hidden);
-    if (res.ok) revalidatePath("/", "layout");
-    return res;
+export async function setReviewHidden(
+    id: string,
+    hidden: boolean,
+    orgId?: string,
+) {
+    return asOrg(orgId, () => setReviewHiddenApi(id, hidden));
 }

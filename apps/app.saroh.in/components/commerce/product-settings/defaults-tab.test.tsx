@@ -22,6 +22,13 @@ const markMomentSeen = vi.fn();
 vi.mock("@/lib/moments/actions", () => ({
     markMomentSeen: (...a: unknown[]) => markMomentSeen(...a) as unknown,
 }));
+// A save reads Product settings again (`productSettingsSaved`, DEC-259).
+vi.mock("@/lib/products/use-product-settings", () => ({
+    useProductSettingsSave: () => ({
+        orgId: "org_1",
+        saved: () => Promise.resolve(),
+    }),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));

@@ -12,6 +12,14 @@ import { PacksTab } from "./packs-tab";
 
 pinClock();
 
+// The tab's business and Class packs' invalidation (DEC-259).
+const packSave = vi.hoisted(() => ({
+    saved: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+}));
+vi.mock("@/lib/class-packs/use-class-packs", () => ({
+    useClassPackSave: () => ({ orgId: "org_1", saved: packSave.saved }),
+}));
+
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),
 }));

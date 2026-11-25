@@ -1,6 +1,8 @@
 "use server";
 
-import type { MemberResult, MemberRole } from "./service";
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
+import type { MemberRole } from "./service";
 import {
     inviteMember as inviteMemberApi,
     removeMember as removeMemberApi,
@@ -12,34 +14,40 @@ import {
  * Server Actions for team management. Thin wrappers that forward the session
  * cookie to api.saroh.in; the api resolves the caller from the session and
  * enforces owner-only management. The UI calls these, never the api directly.
+ * Each takes the tab's business last (`writeAsOrg`, DEC-259): a location's
+ * People tab is on React Query and reads its roster again itself.
  */
 
 export async function inviteMember(
     storeId: string,
     email: string,
     role: MemberRole,
-): Promise<MemberResult> {
-    return inviteMemberApi(storeId, email, role);
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => inviteMemberApi(storeId, email, role));
 }
 
 export async function updateMemberRole(
     storeId: string,
     userId: string,
     role: MemberRole,
-): Promise<MemberResult> {
-    return updateMemberRoleApi(storeId, userId, role);
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => updateMemberRoleApi(storeId, userId, role));
 }
 
 export async function removeMember(
     storeId: string,
     userId: string,
-): Promise<MemberResult> {
-    return removeMemberApi(storeId, userId);
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => removeMemberApi(storeId, userId));
 }
 
 export async function revokeInvitation(
     storeId: string,
     invitationId: string,
-): Promise<MemberResult> {
-    return revokeInvitationApi(storeId, invitationId);
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => revokeInvitationApi(storeId, invitationId));
 }

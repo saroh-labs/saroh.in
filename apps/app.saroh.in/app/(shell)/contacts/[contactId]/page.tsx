@@ -6,8 +6,6 @@ import type { ReactNode } from "react";
 
 import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
 import { CoursesPanel } from "@/components/contacts/courses-panel";
-import { EnquiriesPanel } from "@/components/contacts/enquiries-panel";
-import { LeadsPanel } from "@/components/contacts/leads-panel";
 import { SubscribeAction } from "@/components/contacts/subscribe-action";
 import { CustomerDetailContainer } from "@/components/customers/detail/customer-detail-container";
 import type { PackSale } from "@/components/customers/detail/packs-tab";
@@ -24,9 +22,7 @@ import {
     personTabActions,
     personTabGates,
 } from "@/lib/contacts/person";
-import { deleteQuestion, heldCounts } from "@/lib/contacts/removal";
-import type { ContactDetail } from "@/lib/contacts/service";
-import { getContact } from "@/lib/contacts/service";
+import { heldCounts } from "@/lib/contacts/removal";
 import { contactSourceLabel } from "@/lib/contacts/source";
 import { isRemovedContact, shownEmail } from "@/lib/crm/format";
 import {
@@ -39,7 +35,6 @@ import {
 } from "@/lib/customer-workspace/merge";
 import type { ReviewsRead, Tab, TabKey } from "@/lib/customer-workspace/view";
 import { readCustomerDetailOnce } from "@/lib/customers/access-server";
-import { loadAddLead } from "@/lib/leads/add-lead-data";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { sellsProducts } from "@/lib/orders/sells-products";
 import { knownRoleName } from "@/lib/organizations/role-name";
@@ -77,7 +72,8 @@ export const metadata = { title: "Contact" };
  * merged a redirect); the record with their messages, what they'd be
  * offered to link or merge and their open removal request
  * (`/api/customers/[customerId]`) is `CustomerDetailContainer`'s query,
- * read from the browser behind the route's loader and again after a write.
+ * read from the browser behind the route's loader and again after a write;
+ * so are their leads and enquiries (`/api/contacts/[contactId]`).
  */
 export default async function PersonPage({
     params,
@@ -149,7 +145,7 @@ export default async function PersonPage({
     };
     const packsShown = detail.packs !== undefined;
 
-    const [reviews, packSale, crm, holdings, products] = await Promise.all([
+    const [reviews, packSale, holdings, products] = await Promise.all([
         // Their product reviews (C6), where the business sells.
         detail.linkedCustomers !== undefined && may("product-review:read")
             ? contactReviews(contactId).catch((): ReviewsRead => "failed")
@@ -167,11 +163,6 @@ export default async function PersonPage({
                           : null,
               )
             : Promise.resolve(null),
-        // Their leads and enquiries, only where CRM is on and the viewer
-        // reads leads; null when the read failed.
-        gates.leads
-            ? getContact(contactId).catch((): ContactDetail | null => null)
-            : Promise.resolve(null),
         loadContactHoldings(contactId, holdingsPlan),
         // New order is for a business that sells products (B13).
         opens.newOrder ? sellsProducts() : Promise.resolve(false),
@@ -183,48 +174,14 @@ export default async function PersonPage({
         : (name.split(" ")[0] ?? name);
     // Removed for a privacy request (C11): their leads stay, but nothing can
     // put details back or add to them.
-    const removed = isRemovedContact(crm ?? detail.contact);
+    const removed = isRemovedContact(detail.contact);
     // Never the placeholder a site account's own record holds (UX-013).
-    const email = shownEmail(crm ?? detail.contact);
+    const email = shownEmail(detail.contact);
     const person = { id: contactId, name, email: email ?? "" };
-    const stages =
-        gates.leads && canWrite && !removed
-            ? (await loadAddLead()).stages
-            : null;
     // What a lead is worth is in the business's currency (owner, 11 Oct).
     const currency = gates.leads ? await readBusinessCurrency() : "";
 
     const extra: (Tab & { panel: ReactNode })[] = [];
-    if (gates.leads) {
-        extra.push({
-            key: "lead",
-            label: "Leads",
-            count: crm ? crm.leads.length : null,
-            panel: (
-                <LeadsPanel
-                    person={person}
-                    leads={crm ? crm.leads : null}
-                    stages={stages}
-                    currency={currency}
-                />
-            ),
-        });
-    }
-    if (gates.enquiries) {
-        const enquiries = crm ? (crm.enquiries ?? []) : null;
-        extra.push({
-            key: "enq",
-            label: "Enquiries",
-            count: enquiries ? enquiries.length : null,
-            panel: (
-                <EnquiriesPanel
-                    enquiries={enquiries}
-                    knownEmail={email}
-                    first={first}
-                />
-            ),
-        });
-    }
     if (holdingsPlan.panels.includes("courses")) {
         const enrollments = holdings.courses ?? null;
         extra.push({
@@ -274,17 +231,15 @@ export default async function PersonPage({
     const sells = detail.linkedCustomers !== undefined;
     const now = new Date();
     // The delete confirm names what deleting them ends, from what this page
-    // read; a kind it couldn't read keeps the sentence general.
-    const deleteWords = deleteQuestion(
-        crm ? crm.leads.length : null,
-        heldCounts(
-            {
-                subscriptions: detail.subscriptions?.rows,
-                packs: detail.packs?.rows,
-                courses: holdings.courses,
-            },
-            now,
-        ),
+    // read (their leads are the container's); a kind it couldn't read keeps
+    // the sentence general.
+    const deleteHeld = heldCounts(
+        {
+            subscriptions: detail.subscriptions?.rows,
+            packs: detail.packs?.rows,
+            courses: holdings.courses,
+        },
+        now,
     );
 
     return (
@@ -324,8 +279,13 @@ export default async function PersonPage({
                 canExtendPacks={packsShown && canWritePacks(organization)}
                 nowIso={now.toISOString()}
                 extra={extra}
+                crm={
+                    gates.leads
+                        ? { person, currency, knownEmail: email, first }
+                        : null
+                }
                 actions={actions}
-                deleteWords={deleteWords}
+                deleteHeld={deleteHeld}
                 canRecordPayment={acts.recordPayment}
                 starts={personStarts(contactId, opens, {
                     removed,

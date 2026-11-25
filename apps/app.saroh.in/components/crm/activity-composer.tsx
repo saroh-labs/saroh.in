@@ -3,11 +3,11 @@
 import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { logActivity } from "@/lib/leads/actions";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 /**
@@ -26,7 +26,7 @@ export function ActivityComposer({
     /** The note was saved: close the sheet. */
     onDone: () => void;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const [body, setBody] = useState("");
     const [busy, setBusy] = useState(false);
     const [tried, setTried] = useState(false);
@@ -37,9 +37,12 @@ export function ActivityComposer({
         setTried(true);
         const text = body.trim();
         if (!text) return;
-        const res = await runAction(() => logActivity(leadId, text), {
-            setBusy,
-        });
+        const res = await runAction(
+            () => logActivity(leadId, text, save.orgId),
+            {
+                setBusy,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);
@@ -47,7 +50,7 @@ export function ActivityComposer({
         }
         showSuccess("Note added.");
         onDone();
-        router.refresh();
+        void save.saved();
     }
 
     return (

@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import type { PickableProduct } from "@/lib/collections/actions";
@@ -20,6 +19,7 @@ import {
     websiteLine,
 } from "@/lib/collections/rules";
 import type { CollectionDetail } from "@/lib/collections/service";
+import { useCollectionSave } from "@/lib/collections/use-collections";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { FormSheet } from "@saroh/ui/form-sheet";
@@ -77,10 +77,10 @@ export function CollectionSheet({
     collectionId: string | null;
     categories: CategoryNode[];
     canWrite: boolean;
-    /** After a save or a delete; the page is refreshed either way. */
+    /** After a save or a delete; the collections and Products are read again either way. */
     onSaved?: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useCollectionSave();
     const editing = collectionId !== null;
     const [before, setBefore] = useState<SheetValues>(BLANK);
     const [values, setValues] = useState<SheetValues>(BLANK);
@@ -156,12 +156,11 @@ export function CollectionSheet({
         setErrors((e) => ({ ...e, [key]: undefined }));
     }
 
-    function done(message: string) {
+    async function done(message: string) {
         showSuccess(message);
         onOpenChange(false);
         onSaved?.();
-        // rq-refresh-ok: Collections are server-drawn until U24.
-        router.refresh();
+        await saved();
     }
 
     async function save() {
@@ -177,8 +176,9 @@ export function CollectionSheet({
                           collectionId,
                           changes.patch,
                           changes.products,
+                          orgId,
                       )
-                    : await saveNewCollection(createBody(values)),
+                    : await saveNewCollection(createBody(values), orgId),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -190,21 +190,20 @@ export function CollectionSheet({
             if ("partly" in res && res.partly) {
                 // Its name, line or category saved; the list didn't.
                 showError("The rest saved, but not its products.", res.error);
-                // rq-refresh-ok: Collections are server-drawn until U24.
-                router.refresh();
+                await saved();
             } else if (!field) {
                 showError("The collection wasn't saved.", res.error);
             }
             return;
         }
-        done(editing ? "Collection saved." : "Collection created.");
+        await done(editing ? "Collection saved." : "Collection created.");
     }
 
     async function remove(): Promise<ConfirmResult> {
         if (!collectionId) return;
-        const res = await removeCollection(collectionId);
+        const res = await removeCollection(collectionId, orgId);
         if (!res.ok) return { ok: false, error: res.error };
-        done("Collection deleted.");
+        await done("Collection deleted.");
     }
 
     const title = !editing

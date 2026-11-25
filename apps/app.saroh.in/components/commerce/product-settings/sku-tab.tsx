@@ -6,7 +6,6 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import type { SkuPreview, SkuSettings } from "@/lib/products/settings";
@@ -15,6 +14,7 @@ import {
     saveSkuPattern,
 } from "@/lib/products/settings-actions";
 import { patternProblem } from "@/lib/products/sku-pattern";
+import { useProductSettingsSave } from "@/lib/products/use-product-settings";
 
 import { listTable } from "@/components/shared/lists/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
@@ -51,7 +51,7 @@ export function SkuTab({
     preview: SkuPreview | null;
     canWrite: boolean;
 }) {
-    const router = useRouter();
+    const { orgId, saved: settingsSaved } = useProductSettingsSave();
     const { report } = useUnsaved();
     const [saved, setSaved] = useState({
         pattern: settings.pattern,
@@ -99,7 +99,7 @@ export function SkuTab({
         const before = saved;
         // Off, a pattern that is wrong on its own isn't sent: the saved one stays.
         const next = patternProblem(pattern) ? saved.pattern : pattern.trim();
-        const res = await runAction(() => saveSkuPattern(next, suggest));
+        const res = await runAction(() => saveSkuPattern(next, suggest, orgId));
         if (!res) return false;
         if (!res.ok) {
             showError(res.error);
@@ -107,7 +107,7 @@ export function SkuTab({
         }
         setSaved({ pattern: res.data.pattern, suggest: res.data.suggest });
         setPattern(res.data.pattern);
-        router.refresh();
+        void settingsSaved();
         showUndo(
             res.data.suggest
                 ? `Saved. The editor suggests ${rows[0]?.next ?? "them"}-style SKUs.`
@@ -115,14 +115,14 @@ export function SkuTab({
             () =>
                 start(async () => {
                     const undo = await runAction(() =>
-                        saveSkuPattern(before.pattern, before.suggest),
+                        saveSkuPattern(before.pattern, before.suggest, orgId),
                     );
                     if (!undo) return;
                     if (!undo.ok) return showError(undo.error);
                     setSaved(before);
                     setPattern(before.pattern);
                     setSuggest(before.suggest);
-                    router.refresh();
+                    void settingsSaved();
                 }),
         );
         return true;

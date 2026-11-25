@@ -7,7 +7,6 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { MessageSquareQuote, Send } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
@@ -17,12 +16,14 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
 import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import { stars } from "@/lib/product-reviews/describe";
 import type { InvitableOrder, Review } from "@/lib/product-reviews/service";
+import { useReviewSave } from "@/lib/product-reviews/use-product-reviews";
 import { Field } from "@saroh/ui/field";
 import { InviteReviewsSheet } from "./invite-reviews-sheet";
 
@@ -44,6 +45,10 @@ const FILTERS: DataFilter<Review>[] = [
  * is verified purchases only. A review can be replied to once (the reply can
  * be edited) and hidden — never deleted; hidden reviews stay here, marked.
  * Text is shown as text: nothing a customer typed is ever read as markup.
+ *
+ * Drawn at once (DEC-259): the header and tabs from the page, the rows as
+ * skeletons until the reviews land (`reviews` undefined), and Invite
+ * reviews once what it offers has (`invitable` undefined until then).
  */
 export function ReviewsView({
     reviews,
@@ -53,8 +58,10 @@ export function ReviewsView({
     tabs,
     initialReviewId,
 }: {
-    reviews: Review[];
-    invitable: InvitableOrder[];
+    /** Undefined while on their way. */
+    reviews: Review[] | undefined;
+    /** Undefined while on its way, or for a role that can't invite. */
+    invitable: InvitableOrder[] | undefined;
     canWrite: boolean;
     /** Why invitations can't go (D11); the invite sheet leads with it. */
     emailNote?: ReviewEmailNote | null;
@@ -62,9 +69,14 @@ export function ReviewsView({
     /** `?review=<id>` — opened on arrival, from a notification. */
     initialReviewId?: string;
 }) {
-    const [open, setOpen] = useState<Review | null>(
-        () => reviews.find((r) => r.id === initialReviewId) ?? null,
+    // By id, so `?review=` opens it once the reviews land, and the sheet
+    // shows the review as last read.
+    const [openId, setOpenId] = useState<string | null>(
+        initialReviewId ?? null,
     );
+    const open = reviews?.find((r) => r.id === openId) ?? null;
+    const setOpen = (r: Review | null) => setOpenId(r?.id ?? null);
+    const orders = invitable ?? [];
     const [inviting, setInviting] = useState(false);
 
     const columns: DataColumn<Review>[] = [
@@ -136,7 +148,7 @@ export function ReviewsView({
     ];
 
     const inviteAction =
-        canWrite && invitable.length > 0 ? (
+        canWrite && orders.length > 0 ? (
             <Button onClick={() => setInviting(true)}>
                 <Send className="mr-1.5 size-4" />
                 Invite reviews
@@ -152,36 +164,45 @@ export function ReviewsView({
                 actions={inviteAction}
             />
             {tabs}
-            <DataView
-                viewId="reviews"
-                rows={reviews}
-                columns={columns}
-                rowKey={(r) => r.id}
-                onRowClick={(r) => setOpen(r)}
-                modes={["table", "list"]}
-                hideModeToggle
-                filters={FILTERS}
-                noun={{ one: "review", other: "reviews" }}
-                searchPlaceholder="Search reviews"
-                searchableColumnIds={["review", "product"]}
-                emptyState={{
-                    icon: <MessageSquareQuote />,
-                    title: "No reviews yet",
-                    // One sentence, and it promises an invitation only to
-                    // someone who may send one and has an order to ask about.
-                    note: !canWrite
-                        ? "They show here once a customer leaves one."
-                        : invitable.length > 0
-                          ? "They show here once a customer leaves one, and you can invite one from a past order."
-                          : "They show here once a customer leaves one. You can invite one once an order has shipped.",
-                    action:
-                        canWrite && invitable.length > 0 ? (
-                            <Button onClick={() => setInviting(true)}>
-                                Invite a review
-                            </Button>
-                        ) : undefined,
-                }}
-            />
+            {reviews === undefined ? (
+                <PageLoading
+                    bare
+                    shape="rows"
+                    width="full"
+                    label="Loading reviews"
+                />
+            ) : (
+                <DataView
+                    viewId="reviews"
+                    rows={reviews}
+                    columns={columns}
+                    rowKey={(r) => r.id}
+                    onRowClick={(r) => setOpen(r)}
+                    modes={["table", "list"]}
+                    hideModeToggle
+                    filters={FILTERS}
+                    noun={{ one: "review", other: "reviews" }}
+                    searchPlaceholder="Search reviews"
+                    searchableColumnIds={["review", "product"]}
+                    emptyState={{
+                        icon: <MessageSquareQuote />,
+                        title: "No reviews yet",
+                        // One sentence, and it promises an invitation only to
+                        // someone who may send one and has an order to ask about.
+                        note: !canWrite
+                            ? "They show here once a customer leaves one."
+                            : orders.length > 0
+                              ? "They show here once a customer leaves one, and you can invite one from a past order."
+                              : "They show here once a customer leaves one. You can invite one once an order has shipped.",
+                        action:
+                            canWrite && orders.length > 0 ? (
+                                <Button onClick={() => setInviting(true)}>
+                                    Invite a review
+                                </Button>
+                            ) : undefined,
+                    }}
+                />
+            )}
             <p
                 data-ph-unmask=""
                 className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
@@ -196,7 +217,7 @@ export function ReviewsView({
                 canWrite={canWrite}
                 onClose={() => setOpen(null)}
             />
-            {canWrite ? (
+            {canWrite && invitable ? (
                 <InviteReviewsSheet
                     open={inviting}
                     onOpenChange={setInviting}
@@ -221,7 +242,7 @@ function ReviewSheet({
     canWrite: boolean;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useReviewSave();
     const [reply, setReply] = useState("");
     const [pending, startTransition] = useTransition();
     const [tried, setTried] = useState(false);
@@ -242,7 +263,7 @@ function ReviewSheet({
         if (!review || !reply.trim()) return;
         startTransition(async () => {
             const res = await runAction(() =>
-                replyToReview(review.id, reply.trim()),
+                replyToReview(review.id, reply.trim(), orgId),
             );
             if (!res) return;
             if (!res.ok) {
@@ -251,8 +272,7 @@ function ReviewSheet({
             }
             showSuccess(review.reply ? "Reply saved." : "Reply posted.");
             onClose();
-            // rq-refresh-ok: Reviews on Products is server-drawn until U24.
-            router.refresh();
+            await saved();
         });
     };
 
@@ -260,26 +280,26 @@ function ReviewSheet({
         if (!review) return;
         const next = !hidden;
         startTransition(async () => {
-            const res = await runAction(() => setReviewHidden(review.id, next));
+            const res = await runAction(() =>
+                setReviewHidden(review.id, next, orgId),
+            );
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
             onClose();
-            // rq-refresh-ok: Reviews on Products is server-drawn until U24.
-            router.refresh();
+            await saved();
             if (next) {
                 showUndo(
                     "Review hidden.",
                     async () => {
                         const back = await runAction(
-                            () => setReviewHidden(review.id, false),
+                            () => setReviewHidden(review.id, false, orgId),
                             { quiet: true },
                         );
                         if (!back) return { ok: false, error: UNREACHED };
-                        // rq-refresh-ok: Reviews on Products is server-drawn until U24.
-                        router.refresh();
+                        if (back.ok) await saved();
                         return back;
                     },
                     { description: "It stays here, marked." },

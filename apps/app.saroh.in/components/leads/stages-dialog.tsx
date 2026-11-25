@@ -6,10 +6,10 @@ import { FormDialog } from "@saroh/ui/form-dialog";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ArrowDown, ArrowUp, Plus, Settings2, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { saveStages } from "@/lib/pipelines/actions";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Tip } from "@saroh/ui/tooltip";
@@ -40,7 +40,7 @@ export function StagesDialog({
     pipelineName: string;
     stages: { id: string; name: string; leads: number }[];
 }) {
-    const router = useRouter();
+    const leads = useLeadsSave();
     const [open, setOpen] = useState(false);
     const [rows, setRows] = useState<Row[]>([]);
     const [removed, setRemoved] = useState<Row[]>([]);
@@ -97,18 +97,19 @@ export function StagesDialog({
                         was: r.was,
                     })),
                     removed.flatMap((r) => (r.id ? [r.id] : [])),
+                    leads.orgId,
                 ),
             { setBusy: setSaving },
         );
         if (!res) return;
         if (!res.ok) {
             showError("Some of the stage changes were not saved.", res.error);
-            router.refresh();
+            void leads.saved();
             return;
         }
         setOpen(false);
         showSuccess("Stages saved.");
-        router.refresh();
+        void leads.saved();
     }
 
     return (

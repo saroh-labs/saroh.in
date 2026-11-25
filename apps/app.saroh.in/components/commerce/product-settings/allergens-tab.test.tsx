@@ -18,6 +18,16 @@ vi.mock("@/lib/products/settings-actions", () => ({
     removeAllergen: (...a: unknown[]) => removeAllergen(...a) as unknown,
 }));
 const refresh = vi.fn();
+// A save reads Product settings again (`productSettingsSaved`, DEC-259).
+vi.mock("@/lib/products/use-product-settings", () => ({
+    useProductSettingsSave: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
 }));
@@ -116,7 +126,7 @@ describe("the list", () => {
         render();
         s.press("Remove Sesame");
         await s.settle();
-        expect(removeAllergen).toHaveBeenCalledWith("a2");
+        expect(removeAllergen).toHaveBeenCalledWith("a2", "org_1");
         expect(showUndo.mock.calls[0][0]).toBe("Sesame removed from the list.");
     });
 });
@@ -140,7 +150,7 @@ describe("Add allergen", () => {
         addAllergens.mockResolvedValue({ ok: true, data: [...LIST, celery] });
         s.type(open(), " Celery ");
         await s.submit(s.dialog());
-        expect(addAllergens).toHaveBeenCalledWith(["Celery"]);
+        expect(addAllergens).toHaveBeenCalledWith(["Celery"], "org_1");
         expect(s.dialog()).toBe(null);
         expect(refresh).toHaveBeenCalled();
         expect(showUndo.mock.calls[0][0]).toBe(

@@ -18,6 +18,13 @@ vi.mock("@/lib/products/settings-actions", () => ({
     saveSkuPattern: (...a: unknown[]) => saveSkuPattern(...a) as unknown,
     previewSkuPattern: (...a: unknown[]) => previewSkuPattern(...a) as unknown,
 }));
+// A save reads Product settings again (`productSettingsSaved`, DEC-259).
+vi.mock("@/lib/products/use-product-settings", () => ({
+    useProductSettingsSave: () => ({
+        orgId: "org_1",
+        saved: () => Promise.resolve(),
+    }),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
@@ -83,7 +90,11 @@ describe("SKUs", () => {
         expect(s.button("Save")?.disabled).toBe(false);
         s.press("Save");
         await s.settle();
-        expect(saveSkuPattern).toHaveBeenCalledWith(SAVED.pattern, false);
+        expect(saveSkuPattern).toHaveBeenCalledWith(
+            SAVED.pattern,
+            false,
+            "org_1",
+        );
     });
 
     it("off, a broken pattern is not sent: the saved one stays", async () => {
@@ -93,7 +104,11 @@ describe("SKUs", () => {
         expect(document.querySelector('[role="alert"]')).toBe(null);
         s.press("Save");
         await s.settle();
-        expect(saveSkuPattern).toHaveBeenCalledWith(SAVED.pattern, false);
+        expect(saveSkuPattern).toHaveBeenCalledWith(
+            SAVED.pattern,
+            false,
+            "org_1",
+        );
     });
 
     it("on, a pattern changed into a broken one is said, and Save stays on", async () => {

@@ -4,10 +4,10 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { showWarning } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useHold } from "@/components/shared/undo/use-hold";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { sendMessage } from "@/lib/messages/actions";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import { sendFailureWords } from "@/lib/messages/composer-gate";
@@ -80,7 +80,7 @@ export function MessageComposer({
     /** Refused or undone: open the sheet again, with what was written. */
     onReopen: () => void;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const { channel, subject, body } = draft;
     const setChannel = (next: MessageChannel) =>
         onDraft({ ...draft, channel: next });
@@ -107,16 +107,19 @@ export function MessageComposer({
         send(`message:${leadId}`, {
             description: `By ${CHANNEL_LABEL[channel]}.`,
             run: async () => {
-                const res = await sendMessage({
-                    leadId,
-                    channel,
-                    contactId,
-                    subject:
-                        channel === "EMAIL" && subject.trim()
-                            ? subject.trim()
-                            : undefined,
-                    body: text,
-                });
+                const res = await sendMessage(
+                    {
+                        leadId,
+                        channel,
+                        contactId,
+                        subject:
+                            channel === "EMAIL" && subject.trim()
+                                ? subject.trim()
+                                : undefined,
+                        body: text,
+                    },
+                    save.orgId,
+                );
                 if (!res.ok) {
                     return {
                         ok: false,
@@ -128,7 +131,7 @@ export function MessageComposer({
                     suppressed = true;
                     showWarning("Message not sent. Their consent is revoked.");
                     onDraft(BLANK_MESSAGE);
-                    router.refresh();
+                    void save.saved();
                     return { ok: false, error: "", said: true };
                 }
                 return { ok: true };
@@ -136,7 +139,7 @@ export function MessageComposer({
             sent: "Message sent.",
             onSent: () => {
                 onDraft(BLANK_MESSAGE);
-                router.refresh();
+                void save.saved();
             },
             onBack: () => {
                 if (!suppressed) onReopen();

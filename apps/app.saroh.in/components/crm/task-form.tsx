@@ -13,11 +13,11 @@ import {
 import { Input } from "@saroh/ui/input";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { createTask } from "@/lib/leads/actions";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 
 /**
@@ -59,7 +59,7 @@ export function TaskForm({
     /** The follow-up was saved: close the sheet. */
     onDone: () => void;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -76,17 +76,18 @@ export function TaskForm({
             return;
         }
         const parsed = joinDue(values.dueDate, values.dueTime);
-        const res = await createTask(leadId, {
-            body: values.body,
-            dueAt: parsed.toISOString(),
-        });
+        const res = await createTask(
+            leadId,
+            { body: values.body, dueAt: parsed.toISOString() },
+            save.orgId,
+        );
         if (!res.ok) {
             showError(res.error);
             return;
         }
         showSuccess("Follow-up added.");
         onDone();
-        router.refresh();
+        void save.saved();
     }
 
     return (

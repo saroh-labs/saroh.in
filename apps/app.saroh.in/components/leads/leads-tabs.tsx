@@ -11,7 +11,8 @@ export function LeadsTabs({
     taskCount,
 }: {
     active: "leads" | "follow-ups";
-    leadCount: number;
+    /** Null: not read yet, and left out (never a 0). */
+    leadCount: number | null;
     taskCount: number | null;
 }) {
     return (
@@ -23,7 +24,7 @@ export function LeadsTabs({
                     value: "leads",
                     label: "Leads",
                     href: "/leads",
-                    count: leadCount,
+                    count: leadCount ?? undefined,
                 },
                 {
                     value: "follow-ups",

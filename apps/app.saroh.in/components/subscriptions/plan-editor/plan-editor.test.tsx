@@ -47,6 +47,15 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/subscriptions/actions", () => actions);
 
+// The tab's business and Subscriptions' invalidation (DEC-259).
+const planSave = vi.hoisted(() => ({
+    saved: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+    drafted: vi.fn(),
+}));
+vi.mock("@/lib/subscriptions/use-subscriptions", () => ({
+    useSubscriptionSave: () => ({ orgId: "org_1", ...planSave }),
+}));
+
 // The product's select opens a portal jsdom can't press: a native select
 // stands in, with the same options, placeholder and wiring.
 vi.mock("@saroh/ui/option-select", () => ({
@@ -147,6 +156,8 @@ beforeEach(() => {
     for (const fn of Object.values(actions)) fn.mockReset();
     push.mockReset();
     refresh.mockReset();
+    planSave.saved.mockClear();
+    planSave.drafted.mockClear();
     toast.showSuccess.mockReset();
     toast.showError.mockReset();
     window.history.replaceState(null, "", "/billing/plans/new");
@@ -316,18 +327,27 @@ describe("the Plan Editor", () => {
 
         type(field("Name"), "Monthly");
         await wait(800);
-        expect(actions.createPlanDraft).toHaveBeenCalledWith({
-            name: "Monthly",
-            description: null,
-            price: null,
-            interval: "MONTH",
-            classesPerMonth: null,
-            // Nothing is asked of a business that isn't registered: its
-            // GST goes as it stands, not set.
-            gstRate: null,
-            sacCode: null,
-            gstPriceMode: null,
-        });
+        expect(actions.createPlanDraft).toHaveBeenCalledWith(
+            {
+                name: "Monthly",
+                description: null,
+                price: null,
+                interval: "MONTH",
+                classesPerMonth: null,
+                // Nothing is asked of a business that isn't registered: its
+                // GST goes as it stands, not set.
+                gstRate: null,
+                sacCode: null,
+                gstPriceMode: null,
+            },
+            "org_1",
+        );
+        // The Plans tab and the plan's page are marked stale, nothing read.
+        expect(planSave.drafted).toHaveBeenCalled();
+        // The crumb follows the first save; the page isn't drawn again.
+        expect(
+            document.querySelector('nav[aria-label="Breadcrumb"]')?.textContent,
+        ).toContain("Monthly");
         expect(text()).toContain("Saved as a draft. Nobody can join it yet");
         expect(button("Publish").disabled).toBe(true);
         expect(text()).toContain(
@@ -348,6 +368,7 @@ describe("the Plan Editor", () => {
             "plan_1",
             expect.objectContaining({ price: "1200" }),
             1,
+            "org_1",
         );
 
         actions.publishPlan.mockResolvedValue({
@@ -359,10 +380,13 @@ describe("the Plan Editor", () => {
         });
         click(button("Publish"));
         await wait();
-        expect(actions.publishPlan).toHaveBeenCalledWith("plan_1", 2);
+        expect(actions.publishPlan).toHaveBeenCalledWith("plan_1", 2, "org_1");
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Monthly is open for sign-ups.",
         );
+        // Subscriptions' plans read again, never the page.
+        expect(planSave.saved).toHaveBeenCalledTimes(1);
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it("a live plan's classes from 8 to 12 read as Changes not live, then Publish changes", async () => {
@@ -384,6 +408,7 @@ describe("the Plan Editor", () => {
             "plan_1",
             expect.objectContaining({ classesPerMonth: 12 }),
             4,
+            "org_1",
         );
         expect(text()).toContain("Changes not live");
         expect(text()).toContain(
@@ -403,7 +428,7 @@ describe("the Plan Editor", () => {
         });
         click(button("Publish changes"));
         await wait();
-        expect(actions.publishPlan).toHaveBeenCalledWith("plan_1", 5);
+        expect(actions.publishPlan).toHaveBeenCalledWith("plan_1", 5, "org_1");
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Changes published. The 12 already on it keep what they pay now.",
         );
@@ -549,7 +574,11 @@ describe("the Plan Editor", () => {
         if (!confirm) throw new Error("No confirm");
         click(confirm);
         await wait();
-        expect(actions.discardPlanChanges).toHaveBeenCalledWith("plan_1", 7);
+        expect(actions.discardPlanChanges).toHaveBeenCalledWith(
+            "plan_1",
+            7,
+            "org_1",
+        );
         expect(field("Price").value).toBe("1200");
     });
 
@@ -703,6 +732,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
                 gstPriceMode: null,
             }),
             4,
+            "org_1",
         );
         expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(button("Publish changes").disabled).toBe(false);
@@ -719,7 +749,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
         });
         click(button("Publish changes"));
         await wait();
-        expect(actions.publishPlan).toHaveBeenCalledWith("plan_1", 5);
+        expect(actions.publishPlan).toHaveBeenCalledWith("plan_1", 5, "org_1");
     });
 
     it("says it as an error once the rate box is left with nothing chosen", () => {
@@ -826,6 +856,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
                 gstPriceMode: "ADDED",
             }),
             4,
+            "org_1",
         );
         expect(text()).not.toContain("Choose a GST rate");
     });

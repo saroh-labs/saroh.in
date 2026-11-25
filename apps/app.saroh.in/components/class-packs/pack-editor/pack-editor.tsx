@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { EditorShell } from "@/components/editor-shell/editor-shell";
 import {
     createPackDraft,
@@ -28,6 +30,7 @@ import {
     publishedToast,
     soldKeepNote,
 } from "@/lib/class-packs/pack-editor-words";
+import { useClassPackSave } from "@/lib/class-packs/use-class-packs";
 import type { EditorAdapter } from "@/lib/editor-shell/types";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { NOT_ASKED } from "@/lib/gst/item-words";
@@ -44,17 +47,20 @@ import { ServicesPicker } from "./services-picker";
 /**
  * E14's draft routes, through the Server Actions. What an autosave sends is
  * `packPayload`: a field the API would refuse ("4500.", 5 days) is left out
- * so the rest still saves, and its problem keeps Publish off.
+ * so the rest still saves, and its problem keeps Publish off. Each write
+ * takes the tab's business last (`writeAsOrg`).
  */
-const ADAPTER: EditorAdapter<PackValues> = {
-    create: (values) => createPackDraft(packPayload(values)),
-    saveDraft: (id, values, revision) =>
-        savePackDraft(id, packPayload(values), revision),
-    publish: (id, revision) => publishPack(id, revision),
-    discard: (id, revision) => discardPackChanges(id, revision),
-    remove: (id, revision) => deletePackDraft(id, revision),
-    load: (id) => loadPackDraft(id),
-};
+function packAdapter(orgId: string): EditorAdapter<PackValues> {
+    return {
+        create: (values) => createPackDraft(packPayload(values), orgId),
+        saveDraft: (id, values, revision) =>
+            savePackDraft(id, packPayload(values), revision, orgId),
+        publish: (id, revision) => publishPack(id, revision, orgId),
+        discard: (id, revision) => discardPackChanges(id, revision, orgId),
+        remove: (id, revision) => deletePackDraft(id, revision, orgId),
+        load: (id) => loadPackDraft(id),
+    };
+}
 
 /**
  * The Pack Editor (round-2 E18, Saroh Pack Editor.dc.html) on the shared
@@ -89,23 +95,30 @@ export function PackEditor({
     sold: number | null;
     canEdit: boolean;
 }) {
+    // The editor keeps its own draft; a publish, discard or delete marks
+    // Class packs' reads stale (DEC-259).
+    const save = useClassPackSave();
+    const adapter = useMemo(() => packAdapter(save.orgId), [save.orgId]);
     const keepNote = soldKeepNote(
         initial?.published?.kind ?? emptyValues.kind,
         sold,
     );
     return (
         <EditorShell<PackValues>
-            adapter={ADAPTER}
+            adapter={adapter}
+            saved={save.saved}
             copy={PACK_COPY}
             initial={initial}
             emptyValues={emptyValues}
             canEdit={canEdit}
-            breadcrumb={packCrumbs(
-                initial
-                    ? (initial.published?.name ?? initial.values.name) ||
-                          "Untitled pack"
-                    : "New pack",
-            )}
+            breadcrumb={(r) =>
+                packCrumbs(
+                    r
+                        ? (r.published?.name ?? r.values.name) ||
+                              "Untitled pack"
+                        : "New pack",
+                )
+            }
             titleOf={(values, record) =>
                 values.name.trim() || (record ? "Untitled pack" : "New pack")
             }

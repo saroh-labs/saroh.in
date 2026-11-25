@@ -1,18 +1,12 @@
-import { PacksScreen } from "@/components/class-packs/list/packs-screen";
+import { PacksContainer } from "@/components/class-packs/list/packs-screen";
+import { PackEditorState } from "@/components/class-packs/pack-editor/editor-states";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
-import { cardNotes } from "@/lib/class-packs/pack-card-notes";
-import { owedSummary, packKind, rulesNote } from "@/lib/class-packs/pack-cards";
 import {
-    listPackCards,
-    readBusinessZone,
-    readFreeCancelHours,
-    readMembershipPlans,
-} from "@/lib/class-packs/packs-page";
-import { getSellingTerms, listPurchases } from "@/lib/class-packs/service";
+    canReadPacks,
+    canSellPacks,
+    canWritePacks,
+} from "@/lib/class-packs/access";
 import { readMissingRates } from "@/lib/gst-rates/service";
-import { contactPickerOptions } from "@/lib/invoices/contacts";
-import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
@@ -20,8 +14,14 @@ export const metadata = { title: "Class packs" };
 
 /**
  * Bookings › Packs (round-2 E15): a card per pack, drafts included, with
- * the sell dialog. The packs and their purchases are the page's reads; the
- * booking rule and the memberships are extras that cost only their line.
+ * the sell dialog.
+ *
+ * On React Query (DEC-259), loaded in the browser: the gates (who may
+ * read, change and sell packs) are the page's; the packs, their notes and
+ * the sell dialog's reads are `PacksContainer`'s query
+ * (`/api/class-packs`), drawn into the screen's frame. What is on sale
+ * with no GST rate stays the page's own read, as on Invoices: its sheet
+ * renders the page again when a rate is saved.
  */
 export default async function ClassPacksPage({
     searchParams,
@@ -29,69 +29,22 @@ export default async function ClassPacksPage({
     searchParams: Promise<{ sell?: string }>;
 }) {
     await requireSession();
-    const [packs, purchases, organization, params, modules] = await Promise.all(
-        [
-            listPackCards(),
-            listPurchases(),
-            resolveActiveOrganization(),
-            searchParams,
-            modulesOrUnknown(),
-        ],
-    );
-    const canWrite = canWritePacks(organization);
+    const [organization, params] = await Promise.all([
+        resolveActiveOrganization(),
+        searchParams,
+    ]);
+    if (!canReadPacks(organization)) {
+        return <PackEditorState state="forbidden" retryHref="/class-packs" />;
+    }
     const canSell = canSellPacks(organization);
-    // Plans live under Payments: switched off or rolled out of, the note is
-    // never drawn (DEC-057). Unknown fails open, as the rail does.
-    const paymentsOn =
-        modules?.find((m) => m.key === "PAYMENTS")?.readiness !== "DISABLED";
-    const [contacts, terms, freeCancelHours, memberships, timeZone, rates] =
-        await Promise.all([
-            canSell ? contactPickerOptions() : Promise.resolve([]),
-            getSellingTerms(),
-            readFreeCancelHours(),
-            paymentsOn ? readMembershipPlans() : Promise.resolve(null),
-            readBusinessZone(),
-            // What is on sale with no GST rate; null draws no notice.
-            readMissingRates(),
-        ]);
-    const now = new Date();
+    // What is on sale with no GST rate; null draws no notice.
+    const rates = await readMissingRates();
 
     return (
         <PageContainer width="full">
-            <PacksScreen
-                packs={packs}
-                notes={Object.fromEntries(
-                    packs.map((p) => [
-                        p.id,
-                        cardNotes(
-                            {
-                                id: p.id,
-                                kind: packKind(p),
-                                price: p.price,
-                                currency: p.currency,
-                                // For "bought at an older price": what
-                                // today's price comes to, GST and all.
-                                gst: p.gst,
-                            },
-                            purchases,
-                            now,
-                            timeZone,
-                        ),
-                    ]),
-                )}
-                contacts={contacts}
-                held={purchases.map((p) => ({
-                    contactId: p.contact.id,
-                    packId: p.pack.id,
-                    left: p.left,
-                    standing: p.standing,
-                }))}
-                canWrite={canWrite}
+            <PacksContainer
+                canWrite={canWritePacks(organization)}
                 canSell={canSell}
-                invoicesOnSale={terms.invoicesOnSale}
-                summary={owedSummary(purchases)}
-                rules={rulesNote(freeCancelHours)}
-                memberships={memberships}
                 openSell={canSell && params.sell === "1"}
                 missingRates={rates}
             />

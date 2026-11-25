@@ -1,8 +1,8 @@
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 
+import type { ShownMessage } from "@/lib/leads/queries";
 import { messageStatusWords } from "@/lib/messages/message-status";
-import type { LeadMessage } from "@/lib/messages/service";
 import { EmptyState } from "@saroh/ui/data-state";
 
 /**
@@ -29,7 +29,7 @@ function isPending(status: string): boolean {
  * (no delivery); otherwise the latest delivery attempt's status (deliveries come
  * asc by createdAt), falling back to the message status before any delivery row.
  */
-function displayStatus(message: LeadMessage): { status: string; at: string } {
+function displayStatus(message: ShownMessage): { status: string; at: string } {
     if (message.status === "SUPPRESSED") {
         return { status: "SUPPRESSED", at: message.createdAt };
     }
@@ -40,7 +40,7 @@ function displayStatus(message: LeadMessage): { status: string; at: string } {
     return { status: message.status, at: message.createdAt };
 }
 
-export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
+export function MessageHistory({ messages }: { messages: ShownMessage[] }) {
     if (messages.length === 0) {
         return <EmptyState size="inline" title="No messages yet." />;
     }
