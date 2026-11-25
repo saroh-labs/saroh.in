@@ -15,6 +15,8 @@ const h = vi.hoisted(
         moment: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
         news: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
         invoiced: ReturnType<typeof vi.fn<() => Promise<boolean>>>;
+        settings: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
+        modules: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
     } => ({
         active: "org_a",
         business: null,
@@ -22,6 +24,8 @@ const h = vi.hoisted(
         moment: vi.fn(),
         news: vi.fn(),
         invoiced: vi.fn(),
+        settings: vi.fn(() => Promise.resolve({ id: "org_a" })),
+        modules: vi.fn(() => Promise.resolve([])),
     }),
 );
 vi.mock("@/lib/api/http", () => ({
@@ -33,7 +37,7 @@ vi.mock("@/lib/organizations/service", () => ({
     activeOrganizationOnce: () => Promise.resolve(h.business),
 }));
 vi.mock("@/lib/organizations/settings-service", () => ({
-    getOrganizationSettings: () => Promise.resolve({ id: "org_a" }),
+    getOrganizationSettings: () => h.settings(),
 }));
 vi.mock("@/lib/settings/ready-service", () => ({
     loadReadyChecklist: () => Promise.resolve({ steps: [] }),
@@ -54,7 +58,7 @@ vi.mock("@/lib/invoices/service", () => ({
     hasAnyInvoice: () => h.invoiced(),
 }));
 vi.mock("@/lib/modules/service", () => ({
-    listModules: () => Promise.resolve([]),
+    listModules: () => h.modules(),
 }));
 vi.mock("@/lib/sites/share-links-read", () => ({
     readWebAddressLinks: () => Promise.resolve(null),
@@ -245,5 +249,22 @@ describe("/api/home/setup", () => {
             },
             () => setupGET(readRequest("/api/home/setup", { orgId: "org_a" })),
         );
+    });
+
+    it("reads the modules beside the settings, not after; unread settings leave setup off", async () => {
+        as(OWNER)();
+        let settle!: (v: unknown) => void;
+        h.settings.mockReturnValueOnce(new Promise((r) => (settle = r)));
+        h.modules.mockClear();
+        const pending = setupGET(
+            readRequest("/api/home/setup", { orgId: "org_a" }),
+        );
+        await vi.waitFor(() => expect(h.modules).toHaveBeenCalled());
+        settle(null);
+        const log = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        expect((await pending).status).toBe(503);
+        log.mockRestore();
     });
 });
