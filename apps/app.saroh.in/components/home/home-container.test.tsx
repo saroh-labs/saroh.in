@@ -20,6 +20,7 @@ vi.mock("@/components/home/dashboard/home-dashboard", () => ({
 }));
 
 import { HomeContainer } from "@/components/home/home-container";
+import { homeNewFor } from "@/components/shared/navigation/quick-actions";
 import { renderWithQuery } from "@/lib/query/test-utils";
 
 const HOME = {
@@ -89,6 +90,53 @@ describe("Home before its read", () => {
         expect(host.querySelector('[data-slot="figure-loading"]')).toBeNull();
         expect(host.textContent).toContain("the dashboard");
         expect(host.querySelector("h1")?.textContent).toContain("Hello, Mohit");
+        unmount();
+    });
+
+    it("lists the role's New rows on first paint and keeps the menu open when Home lands", async () => {
+        // An Owner on a business that sells and books: from the page's gate
+        // props, never from Home's read (empty cache, read held).
+        const menu = homeNewFor({
+            moduleKeys: ["COMMERCE", "APPOINTMENTS", "PAYMENTS"],
+            actions: ["order:create", "booking:write", "invoice:write"],
+        });
+        const { host, unmount } = renderWithQuery(
+            <HomeContainer
+                name="Mohit Mehta"
+                businessName="Northwind"
+                kind="BUSINESS"
+                newMenu={menu}
+                modules={null}
+                setupShown={false}
+                insights={false}
+            />,
+        );
+        const labels = () =>
+            Array.from(
+                document.body.querySelectorAll("[role=menu] [role=menuitem]"),
+            ).map(
+                (row) => row.querySelector("span.font-semibold")?.textContent,
+            );
+        const trigger = Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent.trim() === "New",
+        );
+        if (!trigger) throw new Error("No New button");
+        trigger.focus();
+        await act(async () => {
+            trigger.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+            );
+            await new Promise((r) => setTimeout(r, 20));
+        });
+        const every = ["Take an order", "Book someone", "Send an invoice"];
+        expect(labels()).toEqual(every);
+
+        // Home lands while the menu is open: the header is the same one, so
+        // the menu stays open with its rows (it closed, empty, on CI).
+        release();
+        await tick(50);
+        expect(host.textContent).toContain("the dashboard");
+        expect(labels()).toEqual(every);
         unmount();
     });
 });
