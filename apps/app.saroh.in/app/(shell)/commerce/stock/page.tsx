@@ -11,7 +11,7 @@ import { STOCK_LISTS } from "@/lib/stock/list-query";
 import { getStockTracking } from "@/lib/stock/service";
 import { listStorefronts } from "@/lib/stores/storefronts";
 
-import Loading from "./loading";
+import { canStockProducts } from "@/lib/products/access";
 
 export const metadata = { title: "Stock" };
 
@@ -40,8 +40,9 @@ function roleWords(org: { role: string; roleLabel?: string | null }) {
  * On React Query (DEC-259), loaded in the browser: the gates (who may read
  * stock, Track stock on) and the storefronts are the page's; the levels,
  * the checks and, on its tab, the log as the address asks (`stockView`)
- * are `StockContainer`'s queries, read from the browser behind the route's
- * loader, and every later one in place.
+ * are `StockContainer`'s queries, read from the browser into the screen's
+ * frame, drawn at once with its rows as skeletons, and every later one in
+ * place.
  */
 export default async function StockPage() {
     await requireSession();
@@ -87,7 +88,7 @@ export default async function StockPage() {
 
     return (
         <StockContainer
-            skeleton={<Loading />}
+            canWrite={canStockProducts(organization)}
             business={organization.name}
             storefronts={storefronts}
             sizes={sizes}

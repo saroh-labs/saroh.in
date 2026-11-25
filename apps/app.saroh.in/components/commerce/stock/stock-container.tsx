@@ -7,7 +7,6 @@ import {
 } from "@saroh/ui/lib/paging";
 import { PageContainer } from "@saroh/ui/page-container";
 import { useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ScreenPending } from "@/components/shared/page/screen-pending";
@@ -44,8 +43,10 @@ function rememberedSizes(server: Sizes): Sizes {
 /**
  * Sell › Stock on React Query (DEC-259): the same `StockScreen`, its
  * levels, checks and (on its tab) log each a query keyed on what the
- * address asks (`stockView`), read in the browser behind the route's
- * loader (`skeleton`) until the open tab's lists are here. A tab, a
+ * address asks (`stockView`), read in the browser. The frame (header and
+ * its buttons, tabs, each list's toolbar) is drawn at once and works; the
+ * rows are skeletons until the open tab's list is here (owner, 25 Nov),
+ * and the buttons follow the page's `canWrite` until the levels say. A tab, a
  * filter or a page changes the address in place; the last rows stay,
  * greyed, until the new ones land, and the Log tab opens once its first
  * page is here. Levels failing fails the page; the log and the checks
@@ -55,10 +56,10 @@ export function StockContainer({
     business,
     storefronts,
     sizes,
-    skeleton,
+    canWrite,
 }: {
-    /** The route's loader, until the first read. */
-    skeleton: ReactNode;
+    /** Who may change stock, from the page's gates, until the levels say. */
+    canWrite: boolean;
     business: string | null;
     /** The business's open storefronts, first made first. */
     storefronts: { id: string; name: string }[];
@@ -112,19 +113,12 @@ export function StockContainer({
 
     // Levels is the screen's own read: it failing is the page failing.
     if (levels.isError && !levels.data) throw levels.error;
-    // Opened on the Log: it is waited for too, never said "failed" first.
-    if (
-        !levels.data ||
-        (!checks.data && !checks.isError) ||
-        (tab === "log" && !logReady)
-    ) {
-        return skeleton;
-    }
-
+    // Before the first read the rows are skeletons, not greyed rows.
     const pending =
-        levels.isPlaceholderData ||
-        checks.isPlaceholderData ||
-        (onLog && (!logReady || log.isPlaceholderData));
+        !!levels.data &&
+        (levels.isPlaceholderData ||
+            checks.isPlaceholderData ||
+            (onLog && (!logReady || log.isPlaceholderData)));
 
     return (
         <PageContainer width="full">
@@ -134,11 +128,15 @@ export function StockContainer({
                     tab={tab}
                     show={address.show}
                     q={address.q}
-                    levels={levels.data}
-                    needsYou={levels.data.needsYou ?? 0}
+                    levels={levels.data ?? null}
+                    needsYou={levels.data ? (levels.data.needsYou ?? 0) : null}
                     storefronts={storefronts}
-                    checks={checks.data ?? "failed"}
-                    log={tab === "log" ? (log.data ?? "failed") : null}
+                    checks={checks.data ?? (checks.isError ? "failed" : null)}
+                    log={
+                        tab === "log"
+                            ? (log.data ?? (log.isError ? "failed" : null))
+                            : null
+                    }
                     logFilter={{
                         kind: logKindId(address.kind),
                         store: address.store,
@@ -148,7 +146,7 @@ export function StockContainer({
                         to: address.to,
                     }}
                     products={log.data?.products ?? []}
-                    canWrite={levels.data.canWrite}
+                    canWrite={levels.data?.canWrite ?? canWrite}
                     pages={address.pages}
                     reload={{
                         log: () => void log.refetch(),
