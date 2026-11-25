@@ -27,18 +27,12 @@ describe("week words", () => {
             weekHelp({
                 lanes: ["Meera Iyer", "Arjun Rao"],
                 canBook: true,
-                phone: false,
             }),
         ).toBe(
             "Each day has a lane per person: Meera, Arjun. The bar under each day shows how full it is. Click a day to open it, a free time to book or block it.",
         );
-        expect(weekHelp({ lanes: [], canBook: false, phone: false })).toBe(
+        expect(weekHelp({ lanes: [], canBook: false })).toBe(
             "The bar under each day shows how full it is. Click a day to open it.",
-        );
-        expect(
-            weekHelp({ lanes: [], canBook: true, phone: true, free: false }),
-        ).toBe(
-            "The bar on each day shows how full it is. Tap a day to see its bookings. Swipe left or right for the week before or after.",
         );
     });
 });

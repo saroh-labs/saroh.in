@@ -161,7 +161,6 @@ export function WeekView({
                 {weekHelp({
                     lanes: split ? lanes.map((l) => l.name) : [],
                     canBook,
-                    phone: false,
                 })}
             </p>
         </div>

@@ -34,25 +34,17 @@ export function fullWords(share: number): string {
 }
 
 /**
- * The line under the week: the lanes by name on Everyone, what the bar
- * means, and what a click or a tap does (a role that only reads the
- * calendar has no free time to book).
+ * The line under the desk's week: the lanes by name on Everyone, what the
+ * bar means, and what a click does (a role that only reads the calendar
+ * has no free time to book). A phone has none (critique, 25 Nov).
  */
 export function weekHelp({
     lanes,
     canBook,
-    phone,
-    free = true,
 }: {
     lanes: string[];
     canBook: boolean;
-    phone: boolean;
-    /** The hours are known, so free times are shown. */
-    free?: boolean;
 }): string {
-    if (phone) {
-        return `The bar on each day shows how full it is. Tap a day to see its bookings${free ? " and free times" : ""}. Swipe left or right for the week before or after.`;
-    }
     const each = lanes.length
         ? `Each day has a lane per person: ${lanes.map(firstName).join(", ")}. `
         : "";

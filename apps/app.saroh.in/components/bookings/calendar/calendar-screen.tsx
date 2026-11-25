@@ -527,7 +527,6 @@ export function CalendarScreen({
                                     canOpenHours={can.hours}
                                     offersFree={offersFree}
                                     selected={peek}
-                                    onPick={(d) => go("week", d)}
                                     onBlock={(b) => setPeek(b.key)}
                                     onFree={bookGap}
                                     onOpenDay={openDay}

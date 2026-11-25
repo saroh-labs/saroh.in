@@ -656,9 +656,8 @@ describe("the header on a phone", () => {
         click(button(/Change the day or the view$/));
         expect(sheet()).not.toBeNull();
         expect(popover()).toBeNull();
-        expect(sheet()?.textContent).toContain(
-            "Swipe the calendar left or right to go a day back or on.",
-        );
+        expect(sheet()?.textContent).not.toContain("Swipe");
+        expect(sheet()?.getAttribute("data-snap")).toBe("half");
         expect(sheet()?.textContent).toContain("on this phone.");
         // The week strip's days are letters on a phone.
         expect(
@@ -720,6 +719,8 @@ describe("the header on a phone", () => {
             "26 Oct to 1 NovWeek",
         );
         expect(host.querySelector("[data-today-button]")).not.toBeNull();
+        // Week draws the same strip as Day: one style for both.
+        expect(host.querySelectorAll("[data-week-strip] a")).toHaveLength(7);
     });
 
     it("the ⋯ sheet opens half way, and its colours say Tap", () => {

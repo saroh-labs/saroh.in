@@ -236,13 +236,6 @@ const heading = (label: string) => {
     if (!el) throw new Error(`no heading ${label}`);
     return el;
 };
-const dayCell = (label: string) => {
-    const el = phone().querySelector<HTMLButtonElement>(
-        `[role="radio"][aria-label^="${label}"]`,
-    );
-    if (!el) throw new Error(`no day ${label}`);
-    return el;
-};
 const byText = (scope: HTMLElement, text: string) =>
     Array.from(scope.querySelectorAll<HTMLButtonElement>("button")).find(
         (b) => b.textContent.trim() === text,
@@ -396,37 +389,10 @@ describe("the week on the desk", () => {
 });
 
 describe("the week on a phone", () => {
-    it("shows Monday to Sunday with counts, today picked", () => {
-        draw();
-        const cells = phone().querySelectorAll('[role="radio"]');
-        expect(cells).toHaveLength(7);
-        expect(
-            phone()
-                .querySelector('[role="radiogroup"]')
-                ?.getAttribute("aria-label"),
-        ).toBe("Pick a day of the week");
-        const mon = dayCell("Mon 19 Oct");
-        expect(mon.getAttribute("aria-checked")).toBe("true");
-        expect(mon.getAttribute("aria-label")).toBe(
-            "Mon 19 Oct, today, 3 sessions · 3 people",
-        );
-        expect(mon.textContent).toContain("Today");
-        expect(dayCell("Sun 25 Oct").getAttribute("aria-label")).toBe(
-            "Sun 25 Oct, closed",
-        );
-        expect(dayCell("Sun 25 Oct").textContent).toContain("–");
-        // The bar says how full: Monday's is taller than Tuesday's.
-        const bar = (label: string) =>
-            Number(
-                dayCell(label)
-                    .querySelector("[data-bar]")
-                    ?.getAttribute("data-bar"),
-            );
-        expect(bar("Mon 19 Oct")).toBeGreaterThan(bar("Tue 20 Oct"));
-    });
-
     it("lists the picked day: bookings and free times in time order", () => {
         draw();
+        // The strip is the header's, the one Day has: no second strip.
+        expect(phone().querySelector('[role="radiogroup"]')).toBeNull();
         expect(phone().querySelector("h2")?.textContent).toBe(
             "Mon 19 Oct · today",
         );
@@ -443,46 +409,10 @@ describe("the week on a phone", () => {
         expect(rows[2]).toContain("Vikram Nair");
     });
 
-    it("a tap picks a day at once, its count agrees, and the address follows", () => {
-        draw();
-        const wed = dayCell("Wed 21 Oct");
-        act(() => wed.click());
-        expect(wed.getAttribute("aria-checked")).toBe("true");
-        expect(dayCell("Mon 19 Oct").getAttribute("aria-checked")).toBe(
-            "false",
-        );
+    it("shows the day the address picks, and its count agrees", () => {
+        draw({ date: WED });
         expect(phone().querySelector("h2")?.textContent).toBe("Wed 21 Oct");
-        expect(wed.textContent).toMatch(/^1/);
         expect(phone().textContent).toContain("1 session · 1 person · ");
-        expect(push).toHaveBeenCalledWith(
-            `/bookings?date=${WED}&layout=week&person=all`,
-            { scroll: false },
-        );
-    });
-
-    it("moves along the strip with the arrow keys", () => {
-        draw();
-        const mon = dayCell("Mon 19 Oct");
-        expect(mon.tabIndex).toBe(0);
-        expect(dayCell("Tue 20 Oct").tabIndex).toBe(-1);
-        mon.focus();
-        act(() => {
-            mon.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                    key: "ArrowRight",
-                    bubbles: true,
-                }),
-            );
-        });
-        const tue = dayCell("Tue 20 Oct");
-        expect(tue.getAttribute("aria-checked")).toBe("true");
-        expect(document.activeElement).toBe(tue);
-        act(() => {
-            tue.dispatchEvent(
-                new KeyboardEvent("keydown", { key: "End", bubbles: true }),
-            );
-        });
-        expect(dayCell("Sun 25 Oct").getAttribute("aria-checked")).toBe("true");
     });
 
     it("a day with no bookings but free time lists only free times", () => {
@@ -533,11 +463,10 @@ describe("the week on a phone", () => {
             "1 session · 1 person · 1 free time",
         );
         expect(phone().textContent).not.toContain("Ananya Desai");
-        expect(dayCell("Mon 19 Oct").getAttribute("aria-label")).toBe(
-            "Mon 19 Oct, today, 1 session · 1 person",
-        );
+        act(() => root.unmount());
+        root = createRoot(host);
         // Opening hours on Sunday is for Arjun, who is picked.
-        act(() => dayCell("Sun 25 Oct").click());
+        draw({ person: "arjun", date: SUN });
         act(() => byText(phone(), "Open hours on this day")?.click());
         expect(dialogText()).toContain(
             `Open hours Arjun Rao on ${SUN} from 600`,
@@ -552,17 +481,16 @@ describe("the week on a phone", () => {
             expect(f.querySelector("button")).toBeNull();
             expect(f.textContent).not.toContain("Book");
         });
-        act(() => dayCell("Sun 25 Oct").click());
+        act(() => root.unmount());
+        root = createRoot(host);
+        draw({ can: { book: false, hours: false }, date: SUN });
         expect(phone().textContent).toContain("Closed on Sundays");
         expect(byText(phone(), "Open hours on this day")).toBeUndefined();
         expect(phone().textContent).not.toContain("Open some hours");
     });
 
-    it("an empty week: zeros on the strip, the day's free times below", () => {
+    it("an empty week: the day's free times", () => {
         draw({ calendar: calendarOf([]) });
-        for (const label of ["Mon 19 Oct", "Wed 21 Oct", "Sat 24 Oct"]) {
-            expect(dayCell(label).textContent).toMatch(/^0/);
-        }
         expect(phone().textContent).toContain("Nothing booked · 3 free times");
     });
 
@@ -572,20 +500,10 @@ describe("the week on a phone", () => {
         expect(phone().textContent).not.toContain("free time");
         expect(phone().textContent).not.toContain("Closed on");
         expect(phone().textContent).toContain("Nothing booked on Sun 25 Oct.");
-        // Bars are measured against the busiest day instead.
-        const bar = (label: string) =>
-            Number(
-                dayCell(label)
-                    .querySelector("[data-bar]")
-                    ?.getAttribute("data-bar"),
-            );
-        expect(bar("Mon 19 Oct")).toBe(40);
     });
 
-    it("says what the bar means and that a swipe steps the week", () => {
+    it("has no help line to swipe (critique, 25 Nov)", () => {
         draw();
-        expect(phone().textContent).toContain(
-            "The bar on each day shows how full it is. Tap a day to see its bookings and free times. Swipe left or right for the week before or after.",
-        );
+        expect(phone().textContent).not.toContain("Swipe");
     });
 });
