@@ -20,6 +20,8 @@ import type {
 
 const push = vi.fn();
 const refresh = vi.fn();
+// The editor's domain reads again after Publish, Discard and Delete draft.
+const saved = vi.fn<() => Promise<void>>(() => Promise.resolve());
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh, replace: vi.fn() }),
     usePathname: () => "/billing/plans/new",
@@ -87,6 +89,7 @@ beforeEach(() => {
     adapter = adapterMock();
     push.mockReset();
     refresh.mockReset();
+    saved.mockClear();
     toast.showSuccess.mockReset();
     toast.showError.mockReset();
     window.history.replaceState(null, "", "/billing/plans/new");
@@ -102,6 +105,7 @@ afterEach(() => {
 function render(initial: EditorRecord<Plan> | null) {
     const props: EditorShellProps<Plan> = {
         adapter,
+        saved,
         copy: {
             noun: "plan",
             liveLabel: "Open",
@@ -115,7 +119,7 @@ function render(initial: EditorRecord<Plan> | null) {
         initial,
         emptyValues: EMPTY,
         canEdit: true,
-        breadcrumb: [
+        breadcrumb: () => [
             // A plain link: the guard catches any <a>, Next's or not.
             // eslint-disable-next-line @next/next/no-html-link-for-pages
             <a key="plans" href="/billing/subscriptions?tab=plans">
@@ -479,7 +483,8 @@ describe("the editor shell", () => {
         await wait();
         expect(adapter.publish).toHaveBeenCalledWith("pl-1", 5);
         expect(toast.showSuccess).toHaveBeenCalledWith("Changes published.");
-        expect(refresh).toHaveBeenCalled();
+        expect(saved).toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
         expect(status()).toBe("Open to new sign-ups · no changes");
         expect(host.textContent).not.toContain("When you publish");
     });
@@ -551,6 +556,7 @@ describe("the editor shell", () => {
             root.render(
                 <EditorShell<Plan>
                     adapter={adapter}
+                    saved={saved}
                     copy={{
                         noun: "plan",
                         liveLabel: "Open",

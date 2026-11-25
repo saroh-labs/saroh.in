@@ -111,12 +111,14 @@ export function PackEditor({
             initial={initial}
             emptyValues={emptyValues}
             canEdit={canEdit}
-            breadcrumb={packCrumbs(
-                initial
-                    ? (initial.published?.name ?? initial.values.name) ||
-                          "Untitled pack"
-                    : "New pack",
-            )}
+            breadcrumb={(r) =>
+                packCrumbs(
+                    r
+                        ? (r.published?.name ?? r.values.name) ||
+                              "Untitled pack"
+                        : "New pack",
+                )
+            }
             titleOf={(values, record) =>
                 values.name.trim() || (record ? "Untitled pack" : "New pack")
             }

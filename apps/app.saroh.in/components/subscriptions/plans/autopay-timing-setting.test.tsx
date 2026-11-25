@@ -379,9 +379,11 @@ describe("a plan's own choice", () => {
             select.value = "ON_RENEWAL_DATE";
             select.dispatchEvent(new Event("change", { bubbles: true }));
         });
+        // Drawn outside the plan page's provider here: no business named.
         expect(actions.setPlanChargeTiming).toHaveBeenCalledWith(
             "plan_1",
             "ON_RENEWAL_DATE",
+            undefined,
         );
         await settle(() => {
             select.value = "BUSINESS";
@@ -390,6 +392,7 @@ describe("a plan's own choice", () => {
         expect(actions.setPlanChargeTiming).toHaveBeenLastCalledWith(
             "plan_1",
             null,
+            undefined,
         );
     });
 });

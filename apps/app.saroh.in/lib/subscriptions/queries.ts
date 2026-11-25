@@ -4,9 +4,12 @@ import { defineRead } from "@/lib/query/define-read";
 import type { DomainKey } from "@/lib/query/keys";
 import { domainKey } from "@/lib/query/keys";
 
+import type { CappedList } from "@/lib/lists/capped";
+
 import type {
     Optional,
     Plan,
+    PlanEventsPage,
     Renewals,
     SubscriberCard,
     Subscription,
@@ -52,6 +55,33 @@ export const subscriptionsListRead = defineRead<SubscriptionsListView>()({
 });
 
 const ID = z.string().regex(/^[\w-]{1,64}$/);
+
+/** Every plan's own page: what a plan's save reads again. */
+export const planKeys = (orgId: string): DomainKey =>
+    domainKey("subscriptions", orgId, "plan");
+
+/** One plan's page (D4): the plan, who is on it and its history's first page. */
+export interface PlanView {
+    plan: Plan;
+    /** Its newest and every live subscription; a failed read is its tab's. */
+    subscriptions: Optional<CappedList<Subscription>>;
+    events: Optional<PlanEventsPage>;
+    /** The business sells classes (Appointments on, default 31). */
+    withClasses: boolean;
+}
+
+/**
+ * Records, not settings: who is on a plan changes from outside (a customer
+ * subscribes on the site), so it can't wait for the plan's own saves.
+ */
+export const planRead = defineRead<PlanView>()({
+    key: (orgId, { planId }) =>
+        domainKey("subscriptions", orgId, "plan", planId),
+    route: { path: "/api/plans/[planId]", params: { planId: ID } },
+    tier: "records",
+});
+
+export type PlanAsk = Parameters<typeof planRead.options>[1];
 
 /** One subscription as its page draws it. */
 export interface SubscriptionView {

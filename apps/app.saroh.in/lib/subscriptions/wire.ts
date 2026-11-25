@@ -1,6 +1,7 @@
 import type {
     Optional,
     Plan,
+    PlanEventsPage,
     Renewals,
     Subscription,
     SubscriptionCharge,
@@ -193,6 +194,21 @@ const EVENTS = {
     earlierUnrecorded: ANY,
 } as const;
 
+const PLAN_EVENTS = {
+    events: [
+        {
+            id: ANY,
+            kind: ANY,
+            // `{ field: [before, after] }`: prices and classes.
+            changes: ANY,
+            actor: { kind: ANY, userId: ANY, name: ANY },
+            createdAt: ANY,
+        },
+    ],
+    nextCursor: ANY,
+    earlierUnrecorded: ANY,
+} as const;
+
 const RENEWALS = { lastCheckedAt: ANY, nextCheckAt: ANY, issuedToday: ANY };
 
 export const renewalsWire = (r: Renewals | null) =>
@@ -200,6 +216,8 @@ export const renewalsWire = (r: Renewals | null) =>
 export const subscriptionWire = (s: Subscription) =>
     pick(s, SUBSCRIPTION) as Subscription;
 export const planWire = (p: Plan) => pick(p, PLAN) as Plan;
+export const planEventsWire = (page: PlanEventsPage) =>
+    pick(page, PLAN_EVENTS) as PlanEventsPage;
 export const chargeWire = (c: SubscriptionCharge) =>
     pick(c, CHARGE) as SubscriptionCharge;
 export const eventsWire = (page: SubscriptionEventsPage) =>

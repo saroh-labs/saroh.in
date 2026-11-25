@@ -1,5 +1,5 @@
 /**
- * Subscriptions' read routes (DEC-259): the list, one subscription, the
+ * Subscriptions' read routes (DEC-259): the list, one subscription, one plan, the
  * settings for every plan and who can be subscribed. Each has the section's
  * gate (Payments on, `subscription:read`; the picker `subscription:write`),
  * answers what its service gives as JSON, and never passes on a provider's
@@ -20,6 +20,7 @@ interface Hoisted {
     events: unknown;
     plans: unknown[];
     charges: unknown[];
+    planEvents: unknown;
 }
 const h = vi.hoisted((): Hoisted => ({
     active: "org_a",
@@ -30,6 +31,7 @@ const h = vi.hoisted((): Hoisted => ({
     events: null,
     plans: [],
     charges: [],
+    planEvents: null,
 }));
 vi.mock("@/lib/api/http", () => ({
     ACTIVE_ORG_COOKIE: "active_org",
@@ -40,6 +42,8 @@ vi.mock("@/lib/organizations/service", () => ({
 }));
 vi.mock("@/lib/modules/guard", () => ({
     moduleAccess: () => Promise.resolve({ state: h.module }),
+    modulesOrUnknown: () =>
+        Promise.resolve([{ key: "APPOINTMENTS", readiness: "LIVE" }]),
 }));
 vi.mock("@/lib/invoices/contacts", () => ({
     contactPickerOptions: () =>
@@ -63,6 +67,10 @@ vi.mock("@/lib/subscriptions/service", () => {
         getSubscription: (id: string) =>
             Promise.resolve(id === "sub_1" ? h.sub : null),
         listPlans: () => Promise.resolve(h.plans),
+        getPlan: (id: string) =>
+            Promise.resolve(id === "pl_1" ? h.plans[0] : null),
+        listPlanSubscriptions: () => ok({ rows: h.subs, truncated: false }),
+        listPlanEvents: () => ok(h.planEvents),
         listCharges: () => ok(h.charges),
         listSubscriptionEvents: () => ok(h.events),
         getSubscriberCard: () =>
@@ -84,12 +92,14 @@ import {
     readRequest,
 } from "@/lib/query/test-utils";
 import {
+    planServer,
     subscriptionContactsServer,
     subscriptionServer,
     subscriptionSettingsServer,
     subscriptionsListServer,
 } from "@/lib/subscriptions/access-server";
 
+import { GET as PLAN } from "../plans/[planId]/route";
 import { GET as ONE } from "./[subscriptionId]/route";
 import { GET as CONTACTS } from "./contacts/route";
 import { GET, POST } from "./route";
@@ -182,6 +192,23 @@ const LEAKY_PLAN = {
     status: "ACTIVE",
     providerPlanId: "plan_RZP1",
 };
+const LEAKY_PLAN_EVENTS = {
+    events: [
+        {
+            id: "pev_1",
+            kind: "PRICE_CHANGED",
+            changes: {
+                price: ["800.00", "900.00"],
+                providerPlanId: ["a", "plan_RZP2"],
+            },
+            actor: { kind: "TEAM", userId: "u_1", name: "Demo Owner" },
+            providerRef: "plan_RZP3",
+            createdAt: "2026-11-01T00:00:00.000Z",
+        },
+    ],
+    nextCursor: null,
+    earlierUnrecorded: false,
+};
 const SECRETS = /RZP|rzp_secret/;
 
 const as = (who: Business) => () => {
@@ -193,6 +220,7 @@ const as = (who: Business) => () => {
     h.plans = [LEAKY_PLAN];
     h.charges = [LEAKY_CHARGE];
     h.events = LEAKY_EVENTS;
+    h.planEvents = LEAKY_PLAN_EVENTS;
 };
 
 const req = (path: string) => readRequest(path, { orgId: "org_a" });
@@ -200,6 +228,10 @@ const list = () => GET(req("/api/subscriptions"));
 const one = (id = "sub_1") =>
     ONE(req(`/api/subscriptions/${id}`), {
         params: Promise.resolve({ subscriptionId: id }),
+    });
+const plan = (id = "pl_1") =>
+    PLAN(req(`/api/plans/${id}`), {
+        params: Promise.resolve({ planId: id }),
     });
 const settings = () => SETTINGS(req("/api/subscriptions/settings"));
 const contacts = () => CONTACTS(req("/api/subscriptions/contacts"));
@@ -324,5 +356,37 @@ describe("/api/subscriptions/contacts", () => {
             },
             contacts,
         );
+    });
+});
+
+describe("/api/plans/[planId]", () => {
+    it("answers what its service gives", async () => {
+        await expectReadContract(planServer, () => plan(), "org_a", {
+            planId: "pl_1",
+        });
+    });
+
+    it("never sends a provider's reference: the plan, who is on it, its history", async () => {
+        const body = JSON.stringify(await (await plan()).json());
+        expect(body).not.toMatch(SECRETS);
+        expect(body).toContain("Loaf plan");
+        expect(body).toContain("Asha Rao");
+        expect(body).toContain('"price":["800.00","900.00"]');
+        expect(body).toContain('"withClasses":true');
+        const client = makeTestClient();
+        await prefetchRead(client, planServer, "org_a", { planId: "pl_1" });
+        expect(
+            JSON.stringify(client.getQueryCache().getAll()[0]?.state.data),
+        ).not.toMatch(SECRETS);
+    });
+
+    it("another business's (or a missing) plan is a 404", async () => {
+        const res = await plan("pl_of_b");
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ code: "not_found" });
+    });
+
+    it("is the section's gate", async () => {
+        await expectAuthzMatrix(READ_GATE, () => plan());
     });
 });

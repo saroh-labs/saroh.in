@@ -2,18 +2,22 @@ import "server-only";
 
 import { mayRead } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
-import { moduleAccess } from "@/lib/modules/guard";
+import { moduleAccess, modulesOrUnknown } from "@/lib/modules/guard";
 import { permits } from "@/lib/organizations/permits";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import type { ServerRead } from "@/lib/query/route";
 
+import { plansShowClasses } from "./plan-cards";
 import type {
+    PlanAsk,
+    PlanView,
     SubscriptionAsk,
     SubscriptionContact,
     SubscriptionsListView,
     SubscriptionView,
 } from "./queries";
 import {
+    planRead,
     subscriptionContactsRead,
     subscriptionRead,
     subscriptionSettingsRead,
@@ -21,14 +25,17 @@ import {
 } from "./queries";
 import type { SubscriptionSettings } from "./service";
 import {
+    getPlan,
     getRenewals,
     getSubscriberCard,
     getSubscription,
     getSubscriptionSettings,
     listCharges,
     listChargesBySubscription,
+    listPlanEvents,
     listPlans,
     listPlansOptional,
+    listPlanSubscriptions,
     listSubscriptionEvents,
     listSubscriptions,
 } from "./service";
@@ -36,6 +43,7 @@ import {
     chargeWire,
     eventsWire,
     optionalWire,
+    planEventsWire,
     planWire,
     renewalsWire,
     subscriptionWire,
@@ -110,6 +118,36 @@ export async function readSubscriptionView({
     };
 }
 
+/**
+ * One plan's page (D4); null (a 404): missing, or another business's. Who
+ * is on it and its history each fail on their own tab.
+ */
+export async function readPlanView({
+    planId,
+}: PlanAsk): Promise<PlanView | null> {
+    const plan = await getPlan(planId);
+    if (!plan) return null;
+    const [subscriptions, events, modules] = await Promise.all([
+        listPlanSubscriptions(plan.id),
+        listPlanEvents(plan.id),
+        modulesOrUnknown(),
+    ]);
+    const appointments = modules
+        ? modules.some(
+              (m) => m.key === "APPOINTMENTS" && m.readiness !== "DISABLED",
+          )
+        : null;
+    return {
+        plan: planWire(plan),
+        subscriptions: optionalWire(subscriptions, (c) => ({
+            ...c,
+            rows: c.rows.map(subscriptionWire),
+        })),
+        events: optionalWire(events, planEventsWire),
+        withClasses: plansShowClasses(appointments, [plan]),
+    };
+}
+
 export async function readSubscriptionSettings(): Promise<{
     settings: SubscriptionSettings | null;
 }> {
@@ -123,6 +161,11 @@ export const subscriptionsListServer: ServerRead<
 
 export const subscriptionServer: ServerRead<SubscriptionAsk, SubscriptionView> =
     { read: subscriptionRead, service: readSubscriptionView };
+
+export const planServer: ServerRead<PlanAsk, PlanView> = {
+    read: planRead,
+    service: readPlanView,
+};
 
 export const subscriptionSettingsServer: ServerRead<
     Record<string, never>,

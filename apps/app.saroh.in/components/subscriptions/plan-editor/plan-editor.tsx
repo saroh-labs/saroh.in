@@ -34,6 +34,7 @@ import {
 } from "@/lib/subscriptions/plan-editor";
 import { planEditorAdapter } from "@/lib/subscriptions/plan-editor-adapter";
 import type { RenewalChange } from "@/lib/subscriptions/renewal-change";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 
 import { PlanAside } from "./at-a-glance";
 import { ClassesSection } from "./classes-section";
@@ -126,14 +127,21 @@ export function PlanEditor({
     const [renewal, setRenewal] = useState<RenewalChange | null>(
         () => initial?.renewalChange ?? null,
     );
+    // Saves as the tab's business; Publish, Discard and Delete draft read
+    // Subscriptions' plans again, an autosave marks them stale (DEC-259).
+    const save = useSubscriptionSave();
     // Made once: it follows `renewalChange` through every answer, so the
     // publish toast says what the publish did to the members on the plan.
     const [adapter] = useState(() =>
-        planEditorAdapter((r) => {
-            setClash(clashOf(r));
-            if (r.gst) setGstOfRead(r.gst);
-            setRenewal(r.renewalChange ?? null);
-        }, initial?.renewalChange ?? null),
+        planEditorAdapter(
+            (r) => {
+                setClash(clashOf(r));
+                if (r.gst) setGstOfRead(r.gst);
+                setRenewal(r.renewalChange ?? null);
+            },
+            initial?.renewalChange ?? null,
+            save,
+        ),
     );
     const gst = gstOfRead ?? gstOfPage;
     const subscribers = figures?.subscriberCount ?? 0;
@@ -148,17 +156,18 @@ export function PlanEditor({
     return (
         <EditorShell
             adapter={adapter}
+            saved={save.saved}
             copy={PLAN_COPY}
             initial={first}
             emptyValues={EMPTY_PLAN}
             canEdit={canEdit}
             readOnlyText={readOnlyText}
-            breadcrumb={[
+            breadcrumb={(r) => [
                 "Payments",
                 <IntentLink data-ph-unmask="" key="plans" href={PLANS_HREF}>
                     Plans
                 </IntentLink>,
-                first ? planTitle(first.values, true) : "New plan",
+                r ? planTitle(r.values, true) : "New plan",
             ]}
             titleOf={(v, r) => planTitle(v, r !== null)}
             problemsOf={(v, r) =>

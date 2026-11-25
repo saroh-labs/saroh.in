@@ -12,6 +12,7 @@ import type { PlanEditorRecord } from "./plan-drafts";
 import type { PlanForm } from "./plan-editor";
 import { editorRecordOf, payloadOf } from "./plan-editor";
 import type { RenewalChange } from "./renewal-change";
+import type { SubscriptionSave } from "./use-subscriptions";
 
 /** The shell's adapter, and what the last publish did to the plan's members. */
 export interface PlanEditorAdapter extends EditorAdapter<PlanForm> {
@@ -35,31 +36,44 @@ export interface PlanEditorAdapter extends EditorAdapter<PlanForm> {
  *
  * `renewal` is that last as the page first read it. The adapter follows it
  * through every answer, so a save flushed just before a publish counts.
+ *
+ * Each write takes the tab's business last (`save.orgId`); a draft saved
+ * marks the Plans tab and the plan's page stale (`save.drafted`).
  */
 export function planEditorAdapter(
     onRecord: (record: PlanEditorRecord) => void,
-    renewal: RenewalChange | null = null,
+    renewal: RenewalChange | null,
+    save: Pick<SubscriptionSave, "orgId" | "drafted">,
 ): PlanEditorAdapter {
+    const { orgId } = save;
     let last = renewal;
     let published: RenewalChange | null = null;
     async function read(
         res: Promise<EditorResult<PlanEditorRecord>>,
         publishing = false,
+        drafting = false,
     ): Promise<EditorResult<ReturnType<typeof editorRecordOf>>> {
         const r = await res;
         if (!r.ok) return r;
+        if (drafting) save.drafted();
         if (publishing) published = last;
         last = r.data.renewalChange ?? null;
         onRecord(r.data);
         return { ok: true, data: editorRecordOf(r.data) };
     }
     return {
-        create: (values) => read(createPlanDraft(payloadOf(values))),
+        create: (values) =>
+            read(createPlanDraft(payloadOf(values), orgId), false, true),
         saveDraft: (id, values, revision) =>
-            read(savePlanDraft(id, payloadOf(values), revision)),
-        publish: (id, revision) => read(publishPlan(id, revision), true),
-        discard: (id, revision) => read(discardPlanChanges(id, revision)),
-        remove: (id, revision) => deletePlanDraft(id, revision),
+            read(
+                savePlanDraft(id, payloadOf(values), revision, orgId),
+                false,
+                true,
+            ),
+        publish: (id, revision) => read(publishPlan(id, revision, orgId), true),
+        discard: (id, revision) =>
+            read(discardPlanChanges(id, revision, orgId)),
+        remove: (id, revision) => deletePlanDraft(id, revision, orgId),
         load: (id) => read(loadPlanDraft(id)),
         publishedRenewal: () => published,
     };

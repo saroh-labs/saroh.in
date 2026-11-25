@@ -21,7 +21,7 @@ function refresh() {
         ["/billing/plans", "layout"],
         ["/billing/invoices", undefined],
     ] as const) {
-        // rq-revalidate-ok: reached only by a write without orgId, from a server-rendered screen (a plan's page, a person's page, the Plan Editor).
+        // rq-revalidate-ok: reached only by a write without orgId, from a server-rendered screen (a person's page).
         revalidatePath(path, type);
     }
 }
@@ -36,8 +36,7 @@ async function then<T extends { ok: boolean }>(res: Promise<T>): Promise<T> {
  * A write from Subscriptions' React Query screens names the tab's business
  * (`orgId`, `useSubscriptionSave`): refused when another is open, and
  * nothing revalidated, since the screen reads its own queries again.
- * Without it (a plan's page, a person's page) the pages are revalidated as
- * before.
+ * Without it (a person's page) the pages are revalidated as before.
  */
 function write<T extends { ok: boolean }>(
     orgId: string | undefined,
@@ -192,29 +191,47 @@ export async function loadPlanEvents(planId: string, cursor: string) {
 }
 
 // — The Plan Editor (D5 → D7): the editor shell's adapter calls these. ———
-// Each write refreshes the Plans tab and Plan Detail, which show a draft and
-// "Unpublished changes"; the read refreshes nothing.
+// Each write takes the tab's business last (`writeAsOrg`) and revalidates
+// nothing: the editor marks the Plans tab and the plan's page stale, or
+// reads them again after Publish, Discard and Delete draft
+// (`useSubscriptionSave`). The read changes nothing.
 
 /** Read a plan for the editor, and again for Reload after a conflict. */
 export async function loadPlanDraft(id: string) {
     return drafts.loadPlanDraft(id);
 }
-export async function createPlanDraft(values: Partial<PlanValues>) {
-    return then(drafts.createPlanDraft(values));
+export async function createPlanDraft(
+    values: Partial<PlanValues>,
+    orgId?: string,
+) {
+    return write(orgId, () => drafts.createPlanDraft(values));
 }
 export async function savePlanDraft(
     id: string,
     values: Partial<PlanValues>,
     revision: number,
+    orgId?: string,
 ) {
-    return then(drafts.savePlanDraft(id, values, revision));
+    return write(orgId, () => drafts.savePlanDraft(id, values, revision));
 }
-export async function publishPlan(id: string, revision: number) {
-    return then(drafts.publishPlan(id, revision));
+export async function publishPlan(
+    id: string,
+    revision: number,
+    orgId?: string,
+) {
+    return write(orgId, () => drafts.publishPlan(id, revision));
 }
-export async function discardPlanChanges(id: string, revision: number) {
-    return then(drafts.discardPlanChanges(id, revision));
+export async function discardPlanChanges(
+    id: string,
+    revision: number,
+    orgId?: string,
+) {
+    return write(orgId, () => drafts.discardPlanChanges(id, revision));
 }
-export async function deletePlanDraft(id: string, revision: number) {
-    return then(drafts.deletePlanDraft(id, revision));
+export async function deletePlanDraft(
+    id: string,
+    revision: number,
+    orgId?: string,
+) {
+    return write(orgId, () => drafts.deletePlanDraft(id, revision));
 }
