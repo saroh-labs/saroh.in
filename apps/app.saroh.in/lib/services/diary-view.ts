@@ -135,8 +135,9 @@ export function blockStatus(block: Block): {
 
 /**
  * Free time on a phone's Everyone day (BKVCalendarBPhone), drawn as one
- * column: where anybody is free, each stretch booked with the first person
- * (in column order) free all through it, so a tap books someone who is.
+ * column: where anybody is free, each stretch booked with someone free all
+ * through it (the one before while they still are, else the first in
+ * column order), so a tap books someone who is.
  * Only the columns `bookable` lets through are offered.
  */
 export function everyoneFree(
@@ -151,11 +152,16 @@ export function everyoneFree(
     for (let i = 0; i + 1 < cuts.length; i++) {
         const a = cuts[i] ?? 0;
         const b = cuts[i + 1] ?? 0;
-        const column = offered.find((c) =>
-            (c.day?.free ?? []).some(([x, y]) => x <= a && y >= b),
-        );
-        if (!column) continue;
+        const frees = (c: Column) =>
+            (c.day?.free ?? []).some(([x, y]) => x <= a && y >= b);
         const last = out.at(-1);
+        // Whoever the stretch before had keeps it while still free, so a
+        // free time isn't cut in two for nothing.
+        const column =
+            last?.free[1] === a && frees(last.column)
+                ? last.column
+                : offered.find(frees);
+        if (!column) continue;
         if (last?.column === column && last.free[1] === a) {
             last.free = [last.free[0], b];
         } else {

@@ -397,6 +397,12 @@ describe("Everyone", () => {
         const phone = host.querySelector("[data-everyone-column]");
         expect(phone?.textContent).toContain("Ananya Desai · Meera");
         expect(phone?.textContent).toContain("Vikram Nair · Arjun");
+        // Free times and closed time are drawn on the phone's one column
+        // too (BKVCalendarBPhone).
+        expect(
+            phone?.querySelectorAll("[data-free-gap]").length,
+        ).toBeGreaterThan(0);
+        expect(phone?.querySelector('[data-hatch="closed"]')).not.toBeNull();
         // The desk's column heads count each person's day.
         const heads = Array.from(
             host.querySelectorAll("[data-column-head]"),
