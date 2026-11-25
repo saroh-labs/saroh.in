@@ -139,7 +139,9 @@ export function FirstSight({
         <div
             ref={ref}
             aria-hidden
-            className="pointer-events-none absolute left-0 w-px"
+            // Clear of the sticky Calendar | List row on a phone (and the
+            // app's bar), so moving to now never hides the switch.
+            className="pointer-events-none absolute left-0 w-px scroll-mt-[132px]"
             style={{ top: at(top, span[0]), height: tall(top, bottom) }}
         />
     );

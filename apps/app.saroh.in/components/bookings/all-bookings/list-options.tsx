@@ -21,10 +21,13 @@ import { callName } from "@/lib/services/call-name";
 export function ListOptions({
     opens: kept,
     me,
+    zone,
 }: {
     opens: BookingsOpens;
     /** The viewer on the diary, for "Just me"; null when they aren't on it. */
     me: { id: string; name: string } | null;
+    /** "IST", said in the sheet on a phone. */
+    zone?: string;
 }) {
     // The address holds it (`?cancelled=1`); a change only opens what was
     // read, so it is made in place, with no read (DEC-259).
@@ -72,6 +75,7 @@ export function ListOptions({
             onShowFor={(showFor: ShowFor) => void change({ showFor })}
             me={me ? callName(me.name) : null}
             whoNow="everyone"
+            zone={zone}
         />
     );
 }

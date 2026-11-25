@@ -360,7 +360,8 @@ export function CalendarScreen({
     const peekFromDay = (b: Block) => setPeek(b.key);
 
     return (
-        <div>
+        // Room under the last row for the floating New booking (BKVListBPhone).
+        <div className="max-[759px]:pb-24">
             <CalendarHeader
                 layout={layout}
                 date={date}

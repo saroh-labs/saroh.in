@@ -4,6 +4,7 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import {
+    CalendarDays,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -13,7 +14,10 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { BookingsModeSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
+import {
+    BookingsModeSwitch,
+    BookingsPhoneBar,
+} from "@/components/bookings/all-bookings/bookings-view-switch";
 import { formatDay } from "@/lib/format/datetime";
 import type { BookingsOpens, ShowFor } from "@/lib/services/bookings-opens";
 import { EVERYONE } from "@/lib/services/bookings-opens";
@@ -23,6 +27,7 @@ import {
     dayRange,
     headerTitle,
     periodWord as periodWordOf,
+    phoneTitle,
 } from "@/lib/services/calendar-header";
 import type { CalendarLayout, GoogleShow } from "@/lib/services/calendar-href";
 import { callName } from "@/lib/services/call-name";
@@ -157,6 +162,7 @@ export function CalendarHeader({
     };
 
     const title = headerTitle(layout, date, today);
+    const short = phoneTitle(layout, date, today);
     const step = layout === "week" ? 7 : 1;
     const unit = layout === "week" ? "week" : "day";
     const inWeek = layout === "week";
@@ -213,7 +219,26 @@ export function CalendarHeader({
                 "max-[759px]:h-12 max-[759px]:flex-1 max-[759px]:gap-1 max-[759px]:rounded-none max-[759px]:px-0 max-[759px]:text-left max-[759px]:text-[19px] max-[759px]:tracking-[-0.02em] max-[759px]:hover:bg-transparent max-[759px]:data-[state=open]:bg-transparent",
             )}
         >
-            <span className="min-w-0 truncate">{title}</span>
+            {phone ? (
+                <>
+                    <span className="min-w-0 whitespace-nowrap">
+                        {short.lead ? (
+                            <span className="max-[359px]:hidden">
+                                {short.lead}{" "}
+                            </span>
+                        ) : null}
+                        {short.main}
+                    </span>
+                    <span
+                        data-view-name=""
+                        className="ml-1 shrink-0 rounded-full border border-border px-2 py-0.5 font-sans text-[12.5px] font-medium tracking-normal text-muted-foreground"
+                    >
+                        {VIEW_NAME[layout]}
+                    </span>
+                </>
+            ) : (
+                <span className="min-w-0 truncate">{title}</span>
+            )}
             <ChevronDown
                 aria-hidden
                 className="size-5 shrink-0 max-[759px]:size-[18px]"
@@ -262,16 +287,161 @@ export function CalendarHeader({
         </button>
     );
 
+    const options = (
+        <OptionsSheet
+            open={open === "opts"}
+            onOpenChange={toggle("opts")}
+            trigger={optsButton}
+            title={optsTitle}
+            summary={summary}
+            cancelled={{
+                shown: cancelled.shown,
+                onChange: cancelled.onChange,
+                line:
+                    cancelled.count === null
+                        ? `Cancelled ${periodWord}`
+                        : cancelledLine(cancelled.count, periodWord),
+            }}
+            hours={{ href: hoursHref, label: hoursLabel }}
+            start={opens.start}
+            onStart={(start) => void change({ start })}
+            showFor={opens.showFor}
+            onShowFor={pickShowFor}
+            google={
+                google
+                    ? {
+                          ...google,
+                          mine: me !== null,
+                          team: others.map((c) => ({
+                              key: c.key,
+                              name: c.name,
+                              state:
+                                  google.people.find((p) => p.staffId === c.key)
+                                      ?.state ?? "NONE",
+                          })),
+                          you: me?.id ?? null,
+                      }
+                    : null
+            }
+            me={me ? callName(me.name) : null}
+            whoNow={everyone ? "everyone" : whoName}
+            zone={zone}
+        />
+    );
+
+    const todayHref = hrefFor(layout, today);
+    const prevHref = hrefFor(layout, addDays(date, -step));
+    const nextHref = hrefFor(layout, addDays(date, step));
+
+    if (phone) {
+        // BKVCalendarBPhone: Calendar | List and "…" first (the List's
+        // row too), then the date naming its view, Today when away from
+        // today, whose bookings with the summary, and the week strip.
+        return (
+            <div data-calendar-header="" className="relative mb-3">
+                <BookingsPhoneBar current="calendar" options={options} />
+                <div className="flex min-w-0 items-center gap-2 pt-1">
+                    <h1 className="m-0 flex min-w-0 flex-1">
+                        <DateSheet
+                            open={open === "date"}
+                            onOpenChange={toggle("date")}
+                            trigger={titleButton}
+                            title={title}
+                            layout={layout}
+                            date={date}
+                            today={today}
+                            facts={facts}
+                            start={opens.start}
+                            hrefFor={(l, d) => hrefFor(l, d, picked)}
+                            onGo={go}
+                        />
+                    </h1>
+                    {date === today ? null : (
+                        <IntentLink
+                            href={todayHref}
+                            onNavigate={screenLink(todayHref)}
+                            scroll={false}
+                            data-today-button=""
+                            data-ph-unmask=""
+                            className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-[14px] font-semibold text-foreground transition-colors duration-fast hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[359px]:px-0"
+                        >
+                            <CalendarDays aria-hidden className="size-4" />
+                            {/* At 320 the date keeps its room: the icon alone. */}
+                            <span className="max-[359px]:sr-only">Today</span>
+                        </IntentLink>
+                    )}
+                </div>
+                {/* For a keyboard and a screen reader: swipe is the touch. */}
+                <IntentLink
+                    href={prevHref}
+                    onNavigate={screenLink(prevHref)}
+                    scroll={false}
+                    aria-label={`Previous ${unit}`}
+                    className={cn(STEP, PHONE_STEP)}
+                >
+                    <ChevronLeft aria-hidden className="size-4" />
+                </IntentLink>
+                <IntentLink
+                    href={nextHref}
+                    onNavigate={screenLink(nextHref)}
+                    scroll={false}
+                    aria-label={`Next ${unit}`}
+                    className={cn(STEP, PHONE_STEP)}
+                >
+                    <ChevronRight aria-hidden className="size-4" />
+                </IntentLink>
+                <div className="flex min-h-11 min-w-0 items-center gap-2 text-[13.5px] tabular-nums text-foreground/80">
+                    {loadingPeople ? (
+                        <Skeleton
+                            aria-hidden
+                            className="h-11 w-32 shrink-0 rounded-full"
+                        />
+                    ) : null}
+                    {showChip && chip ? (
+                        <PeopleSheet
+                            open={open === "people"}
+                            onOpenChange={toggle("people")}
+                            trigger={chip}
+                            period={period}
+                            periodWord={periodWord}
+                            choices={choices ?? []}
+                            picked={everyone ? EVERYONE : picked}
+                            showFor={opens.showFor}
+                            onPick={pickPerson}
+                            onAdd={onAddPerson}
+                        />
+                    ) : null}
+                    <span role="status" className="min-w-0 flex-1">
+                        {summary}
+                    </span>
+                </div>
+                <WeekStrip
+                    layout={layout}
+                    date={date}
+                    today={today}
+                    facts={facts}
+                    hrefFor={(l, d) => hrefFor(l, d)}
+                />
+                {calOnly ? (
+                    <p
+                        data-ph-unmask=""
+                        className="m-0 pt-2 text-[12.5px] text-muted-foreground"
+                    >
+                        Your role sees the calendar only, so you can't book or
+                        change bookings. An owner can change this in Settings ›
+                        Team.
+                    </p>
+                ) : null}
+                {newBooking}
+            </div>
+        );
+    }
+
     return (
         <div
             data-calendar-header=""
             className="relative mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 max-[759px]:mb-3 max-[759px]:gap-x-2 max-[759px]:gap-y-0 max-[759px]:border-b max-[759px]:border-border max-[759px]:pb-0.5"
         >
-            {phone ? (
-                <div className="order-0 mb-1.5 basis-full">
-                    <BookingsModeSwitch current="calendar" />
-                </div>
-            ) : null}
             <IntentLink
                 href={hrefFor(layout, today)}
                 onNavigate={screenLink(hrefFor(layout, today))}
@@ -378,46 +548,8 @@ export function CalendarHeader({
             </div>
 
             <div className="order-5 ml-auto flex items-center gap-2 max-[759px]:order-6 max-[759px]:ml-0">
-                {phone ? null : <BookingsModeSwitch current="calendar" />}
-                <OptionsSheet
-                    open={open === "opts"}
-                    onOpenChange={toggle("opts")}
-                    trigger={optsButton}
-                    title={optsTitle}
-                    summary={summary}
-                    cancelled={{
-                        shown: cancelled.shown,
-                        onChange: cancelled.onChange,
-                        line:
-                            cancelled.count === null
-                                ? `Cancelled ${periodWord}`
-                                : cancelledLine(cancelled.count, periodWord),
-                    }}
-                    hours={{ href: hoursHref, label: hoursLabel }}
-                    start={opens.start}
-                    onStart={(start) => void change({ start })}
-                    showFor={opens.showFor}
-                    onShowFor={pickShowFor}
-                    google={
-                        google
-                            ? {
-                                  ...google,
-                                  mine: me !== null,
-                                  team: others.map((c) => ({
-                                      key: c.key,
-                                      name: c.name,
-                                      state:
-                                          google.people.find(
-                                              (p) => p.staffId === c.key,
-                                          )?.state ?? "NONE",
-                                  })),
-                                  you: me?.id ?? null,
-                              }
-                            : null
-                    }
-                    me={me ? callName(me.name) : null}
-                    whoNow={everyone ? "everyone" : whoName}
-                />
+                <BookingsModeSwitch current="calendar" />
+                {options}
                 {newBooking}
             </div>
 

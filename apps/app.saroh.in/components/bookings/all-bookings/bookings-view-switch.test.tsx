@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { BookingsModeSwitch, BookingsViewSwitch } from "./bookings-view-switch";
+import {
+    BookingsModeSwitch,
+    BookingsPhoneBar,
+    BookingsViewSwitch,
+} from "./bookings-view-switch";
 
 /**
  * The views of the same bookings: Calendar | List in both headers (List is
@@ -54,6 +58,20 @@ describe("the bookings views", () => {
         expect(html).toContain("max-[759px]:w-full");
         expect(html).toContain("max-[759px]:flex-1");
         expect(html).toContain("coarse:h-11");
+        expect(html).toContain("max-[759px]:h-11");
+    });
+
+    it("is one phone row with the view's ⋯, kept in sight as the page scrolls", () => {
+        const html = renderToStaticMarkup(
+            <BookingsPhoneBar
+                current="list"
+                options={<button type="button">More</button>}
+            />,
+        );
+        expect(html).toMatch(/^<div data-bookings-bar="" class="sticky /);
+        expect(html.indexOf('aria-label="Bookings"')).toBeLessThan(
+            html.indexOf(">More<"),
+        );
     });
 
     it("Show as is Day, Week and Agenda, and no old List", () => {

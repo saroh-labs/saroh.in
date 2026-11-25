@@ -108,6 +108,34 @@ export function headerTitle(
     return words;
 }
 
+/**
+ * The phone's short title (BKVCalendarBPhone): "Tue 17" with "Today," or
+ * "Tomorrow," before it where there is room, or "23 to 29 Nov" for a
+ * week. The day's month and year are in Go to a day and in the full title
+ * a screen reader hears.
+ */
+export function phoneTitle(
+    layout: CalendarLayout,
+    date: LocalDate,
+    today: LocalDate,
+): { lead: string | null; main: string } {
+    if (layout === "week") {
+        const start = weekStartOf(date);
+        return { lead: null, main: dayRange(start, addDays(start, 6), " to ") };
+    }
+    const weekday =
+        WEEKDAYS[(new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7];
+    return {
+        lead:
+            date === today
+                ? "Today,"
+                : date === addDays(today, 1)
+                  ? "Tomorrow,"
+                  : null,
+        main: `${weekday} ${dayNumber(date)}`,
+    };
+}
+
 /** The view's own name in a sentence: "today", "this week", "Tue 20 Oct". */
 export function periodWord(
     layout: CalendarLayout,

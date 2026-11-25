@@ -2,7 +2,7 @@
 
 import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import { ChevronRight, Clock, Eye } from "lucide-react";
+import { ChevronRight, Clock, Eye, Globe } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
 import { GOOGLE_CALENDAR_HREF } from "@/lib/google-calendar/words";
@@ -63,6 +63,7 @@ export function OptionsSheet({
     onShowFor,
     me,
     whoNow,
+    zone,
     google = null,
 }: {
     open: boolean;
@@ -87,6 +88,8 @@ export function OptionsSheet({
     me: string | null;
     /** Who is shown now, for "The last person I picked": "everyone". */
     whoNow: string;
+    /** "IST": every time on the view is in it, said here on a phone. */
+    zone?: string;
     /**
      * Google busy times (BKVGoogle), while Google Calendar is on: the layer
      * in What to show, and who on the diary has connected.
@@ -140,6 +143,15 @@ export function OptionsSheet({
             align="end"
         >
             <div className="max-[759px]:pb-6">
+                {zone && phone ? (
+                    <p
+                        data-zone-line=""
+                        className="m-0 flex items-center gap-1.5 pb-2 text-[12.5px] text-muted-foreground"
+                    >
+                        <Globe aria-hidden className="size-[13px]" />
+                        Times in {zone}
+                    </p>
+                ) : null}
                 <div className={ROW}>
                     <span className={ICON}>
                         <Eye aria-hidden />

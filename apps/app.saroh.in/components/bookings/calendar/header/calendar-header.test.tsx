@@ -663,6 +663,37 @@ describe("the header on a phone", () => {
         expect(rows[0]?.textContent).toContain("Everyone’s bookings together");
     });
 
+    it("starts with Calendar | List and ⋯ in one row, as the List does", () => {
+        draw();
+        const bar = host.querySelector("[data-bookings-bar]");
+        expect(bar?.querySelector('nav[aria-label="Bookings"]')).not.toBeNull();
+        expect(
+            bar?.querySelector('button[aria-label^="This day:"]'),
+        ).not.toBeNull();
+        // The Calendar | List options are a finger tall.
+        expect(
+            bar?.querySelector('a[aria-current="page"]')?.className,
+        ).toContain("max-[759px]:h-11");
+        // "Times in IST" is in the ⋯ sheet, not the header.
+        expect(host.textContent).not.toContain("Times in IST");
+        click(button(/^This day:/));
+        expect(sheet()?.textContent).toContain("Times in IST");
+    });
+
+    it("names the view beside a short date; Today only away from today", () => {
+        draw();
+        const title = button(/Change the day or the view$/);
+        expect(title.textContent).toBe("Today, Mon 19Day");
+        expect(host.querySelector("[data-today-button]")).toBeNull();
+        act(() => root.unmount());
+        root = createRoot(host);
+        draw({ layout: "week", date: "2026-10-28" });
+        expect(button(/Change the day or the view$/).textContent).toBe(
+            "26 Oct to 1 NovWeek",
+        );
+        expect(host.querySelector("[data-today-button]")).not.toBeNull();
+    });
+
     it("the ⋯ sheet says Tap", () => {
         draw();
         click(button(/^This day:/));
