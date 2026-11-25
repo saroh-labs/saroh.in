@@ -1003,8 +1003,13 @@ test.describe("orders bulk kitchen moves (B6)", () => {
             .getByRole("list", { name: "Tickets" })
             .getByRole("article");
         await expect(tickets).toHaveCount(2);
-        // Oldest first: the list is newest first, so the order flips.
-        const oldest = [...picked].reverse();
+        // Oldest first by when each was placed (the list's own order puts
+        // late and due orders first, so it can't stand in for age).
+        const oldest = [...picked].sort(
+            (a, b) =>
+                new Date((a as Row & { placedAt: string }).placedAt).getTime() -
+                new Date((b as Row & { placedAt: string }).placedAt).getTime(),
+        );
         await expect(tickets.first()).toContainText(`#${oldest[0]?.orderId}`);
         await expect
             .poll(() =>
