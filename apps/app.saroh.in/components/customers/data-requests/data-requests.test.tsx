@@ -81,7 +81,10 @@ const UNLINKED: DataRequestRow = {
 };
 
 const s = stage();
-const view = (rows: DataRequestRow[] | null, filter: "open" | "all" = "open") =>
+const view = (
+    rows: DataRequestRow[] | null | undefined,
+    filter: "open" | "all" = "open",
+) =>
     s.render(
         <RequestsView
             heading={<h1>Customers</h1>}
@@ -143,6 +146,15 @@ describe("the Requests tab", () => {
         expect(s.text()).toContain("No open requests");
         view([], "all");
         expect(s.text()).toContain("No requests yet");
+    });
+
+    it("before the rows land, the frame and Show are here, the rows skeletons", () => {
+        view(undefined);
+        expect(s.text()).toContain("Customers");
+        expect(document.querySelector('[aria-label="Show"]')).not.toBe(null);
+        expect(document.querySelector('[data-shape="rows"]')).not.toBe(null);
+        expect(s.text()).not.toContain("No open requests");
+        expect(s.text()).not.toContain("Couldn't load requests");
     });
 
     it("a failed read says so with Try again, never an empty list", () => {
