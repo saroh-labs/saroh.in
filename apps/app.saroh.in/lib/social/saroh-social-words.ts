@@ -46,6 +46,7 @@ export const CONNECT_NEEDS: Record<ChannelKind, readonly string[]> = {
 export const SOCIAL_WORDS = {
     social: "Social",
     channels: "Channels",
+    loading: "Loading Social",
     posts: "Posts",
     newPost: "New post",
     connect: (kind: ChannelKind) => `Connect ${CHANNEL_SHORT[kind]}`,
