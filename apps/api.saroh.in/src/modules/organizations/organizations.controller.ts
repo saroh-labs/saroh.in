@@ -4,6 +4,7 @@ import {
     Delete,
     Get,
     Header,
+    NotFoundException,
     Patch,
     Post,
     Put,
@@ -30,6 +31,7 @@ import {
     SetLogoDto,
     UpdateOrganizationDto,
 } from "./dto";
+import type { UserOrganization } from "./organization-context.service";
 import { OrganizationContextService } from "./organization-context.service";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
 import { OrganizationSettingsService } from "./organization-settings.service";
@@ -164,6 +166,29 @@ export class OrganizationsController {
         @OrgContext() ctx: OrganizationContext,
     ): Promise<ClosingNoticeView> {
         return closingNotice(ctx);
+    }
+
+    /**
+     * The caller's own row of `GET /organizations` for this one business
+     * (role, permissions, paused), so the app's gates read one membership
+     * rather than the whole list. The guard has already refused a
+     * non-member or a paused seat.
+     */
+    @Get(":organizationId/me")
+    @Header("Cache-Control", "no-store")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    async me(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<UserOrganization> {
+        const rows = await this.organizations.listForUser(
+            ctx.userId,
+            ctx.organizationId,
+        );
+        // Only a business closed between the guard and this read.
+        if (rows.length === 0) {
+            throw new NotFoundException("Business not found");
+        }
+        return rows[0];
     }
 
     @Get(":organizationId")
