@@ -1,13 +1,13 @@
 "use client";
 
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { LEAD_STATUS } from "@/lib/crm/format";
 import { updateLead } from "@/lib/leads/actions";
 import type { LeadStatus } from "@/lib/leads/service";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 const STATUSES: LeadStatus[] = ["OPEN", "WON", "LOST"];
@@ -24,13 +24,13 @@ export function LeadStatusControl({
     leadId: string;
     status: LeadStatus;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const [busy, setBusy] = useState(false);
 
     async function onChange(next: LeadStatus) {
         if (next === status) return;
         const res = await runAction(
-            () => updateLead(leadId, { status: next }),
+            () => updateLead(leadId, { status: next }, save.orgId),
             { setBusy },
         );
         if (!res) return;
@@ -39,7 +39,7 @@ export function LeadStatusControl({
             return;
         }
         showSuccess("Lead saved.");
-        router.refresh();
+        void save.saved();
     }
 
     return (

@@ -9,6 +9,7 @@ import {
 import { useMemo } from "react";
 
 import { bookingsKeys } from "@/lib/bookings/queries";
+import { contactsKeys } from "@/lib/contacts/queries";
 import { homeKeys } from "@/lib/home/queries";
 import { invoicesKeys } from "@/lib/invoices/queries";
 import { ordersKeys } from "@/lib/orders/queries";
@@ -52,8 +53,9 @@ export function useCustomer(ask: CustomerAsk) {
  * again (on a customer's page, that page alone), resolving once it is back
  * so a busy state lasts until the screen has changed; the rest of Customers
  * is only marked stale. Orders, bookings, invoices and Home name the
- * customer, so they are marked stale for their next visit. Never throws: a
- * read that fails is the screen's failed state.
+ * customer, so they are marked stale for their next visit, and so are
+ * Contacts (the list and a person's Leads tab). Never throws: a read that
+ * fails is the screen's failed state.
  */
 export function customersSaved(qc: QueryClient, orgId: string): Promise<void> {
     const stale = { refetchType: "none" } as const;
@@ -63,6 +65,7 @@ export function customersSaved(qc: QueryClient, orgId: string): Promise<void> {
         qc.invalidateQueries({ queryKey: bookingsKeys(orgId), ...stale }),
         qc.invalidateQueries({ queryKey: invoicesKeys(orgId), ...stale }),
         qc.invalidateQueries({ queryKey: homeKeys(orgId), ...stale }),
+        qc.invalidateQueries({ queryKey: contactsKeys(orgId), ...stale }),
     ]).then(
         () => undefined,
         () => undefined,

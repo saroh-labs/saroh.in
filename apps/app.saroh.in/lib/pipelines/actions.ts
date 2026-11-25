@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import type { CrmResult } from "@/lib/api/http";
 import {
     addStage as addStageApi,
@@ -21,9 +22,19 @@ export interface StageChange {
  * Apply a pipeline's edited stages in one go — what the Stages dialog's Save
  * sends. Removals first (so a freed position is free), then renames and
  * moves, then additions. Stops at the first failure and says which change it
- * was, because the ones before it have already landed.
+ * was, because the ones before it have already landed. As the tab's
+ * business (DEC-259, `writeAsOrg`): nothing revalidated.
  */
 export async function saveStages(
+    pipelineId: string,
+    stages: StageChange[],
+    removed: string[],
+    orgId: string,
+): Promise<CrmResult<{ changed: number }>> {
+    return writeAsOrg(orgId, () => applyStages(pipelineId, stages, removed));
+}
+
+async function applyStages(
     pipelineId: string,
     stages: StageChange[],
     removed: string[],

@@ -17,6 +17,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import type { MessageChannel } from "@/lib/messages/constants";
 
+import { QueryClientProvider } from "@tanstack/react-query";
+
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
+
 import { LeadActions } from "./lead-actions";
 
 const logActivity = vi.fn();
@@ -29,10 +34,11 @@ const sendMessage = vi.fn();
 vi.mock("@/lib/messages/actions", () => ({
     sendMessage: (...args: unknown[]) => sendMessage(...args) as unknown,
 }));
-const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push: vi.fn(), refresh }),
+    useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
+/** Counts the reads of Leads a save asks for (DEC-259): what refreshed the page before. */
+const refresh = vi.fn();
 const showSuccess = vi.fn();
 const showError = vi.fn();
 const showWarning = vi.fn();
@@ -103,16 +109,28 @@ function render(
         revoked: boolean;
     }> = {},
 ) {
+    const client = makeTestClient();
+    const invalidate = client.invalidateQueries.bind(client);
+    client.invalidateQueries = (filters) => {
+        if (filters?.queryKey?.[0] === "leads") refresh(filters.queryKey);
+        return invalidate(filters);
+    };
     act(() =>
         root.render(
-            <LeadActions
-                leadId="lead_1"
-                contactId={
-                    over.contactId === undefined ? "con_1" : over.contactId
-                }
-                consent={over.revoked ? { EMAIL: "REVOKED" } : {}}
-                gates={over.gates ?? COMPOSE}
-            />,
+            <QueryClientProvider client={client}>
+                <OrgProvider orgId="org_1">
+                    <LeadActions
+                        leadId="lead_1"
+                        contactId={
+                            over.contactId === undefined
+                                ? "con_1"
+                                : over.contactId
+                        }
+                        consent={over.revoked ? { EMAIL: "REVOKED" } : {}}
+                        gates={over.gates ?? COMPOSE}
+                    />
+                </OrgProvider>
+            </QueryClientProvider>,
         ),
     );
 }
@@ -204,6 +222,7 @@ describe("Add note", () => {
         expect(logActivity).toHaveBeenCalledWith(
             "lead_1",
             "Called, wants a quote",
+            "org_1",
         );
         expect(showError).toHaveBeenCalledWith(
             "Your role can't add notes to a lead.",
@@ -222,7 +241,7 @@ describe("Add note", () => {
         type(dialog()?.querySelector("textarea"), "  Called  ");
         await submit();
 
-        expect(logActivity).toHaveBeenCalledWith("lead_1", "Called");
+        expect(logActivity).toHaveBeenCalledWith("lead_1", "Called", "org_1");
         expect(showSuccess).toHaveBeenCalledWith("Note added.");
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(dialog()).toBe(null);
@@ -278,10 +297,14 @@ describe("Schedule follow-up", () => {
         await fill();
         await submit();
 
-        expect(createTask).toHaveBeenCalledWith("lead_1", {
-            body: "Send the quote",
-            dueAt: new Date(2099, 0, 5, 9, 0).toISOString(),
-        });
+        expect(createTask).toHaveBeenCalledWith(
+            "lead_1",
+            {
+                body: "Send the quote",
+                dueAt: new Date(2099, 0, 5, 9, 0).toISOString(),
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Follow-up added.");
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(dialog()).toBe(null);
@@ -298,13 +321,16 @@ describe("Send message", () => {
         type(dialog()?.querySelector("textarea"), "Here it is.");
         await submit();
 
-        expect(sendMessage).toHaveBeenCalledWith({
-            leadId: "lead_1",
-            channel: "EMAIL",
-            contactId: "con_1",
-            subject: "Your quote",
-            body: "Here it is.",
-        });
+        expect(sendMessage).toHaveBeenCalledWith(
+            {
+                leadId: "lead_1",
+                channel: "EMAIL",
+                contactId: "con_1",
+                subject: "Your quote",
+                body: "Here it is.",
+            },
+            "org_1",
+        );
         expect(showError).toHaveBeenCalledTimes(1);
         expect(dialogName()).toBe("Send message");
         expect(dialog()?.querySelector("input")?.value).toBe("Your quote");

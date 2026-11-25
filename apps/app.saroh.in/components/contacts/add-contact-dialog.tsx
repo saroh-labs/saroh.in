@@ -14,6 +14,7 @@ import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-in
 import { runAction } from "@/lib/api/run-action";
 import { createContact } from "@/lib/contacts/create";
 import { personHref } from "@/lib/contacts/person-href";
+import { useContactsSave } from "@/lib/contacts/use-contacts";
 import { phoneProblem } from "@/lib/organizations/business-phone";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
@@ -50,6 +51,7 @@ export function AddContactDialog({
     openOnArrival?: boolean;
 } = {}) {
     const router = useRouter();
+    const save = useContactsSave();
     const [open, setOpen] = useState(openOnArrival);
     const [fields, setFields] = useState({
         name: "",
@@ -83,17 +85,20 @@ export function AddContactDialog({
         const [firstName, ...rest] = fields.name.trim().split(/\s+/);
         const res = await runAction(
             () =>
-                createContact({
-                    email: fields.email.trim(),
-                    ...(firstName ? { firstName } : {}),
-                    ...(rest.length ? { lastName: rest.join(" ") } : {}),
-                    ...(fields.phone.trim()
-                        ? { phone: fields.phone.trim() }
-                        : {}),
-                    ...(fields.company.trim()
-                        ? { company: fields.company.trim() }
-                        : {}),
-                }),
+                createContact(
+                    {
+                        email: fields.email.trim(),
+                        ...(firstName ? { firstName } : {}),
+                        ...(rest.length ? { lastName: rest.join(" ") } : {}),
+                        ...(fields.phone.trim()
+                            ? { phone: fields.phone.trim() }
+                            : {}),
+                        ...(fields.company.trim()
+                            ? { company: fields.company.trim() }
+                            : {}),
+                    },
+                    save.orgId,
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -108,6 +113,8 @@ export function AddContactDialog({
         const id = res.data.id;
         setOpen(false);
         setFields(blank);
+        // The list, and Customers' next visit, read the new contact.
+        void save.saved();
         if (onAdded) {
             showSuccess("Contact added.");
             onAdded({ id, name, email: fields.email.trim() });
@@ -119,8 +126,6 @@ export function AddContactDialog({
             onClick: () => router.push(personHref(id)),
         });
         if (openOnArrival) router.replace("/contacts");
-        // rq-refresh-ok: Contacts is server-rendered until U19; the invoice editor passes onAdded.
-        router.refresh();
     }
 
     return (
