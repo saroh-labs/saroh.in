@@ -406,6 +406,9 @@ async function focusWithoutIndicator(page: Page, from: "top" | "main") {
 }
 
 async function audit(page: Page, screen: string, testInfo: TestInfo) {
+    // A screen may still be moving on (a phone's Bookings opens on Day and
+    // swaps to List): let that navigation finish before reading the page.
+    await page.waitForLoadState("networkidle");
     // Next streams a dynamic page's <title> after its shell; axe run before
     // it lands reads an empty one. A screen with no title still fails here.
     await expect(page).toHaveTitle(/\S/);
