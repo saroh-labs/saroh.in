@@ -31,7 +31,7 @@ vi.mock("next/navigation", async () => {
 vi.mock("@/lib/api/http", () => ({}));
 
 import { CustomersContainer } from "@/components/customers/list/customers-container";
-import { renderWithQuery } from "@/lib/query/test-utils";
+import { renderWithQuery, typeSearch } from "@/lib/query/test-utils";
 
 const VIEW = {
     page: {
@@ -131,20 +131,12 @@ describe("Customers before its first page", () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const { host, unmount } = open();
         await tick();
-        const input = host.querySelector<HTMLInputElement>(
-            'input[placeholder="Search customers"]',
-        )!;
-        act(() => {
-            Object.getOwnPropertyDescriptor(
-                HTMLInputElement.prototype,
-                "value",
-            )!.set!.call(input, "priya");
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-        });
-        await act(async () => {
-            vi.advanceTimersByTime(1000);
-        });
-        act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+        typeSearch(
+            host.querySelector<HTMLInputElement>(
+                'input[placeholder="Search customers"]',
+            ),
+            "priya",
+        );
         await tick();
         vi.useRealTimers();
         expect(window.location.search).toContain("q=priya");

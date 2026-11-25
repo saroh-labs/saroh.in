@@ -117,7 +117,7 @@ describe("the diary before its first read", () => {
         expect(host.querySelector("[data-calendar-title]")).not.toBeNull();
         expect(host.querySelector('[aria-label="Next day"]')).not.toBeNull();
         const newBooking = Array.from(host.querySelectorAll("button")).find(
-            (b) => b.textContent?.includes("New booking"),
+            (b) => b.textContent.includes("New booking"),
         );
         expect(newBooking?.disabled).toBe(false);
         expect(host.querySelector('[data-shape="diary"]')).not.toBeNull();

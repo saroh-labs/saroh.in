@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 
 import { ORG_HEADER } from "@/lib/query/api-read";
 import { makeQueryClient } from "@/lib/query/client";
@@ -44,6 +44,25 @@ export function renderWithQuery(
             host.remove();
         },
     };
+}
+
+/**
+ * Type into a field as a person does (React hears its own value setter),
+ * wait out a search's pause, and let the address change be read again (the
+ * tests' `useSearchParams` mock listens for popstate). Fake timers on.
+ */
+export function typeSearch(input: HTMLInputElement | null, value: string) {
+    if (!input) throw new Error("No field to type into");
+    act(() => {
+        Reflect.set(HTMLInputElement.prototype, "value", value, input);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => {
+        vi.advanceTimersByTime(1000);
+    });
+    act(() => {
+        window.dispatchEvent(new PopStateEvent("popstate"));
+    });
 }
 
 const HOST = "app.saroh.localhost";

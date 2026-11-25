@@ -46,7 +46,7 @@ vi.mock("@/components/gst-rates/gst-rates-sheet", () => ({
 }));
 
 import { InvoicesContainer } from "@/components/invoices/list/invoices-container";
-import { renderWithQuery } from "@/lib/query/test-utils";
+import { renderWithQuery, typeSearch } from "@/lib/query/test-utils";
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -97,15 +97,6 @@ function invoice(id: string, over: Partial<Invoice> = {}): Invoice {
     };
 }
 
-const DUE = invoice("0105", {
-    contact: { id: "c_p", name: "Priya Raman", email: "priya@example.com" },
-    billTo: { name: "Priya Raman", email: "priya@example.com" },
-});
-const LATE = invoice("0106", {
-    standing: "OVERDUE",
-    // 12 days and some hours ago: "13 days late", counted in whole days.
-    dueAt: new Date(NOW - 13 * DAY + 3_600_000).toISOString(),
-});
 const inr = (amountMinor: number) => [{ currency: "INR", amountMinor }];
 const SUMMARY: InvoiceSummary = {
     zone: "Asia/Kolkata",
@@ -201,20 +192,12 @@ describe("Invoices before its first read", () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const { host, unmount } = open();
         await tick();
-        const input = host.querySelector<HTMLInputElement>(
-            'input[placeholder="Search invoices"]',
-        )!;
-        act(() => {
-            Object.getOwnPropertyDescriptor(
-                HTMLInputElement.prototype,
-                "value",
-            )!.set!.call(input, "priya");
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-        });
-        await act(async () => {
-            vi.advanceTimersByTime(1000);
-        });
-        act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+        typeSearch(
+            host.querySelector<HTMLInputElement>(
+                'input[placeholder="Search invoices"]',
+            ),
+            "priya",
+        );
         await tick();
         vi.useRealTimers();
         expect(window.location.search).toContain("q=priya");

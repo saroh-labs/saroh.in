@@ -31,7 +31,7 @@ vi.mock("next/navigation", async () => {
 vi.mock("@/lib/api/http", () => ({}));
 
 import { OrdersContainer } from "@/components/commerce/orders/orders-container";
-import { renderWithQuery } from "@/lib/query/test-utils";
+import { renderWithQuery, typeSearch } from "@/lib/query/test-utils";
 
 const PAGE = {
     rows: [
@@ -131,7 +131,7 @@ describe("Orders before its first page", () => {
             host.querySelector('[data-slot="figure-loading"]'),
         ).not.toBeNull();
         const exportButton = Array.from(host.querySelectorAll("button")).find(
-            (b) => /Export/.test(b.textContent ?? ""),
+            (b) => b.textContent.includes("Export"),
         );
         expect(exportButton?.disabled).toBe(true);
 
@@ -147,22 +147,12 @@ describe("Orders before its first page", () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const { host, unmount } = open();
         await tick();
-        const input = host.querySelector<HTMLInputElement>(
-            'input[placeholder="Search orders"]',
-        )!;
-        act(() => {
-            const set = Object.getOwnPropertyDescriptor(
-                HTMLInputElement.prototype,
-                "value",
-            )!.set!;
-            set.call(input, "priya");
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-        });
-        await act(async () => {
-            vi.advanceTimersByTime(1000);
-        });
-        // Next reads an in-place address change; the mock hears popstate.
-        act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+        typeSearch(
+            host.querySelector<HTMLInputElement>(
+                'input[placeholder="Search orders"]',
+            ),
+            "priya",
+        );
         await tick();
         vi.useRealTimers();
         expect(window.location.search).toContain("q=priya");

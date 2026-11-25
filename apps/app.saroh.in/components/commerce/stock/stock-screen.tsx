@@ -207,7 +207,7 @@ export function StockScreen({
         {
             id: "levels",
             label: "Levels",
-            count: needsYou ? needsYou : undefined,
+            count: needsYou && needsYou > 0 ? needsYou : undefined,
             tone: "strong",
             says: plural(needsYou ?? 0, "needs you", "need you"),
         },

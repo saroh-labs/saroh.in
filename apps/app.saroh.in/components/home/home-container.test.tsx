@@ -74,7 +74,7 @@ describe("Home before its read", () => {
         );
         await tick();
         const newButton = Array.from(host.querySelectorAll("button")).find(
-            (b) => /New/.test(b.textContent ?? ""),
+            (b) => b.textContent.includes("New"),
         );
         expect(newButton?.disabled).toBe(false);
         expect(host.querySelector('[data-shape="home"]')).not.toBeNull();

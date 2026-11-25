@@ -31,7 +31,7 @@ vi.mock("@/lib/api/http", () => ({}));
 
 import { CatalogueContainer } from "@/components/stores/catalogue/catalogue-container";
 import { catalogueProduct } from "@/lib/products/catalogue.fixture";
-import { renderWithQuery } from "@/lib/query/test-utils";
+import { renderWithQuery, typeSearch } from "@/lib/query/test-utils";
 
 const PAGE = {
     items: [catalogueProduct({ id: "p1", name: "Cinnamon bun" })],
@@ -47,13 +47,14 @@ let release: () => void;
 const reads: string[] = [];
 
 beforeEach(() => {
-    window.matchMedia ??= ((q: string) => ({
+    // jsdom has no matchMedia.
+    window.matchMedia = ((q: string) => ({
         matches: false,
         media: q,
-        addEventListener() {},
-        removeEventListener() {},
-        addListener() {},
-        removeListener() {},
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
     })) as unknown as typeof window.matchMedia;
     window.history.replaceState(null, "", "/commerce/products");
     reads.length = 0;
@@ -122,22 +123,12 @@ describe("Products before its first page", () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const { host, unmount } = open();
         await tick();
-        const input = host.querySelector<HTMLInputElement>(
-            'input[placeholder="Search products"]',
-        )!;
-        act(() => {
-            const set = Object.getOwnPropertyDescriptor(
-                HTMLInputElement.prototype,
-                "value",
-            )!.set!;
-            set.call(input, "bun");
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-        });
-        await act(async () => {
-            vi.advanceTimersByTime(1000);
-        });
-        // Next reads an in-place address change; the mock hears popstate.
-        act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+        typeSearch(
+            host.querySelector<HTMLInputElement>(
+                'input[placeholder="Search products"]',
+            ),
+            "bun",
+        );
         await tick();
         vi.useRealTimers();
         expect(window.location.search).toContain("q=bun");
