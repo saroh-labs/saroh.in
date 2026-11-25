@@ -165,7 +165,7 @@ export function useChangeWho({
     /** The sheet closes once the change is held. */
     onDone: () => void;
 }) {
-    const { refresh } = useBookingSave();
+    const { refresh, org } = useBookingSave();
     const [picked, setPicked] = useState<{ id: string; name: string } | null>(
         null,
     );
@@ -218,10 +218,11 @@ export function useChangeWho({
             soon: `Giving it to ${firstName(to.name) || to.name} in 10 seconds`,
             description: toldLine(reach, first),
             run: async (): Promise<HeldResult> => {
-                const res = await reassignBooking(target.id, {
-                    staffId: to.id,
-                    ...(time ? { startAt: time } : {}),
-                });
+                const res = await reassignBooking(
+                    target.id,
+                    { staffId: to.id, ...(time ? { startAt: time } : {}) },
+                    ...org,
+                );
                 if (!res.ok) return { ok: false, error: res.error };
                 // What Google does with it (DEC-233), said in the toast.
                 google = res.data.googleCalendar?.message ?? null;

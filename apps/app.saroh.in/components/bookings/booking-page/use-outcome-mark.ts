@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { useHold } from "@/components/shared/undo/use-hold";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { recordBookingOutcome } from "@/lib/services/actions";
 import type { BookingOutcome } from "@/lib/services/booking-state";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
@@ -26,7 +26,7 @@ export function useOutcomeMark({
     saved: BookingOutcome | null;
     first: string;
 } & Pick<ReturnType<typeof useHold>, "hold" | "undo" | "pending">) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const [mark, setMark] = useState<BookingOutcome | null | undefined>(
         undefined,
     );
@@ -43,11 +43,10 @@ export function useOutcomeMark({
                 ? `${first || "They"} ${BOOKING_WORDS.came.toLowerCase()}.`
                 : `Marked ${first || "them"} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
             async () => {
-                try {
-                    return await recordBookingOutcome(bookingId, next);
-                } finally {
-                    router.refresh();
-                }
+                const res = await recordBookingOutcome(bookingId, next, ...org);
+                // A refusal puts the mark back below; only a write is read.
+                if (res.ok) refresh();
+                return res;
             },
             // Undone, refused or never got there: back to what it was,
             // unless a newer mark has been made on top of this one since.

@@ -5,7 +5,9 @@
  * already read is mounted over without a read, a date filter is a new key with
  * the old rows kept meanwhile, a save reads the list once (Home and the
  * calendar only marked stale), a refusal reads nothing, and a part drawn
- * outside the list saves and refreshes as before.
+ * outside the list saves and refreshes as before. A booking's page (U26)
+ * draws a booking seen before at once and reads it again behind it, and a
+ * save there reads the booking once, the list and diary only marked stale.
  */
 import { dehydrate, hydrate } from "@tanstack/react-query";
 import { act, useState } from "react";
@@ -23,13 +25,20 @@ vi.mock("next/navigation", () => ({
 
 import { UNREACHED } from "@/lib/api/unreached";
 import type {
+    BookingView,
     BookingsAsk,
     BookingsDiary,
     BookingsList,
 } from "@/lib/bookings/queries";
-import { bookingsRead, diaryAsk, diaryRead } from "@/lib/bookings/queries";
+import {
+    bookingRead,
+    bookingsRead,
+    diaryAsk,
+    diaryRead,
+} from "@/lib/bookings/queries";
 import type { BookingSave } from "@/lib/bookings/use-bookings";
 import {
+    useBooking,
     useBookingSave,
     useBookingSaveWithQuery,
     useBookingsDiary,
@@ -223,7 +232,7 @@ describe("a save on the list", () => {
     });
 });
 
-describe("off React Query (a booking's page, Hours)", () => {
+describe("off React Query (Hours)", () => {
     it("saves as before, with no business, and refreshes the page after", async () => {
         let save: BookingSave = {
             save: vi.fn(),
@@ -350,6 +359,126 @@ describe("the diary", () => {
         diary.refresh();
         await tick();
         expect(diaryReads()).toBe(1);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(refresh).not.toHaveBeenCalled();
+    });
+});
+
+const VIEW = {
+    booking: { id: "bk_1", status: "CONFIRMED" },
+    now: 1,
+    person: null,
+    staff: null,
+    meeting: null,
+} as unknown as BookingView;
+const MOVED = { ...VIEW, now: 2 };
+
+describe("a booking's page (U26)", () => {
+    const ask = { bookingId: "bk_1" };
+    const bookingReads = () =>
+        fetchMock.mock.calls.filter(([url]) => url === "/api/bookings/bk_1")
+            .length;
+    let page: BookingSave;
+    let shown: unknown[];
+    let client: ReturnType<typeof hydrated>;
+    let unmount: () => void;
+    function open(seenBefore: boolean) {
+        client = hydrated();
+        if (seenBefore) {
+            // Opened a minute ago: past its 30 seconds.
+            client.setQueryData(bookingRead.options(ORG, ask).queryKey, VIEW, {
+                updatedAt: Date.now() - 60_000,
+            });
+        }
+        // The diary, seen earlier in this tab.
+        client.setQueryData(
+            diaryRead.options(ORG, diaryAsk("2026-11-25")).queryKey,
+            DIARY,
+        );
+        client.setQueryData(domainKey("customers", ORG, "customer", "c1"), {});
+        client.setQueryData(domainKey("invoices", ORG, "list", {}), {});
+        shown = [];
+        function Probe({ report }: { report: (s: BookingSave) => void }) {
+            shown.push(useBooking(ask).data);
+            report(useBookingSaveWithQuery());
+            return null;
+        }
+        ({ unmount } = renderWithQuery(<Probe report={(s) => (page = s)} />, {
+            client,
+            orgId: ORG,
+        }));
+    }
+    beforeEach(() => {
+        fetchMock.mockImplementation(() =>
+            Promise.resolve(
+                new Response(JSON.stringify(MOVED), { status: 200 }),
+            ),
+        );
+    });
+    afterEach(() => unmount());
+    const stale = (key: readonly unknown[]) =>
+        client.getQueryState(key)?.isInvalidated;
+
+    it("a booking seen before draws at once, then is read once behind it", async () => {
+        open(true);
+        expect(shown[0]).toEqual(VIEW);
+        await tick();
+        expect(bookingReads()).toBe(1);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(shown.at(-1)).toEqual(MOVED);
+    });
+
+    it("never seen: nothing drawn until its one read lands", async () => {
+        open(false);
+        expect(shown[0]).toBeUndefined();
+        await tick();
+        expect(bookingReads()).toBe(1);
+        expect(shown.at(-1)).toEqual(MOVED);
+    });
+
+    it("a save reads the booking once; the list, diary, Home, customers and invoices only marked stale", async () => {
+        open(false);
+        await tick();
+        fetchMock.mockClear();
+        const action = vi.fn((..._org: [] | [string]) =>
+            Promise.resolve({ ok: true as const }),
+        );
+        await act(() => page.save(action));
+        expect(action).toHaveBeenCalledWith(ORG);
+        expect(bookingReads()).toBe(1);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(stale(bookingsRead.options(ORG, {}).queryKey)).toBe(true);
+        expect(
+            stale(diaryRead.options(ORG, diaryAsk("2026-11-25")).queryKey),
+        ).toBe(true);
+        expect(stale(domainKey("home", ORG, "home"))).toBe(true);
+        expect(stale(domainKey("customers", ORG, "customer", "c1"))).toBe(true);
+        expect(stale(domainKey("invoices", ORG, "list", {}))).toBe(true);
+        page.saved();
+        await tick();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("a refusal reads nothing and marks nothing stale", async () => {
+        open(false);
+        await tick();
+        fetchMock.mockClear();
+        const refused = { ok: false as const, error: "That time was taken." };
+        expect(await act(() => page.save(() => Promise.resolve(refused)))).toBe(
+            refused,
+        );
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(stale(bookingsRead.options(ORG, {}).queryKey)).toBe(false);
+    });
+
+    it("a write made some other way (Change who, an outcome) reads the booking once", async () => {
+        open(false);
+        await tick();
+        fetchMock.mockClear();
+        page.refresh();
+        await tick();
+        expect(bookingReads()).toBe(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(refresh).not.toHaveBeenCalled();
     });
