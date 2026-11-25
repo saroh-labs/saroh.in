@@ -10,12 +10,12 @@ import { TextLink } from "@saroh/ui/text-link";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ExternalLink } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { QuickLook } from "@/components/shared/forms/quick-look";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { useScreenLink } from "@/components/shared/page/screen-pending";
 import type { CrmResult } from "@/lib/api/http";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate } from "@/lib/format/datetime";
@@ -44,6 +44,7 @@ import {
     deliveryReason,
     SOCIAL_WORDS,
 } from "@/lib/social/saroh-social-words";
+import { useSocialSave } from "@/lib/social/use-social";
 
 import { ChannelIcon } from "./channels/channel-icon";
 import { PostThumb } from "./post-thumb";
@@ -73,7 +74,7 @@ export function PostSheet({
     narrow: boolean;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useSocialSave();
     const zone = useBusinessZone();
     const [asking, setAsking] = useState<Asking>(null);
     const [busy, setBusy] = useState(false);
@@ -87,7 +88,7 @@ export function PostSheet({
     const started = !post.canEdit && post.status !== "CANCELLED" && !heldUnsent;
     const failed = post.channels.filter((c) => c.status === "FAILED");
 
-    /** A write: said once, the list refreshed; false keeps a dialog open. */
+    /** A write: said once, Social read again; false keeps a dialog open. */
     async function run(
         write: () => Promise<CrmResult<unknown>>,
         done: string,
@@ -101,29 +102,33 @@ export function PostSheet({
         }
         showSuccess(done);
         if (close) onClose();
-        router.refresh();
+        await saved();
         return true;
     }
 
     const postNow = () =>
         run(
-            () => savePost(post.id, { action: "now" }),
+            () => savePost(post.id, { action: "now" }, orgId),
             SOCIAL_WORDS.postingNow,
         );
     const pickTime = (at: string) =>
         post.status === "DRAFT"
             ? run(
                   () =>
-                      savePost(post.id, { action: "schedule", publishAt: at }),
+                      savePost(
+                          post.id,
+                          { action: "schedule", publishAt: at },
+                          orgId,
+                      ),
                   SOCIAL_WORDS.scheduledFor(whenWords(at, zone)),
               )
             : failed.length > 0
               ? run(
-                    () => tryPostAgain(post.id, at),
+                    () => tryPostAgain(post.id, at, orgId),
                     SOCIAL_WORDS.scheduledFor(whenWords(at, zone)),
                 )
               : run(
-                    () => savePost(post.id, { publishAt: at }),
+                    () => savePost(post.id, { publishAt: at }, orgId),
                     SOCIAL_WORDS.moved(whenWords(at, zone)),
                 );
 
@@ -160,7 +165,7 @@ export function PostSheet({
                     busyLabel={SOCIAL_WORDS.posting}
                     onClick={() =>
                         void run(
-                            () => tryPostAgain(post.id),
+                            () => tryPostAgain(post.id, undefined, orgId),
                             SOCIAL_WORDS.tryingAgain,
                         )
                     }
@@ -249,7 +254,7 @@ export function PostSheet({
                             busy={busy}
                             onSave={() =>
                                 void run(
-                                    () => savePost(post.id, { caption }),
+                                    () => savePost(post.id, { caption }, orgId),
                                     SOCIAL_WORDS.captionSaved,
                                 )
                             }
@@ -351,7 +356,7 @@ export function PostSheet({
                 keepLabel={SOCIAL_WORDS.keepScheduled}
                 onConfirm={async () => ({
                     ok: await run(
-                        () => cancelPost(post.id),
+                        () => cancelPost(post.id, orgId),
                         SOCIAL_WORDS.cancelledDone,
                     ),
                 })}
@@ -373,7 +378,7 @@ export function PostSheet({
                 keepLabel={SOCIAL_WORDS.keepIt}
                 onConfirm={async () => ({
                     ok: await run(
-                        () => deletePost(post.id),
+                        () => deletePost(post.id, orgId),
                         started ? SOCIAL_WORDS.removed : SOCIAL_WORDS.deleted,
                         true,
                     ),
@@ -435,6 +440,7 @@ function Reason({
     onTime: () => void;
 }) {
     const zone = useBusinessZone();
+    const screenLink = useScreenLink();
     const after = delivery.retryAfter
         ? whenWords(delivery.retryAfter, zone)
         : null;
@@ -449,6 +455,7 @@ function Reason({
               !connected ? (
                 <IntentLink
                     href="/social?tab=channels"
+                    onNavigate={screenLink("/social?tab=channels")}
                     className="inline-flex min-h-11 w-fit items-center text-[13px] font-semibold underline decoration-border-strong underline-offset-4"
                 >
                     {fix === "connect"

@@ -12,6 +12,7 @@ export const POST_WORDS = {
     title: "New post",
     ownTitle: "Your own post",
     social: "Social",
+    loading: "Loading Social",
     description:
         "Make a post from anything you sell and share it. Scheduling to your channels comes with Saroh Social.",
     ownDescription: "Type a line. Saroh draws it in your website's look.",

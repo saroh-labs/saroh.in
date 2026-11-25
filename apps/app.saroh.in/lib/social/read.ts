@@ -9,6 +9,7 @@ import { listServices } from "@/lib/services/service";
 import { readShareSetup } from "@/lib/share-item/read";
 import type { ShareSetup } from "@/lib/share-item/share";
 import { getSite } from "@/lib/sites/service";
+import type { WebAddressLinks } from "@/lib/sites/share-links";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 
 import type { LinkSources } from "./links";
@@ -46,16 +47,33 @@ export async function readCreatePost(organization: {
     const web = await readWebAddressLinks();
     const setup = await readShareSetup(web);
     if (!web || !setup) return null;
+    return {
+        setup,
+        origin: web.origin,
+        ...(await readPicks(organization, web, setup.siteId)),
+    };
+}
+
+/**
+ * What there is to post about: the products, services, blog posts and
+ * offers this role may read, the booking page and the site's pages, each
+ * read on its own; what failed is named in `failed`.
+ */
+export async function readPicks(
+    organization: { actions?: readonly string[] },
+    web: WebAddressLinks,
+    siteId: string,
+): Promise<Pick<CreatePostRead, "pick" | "links" | "failed">> {
     const may = (action: string) => permits(organization, action);
     const none = Promise.resolve([] as never[]);
     const [products, services, posts, offers, booking, site] =
         await Promise.all([
             may("store:read") ? orNull(listProducts()) : none,
             orNull(listServices()),
-            orNull(listPosts(setup.siteId)),
+            orNull(listPosts(siteId)),
             may("discount:read") ? orNull(listDiscounts()) : none,
             readBookingLink(),
-            orNull(getSite(setup.siteId)),
+            orNull(getSite(siteId)),
         ]);
     const failed = [
         products ? null : "products",
@@ -64,8 +82,6 @@ export async function readCreatePost(organization: {
         offers ? null : "offers",
     ].filter((t): t is string => t !== null);
     return {
-        setup,
-        origin: web.origin,
         failed,
         pick: {
             products: products ?? [],
