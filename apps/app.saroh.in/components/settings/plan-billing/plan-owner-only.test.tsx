@@ -234,8 +234,12 @@ describe("Settings › Plan and billing, by who is reading", () => {
             role: "MEMBER",
             actions: ["org:read"],
         });
-        // The route refuses it: the tab says so (`SettingsSectionError`).
+        // The route refuses it, and the page says so itself, by name.
         expect(html).toBe("REFUSED");
+        const { default: PlanBillingPage } =
+            await import("@/app/(shell)/settings/(sections)/billing/page");
+        const own = renderToStaticMarkup(await PlanBillingPage());
+        expect(own).toContain("You can&#x27;t open Plan and billing");
     });
 });
 

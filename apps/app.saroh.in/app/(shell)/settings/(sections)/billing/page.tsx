@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 
 import { PLANS_HREF } from "@/components/settings/plan-billing/styles";
 import { SettingsTabScreen } from "@/components/settings/settings-tab-screen";
+import { BillingView } from "@/components/settings/tabs/billing-tab";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
+import { mayReadBilling } from "@/lib/saroh-billing/screen-service";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -39,7 +41,9 @@ import { requireSession } from "@/lib/session";
  * On React Query (DEC-259): the page checks the session and moves an old
  * link on; what the tab draws (`/api/settings/billing`,
  * `lib/saroh-billing/screen-service.ts`) loads in the browser, drawn by
- * `SettingsTabScreen`, and whoever may not open the plan is told so there.
+ * `SettingsTabScreen`. Whoever may not open the plan is told so here, from
+ * the same gate as the read route (`mayReadBilling`): the route's 403 would
+ * only draw a generic denial.
  */
 // Always named. While plans aren't shown the address is not-found, and
 // the not-found page's own title replaces this one; a tab never falls back
@@ -64,6 +68,10 @@ export default async function PlanBillingPage({
         redirect(`${PLANS_HREF}?${on.toString()}`);
     }
     const org = await activeOrganizationOnce();
+    // Unknown (no business resolved) opens, and the API decides.
+    if (org && !(await mayReadBilling())) {
+        return <BillingView screen={{ kind: "denied" }} />;
+    }
     return (
         <SettingsTabScreen tab="/settings/billing" kind={org?.kind ?? null} />
     );
