@@ -4,8 +4,10 @@ import { defineRead } from "@/lib/query/define-read";
 import type { DomainKey } from "@/lib/query/keys";
 import { domainKey } from "@/lib/query/keys";
 
+import type { MomentView } from "@/lib/moments/keys";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 import type { InvitationState } from "@/lib/product-reviews/service";
+import type { ShareLink } from "@/lib/sites/share-links";
 import type { OrderFilterOptions, OrderListPage } from "./business-service";
 import type { OrdersQuery } from "./list-query";
 import { ordersHref } from "./list-query";
@@ -34,8 +36,19 @@ export const orderKeys = (orgId: string): DomainKey =>
 // each means, as the page always has.
 const word = z.string().max(100).optional();
 
+/**
+ * One page of the list, with what its first run says from that page: the
+ * business's first, 10th or 100th order on the whole list's first page
+ * (wave G), and, with no orders yet, the share button (DEC-069). Read
+ * here, beside the page, since the page loads in the browser (DEC-259).
+ */
+export interface OrdersListView extends OrderListPage {
+    moment: MomentView | null;
+    share: ShareLink | null;
+}
+
 /** One page of the list, as the address narrows it (`ordersAsk`). */
-export const ordersListRead = defineRead<OrderListPage>()({
+export const ordersListRead = defineRead<OrdersListView>()({
     key: (orgId, ask) => domainKey("orders", orgId, "list", ask),
     route: {
         path: "/api/orders",

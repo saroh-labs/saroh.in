@@ -16,13 +16,13 @@ Two patterns run side by side. A route is one or the other, never both
 - **Adopted** — React Query, for the routes in the registry (DEC-259). Home
   first; it is Current per section as each screen ships.
 
-| State                                      | Unmigrated route (**Current**), accounts, merchant sites, admin                                                                                                                                       | Migrated `app.saroh.in` route (**Adopted**)                                                                                                         |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Server data                                | Server Components through `lib/<domain>/service.ts`, request-cached with React `cache()`                                                                                                              | Prefetched on the server into a per-request QueryClient, read by `useQuery` through `lib/<domain>/use-<domain>.ts`; refetched over a GET read route |
-| Writes                                     | Server Action → service → `mutate()` → `{ ok: true, data }` or `{ ok: false, error }`, then `router.refresh()` or navigate. Called from the client through `runAction` (`frontend-error-feedback.md`) | The same Server Action, called through `useActionMutation`, which declares `invalidates`; no `router.refresh()`                                     |
-| Shareable filters, tabs, the selected page | The URL, read from the page's `searchParams` on the server                                                                                                                                            | The URL; the value is part of the query key                                                                                                         |
-| Active organization                        | The `active_org` cookie, sent as `x-organization-id`; the API re-validates membership                                                                                                                 | The same cookie; the organization id is also in every key and sent with every read and write, and the server refuses a mismatch                     |
-| Open/closed, draft input, hover            | `useState` in the component                                                                                                                                                                           | `useState` in the component                                                                                                                         |
+| State                                      | Unmigrated route (**Current**), accounts, merchant sites, admin                                                                                                                                       | Migrated `app.saroh.in` route (**Adopted**)                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Server data                                | Server Components through `lib/<domain>/service.ts`, request-cached with React `cache()`                                                                                                              | Read in the browser by `useQuery` through `lib/<domain>/use-<domain>.ts`, over a GET read route; the server awaits only the gates |
+| Writes                                     | Server Action → service → `mutate()` → `{ ok: true, data }` or `{ ok: false, error }`, then `router.refresh()` or navigate. Called from the client through `runAction` (`frontend-error-feedback.md`) | The same Server Action, called through `useActionMutation`, which declares `invalidates`; no `router.refresh()`                   |
+| Shareable filters, tabs, the selected page | The URL, read from the page's `searchParams` on the server                                                                                                                                            | The URL; the value is part of the query key                                                                                       |
+| Active organization                        | The `active_org` cookie, sent as `x-organization-id`; the API re-validates membership                                                                                                                 | The same cookie; the organization id is also in every key and sent with every read and write, and the server refuses a mismatch   |
+| Open/closed, draft input, hover            | `useState` in the component                                                                                                                                                                           | `useState` in the component                                                                                                       |
 
 There is no global client store. React Query holds server state only, in
 `app.saroh.in`, and nowhere else.
@@ -32,8 +32,8 @@ There is no global client store. React Query holds server state only, in
 - Routes are registered by **route glob** in `lib/query/rq-routes.ts`, not by
   domain.
 - On a registered route anything that shows changeable data is a Client
-  Component reading a query; the server component renders the frame, the gates
-  and the prefetch.
+  Component reading a query; the server component checks access and renders
+  the frame, nothing more (DEC-259, amended 24 Nov 2026).
 - A registered route never calls `router.refresh()`. An unregistered route keeps
   it. The exceptions are chrome a write changes on the server (unread count,
   tab title, module badges, active business name), listed in
@@ -42,19 +42,35 @@ There is no global client store. React Query holds server state only, in
 
 ## React Query — **Adopted** (DEC-259)
 
-- **One definition, two paths.** A domain's `lib/<domain>/queries.ts` defines
-  the key factory and each read once; the server prefetch calls the service, the
-  browser calls the read route. A contract test per domain asserts both give the
-  same shape.
+- **One definition.** A domain's `lib/<domain>/queries.ts` defines the key
+  factory and each read once; the browser calls the read route, which pairs
+  the read with its service (`ServerRead`). A contract test per domain
+  (`expectReadContract`) asserts the service and the route give the same JSON.
 - **Hooks, not fetches.** Components import `use-<domain>.ts`; none writes its
   own fetch or key. Presentational components stay props-in; a thin container
   calls the hook.
-- **Prefetch.** Gate reads (session, organization, permissions, `notFound`) are
-  awaited and decide the response. Display reads are `prefetchQuery`, awaited
-  only where a section would flash empty. **Every un-awaited prefetch is
-  dehydrated**, pending included, or it is orphaned when the response ends. A
-  failed prefetch is swallowed; the client then reads and lands in the section's
-  existing failed state, never an empty list.
+- **Data loads on the client** (owner, 24 Nov 2026; DEC-259 amended). The
+  page awaits only gates: session, the active business, role and permissions,
+  module guards, redirects, `notFound`/`forbidden`, and facts that decide what
+  is offered (payments on, the business's zone, money shown). It renders the
+  container and **prefetches no display read**: no `prefetchRead`, no
+  `HydrationBoundary`. The container returns the route's own loader (the
+  page passes `skeleton={<Loading />}` from its `loading.tsx`; the container
+  then owns the `PageContainer`, so nothing nests or jumps) until its first
+  `useQuery` lands, and its existing failed state on error (`throw` to
+  `error.tsx`, or the screen's own). A screen that draws several queries
+  waits for the ones that would otherwise say "couldn't be read" while still
+  on their way. A record's page may keep a `notFound` only when it shares the
+  tab title's `cache()`d read (`readOrderOnce`, `readInvoiceOnce`). What a
+  screen says from its data (a moment, the first-run share, Home's news)
+  comes with that screen's read, never from a page that read it first.
+- **Security, unchanged.** Every read goes through a read route (`readRoute`:
+  session, `x-organization-id` = the active business or 409, same origin, GET
+  only, `private,no-store`, generic errors); the API checks membership,
+  paused seats and permission on every call; no query's data is in the
+  page's HTML; the middleware sends a signed-out request for a page to
+  sign-in and a read route answers it 401; the cache is per business key and
+  cleared on sign-out in every tab.
 - **Keys.** `[domain, orgId, kind, ...params]`, built only through
   `domainKey(domain, orgId)`, a branded tuple; a key without the organization
   fails the typecheck. Each mutation declares `invalidates`; invalidation fires
@@ -116,7 +132,8 @@ There is no global client store. React Query holds server state only, in
   the list through `organizationsOnce` (or `resolveActiveOrganization()`),
   never `listOrganizations`, which is for a Server Action that changed it.
 - **Never cached:** billing secrets, API keys, tokens, provider credentials. The
-  dehydrate allowlist is explicit.
+  dehydrate allowlist (`dehydrate-allow.ts`) stays explicit, though no page
+  dehydrates any more.
 
 ### The read-route contract
 
@@ -197,10 +214,10 @@ cache.
   domains) the same triggers and guards invalidate that route's domains for
   the open business instead, so its shown queries read again; it also waits
   while those queries are reading or any save is on its way. A route in
-  `lib/query/chrome-refresh.ts` (capped at 6) calls `router.refresh()` instead
-  and only marks its queries stale: its render's prefetch hydrates them, so
-  each is read once. Such a page prefetches every query it shows. A route on
-  neither list keeps the path above.
+  `lib/query/chrome-refresh.ts` (capped at 6) also calls `router.refresh()`,
+  for its server-drawn chrome; its queries read again in the browser all the
+  same, since its render sends no rows. A route on neither list keeps the
+  path above.
 - **Outside a render, `cache()` doesn't share.** A read route's handler runs in
   `inReadScope` (`lib/api/read-scope.ts`, via `readRoute`), one API answer per
   URL; a Server Action called from a React Query screen takes the tab's

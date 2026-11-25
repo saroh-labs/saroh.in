@@ -25,6 +25,7 @@ import {
 } from "@/lib/products/tracking";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
+import { useProductSaved } from "@/components/commerce/quick-edits/quick-edits";
 import { STOCK_SHEET_PARAM } from "./stock-sheet";
 
 /**
@@ -47,6 +48,7 @@ export function StartTrackingButton({
     className?: string;
 }) {
     const router = useRouter();
+    const saved = useProductSaved();
     const [pending, start] = useTransition();
 
     function turnOn() {
@@ -60,6 +62,9 @@ export function StartTrackingButton({
                 return;
             }
             showSuccess(TRACKING_ON_SAID, TRACKING_ON_NEXT);
+            // The page draws from the product's query, not the server's
+            // render: read it again, so the Stock tab finds it counted.
+            await saved();
             router.push(
                 `${productHref(storeId, productId, "stock")}&${STOCK_SHEET_PARAM}=stock`,
                 { scroll: false },
@@ -96,6 +101,7 @@ export function StopTrackingButton({
     className?: string;
 }) {
     const router = useRouter();
+    const saved = useProductSaved();
     const [asking, setAsking] = useState(false);
     const confirm = stopTrackingConfirm(productName);
 
@@ -108,6 +114,7 @@ export function StopTrackingButton({
             return { ok: false, error: `${TRACKING_STILL_ON}. ${res.error}` };
         }
         showSuccess(TRACKING_OFF_SAID);
+        await saved();
         // Untracked, the product has no stock view: back to Overview.
         router.push(productHref(storeId, productId));
     }

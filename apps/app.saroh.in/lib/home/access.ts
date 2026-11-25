@@ -3,8 +3,13 @@ import "server-only";
 import { cache } from "react";
 
 import type { HomeSetup } from "@/components/home/dashboard/home-setup";
+import { hasAnyInvoice } from "@/lib/invoices/service";
 import { listModules } from "@/lib/modules/service";
+import { homeMoment, homeNewFeature } from "@/lib/moments/read";
 import { getSeenMoments } from "@/lib/moments/service";
+import type { OrganizationKind } from "@/lib/organizations/kind";
+import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
+import type { Organization } from "@/lib/organizations/service";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import type { ServerRead } from "@/lib/query/route";
@@ -13,8 +18,10 @@ import { loadReadyChecklist } from "@/lib/settings/ready-service";
 import { shareLink } from "@/lib/sites/share-links";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 
+import type { InvoiceJobFacts } from "./first-run";
+import { mayWriteInvoices } from "./first-run";
+import type { HomeScreen } from "./queries";
 import { homeRead, homeSetupRead } from "./queries";
-import type { HomeModel } from "./service";
 import { getHome } from "./service";
 
 /**
@@ -39,11 +46,16 @@ export async function maySeeSetup(): Promise<boolean> {
 /**
  * Home as the screen draws it: the API's answer without what no part of
  * Home shows (the old ranked `actions` and their evidence, and the week's
- * figures besides cheques waiting), so the browser isn't sent them.
+ * figures besides cheques waiting), so the browser isn't sent them; and
+ * what Home says from it, each read only when it can be said (a
+ * Reviewer's Home reads nothing more).
  */
-export async function readHomeScreen(): Promise<HomeModel> {
-    const home = await getHome();
-    return {
+export async function readHomeScreen(): Promise<HomeScreen> {
+    const [home, business] = await Promise.all([
+        getHome(),
+        activeOrganizationOnce(),
+    ]);
+    const screen = {
         ...home,
         actions: [],
         week: home.week
@@ -56,6 +68,39 @@ export async function readHomeScreen(): Promise<HomeModel> {
               }
             : null,
     };
+    if (home.view === "reviewer")
+        return { ...screen, moment: null, news: null };
+    const own = home.view !== "staff";
+    // The first order or booking, in its first day (wave G), said once,
+    // above the work: the business's Home only.
+    const moment =
+        own && home.hasAnyModule ? await homeMoment(home, business) : null;
+    // Else one new feature, only while nothing else holds the slot (a
+    // part that couldn't load): one message at a time, never stacked.
+    const news =
+        home.hasAnyModule && !moment && home.unavailable.length === 0
+            ? await homeNewFeature(business)
+            : null;
+    const invoicing =
+        own && !home.hasAnyModule
+            ? await loadInvoicing(business, kindOf(business?.kind))
+            : undefined;
+    return { ...screen, moment, news, ...(invoicing ? { invoicing } : {}) };
+}
+
+/**
+ * "Invoice a client" (DEC-070), for a kind whose first run offers it: to
+ * someone who may write invoices, until the business has one. The invoice
+ * read happens only then, and a read that fails leaves the card offered.
+ */
+async function loadInvoicing(
+    business: Organization | null,
+    kind: OrganizationKind,
+): Promise<InvoiceJobFacts | undefined> {
+    if (!firstRunOrder(kind).includes(INVOICE_JOB)) return undefined;
+    if (!mayWriteInvoices(business))
+        return { mayWrite: false, hasInvoice: null };
+    return { mayWrite: true, hasInvoice: await hasAnyInvoice() };
 }
 
 /**
@@ -87,7 +132,7 @@ export async function readHomeSetup(): Promise<HomeSetup> {
 /** Home's reads take no params. */
 type HomeParams = Parameters<typeof homeRead.key>[1];
 
-export const homeServer: ServerRead<HomeParams, HomeModel> = {
+export const homeServer: ServerRead<HomeParams, HomeScreen> = {
     read: homeRead,
     service: readHomeScreen,
 };

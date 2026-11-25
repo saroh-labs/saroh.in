@@ -234,6 +234,30 @@ describe("OrganizationContextService.listForUser", () => {
         jest.clearAllMocks();
     });
 
+    it("reads only one business's row when asked for it (GET /organizations/:id/me)", async () => {
+        membershipFindMany.mockResolvedValue([
+            {
+                role: "ADMIN",
+                organization: {
+                    lifecycleStatus: "ACTIVE",
+                    id: "org_1",
+                    name: "Acme",
+                    slug: "acme",
+                },
+            },
+        ]);
+
+        const [row] = await service.listForUser("user_1", "org_1");
+
+        expect(membershipFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { userId: "user_1", organizationId: "org_1" },
+            }),
+        );
+        expect(row).toMatchObject({ id: "org_1", role: "ADMIN" });
+        expect(row?.actions).toContain("org:update");
+    });
+
     it("maps memberships to org summaries with the caller's role", async () => {
         membershipFindMany.mockResolvedValue([
             {

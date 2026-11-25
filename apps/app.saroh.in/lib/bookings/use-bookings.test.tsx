@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
- * The bookings list on React Query (DEC-259), in the browser: the page's
- * prefetch is mounted over without a read, a date filter is a new key with
+ * The bookings list on React Query (DEC-259), in the browser: the first
+ * load reads the list once (nothing comes with the page's HTML), a list
+ * already read is mounted over without a read, a date filter is a new key with
  * the old rows kept meanwhile, a save reads the list once (Home and the
  * calendar only marked stale), a refusal reads nothing, and a part drawn
  * outside the list saves and refreshes as before.
@@ -33,7 +34,13 @@ import { domainKey } from "@/lib/query/keys";
 import { makeTestClient, renderWithQuery } from "@/lib/query/test-utils";
 
 const ORG = "org_1";
-const LIST: BookingsList = { bookings: [], timezone: "Asia/Kolkata", now: 1 };
+const LIST: BookingsList = {
+    bookings: [],
+    timezone: "Asia/Kolkata",
+    now: 1,
+    moment: null,
+    share: null,
+};
 const WEEK: BookingsList = { ...LIST, now: 2 };
 
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
@@ -53,7 +60,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** A browser client holding what the page's server render sent. */
+/** A browser client that has already read the list (an earlier visit). */
 function hydrated() {
     const server = makeTestClient();
     server.setQueryData(bookingsRead.options(ORG, {}).queryKey, LIST);
@@ -66,7 +73,25 @@ function hydrated() {
 }
 
 describe("the list's reads", () => {
-    it("first load draws the hydrated rows with no read of its own", async () => {
+    it("first load has no rows, then the list from one read in the browser", async () => {
+        const seen: unknown[] = [];
+        function Probe() {
+            seen.push(useBookingsList({}).data);
+            return null;
+        }
+        const { unmount } = renderWithQuery(<Probe />, {
+            client: makeTestClient(),
+            orgId: ORG,
+        });
+        expect(seen[0]).toBeUndefined();
+        await tick();
+        expect(seen.at(-1)).toEqual(WEEK);
+        expect(reads()).toBe(1);
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/bookings");
+        unmount();
+    });
+
+    it("a list already read is mounted over without a read", async () => {
         let shown: unknown;
         function Probe({ report }: { report: (data: unknown) => void }) {
             report(useBookingsList({}).data);

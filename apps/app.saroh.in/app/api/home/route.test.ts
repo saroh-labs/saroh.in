@@ -12,7 +12,17 @@ const h = vi.hoisted(
         active: string | null;
         business: { id: string; actions?: string[] } | null;
         home: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
-    } => ({ active: "org_a", business: null, home: vi.fn() }),
+        moment: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
+        news: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
+        invoiced: ReturnType<typeof vi.fn<() => Promise<boolean>>>;
+    } => ({
+        active: "org_a",
+        business: null,
+        home: vi.fn(),
+        moment: vi.fn(),
+        news: vi.fn(),
+        invoiced: vi.fn(),
+    }),
 );
 vi.mock("@/lib/api/http", () => ({
     ACTIVE_ORG_COOKIE: "active_org",
@@ -35,6 +45,13 @@ vi.mock("@/lib/settings/ready", () => ({
 }));
 vi.mock("@/lib/moments/service", () => ({
     getSeenMoments: () => Promise.resolve(null),
+}));
+vi.mock("@/lib/moments/read", () => ({
+    homeMoment: () => h.moment(),
+    homeNewFeature: () => h.news(),
+}));
+vi.mock("@/lib/invoices/service", () => ({
+    hasAnyInvoice: () => h.invoiced(),
 }));
 vi.mock("@/lib/modules/service", () => ({
     listModules: () => Promise.resolve([]),
@@ -89,6 +106,12 @@ const as =
         h.business = who;
         h.home.mockReset();
         h.home.mockImplementation(() => Promise.resolve(home()));
+        for (const fn of [h.moment, h.news]) {
+            fn.mockReset();
+            fn.mockResolvedValue(null);
+        }
+        h.invoiced.mockReset();
+        h.invoiced.mockResolvedValue(false);
     };
 
 beforeEach(as(OWNER));
@@ -105,6 +128,47 @@ describe("/api/home", () => {
             "startDate",
             "zone",
         ]);
+    });
+
+    it("says what Home says from it, each read only when it can be said", async () => {
+        const read = async () =>
+            (await (
+                await homeGET(readRequest("/api/home", { orgId: "org_a" }))
+            ).json()) as Record<string, unknown>;
+        const first = { key: "first-order", title: "Your first order" };
+        const news = { key: "new-ai-apps", title: "AI apps" };
+
+        // The business's Home: the moment holds the slot, so no news.
+        h.moment.mockResolvedValue(first);
+        h.news.mockResolvedValue(news);
+        expect(await read()).toMatchObject({ moment: first, news: null });
+        expect(h.news).not.toHaveBeenCalled();
+
+        // No moment: the news.
+        h.moment.mockResolvedValue(null);
+        expect(await read()).toMatchObject({ moment: null, news });
+
+        // A staff member's Home: no moment is asked, the news is.
+        as(OWNER, () => ({ ...HOME, view: "staff" }))();
+        h.news.mockResolvedValue(news);
+        expect(await read()).toMatchObject({ moment: null, news });
+        expect(h.moment).not.toHaveBeenCalled();
+
+        // A Reviewer's Home reads nothing more.
+        as(REVIEWER, () => ({ ...HOME, view: "reviewer" }))();
+        expect(await read()).toMatchObject({ moment: null, news: null });
+        expect(h.moment).not.toHaveBeenCalled();
+        expect(h.news).not.toHaveBeenCalled();
+
+        // Nothing on yet, for a kind that invoices: "Invoice a client".
+        as(
+            { ...OWNER, kind: "SOLO", actions: ["invoice:write"] } as never,
+            () => ({ ...HOME, hasAnyModule: false }),
+        )();
+        expect(await read()).toMatchObject({
+            invoicing: { mayWrite: true, hasInvoice: false },
+            news: null,
+        });
     });
 
     it("is the page's gate: anyone in the business, the API shaping it", async () => {

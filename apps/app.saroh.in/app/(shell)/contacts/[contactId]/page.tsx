@@ -1,7 +1,6 @@
 import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Button } from "@saroh/ui/button";
 import { IntentLink } from "@saroh/ui/intent-link";
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -12,7 +11,6 @@ import { LeadsPanel } from "@/components/contacts/leads-panel";
 import { SubscribeAction } from "@/components/contacts/subscribe-action";
 import { CustomerDetailContainer } from "@/components/customers/detail/customer-detail-container";
 import type { PackSale } from "@/components/customers/detail/packs-tab";
-import { PageContainer } from "@/components/shared/page/page-container";
 import { AccessDenied } from "@/components/shared/states/access-denied";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { customerPage } from "@/lib/ask-ai/page-hints";
@@ -40,10 +38,7 @@ import {
     mergedRedirectPath,
 } from "@/lib/customer-workspace/merge";
 import type { ReviewsRead, Tab, TabKey } from "@/lib/customer-workspace/view";
-import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
-import { customerServer } from "@/lib/customers/access-server";
-import type { CustomerView } from "@/lib/customers/queries";
-import { customerRead } from "@/lib/customers/queries";
+import { readCustomerDetailOnce } from "@/lib/customers/access-server";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { sellsProducts } from "@/lib/orders/sells-products";
@@ -51,9 +46,9 @@ import { knownRoleName } from "@/lib/organizations/role-name";
 import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { contactReviews } from "@/lib/product-reviews/service";
-import { prefetchRead } from "@/lib/query/prefetch";
-import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
+
+import Loading from "./loading";
 
 // "Contact", never their name: a tab's title shows in a screen share, in
 // history and in bookmarks (`lib/page-title.ts`).
@@ -76,12 +71,13 @@ export const metadata = { title: "Contact" };
  * never merged on its own (DEC-097); a site account's own record keeps
  * DEC-049's placeholder email out of view.
  *
- * On React Query (DEC-259): the gates and the tabs drawn here (Leads,
- * Enquiries, Courses, what Subscribe and a pack sale offer) are the page's;
- * the record, their messages, what they'd be offered to link or merge and
- * their open removal request (`/api/customers/[customerId]`) are
- * prefetched and hydrated, and `CustomerDetailContainer` reads them again
- * after a write.
+ * On React Query (DEC-259), loaded in the browser: the gates and the tabs
+ * drawn here (Leads, Enquiries, Courses, what Subscribe and a pack sale
+ * offer) are the page's, from their record (missing is this page's 404,
+ * merged a redirect); the record with their messages, what they'd be
+ * offered to link or merge and their open removal request
+ * (`/api/customers/[customerId]`) is `CustomerDetailContainer`'s query,
+ * read from the browser behind the route's loader and again after a write.
  */
 export default async function PersonPage({
     params,
@@ -120,22 +116,10 @@ export default async function PersonPage({
     }
 
     if (!organization) notFound();
-    const client = getServerQueryClient();
-    const ask = { customerId: contactId };
-    await prefetchRead(client, customerServer, organization.id, ask);
-    const key = customerRead.options(organization.id, ask).queryKey;
-    const state = client.getQueryState(key);
     // No such contact here. A read that failed otherwise is the page
     // failing (`error.tsx`), as before.
-    if ((state?.error as { status?: number } | null)?.status === 404) {
-        notFound();
-    }
-    if (state?.status === "error") {
-        throw state.error ?? new Error("The customer couldn't be read");
-    }
-    const view = client.getQueryData<CustomerView>(key);
-    if (!view) notFound();
-    const detail = view.detail;
+    const detail = await readCustomerDetailOnce(contactId);
+    if (!detail) notFound();
     // A record merged into another (C9): its old address leads to the one
     // kept, on the same tab.
     if (isMergedRedirect(detail)) {
@@ -165,8 +149,6 @@ export default async function PersonPage({
     };
     const packsShown = detail.packs !== undefined;
 
-    // Their message thread (A13) is the read's, for `message:read`.
-    const thread = view.thread;
     const [reviews, packSale, crm, holdings, products] = await Promise.all([
         // Their product reviews (C6), where the business sells.
         detail.linkedCustomers !== undefined && may("product-review:read")
@@ -280,10 +262,6 @@ export default async function PersonPage({
         );
     }
 
-    const tabs = [
-        ...tabsFor(detail, thread, reviews),
-        ...extra.map(({ key, label, count }) => ({ key, label, count })),
-    ];
     const canSensitive = maySeeSensitive(organization);
     // C12's sensitive tick names who can read the note (DEC-073).
     const sensitiveRoles =
@@ -310,61 +288,59 @@ export default async function PersonPage({
     );
 
     return (
-        <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-            <HydrationBoundary state={dehydrate(client)}>
-                {/* What Ask AI offers on this person, from this read (AF 5). */}
-                <AskAiPageIs
-                    page={customerPage(detail.contact, {
-                        zone: detail.timezone,
-                        total: detail.stats.orders,
-                        orders: detail.orders?.rows,
-                        visits: detail.bookings?.past.map((b) => b.startAt),
-                    })}
-                />
-                <CustomerDetailContainer
-                    ask={ask}
-                    tab={query.tab}
-                    initialTab={tabFromQuery(query.tab, tabs)}
-                    bizName={organization.name}
-                    sells={sells}
-                    // Contacts, the person page's own list; Sell › Customers
-                    // only where Contacts is off and they buy (#858).
-                    crumbsSell={crumbsToSell(
-                        moduleOn(modules, "CRM"),
-                        sells,
-                        detail.linkedCustomers?.length ?? 0,
-                    )}
-                    canWrite={canWrite}
-                    canMerge={canMerge}
-                    canRemove={canRemove}
-                    canConsent={may("consent:write")}
-                    canSensitive={canSensitive}
-                    sensitiveRoles={sensitiveRoles}
-                    userId={session.user.id}
-                    reviews={reviews}
-                    canReplyReviews={may("product-review:write")}
-                    packSale={packSale}
-                    canExtendPacks={packsShown && canWritePacks(organization)}
-                    nowIso={now.toISOString()}
-                    extra={extra}
-                    actions={actions}
-                    deleteWords={deleteWords}
-                    canRecordPayment={acts.recordPayment}
-                    starts={personStarts(contactId, opens, {
-                        removed,
-                        sellsProducts: products,
-                    })}
-                    overviewExtra={
-                        removed ? null : (
-                            <PersonFacts
-                                company={detail.contact.company}
-                                source={detail.contact.source}
-                            />
-                        )
-                    }
-                />
-            </HydrationBoundary>
-        </PageContainer>
+        <>
+            {/* What Ask AI offers on this person, from this read (AF 5). */}
+            <AskAiPageIs
+                page={customerPage(detail.contact, {
+                    zone: detail.timezone,
+                    total: detail.stats.orders,
+                    orders: detail.orders?.rows,
+                    visits: detail.bookings?.past.map((b) => b.startAt),
+                })}
+            />
+            <CustomerDetailContainer
+                skeleton={<Loading />}
+                ask={{ customerId: contactId }}
+                tab={query.tab}
+                bizName={organization.name}
+                sells={sells}
+                // Contacts, the person page's own list; Sell › Customers
+                // only where Contacts is off and they buy (#858).
+                crumbsSell={crumbsToSell(
+                    moduleOn(modules, "CRM"),
+                    sells,
+                    detail.linkedCustomers?.length ?? 0,
+                )}
+                canWrite={canWrite}
+                canMerge={canMerge}
+                canRemove={canRemove}
+                canConsent={may("consent:write")}
+                canSensitive={canSensitive}
+                sensitiveRoles={sensitiveRoles}
+                userId={session.user.id}
+                reviews={reviews}
+                canReplyReviews={may("product-review:write")}
+                packSale={packSale}
+                canExtendPacks={packsShown && canWritePacks(organization)}
+                nowIso={now.toISOString()}
+                extra={extra}
+                actions={actions}
+                deleteWords={deleteWords}
+                canRecordPayment={acts.recordPayment}
+                starts={personStarts(contactId, opens, {
+                    removed,
+                    sellsProducts: products,
+                })}
+                overviewExtra={
+                    removed ? null : (
+                        <PersonFacts
+                            company={detail.contact.company}
+                            source={detail.contact.source}
+                        />
+                    )
+                }
+            />
+        </>
     );
 }
 

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Home on React Query (DEC-259), in the browser: the page's prefetch is
+ * Home on React Query (DEC-259), in the browser: the first load reads Home
+ * once (nothing comes with the page's HTML), a Home already read is
  * mounted over without a read, a save that changes Home reads it once and
  * stays busy until it is back, a refusal reads nothing, and a part drawn
  * on its own saves as before.
@@ -42,7 +43,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** A browser client holding what the page's server render sent. */
+/** A browser client that has already read Home (an earlier visit). */
 function hydrated() {
     const server = makeTestClient();
     server.setQueryData(homeRead.options(ORG, {}).queryKey, HOME as never);
@@ -53,7 +54,24 @@ function hydrated() {
 }
 
 describe("Home's reads", () => {
-    it("first load renders from the hydrated data with no read of its own", async () => {
+    it("first load has nothing, then Home from one read in the browser", async () => {
+        const seen: unknown[] = [];
+        function Probe() {
+            seen.push(useHome().data);
+            return null;
+        }
+        const { unmount } = renderWithQuery(<Probe />, {
+            client: makeTestClient(),
+            orgId: ORG,
+        });
+        expect(seen[0]).toBeUndefined();
+        await act(() => new Promise((r) => setTimeout(r, 20)));
+        expect(seen.at(-1)).toEqual({ ...HOME, needs: [] });
+        expect(reads("/api/home")).toBe(1);
+        unmount();
+    });
+
+    it("a Home already read is mounted over without a read", async () => {
         let shown: unknown;
         function Probe() {
             shown = useHome().data;

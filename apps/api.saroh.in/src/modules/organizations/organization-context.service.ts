@@ -200,10 +200,16 @@ export class OrganizationContextService {
         throw new ForbiddenException("You aren't a member of this business.");
     }
 
-    /** Organizations the user belongs to, with the caller's role, by name. */
-    async listForUser(userId: string): Promise<UserOrganization[]> {
+    /**
+     * Organizations the user belongs to, with the caller's role, by name;
+     * only `organizationId`'s row when given (`GET /organizations/:id/me`).
+     */
+    async listForUser(
+        userId: string,
+        organizationId?: string,
+    ): Promise<UserOrganization[]> {
         const listed = await prisma.membership.findMany({
-            where: { userId },
+            where: organizationId ? { userId, organizationId } : { userId },
             select: {
                 id: true,
                 role: true,

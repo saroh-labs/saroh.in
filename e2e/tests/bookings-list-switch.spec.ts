@@ -36,8 +36,10 @@ test.describe("Calendar | List", () => {
             // read before then is undefined.
             const list = switcher.getByRole("link", { name: "List" });
             await expect(list).toBeVisible();
-            const box = await list.boundingBox();
-            expect(box?.height).toBeGreaterThanOrEqual(44);
+            // The header may draw again as it settles: measure until it holds.
+            await expect
+                .poll(async () => (await list.boundingBox())?.height ?? 0)
+                .toBeGreaterThanOrEqual(44);
         }
         await switcher.getByRole("link", { name: "List" }).click();
         await expect(page).toHaveURL(/\/bookings\/all/);

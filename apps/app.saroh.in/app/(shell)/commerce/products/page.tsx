@@ -1,7 +1,5 @@
 import { rememberedPageSize } from "@/lib/paging/remembered";
 import { PartialRead } from "@saroh/ui/failed-read";
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
-import { redirect } from "next/navigation";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
@@ -28,20 +26,12 @@ import {
     canReadOrders,
     canStockProducts,
     canWriteProducts,
-    productsListServer,
 } from "@/lib/products/access";
 import { choicesFrom } from "@/lib/products/filter-choices";
-import {
-    catalogueFilter,
-    listHref,
-    readListQuery,
-} from "@/lib/products/list-query";
-import { productsListRead } from "@/lib/products/queries";
+import { listHref, readListQuery } from "@/lib/products/list-query";
 import type { CataloguePage } from "@/lib/products/service";
 import { listCataloguePage, listCategories } from "@/lib/products/service";
 import { listOptionNames } from "@/lib/products/settings";
-import { prefetchRead } from "@/lib/query/prefetch";
-import { getServerQueryClient } from "@/lib/query/server-client";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { stockTrackingOnce } from "@/lib/stock/service";
@@ -49,6 +39,8 @@ import { readSiteSelling } from "@/lib/stores/location-selling";
 import { listBusinessStores } from "@/lib/stores/service";
 import { listStorefronts } from "@/lib/stores/storefronts";
 import { isSince, sinceParam } from "@/lib/views/since";
+
+import Loading from "./loading";
 
 /**
  * Sell → Products: the business's catalogue, across every storefront
@@ -61,9 +53,10 @@ import { isSince, sinceParam } from "@/lib/views/since";
  * error boundary) — never an empty catalogue. Reviews failing leaves the
  * list and says their count is unknown.
  *
- * On React Query (DEC-259): the gates and side reads are decided here, the
- * list's page is prefetched (`/api/products`, `lib/products/access.ts`) and
- * hydrated, and `CatalogueContainer` reads every later one in place.
+ * On React Query (DEC-259), loaded in the browser: the gates and side reads
+ * are decided here; the list's page (`/api/products`,
+ * `lib/products/access.ts`) is `CatalogueContainer`'s query, read from the
+ * browser behind the route's loader, and every later one in place.
  */
 export const metadata = { title: "Products" };
 
@@ -117,8 +110,6 @@ export default async function CataloguePage({
         query.storefront = null;
     }
 
-    const client = getServerQueryClient();
-    const filter = catalogueFilter(query);
     const [
         page,
         reviews,
@@ -129,27 +120,11 @@ export default async function CataloguePage({
         paused,
         selling,
     ] = await Promise.all([
-        stores.length === 0
-            ? NO_PAGE
-            : onReviews
-              ? // The Reviews view still counts the chips: one row will do.
-                listCataloguePage({ limit: 1 }).then((p) => p ?? NO_PAGE)
-              : // The list's page, handed to the browser's query. A read
-                // that fails is the container's to say (the error boundary).
-                organization
-                ? prefetchRead(
-                      client,
-                      productsListServer,
-                      organization.id,
-                      filter,
-                  ).then(
-                      () =>
-                          client.getQueryData(
-                              productsListRead.options(organization.id, filter)
-                                  .queryKey,
-                          ) ?? null,
-                  )
-                : null,
+        // The Reviews view still counts the chips: one row will do. The
+        // list's page is the container's, read in the browser.
+        onReviews && stores.length > 0
+            ? listCataloguePage({ limit: 1 }).then((p) => p ?? NO_PAGE)
+            : NO_PAGE,
         canReadReviews ? listReviews().catch(() => null) : Promise.resolve([]),
         stockTrackingOnce(),
         // The Filter's choices and the Collections chip's cards (#524).
@@ -165,12 +140,6 @@ export default async function CataloguePage({
         // website" only then. Unread, it claims neither.
         readSiteSelling(),
     ]);
-    // A page past the end (the list has since got shorter, or the address
-    // was typed): start again at the first page rather than show an empty
-    // one.
-    if (!onReviews && query.page > 1 && page?.items.length === 0) {
-        redirect(listHref(query, { page: 1 }));
-    }
     // Named only while the list is narrowed to one (Settings › Options' count).
     const options = query.option
         ? await listOptionNames().catch(() => null)
@@ -183,7 +152,7 @@ export default async function CataloguePage({
           ? query.view
           : "all";
     // Reviews' own tabs; the list's are drawn from its query.
-    const counts = (page ?? NO_PAGE).counts;
+    const counts = page.counts;
     const tabs = (
         <ProductsTabs
             active={active}
@@ -268,78 +237,70 @@ export default async function CataloguePage({
     const pausedCut = activeCut(paused, "products");
 
     return (
-        <PageContainer width="full">
-            <HydrationBoundary state={dehydrate(client)}>
-                <CatalogueContainer
-                    defaultSize={remembered}
-                    reviewsCount={reviews ? reviews.length : null}
-                    showInventory={tracking?.tracked !== false}
-                    showReviews={canReadReviews}
-                    stores={stores}
-                    notice={
-                        <>
-                            {notice}
-                            {pausedCut ? (
-                                <PausedNote className="mb-3">
-                                    {pausedListWords(
-                                        "product",
-                                        paused?.products.count ?? 0,
-                                    )}
-                                </PausedNote>
-                            ) : null}
-                            {/* With products paused (#800) the note above says
+        <CatalogueContainer
+            skeleton={<Loading />}
+            defaultSize={remembered}
+            reviewsCount={reviews ? reviews.length : null}
+            showInventory={tracking?.tracked !== false}
+            showReviews={canReadReviews}
+            stores={stores}
+            notice={
+                <>
+                    {notice}
+                    {pausedCut ? (
+                        <PausedNote className="mb-3">
+                            {pausedListWords(
+                                "product",
+                                paused?.products.count ?? 0,
+                            )}
+                        </PausedNote>
+                    ) : null}
+                    {/* With products paused (#800) the note above says
                             the limit and links to Plan and billing: the
                             "reached your limit" card would say it again. */}
-                            {pausedCut ? null : (
-                                <PlanLimitNotice moduleId="products" />
-                            )}
-                        </>
-                    }
-                    ratings={ratings}
-                    choices={choices}
-                    canWrite={canWrite}
-                    meter={canWrite ? planMeter(access, "products") : null}
-                    // The banner below the tabs says the limit from 80%, or the
-                    // paused note does (#800); the header then doesn't say it
-                    // again (#874). New product stays off at the limit.
-                    limitBannerShown={
-                        rowNotice(access, "products").on || pausedCut !== null
-                    }
-                    pausedCut={pausedCut}
-                    sellsOnline={
-                        selling.known
-                            ? Boolean(
-                                  selling.site?.sellsFrom &&
-                                  selling.site.origin,
-                              )
-                            : null
-                    }
-                    canStock={canStockProducts(organization)}
-                    canOrders={canReadOrders(organization)}
-                    collectionCount={collections ? collections.length : null}
-                    collectionsPanel={
-                        active === "collections" ? (
-                            <CollectionsPanel
-                                collections={collections}
-                                categories={categories ?? []}
-                                canWrite={canWrite}
-                                activeId={query.collection}
-                                hrefs={Object.fromEntries(
-                                    (collections ?? []).map((c) => [
-                                        c.id,
-                                        listHref(query, { collection: c.id }),
-                                    ]),
-                                )}
-                                clearHref={listHref(query, {
-                                    collection: null,
-                                })}
-                                openNew={params.new === "collection"}
-                                closeNewHref={listHref(query)}
-                            />
-                        ) : null
-                    }
-                />
-            </HydrationBoundary>
-        </PageContainer>
+                    {pausedCut ? null : <PlanLimitNotice moduleId="products" />}
+                </>
+            }
+            ratings={ratings}
+            choices={choices}
+            canWrite={canWrite}
+            meter={canWrite ? planMeter(access, "products") : null}
+            // The banner below the tabs says the limit from 80%, or the
+            // paused note does (#800); the header then doesn't say it
+            // again (#874). New product stays off at the limit.
+            limitBannerShown={
+                rowNotice(access, "products").on || pausedCut !== null
+            }
+            pausedCut={pausedCut}
+            sellsOnline={
+                selling.known
+                    ? Boolean(selling.site?.sellsFrom && selling.site.origin)
+                    : null
+            }
+            canStock={canStockProducts(organization)}
+            canOrders={canReadOrders(organization)}
+            collectionCount={collections ? collections.length : null}
+            collectionsPanel={
+                active === "collections" ? (
+                    <CollectionsPanel
+                        collections={collections}
+                        categories={categories ?? []}
+                        canWrite={canWrite}
+                        activeId={query.collection}
+                        hrefs={Object.fromEntries(
+                            (collections ?? []).map((c) => [
+                                c.id,
+                                listHref(query, { collection: c.id }),
+                            ]),
+                        )}
+                        clearHref={listHref(query, {
+                            collection: null,
+                        })}
+                        openNew={params.new === "collection"}
+                        closeNewHref={listHref(query)}
+                    />
+                ) : null
+            }
+        />
     );
 }
