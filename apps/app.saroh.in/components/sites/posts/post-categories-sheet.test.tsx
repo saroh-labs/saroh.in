@@ -144,7 +144,18 @@ afterEach(() => {
 function render(categories: PostCategory[] | null = CATEGORIES) {
     act(() =>
         root.render(
-            <PostCategoriesSheet siteId="site_1" categories={categories} />,
+            <PostCategoriesSheet
+                siteId="site_1"
+                categories={categories}
+                // What a landed write does is the caller's: here, a spy.
+                save={{
+                    saved: () => {
+                        refresh();
+                        return Promise.resolve();
+                    },
+                }}
+                onRetry={refresh}
+            />,
         ),
     );
 }

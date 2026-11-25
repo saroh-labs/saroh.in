@@ -1,10 +1,10 @@
 "use client";
 
+import { useSettingsSaved } from "@/components/sites/settings/settings-saved";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { FailedState } from "@saroh/ui/data-state";
 import { IntentLink } from "@saroh/ui/intent-link";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { PlanWay } from "@/components/billing/plan-way";
@@ -80,7 +80,7 @@ export function Block({
 
 /** The read failed: say so, offer Retry, and draw no form to save over. */
 export function SearchTrackingFailed() {
-    const router = useRouter();
+    const { saved } = useSettingsSaved();
     const [pending, startTransition] = useTransition();
     return (
         <FailedState
@@ -89,7 +89,7 @@ export function SearchTrackingFailed() {
             description={nothingChanged(
                 "Your codes and trackers are as they were.",
             )}
-            onRetry={() => startTransition(() => router.refresh())}
+            onRetry={() => startTransition(() => saved())}
             retrying={pending}
         />
     );

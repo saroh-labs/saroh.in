@@ -5,31 +5,25 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { Globe } from "lucide-react";
 
 import { PageContainer } from "@/components/shared/page/page-container";
-import { CreateSiteForm } from "@/components/sites/new-site/create-site-form";
+import { NewSiteScreen } from "@/components/sites/new-site/new-site-screen";
 import { requireCan } from "@/lib/access/require-can";
 import { mayAddWebsite } from "@/lib/business-limits";
-import { modulesOrUnknown } from "@/lib/modules/guard";
 import { kindDefaults } from "@/lib/organizations/kind";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { tradeOf } from "@/lib/organizations/trade";
 import { requireSession } from "@/lib/session";
-import type { Template } from "@/lib/sites/service";
-import {
-    getNewSiteDefaults,
-    listSites,
-    listTemplates,
-} from "@/lib/sites/service";
-import { moduleStates, startingTemplate } from "@/lib/sites/template-picker";
+import { listSites } from "@/lib/sites/service";
 import { templateChoiceOn } from "@/lib/sites/templates-switch";
 
 export const metadata = { title: "New website" };
 
 /**
  * New-site page (S2-004). Mirrors the create-store page: a back link, a
- * heading, and the client CreateSiteForm. Templates are fetched server-side
- * and handed to the form so the author can pick one to seed the site
- * (DEC-216: suggested for the business's trade first, else from its kind
- * and its modules).
+ * heading, and the client CreateSiteForm. On React Query (DEC-259): the
+ * page says its refusals (no `site:create`, a website already there) and
+ * hands the business's kind and trade to the screen, which reads the
+ * templates (DEC-216: suggested for the business's trade first, else from
+ * its kind and its modules) and the suggested address in the browser.
  *
  * `?template=<id or slug>` starts the picker on that template, as the
  * gallery's "Use this template" will link.
@@ -46,19 +40,11 @@ export default async function NewSitePage({
     await requireSession();
     const choice = templateChoiceOn();
 
-    const [templates, organization, sites, modules, params] = await Promise.all(
-        [
-            // A failed catalogue is said in the form, not a failed page: the
-            // site can still be made from the kind's template.
-            choice
-                ? listTemplates().catch((): Template[] | null => null)
-                : Promise.resolve<Template[] | null>([]),
-            resolveActiveOrganization(),
-            listSites().catch(() => []),
-            modulesOrUnknown(),
-            searchParams,
-        ],
-    );
+    const [organization, sites, params] = await Promise.all([
+        resolveActiveOrganization(),
+        listSites().catch(() => []),
+        searchParams,
+    ]);
 
     /*
      * Said before the work, not after it (§30).
@@ -119,14 +105,7 @@ export default async function NewSitePage({
         );
     }
 
-    // The business's own address, or a free one like it (DEC-069, L5).
-    const defaults = await getNewSiteDefaults();
-
     const kind = organization?.kind;
-    // The kind's template, picked to start with (DEC-070, K15).
-    const kindTemplate = kindDefaults(kind).starterTemplate;
-    const states = moduleStates(modules);
-    const listed = templates ?? [];
     // `?template=`, else the one picked in the gallery at sign-up (DEC-216).
     const asked = !choice
         ? null
@@ -135,34 +114,15 @@ export default async function NewSitePage({
           : (organization?.startTemplate ?? null);
 
     return (
-        <PageContainer width="form">
-            <PageHeader
-                breadcrumb={[
-                    <IntentLink data-ph-unmask="" key="site" href="/sites">
-                        Website
-                    </IntentLink>,
-                    "New site",
-                ]}
-                title="New site"
-                description={
-                    choice
-                        ? "Name your new site, check its web address and pick a template."
-                        : "Name your new site and check its web address."
-                }
-            />
-            <CreateSiteForm
-                templates={templates}
-                choice={choice}
-                defaults={defaults}
-                defaultTemplateId={kindTemplate}
-                startTemplateId={startingTemplate(listed, asked, kindTemplate)}
-                // The business's trade (DEC-216) suggests first.
-                trade={tradeOf(organization?.trade)}
-                tradeOther={organization?.tradeOther ?? null}
-                kind={kind}
-                modules={states}
-                canSetTrade={organization?.actions?.includes("org:update")}
-            />
-        </PageContainer>
+        <NewSiteScreen
+            choice={choice}
+            // The kind's template, picked to start with (DEC-070, K15).
+            defaultTemplateId={kindDefaults(kind).starterTemplate}
+            asked={asked}
+            trade={tradeOf(organization?.trade)}
+            tradeOther={organization?.tradeOther ?? null}
+            kind={kind}
+            canSetTrade={organization?.actions?.includes("org:update") ?? false}
+        />
     );
 }

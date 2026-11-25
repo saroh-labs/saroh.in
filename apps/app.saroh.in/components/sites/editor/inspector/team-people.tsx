@@ -14,9 +14,10 @@ import { addPeople } from "@/components/sites/editor/inspector/team-empty";
 import { runAction } from "@/lib/api/run-action";
 import type { PersonContent, PersonMember } from "@/lib/sites/service";
 import { membersOf, syncChosen, withMembers } from "@/lib/sites/team-people";
+import { usePickerFetch, usePickerStale } from "@/lib/sites/use-picker";
 import { setTeamPage } from "@/lib/staff/actions";
+import type { TeamPickPerson } from "@/lib/staff/team-picker-read";
 import { readTeamForPicker } from "@/lib/staff/team-picker-read";
-import type { StaffView } from "@/lib/staff/types";
 
 /**
  * Our team's People list (round 3, `EBTeamPicker` 1): who is on this
@@ -34,16 +35,18 @@ export function TeamPeople({
     onChange: (next: PersonContent) => void;
 }) {
     const [read, setRead] = useState<{
-        team: StaffView[] | null;
+        team: TeamPickPerson[] | null;
         canChoose: boolean;
     } | null>(null);
     const [picking, setPicking] = useState(false);
     const [busy, setBusy] = useState(false);
     const dragged = useRef<number | null>(null);
 
+    const fetchTeam = usePickerFetch("team", readTeamForPicker);
+    const teamChanged = usePickerStale("team");
     useEffect(() => {
         let live = true;
-        readTeamForPicker()
+        fetchTeam()
             .then((r) => {
                 if (!live) return;
                 setRead(r);
@@ -54,7 +57,7 @@ export function TeamPeople({
         return () => {
             live = false;
         };
-    }, []);
+    }, [fetchTeam]);
 
     const canPick = read?.canChoose === true && read.team !== null;
     useEffect(() => {
@@ -86,6 +89,7 @@ export function TeamPeople({
             });
             if (!res) return;
             if (!res.ok) return showError(res.error);
+            teamChanged();
             setRead({
                 ...read,
                 team: read.team.map((p) =>

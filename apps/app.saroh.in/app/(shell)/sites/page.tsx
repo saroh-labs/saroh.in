@@ -1,30 +1,10 @@
-import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
-import { IntentLink } from "@saroh/ui/intent-link";
-import { PageHeader } from "@saroh/ui/page-header";
-import { Globe } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { navCan } from "@/components/shared/navigation/nav-items";
-import { PageContainer } from "@/components/shared/page/page-container";
-import { AllSites } from "@/components/sites/all-sites/all-sites";
-import {
-    lastActivityLine,
-    visitsLine,
-} from "@/components/sites/all-sites/site-card-words";
-import { pausedSiteIds } from "@/lib/billing/paused";
-import { mayAddWebsite } from "@/lib/business-limits";
-import { businessZone } from "@/lib/format/business-zone";
+import { AllSitesScreen } from "@/components/sites/all-sites/all-sites-screen";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
-import { businessAddress, defaultSite } from "@/lib/sites/default-site";
 import { listSites } from "@/lib/sites/service";
-import {
-    readWebAddressLinks,
-    RENDERER_APEX,
-} from "@/lib/sites/share-links-read";
-import { siteStatus } from "@/lib/sites/site-status";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 
 /**
@@ -36,128 +16,32 @@ export const metadata = { title: "Website" };
 /**
  * Website, from the rail.
  *
- * The rail's Website row lands here, and a business with a site is sent
- * straight to it: the workspace design has no list of sites to pass through,
- * because the Website screen's own picker says which sites there are and what
- * state each is in. A business with none is shown the way to make one.
- *
- * To the first site's Pages, which sends a reader on to Review — the one
- * redirect decides for every role, rather than this screen guessing.
- *
- * With the Website area on (plan 2026-11-18-001 U3) it is All sites
- * instead, never a redirect. One web address per business for now
- * (DEC-230): it lists the site at the business's default address, one
- * site, until adding sites ships.
+ * With the Website area on (plan 2026-11-18-001 U3) it is All sites, never
+ * a redirect, read in the browser (DEC-259). Off, a business with a site
+ * is sent straight to its Pages, which sends a reader on to Review — the
+ * one redirect decides for every role — and a business with none is shown
+ * the way to make one.
  */
 export default async function SitesPage() {
     await requireSession();
-
-    const [sites, organization] = await Promise.all([
-        listSites(),
+    const [organization, area] = await Promise.all([
         resolveActiveOrganization(),
+        websiteAreaOn(),
     ]);
-    const area = await websiteAreaOn();
-    const first = sites.at(0);
-    if (first && !area) redirect(`/sites/${first.id}/pages`);
-
-    const role = organization?.role ?? null;
-    // By what the role was given, never by its name: a role the business
-    // made with `site:create` ticked may make one.
-    const mayCreate = navCan(
-        { role, actions: organization?.actions },
-        "site:create",
-    );
-
-    if (first) {
-        const [webAddress, paused] = await Promise.all([
-            readWebAddressLinks(),
-            // Websites a move to a lower plan paused (#800).
-            pausedOrNull(),
-        ]);
-        const pausedSites = pausedSiteIds(paused);
-        const zone = businessZone(organization);
-        const reader = role === "REVIEWER";
-        const shown = defaultSite(sites, webAddress) ?? first;
-        const address = businessAddress(shown, webAddress, RENDERER_APEX);
-        return (
-            <PageContainer width="full">
-                <div className="flex flex-col gap-6">
-                    <PageHeader
-                        title="Sites"
-                        className="mb-0"
-                        actions={
-                            mayCreate && mayAddWebsite(sites.length) ? (
-                                <Button asChild>
-                                    <IntentLink href="/sites/new">
-                                        New site
-                                    </IntentLink>
-                                </Button>
-                            ) : undefined
-                        }
-                    />
-                    <AllSites
-                        sites={[shown].map((s) => {
-                            const at = address;
-                            return {
-                                id: s.id,
-                                name: s.name.trim() || "Untitled site",
-                                host: at?.host ?? null,
-                                url: at?.url ?? null,
-                                status: siteStatus(s, { reader }),
-                                paused: pausedSites.includes(s.id),
-                                visits: visitsLine(s.visitsLast7Days),
-                                last: lastActivityLine(s.lastActivity, zone),
-                            };
-                        })}
-                    />
-                </div>
-            </PageContainer>
-        );
+    if (!area) {
+        const first = (await listSites()).at(0);
+        if (first) redirect(`/sites/${first.id}/pages`);
     }
-
-    /*
-     * Three roles reach this screen with nothing on it, and it said the same
-     * thing to all of them. A REVIEWER is waiting to be asked to look at one;
-     * a MEMBER cannot make one (#313).
-     */
-    const nothingHere =
-        role === "REVIEWER"
-            ? {
-                  title: "Nothing to review yet",
-                  description:
-                      "A website appears here when someone asks you to look at it.",
-              }
-            : {
-                  title: "No website yet",
-                  description: mayCreate
-                      ? "Make one and it is yours to edit before anyone can see it."
-                      : "Its pages and posts show here once there is one.",
-              };
-
+    const role = organization?.role ?? null;
     return (
-        <PageContainer width="full">
-            <div className="flex flex-col gap-6">
-                <PageHeader
-                    breadcrumb={["Website"]}
-                    title="Website"
-                    className="mb-0"
-                />
-                <EmptyState
-                    data-ph-unmask=""
-                    icon={<Globe />}
-                    title={nothingHere.title}
-                    description={nothingHere.description}
-                    action={
-                        mayCreate ? (
-                            <Button asChild>
-                                <IntentLink href="/sites/new">
-                                    New site
-                                </IntentLink>
-                            </Button>
-                        ) : undefined
-                    }
-                />
-            </div>
-        </PageContainer>
+        <AllSitesScreen
+            // By what the role was given, never by its name: a role the
+            // business made with `site:create` ticked may make one.
+            mayCreate={navCan(
+                { role, actions: organization?.actions },
+                "site:create",
+            )}
+            reviewer={role === "REVIEWER"}
+        />
     );
 }

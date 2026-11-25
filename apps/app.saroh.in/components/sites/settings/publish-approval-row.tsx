@@ -2,8 +2,8 @@
 
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
+import { useSettingsSaved } from "./settings-saved";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { runAction } from "@/lib/api/run-action";
@@ -32,7 +32,7 @@ export function PublishApprovalSection({
     siteId: string;
     approval: PublishApproval;
 }) {
-    const router = useRouter();
+    const { saved, orgId } = useSettingsSaved();
     const id = useId();
     const [on, setOn] = useState(approval.on);
     const [pending, startTransition] = useTransition();
@@ -41,7 +41,7 @@ export function PublishApprovalSection({
         setOn(next);
         startTransition(async () => {
             const res = await runAction(() =>
-                setPublishNeedsApproval(siteId, next),
+                setPublishNeedsApproval(siteId, next, orgId),
             );
             if (!res) return setOn(!next);
             if (!res.ok) {
@@ -51,7 +51,7 @@ export function PublishApprovalSection({
                 else showError(res.error);
                 return;
             }
-            router.refresh();
+            await saved();
             showSuccess(
                 next
                     ? "Publishing now needs approval."

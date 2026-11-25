@@ -11,8 +11,9 @@ import { usePhone } from "@/components/bookings/calendar/header/use-phone";
 import { runAction } from "@/lib/api/run-action";
 import { count } from "@/lib/format/plural";
 import { initials } from "@/lib/names";
+import { usePickerStale } from "@/lib/sites/use-picker";
 import { setTeamPage } from "@/lib/staff/actions";
-import type { StaffView } from "@/lib/staff/types";
+import type { TeamPickPerson } from "@/lib/staff/team-picker-read";
 
 /** A membership role's key in the board's words; a custom role says Staff. */
 export function teamRoleWord(role: string | undefined): string {
@@ -71,9 +72,9 @@ export function TeamPicker({
     onSaved,
 }: {
     /** The active team, `showOnTeamPage` saying who is on the page now. */
-    team: StaffView[];
+    team: TeamPickPerson[];
     onClose: () => void;
-    onSaved: (chosen: StaffView[]) => void;
+    onSaved: (chosen: TeamPickPerson[]) => void;
 }) {
     const phone = usePhone();
     const [picked, setPicked] = useState<string[]>(() =>
@@ -89,6 +90,7 @@ export function TeamPicker({
             on ? [...prev, id] : prev.filter((p) => p !== id),
         );
 
+    const teamChanged = usePickerStale("team");
     async function save() {
         setError(null);
         const res = await runAction(() => setTeamPage(picked), { setBusy });
@@ -97,6 +99,7 @@ export function TeamPicker({
             setError(res.error);
             return;
         }
+        teamChanged();
         onSaved(team.filter((p) => picked.includes(p.id)));
     }
 

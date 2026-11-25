@@ -3,8 +3,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
+import { useSettingsSaved } from "./settings-saved";
 
 import { runAction } from "@/lib/api/run-action";
 import { updateSiteSettings } from "@/lib/sites/actions";
@@ -61,7 +61,7 @@ export function SellsFromRow({
     /** The screen's own, so a link can open it; the row's when left out. */
     sheet?: SheetControl;
 }) {
-    const router = useRouter();
+    const { saved, orgId } = useSettingsSaved();
     const [pending, startTransition] = useTransition();
     const own = useSheetControl();
     const { open, opened, show, close } = sheet ?? own;
@@ -74,9 +74,13 @@ export function SellsFromRow({
         const choice = sellsFrom.choices.find((c) => c.id === picked);
         startTransition(async () => {
             const res = await runAction(() =>
-                updateSiteSettings(siteId, {
-                    storefrontId: picked,
-                }),
+                updateSiteSettings(
+                    siteId,
+                    {
+                        storefrontId: picked,
+                    },
+                    orgId,
+                ),
             );
             if (!res) return;
             if (!res.ok) {
@@ -85,7 +89,7 @@ export function SellsFromRow({
             }
             if (choice) setCurrent({ id: choice.id, name: choice.name });
             close();
-            router.refresh();
+            await saved();
             showSuccess(
                 `Your online shop now sells from ${choice?.name ?? "that location"}.`,
             );

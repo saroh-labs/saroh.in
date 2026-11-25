@@ -2,7 +2,7 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientContext, useQuery } from "@tanstack/react-query";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { makeQueryClient, ReadFailed } from "@/lib/query/client";
 import { useOrgIdOrNull } from "@/lib/query/org";
@@ -11,6 +11,12 @@ import type { PickerKind } from "./queries";
 import { pickerRead } from "./queries";
 
 type Pick = { ok: true } | { ok: false; forbidden: boolean };
+
+/** A picker's read that failed, or that the role may not make. */
+export interface PickFailed {
+    ok: false;
+    forbidden: boolean;
+}
 
 /**
  * A client for a picker drawn with no React Query above it (a test, a
@@ -95,4 +101,42 @@ export function usePickerRead<T extends Pick>(
         read: (query.data as T | undefined) ?? failed ?? "loading",
         retry: () => void refetch(),
     };
+}
+
+/**
+ * A picker read asked for at a moment (Add people pressed, an inspector
+ * opened): the cached answer while its tier says it's fresh, else read
+ * now, through the same entry `usePickerRead` shares. Without a provider
+ * (a test), the Server Action it always used.
+ */
+export function usePickerFetch<T>(
+    kind: PickerKind,
+    legacy: () => Promise<T>,
+): () => Promise<T> {
+    const provided = useContext(QueryClientContext);
+    const orgId = useOrgIdOrNull();
+    return useCallback(
+        () =>
+            provided && orgId
+                ? (provided.fetchQuery(
+                      pickerRead.options(orgId, { kind }),
+                  ) as Promise<T>)
+                : legacy(),
+        // `legacy` is a module's action: the same function every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [provided, orgId, kind],
+    );
+}
+
+/** After a write that changes a picker's answer (who is on Our team): read it again when next asked. */
+export function usePickerStale(kind: PickerKind): () => void {
+    const provided = useContext(QueryClientContext);
+    const orgId = useOrgIdOrNull();
+    return useCallback(() => {
+        if (!provided || !orgId) return;
+        void provided.invalidateQueries({
+            queryKey: pickerRead.key(orgId, { kind }),
+            refetchType: "none",
+        });
+    }, [provided, orgId, kind]);
 }

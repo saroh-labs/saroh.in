@@ -17,6 +17,18 @@ import { SiteSettings } from "./site-settings";
 import { SiteSettingsRead } from "./site-settings-read";
 
 const refresh = vi.fn();
+vi.mock("@/components/sites/settings/settings-saved", () => ({
+    // The Settings tab's container provides it: the tab's business, and
+    // the site's reads again after a landed save (here, a spy).
+    useSettingsSaved: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+    SettingsSavedProvider: ({ children }: { children: unknown }) => children,
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh }),
     // As Next does: the address's query, as it is now.
@@ -301,9 +313,13 @@ describe("the Title sheet", () => {
 
         await press(item("Save"));
         expect(updateSettings).toHaveBeenCalledTimes(1);
-        expect(updateSettings).toHaveBeenCalledWith("site_rye", {
-            seoTitle: "Rye, a bakery on Hill Road",
-        });
+        expect(updateSettings).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                seoTitle: "Rye, a bakery on Hill Road",
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "Title saved. Publish to make it public.",
         );
@@ -389,9 +405,13 @@ describe("the other rows' sheets", () => {
         type(box, "Sourdough, baked every morning.");
         expect(sheet()?.textContent).toContain("31 of about 155 characters.");
         await press(item("Save"));
-        expect(updateSettings).toHaveBeenCalledWith("site_rye", {
-            seoDescription: "Sourdough, baked every morning.",
-        });
+        expect(updateSettings).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                seoDescription: "Sourdough, baked every morning.",
+            },
+            "org_1",
+        );
         expect(row("settings-description")).toContain(
             "Sourdough, baked every morning.",
         );
@@ -409,12 +429,16 @@ describe("the other rows' sheets", () => {
         // Nothing saved by picking.
         expect(updateSettings).not.toHaveBeenCalled();
         await press(item("Save"));
-        expect(updateSettings).toHaveBeenCalledWith("site_rye", {
-            socialImageUrl: "https://example.com/loaf.jpg",
-            socialImageWidth: 1200,
-            socialImageHeight: 630,
-            socialImageBytes: 90_000,
-        });
+        expect(updateSettings).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                socialImageUrl: "https://example.com/loaf.jpg",
+                socialImageWidth: 1200,
+                socialImageHeight: 630,
+                socialImageBytes: 90_000,
+            },
+            "org_1",
+        );
         expect(row("settings-share-image")).toContain(
             "https://example.com/loaf.jpg",
         );
@@ -422,12 +446,16 @@ describe("the other rows' sheets", () => {
         await press(edit("Replace share image"));
         await press(item("Remove image"));
         await press(item("Save"));
-        expect(updateSettings).toHaveBeenLastCalledWith("site_rye", {
-            socialImageUrl: null,
-            socialImageWidth: null,
-            socialImageHeight: null,
-            socialImageBytes: null,
-        });
+        expect(updateSettings).toHaveBeenLastCalledWith(
+            "site_rye",
+            {
+                socialImageUrl: null,
+                socialImageWidth: null,
+                socialImageHeight: null,
+                socialImageBytes: null,
+            },
+            "org_1",
+        );
         expect(row("settings-share-image")).toContain("None");
     });
 
@@ -455,12 +483,16 @@ describe("the other rows' sheets", () => {
         expect(row("settings-menu")).toContain("Not built");
 
         await press(item("Save"));
-        expect(updateNavigation).toHaveBeenCalledWith("site_rye", {
-            items: [
-                { pageId: "p_find" },
-                { pageId: "p_about", label: "Our story" },
-            ],
-        });
+        expect(updateNavigation).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                items: [
+                    { pageId: "p_find" },
+                    { pageId: "p_about", label: "Our story" },
+                ],
+            },
+            "org_1",
+        );
         expect(sheet()).toBeNull();
         expect(row("settings-menu")).toContain("Find us · Our story");
         expect(edit("Edit menu")?.textContent).toBe("Edit");
@@ -476,7 +508,7 @@ describe("the other rows' sheets", () => {
         expect(box?.value).toBe("Rye, Hill Road");
         type(box ?? null, "  ");
         await press(item("Save"));
-        expect(updateFooter).toHaveBeenCalledWith("site_rye", null);
+        expect(updateFooter).toHaveBeenCalledWith("site_rye", null, "org_1");
         expect(showSuccess).toHaveBeenCalledWith(
             "Footer removed. Publish to take it off the site.",
         );
@@ -496,9 +528,13 @@ describe("the other rows' sheets", () => {
             "Posts will live at rye.saroh.app/journal/…",
         );
         await press(item("Save"));
-        expect(updateSettings).toHaveBeenCalledWith("site_rye", {
-            postsPrefix: "journal",
-        });
+        expect(updateSettings).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                postsPrefix: "journal",
+            },
+            "org_1",
+        );
         expect(row("settings-posts-path")).toContain("/journal");
     });
 

@@ -22,8 +22,9 @@ import type {
     PageStarter,
     SitePage,
 } from "@/lib/sites/service";
+import { usePickerFetch } from "@/lib/sites/use-picker";
+import type { TeamPickPerson } from "@/lib/staff/team-picker-read";
 import { readTeamForPicker } from "@/lib/staff/team-picker-read";
-import type { StaffView } from "@/lib/staff/types";
 
 import { TeamPicker } from "./team-picker";
 
@@ -178,7 +179,7 @@ export function AddPageSheet({
     const [missing, setMissing] = useState(false);
     // Our team: an owner or admin picks who appears before the page is
     // made (round 3, EBTeamPicker); anyone else gets those already chosen.
-    const [picking, setPicking] = useState<StaffView[] | null>(null);
+    const [picking, setPicking] = useState<TeamPickPerson[] | null>(null);
     const menuId = useId();
 
     const offer = offers.find((o) => o.kind === start);
@@ -245,10 +246,12 @@ export function AddPageSheet({
                   : g,
         );
 
+    // The team picker's cached read (U18), else asked now.
+    const fetchTeam = usePickerFetch("team", readTeamForPicker);
     /** Opens Add people when this person may choose; says whether it did. */
     async function pickTeam(): Promise<boolean> {
         setBusy(true);
-        const read = await readTeamForPicker().catch(() => null);
+        const read = await fetchTeam().catch(() => null);
         setBusy(false);
         if (read?.canChoose && read.team && read.team.length > 0) {
             setPicking(read.team);
