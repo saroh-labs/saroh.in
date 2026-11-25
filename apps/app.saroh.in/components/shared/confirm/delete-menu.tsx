@@ -51,8 +51,11 @@ export function DeleteMenu<T>({
     onDelete: () => Promise<CrmResult<T>>;
     /** The toast, given what the API returned. */
     done: (data: T) => string;
-    /** Where to go afterwards. */
-    then: string;
+    /**
+     * Where to go afterwards. Left out, the screen stays: a React Query
+     * screen reads itself again from its own save (DEC-259).
+     */
+    then?: string;
     /**
      * Why it cannot be deleted, when it cannot. The item stays in the menu,
      * disabled, with the reason under it — a missing option explains nothing.
@@ -76,7 +79,7 @@ export function DeleteMenu<T>({
             return { ok: false, error: res.error };
         }
         showSuccess(done(res.data));
-        router.push(then);
+        if (then) router.push(then);
         return { ok: true };
     }
 

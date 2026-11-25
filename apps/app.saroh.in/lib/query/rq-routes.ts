@@ -35,6 +35,7 @@ export const RQ_ROUTES: readonly string[] = [
     "/class-packs/[packId]",
     "/class-packs/[packId]/edit",
     "/class-packs/new",
+    "/social",
 ];
 
 export const RQ_DOMAINS: readonly string[] = [
@@ -47,4 +48,5 @@ export const RQ_DOMAINS: readonly string[] = [
     "customers",
     "stock",
     "class-packs",
+    "social",
 ];

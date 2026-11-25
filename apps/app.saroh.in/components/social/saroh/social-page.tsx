@@ -5,7 +5,11 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Plus, RadioTower } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+
+import {
+    useScreenGo,
+    useScreenLink,
+} from "@/components/shared/page/screen-pending";
 
 import type {
     PageChoice,
@@ -18,6 +22,11 @@ import type {
 import { connectedLine } from "@/lib/social/saroh-social-view";
 import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
 
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
+
 import { ChannelsView } from "./channels/channels-view";
 import { UsageMeter } from "./meter";
 import { PostSheet } from "./post-sheet";
@@ -28,6 +37,9 @@ import { PostsView } from "./posts-view";
  * S3, S5): the next seven days and Posted and drafts, or the Channels,
  * with a post's sheet over either. The address holds where the person is
  * (`?tab=channels`, `?post=<id>`), so Home's Needs you rows open here.
+ * Drawn at once from the page's gate (`access`): until Social's read
+ * lands (`channels` and `posts` null) the header stands and the list is
+ * a skeleton in its place.
  */
 export function SarohSocialPage({
     access,
@@ -36,30 +48,30 @@ export function SarohSocialPage({
     opened,
     pages,
     params,
+    reload,
 }: {
     access: SocialAccess;
-    channels: Read<SocialChannel[]>;
-    posts: Read<SocialPost[]>;
+    /** Null while Social's read is on its way. */
+    channels: Read<SocialChannel[]> | null;
+    posts: Read<SocialPost[]> | null;
     /** The post `?post=` names, read on its own when it isn't in the list. */
     opened: SocialPost | null;
     /** A Facebook sign-in's Pages, when it came back to pick one. */
     pages: Read<PageChoice[]> | null;
     params: SocialParams;
+    /** Read Social again, after a failed read. */
+    reload: () => void;
 }) {
     const narrow = useNarrow();
-    const router = useRouter();
-    const pathname = usePathname();
-    const channelRows = channels.ok ? channels.data : [];
-    const postRows = posts.ok ? posts.data : [];
+    const screenGo = useScreenGo();
+    const screenLink = useScreenLink();
+    const go = (href: string) => screenGo(href, "replace");
+    const channelRows = channels?.ok ? channels.data : [];
+    const postRows = posts?.ok ? posts.data : [];
     const onChannels = params.tab === "channels";
     const post =
         (params.post && postRows.find((p) => p.id === params.post)) ?? opened;
-    const go = (q: Record<string, string | null>) => {
-        const next = new URLSearchParams();
-        for (const [k, v] of Object.entries(q)) if (v) next.set(k, v);
-        const qs = next.toString();
-        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    };
+
     const canPost = access.canPost;
     const newPost = canPost ? (
         <Button asChild size={narrow ? "default" : "lg"}>
@@ -83,7 +95,11 @@ export function SarohSocialPage({
                     onChannels
                         ? [
                               "Grow",
-                              <IntentLink key="social" href="/social">
+                              <IntentLink
+                                  key="social"
+                                  href="/social"
+                                  onNavigate={screenLink("/social")}
+                              >
                                   {SOCIAL_WORDS.social}
                               </IntentLink>,
                           ]
@@ -91,11 +107,13 @@ export function SarohSocialPage({
                 }
                 title={onChannels ? SOCIAL_WORDS.channels : SOCIAL_WORDS.social}
                 description={
-                    onChannels
-                        ? SOCIAL_WORDS.channelsWhat
-                        : channels.ok
-                          ? connectedLine(channelRows)
-                          : undefined
+                    onChannels ? (
+                        SOCIAL_WORDS.channelsWhat
+                    ) : !channels ? (
+                        <FigureLoading className="w-48" />
+                    ) : channels.ok ? (
+                        connectedLine(channelRows)
+                    ) : undefined
                 }
                 meta={onChannels ? undefined : <UsageMeter access={access} />}
                 actions={
@@ -111,6 +129,9 @@ export function SarohSocialPage({
                             >
                                 <IntentLink
                                     href="/social?tab=channels"
+                                    onNavigate={screenLink(
+                                        "/social?tab=channels",
+                                    )}
                                     data-channels-link=""
                                 >
                                     <RadioTower
@@ -125,12 +146,21 @@ export function SarohSocialPage({
                     )
                 }
             />
-            {onChannels ? (
+            {!channels || !posts ? (
+                <PageLoading
+                    bare
+                    shape="rows"
+                    width="full"
+                    label={SOCIAL_WORDS.loading}
+                />
+            ) : onChannels ? (
                 <ChannelsView
                     channels={channels}
                     canPost={canPost}
                     params={params}
                     pages={pages}
+                    go={go}
+                    onRetry={reload}
                 />
             ) : (
                 <PostsView
@@ -150,7 +180,9 @@ export function SarohSocialPage({
                     channels={channelRows}
                     canPost={canPost}
                     narrow={narrow}
-                    onClose={() => go({ tab: onChannels ? "channels" : null })}
+                    onClose={() =>
+                        go(onChannels ? "/social?tab=channels" : "/social")
+                    }
                 />
             ) : null}
         </div>

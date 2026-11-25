@@ -6,24 +6,18 @@ import { Globe } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
-import { SocialHome } from "@/components/social/home/social-home";
 import { SocialLocked } from "@/components/social/saroh/social-locked";
-import { SarohSocialPage } from "@/components/social/saroh/social-page";
+import {
+    SarohSocialContainer,
+    SocialHomeContainer,
+} from "@/components/social/social-container";
 import { requireCan } from "@/lib/access/require-can";
 import { requireSession } from "@/lib/session";
-import { socialPrice } from "@/lib/share-item/read";
+import { readShareSetup, socialPrice } from "@/lib/share-item/read";
 import { sharePostsOn } from "@/lib/share-item/share-posts-switch";
-import { listOwnPosts } from "@/lib/social/own-posts";
-import { pickRows } from "@/lib/social/pick";
-import { readCreatePost } from "@/lib/social/read";
-import {
-    getSocialPost,
-    listChannels,
-    listSocialPosts,
-    readPageChoices,
-    readSocialAccess,
-} from "@/lib/social/saroh-social";
-import type { SocialParams } from "@/lib/social/saroh-social-types";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
+import { socialParams } from "@/lib/social/queries";
+import { readPageChoices, readSocialAccess } from "@/lib/social/saroh-social";
 import { PICKER_KINDS } from "@/lib/social/saroh-social-types";
 import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
 import { POST_WORDS } from "@/lib/social/words";
@@ -40,11 +34,14 @@ import { POST_WORDS } from "@/lib/social/words";
  * Otherwise what is worth posting today and Your posts (boards
  * BSocialHome*, BSocialEmpty*), the free Share, with Saroh Social's lock
  * where it would be; `?tab=channels` shows what Saroh Social is (S1).
+ *
+ * On React Query (DEC-259), loaded in the browser: the page awaits only
+ * its gates (Share on, `social:read`, whether Saroh Social is open, a live
+ * site to share from); the posts, the channels, what's worth posting and
+ * Your posts are the containers' queries, drawn into the real frame. The
+ * Pages to pick after Meta stay this page's one-off read, never cached.
  */
 export const metadata = { title: "Social" };
-
-const one = (v: string | string[] | undefined) =>
-    typeof v === "string" && v !== "" ? v : null;
 
 export default async function SocialPage({
     searchParams,
@@ -53,42 +50,24 @@ export default async function SocialPage({
 }) {
     if (!sharePostsOn()) notFound();
     await requireSession();
-    const { organization, may, denied } = await requireCan("social:read", {
+    const { may, denied } = await requireCan("social:read", {
         thing: "Social",
     });
     if (denied) return denied;
-    const q = await searchParams;
-    const params: SocialParams = {
-        tab: one(q.tab) === "channels" ? "channels" : "posts",
-        channel: one(q.channel),
-        result: one(q.result),
-        choice: one(q.choice),
-        post: one(q.post),
-    };
+    const params = socialParams(await searchParams);
     const social = await readSocialAccess();
 
     if (social?.state === "on") {
         const picking = PICKER_KINDS.find(
             (k) => k.toLowerCase() === params.channel,
         );
-        const [channels, posts, opened, pages] = await Promise.all([
-            listChannels(),
-            listSocialPosts(),
-            params.post ? getSocialPost(params.post) : null,
+        const pages =
             params.result === "choose" && params.choice && picking
-                ? readPageChoices(picking, params.choice)
-                : null,
-        ]);
+                ? await readPageChoices(picking, params.choice)
+                : null;
         return (
             <PageContainer width="full">
-                <SarohSocialPage
-                    access={social}
-                    channels={channels}
-                    posts={posts}
-                    opened={opened?.ok ? opened.data : null}
-                    pages={pages}
-                    params={params}
-                />
+                <SarohSocialContainer access={social} pages={pages} />
             </PageContainer>
         );
     }
@@ -119,8 +98,9 @@ export default async function SocialPage({
         );
     }
 
-    const read = organization ? await readCreatePost(organization) : null;
-    if (!read) {
+    // A live site to share from: the gate, and the cards' look.
+    const setup = await readShareSetup(await readWebAddressLinks());
+    if (!setup) {
         return (
             <PageContainer>
                 <EmptyState
@@ -137,17 +117,9 @@ export default async function SocialPage({
             </PageContainer>
         );
     }
-    // Your posts can't be read: say so once, beside what could be.
-    const ownPosts = await listOwnPosts().catch(() => null);
     return (
         <PageContainer width="full">
-            <SocialHome
-                rows={pickRows(read.pick)}
-                posts={ownPosts ?? []}
-                setup={read.setup}
-                canPost={may("social:post")}
-                failed={ownPosts ? read.failed : [...read.failed, "your posts"]}
-            />
+            <SocialHomeContainer setup={setup} canPost={may("social:post")} />
         </PageContainer>
     );
 }
