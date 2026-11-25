@@ -1,9 +1,10 @@
 "use client";
 
+import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import type { ReactNode } from "react";
 
-import { usePhone } from "@/components/bookings/calendar/header/use-phone";
+import { usePhoneOrUnknown } from "@/components/bookings/calendar/header/use-phone";
 import type { BookingsOpens } from "@/lib/services/bookings-opens";
 
 import { BookingsModeSwitch, BookingsPhoneBar } from "./bookings-view-switch";
@@ -28,23 +29,28 @@ export function ListPageHeader({
     /** New booking, for someone who may book; it floats on a phone. */
     newBooking: ReactNode;
 }) {
-    const phone = usePhone();
+    // Null on the server and while hydrating: both frames, CSS shows one.
+    const known = usePhoneOrUnknown();
     const options = <ListOptions opens={opens} me={me} zone={zone} />;
-    if (phone) {
-        return (
-            // `contents`: the sticky row sticks across the whole page.
-            <div data-list-header="" className="contents">
-                <h1 data-ph-unmask="" className="sr-only">
-                    All bookings
-                </h1>
-                <BookingsPhoneBar current="list" options={options} />
-                {newBooking}
-                <span aria-hidden className="block h-3" />
-            </div>
-        );
-    }
-    return (
+    const both = known === null;
+    const phoneFrame = (
+        // `contents`: the sticky row sticks across the whole page.
+        <div
+            data-list-header="phone"
+            className={cn("contents", both && "min-[760px]:hidden")}
+        >
+            <h1 data-ph-unmask="" className="sr-only">
+                All bookings
+            </h1>
+            <BookingsPhoneBar current="list" options={options} />
+            {newBooking}
+            <span aria-hidden className="block h-3" />
+        </div>
+    );
+    const deskFrame = (
         <PageHeader
+            data-list-header="desk"
+            className={cn(both && "max-[759px]:hidden")}
             title="All bookings"
             holdsData={false}
             meta={<BookingsModeSwitch current="list" />}
@@ -57,4 +63,13 @@ export function ListPageHeader({
             }
         />
     );
+    if (both) {
+        return (
+            <>
+                {phoneFrame}
+                {deskFrame}
+            </>
+        );
+    }
+    return known ? phoneFrame : deskFrame;
 }

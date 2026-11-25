@@ -44,7 +44,7 @@ import { OptionsSheet } from "./options-sheet";
 import type { PersonChoice } from "./people-sheet";
 import { PeopleSheet, PersonFace } from "./people-sheet";
 import { useBookingsOpens } from "./use-bookings-opens";
-import { usePhone } from "./use-phone";
+import { usePhoneOrUnknown } from "./use-phone";
 import { WeekStrip } from "./week-strip";
 
 type Open = "date" | "people" | "opts" | null;
@@ -151,7 +151,9 @@ export function CalendarHeader({
     // The screen's transition: the diary greys while the header stays.
     const screenGo = useScreenGo();
     const screenLink = useScreenLink();
-    const phone = usePhone();
+    // Null on the server and while hydrating: both frames are drawn, CSS
+    // shows the right one, so the first paint never jumps.
+    const known = usePhoneOrUnknown();
     const [open, setOpen] = useState<Open>(null);
     const { opens, change } = useBookingsOpens(kept);
     const toggle = (which: Exclude<Open, null>) => (o: boolean) =>
@@ -209,7 +211,7 @@ export function CalendarHeader({
         else if (showFor === "me" && me) go(hrefFor(layout, date, me.id));
     };
 
-    const titleButton = (
+    const titleButton = (phone: boolean) => (
         <button
             type="button"
             aria-label={`${title}. Change the day or the view`}
@@ -334,21 +336,24 @@ export function CalendarHeader({
     const prevHref = hrefFor(layout, addDays(date, -step));
     const nextHref = hrefFor(layout, addDays(date, step));
 
-    if (phone) {
+    const phoneFrame = (onPhone: boolean, both: boolean) => {
         // BKVCalendarBPhone: Calendar | List and "…" first (the List's
         // row too), then the date naming its view, Today when away from
         // today, whose bookings with the summary, and the week strip.
         return (
             // `contents`: the sticky Calendar | List row sticks across the
             // whole screen, not only while this header is in view.
-            <div data-calendar-header="" className="contents">
+            <div
+                data-calendar-header="phone"
+                className={cn("contents", both && "min-[760px]:hidden")}
+            >
                 <BookingsPhoneBar current="calendar" options={options} />
                 <div className="flex min-w-0 items-center gap-2 pt-1">
                     <h1 className="m-0 flex min-w-0 flex-1">
                         <DateSheet
                             open={open === "date"}
                             onOpenChange={toggle("date")}
-                            trigger={titleButton}
+                            trigger={titleButton(onPhone)}
                             title={title}
                             layout={layout}
                             date={date}
@@ -439,12 +444,15 @@ export function CalendarHeader({
                 <span aria-hidden className="block h-3" />
             </div>
         );
-    }
+    };
 
-    return (
+    const deskFrame = (onPhone: boolean, both: boolean) => (
         <div
-            data-calendar-header=""
-            className="relative mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 max-[759px]:mb-3 max-[759px]:gap-x-2 max-[759px]:gap-y-0 max-[759px]:border-b max-[759px]:border-border max-[759px]:pb-0.5"
+            data-calendar-header="desk"
+            className={cn(
+                both && "max-[759px]:hidden",
+                "relative mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 max-[759px]:mb-3 max-[759px]:gap-x-2 max-[759px]:gap-y-0 max-[759px]:border-b max-[759px]:border-border max-[759px]:pb-0.5",
+            )}
         >
             <IntentLink
                 href={hrefFor(layout, today)}
@@ -483,7 +491,7 @@ export function CalendarHeader({
                 <DateSheet
                     open={open === "date"}
                     onOpenChange={toggle("date")}
-                    trigger={titleButton}
+                    trigger={titleButton(onPhone)}
                     title={title}
                     layout={layout}
                     date={date}
@@ -579,4 +587,14 @@ export function CalendarHeader({
             ) : null}
         </div>
     );
+
+    if (known === null) {
+        return (
+            <>
+                {phoneFrame(true, true)}
+                {deskFrame(false, true)}
+            </>
+        );
+    }
+    return known ? phoneFrame(true, false) : deskFrame(false, false);
 }

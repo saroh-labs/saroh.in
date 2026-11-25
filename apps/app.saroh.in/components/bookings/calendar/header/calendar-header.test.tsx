@@ -2,6 +2,7 @@
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { BookingsOpens } from "@/lib/services/bookings-opens";
@@ -731,5 +732,35 @@ describe("the header on a phone", () => {
         expect(sheet()?.getAttribute("data-snap")).toBe("full");
         click(button(/^What the colours mean$/));
         expect(sheet()?.textContent).toContain("Tap it to book someone in.");
+    });
+});
+
+describe("the first paint (owner, 25 Nov: no layout jump)", () => {
+    it("the server draws both frames, the breakpoint shows one", () => {
+        const html = renderToString(
+            <CalendarHeader
+                layout="day"
+                date={TODAY}
+                today={TODAY}
+                summary="1 session · 1 person"
+                zone="IST"
+                choices={choices}
+                picked={EVERYONE}
+                facts={() => ({ count: 1, closed: false })}
+                cancelled={{ count: 0, shown: false, onChange: vi.fn() }}
+                opens={OPENS_DEFAULT}
+                me={null}
+                hrefFor={(l, d) => calendarHref(l, d)}
+                newBooking={null}
+                calOnly={false}
+            />,
+        );
+        expect(html).toMatch(
+            /data-calendar-header="phone" class="contents min-\[760px\]:hidden"/,
+        );
+        expect(html).toMatch(
+            /data-calendar-header="desk" class="max-\[759px\]:hidden /,
+        );
+        expect(html).toContain("data-bookings-bar");
     });
 });
