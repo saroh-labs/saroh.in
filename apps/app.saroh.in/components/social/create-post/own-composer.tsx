@@ -64,6 +64,7 @@ import type { LinkChoice } from "@/lib/social/links";
 import { addressOf, shownAddress } from "@/lib/social/links";
 import type { OwnPost, OwnPostInput } from "@/lib/social/own-posts";
 import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
+import { useSocialStale } from "@/lib/social/use-social";
 import type { SocialCompose } from "@/lib/social/use-social-post";
 import { NO_SOCIAL, useSocialPost } from "@/lib/social/use-social-post";
 import { counted, POST_WORDS } from "@/lib/social/words";
@@ -125,6 +126,7 @@ export function OwnComposer({
 }) {
     const id = useId();
     const router = useRouter();
+    const stale = useSocialStale();
     const [photo, setPhoto] = useState<PickedImage | null>(null);
     const [mediaId, setMediaId] = useState(initial?.mediaId ?? null);
     const [headline, setHeadline] = useState(initial?.headline ?? "");
@@ -176,6 +178,7 @@ export function OwnComposer({
             try {
                 const res = await saveOwnPost(postId.current, body);
                 if (res.ok) {
+                    stale();
                     postId.current = res.data.id;
                     setPost(res.data);
                     setStatus("idle");
@@ -192,7 +195,7 @@ export function OwnComposer({
                 lastSaved.current = null;
             }
         });
-    }, [key, ready]);
+    }, [key, ready, stale]);
 
     const url = addressOf(origin, post?.linkPath ?? linkPath);
     const item: ShareItem = {
@@ -261,7 +264,10 @@ export function OwnComposer({
     const onDelete = async () => {
         if (!postId.current) return true;
         const res = await removeOwnPost(postId.current);
-        if (res.ok) router.push("/social");
+        if (res.ok) {
+            stale();
+            router.push("/social");
+        }
         return res.ok ? true : { ok: false, error: res.error };
     };
 
