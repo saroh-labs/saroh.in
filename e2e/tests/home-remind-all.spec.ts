@@ -2,7 +2,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { needsYou } from "../fixtures/home";
+import { needsYou, openPhoneGroup } from "../fixtures/home";
 import {
     issueOverdue,
     makeContact,
@@ -95,13 +95,9 @@ async function ownOverdueBill(page: Page): Promise<string> {
 
 /** Where this layout draws the bills' Remind all, or null when it doesn't. */
 async function billsHost(page: Page): Promise<Locator | null> {
-    if (onPhone(page)) {
-        const line = page.locator('[data-phone-line="BILLS"]');
-        if ((await line.count()) === 0) return null;
-        const sheet = page.locator('[data-home-sheet="BILLS"]');
-        await pressUntil(line, sheet);
-        return sheet;
-    }
+    // Home reads its data in the browser: the fixture waits for Needs you
+    // before it looks for the line (and unfolds "Show N more").
+    if (onPhone(page)) return openPhoneGroup(page, "BILLS");
     const needs = needsYou(page);
     await expect(needs).toBeVisible();
     const group = needs.locator('[data-need-group="BILLS"]');

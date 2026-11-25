@@ -1,11 +1,11 @@
 "use client";
 
+import { PageContainer } from "@saroh/ui/page-container";
 import { useSearchParams } from "next/navigation";
 import type { ComponentProps, ReactNode } from "react";
 import { useEffect, useMemo } from "react";
 
 import { Moment } from "@/components/shared/notices/moment";
-import type { MomentView } from "@/lib/moments/keys";
 import { ordersHref, readOrdersQuery } from "@/lib/orders/list-query";
 import { ordersAsk } from "@/lib/orders/queries";
 import { useOrdersList, useOrdersOptions } from "@/lib/orders/use-orders";
@@ -16,7 +16,8 @@ type Screen = ComponentProps<typeof OrdersScreen>;
 
 /**
  * Sell → Orders on React Query (DEC-259): the same `OrdersScreen`, its page
- * a query keyed on what the address asks for, handed over by the server. A
+ * a query keyed on what the address asks for, read in the browser; the
+ * route's loader (`skeleton`) stands in until the first page lands. A
  * tab, filter or search changes the address in place and the key; the last
  * rows stay, greyed, until the new ones land. What the filter bar offers is
  * its own read, keyed on the product filter alone, so a tab or page change
@@ -25,20 +26,23 @@ type Screen = ComponentProps<typeof OrdersScreen>;
 export function OrdersContainer({
     defaultSize,
     notices,
-    moment,
-    firstHref,
+    skeleton,
     ...screen
 }: Omit<
     Screen,
-    "query" | "page" | "filterOptions" | "openByStore" | "pending" | "onRetry"
+    | "query"
+    | "page"
+    | "filterOptions"
+    | "openByStore"
+    | "pending"
+    | "onRetry"
+    | "share"
 > & {
     /** Rows per page when the address names none (the remembered size). */
     defaultSize: number;
     notices: ReactNode;
-    /** The business's first, 10th or 100th order (wave G), from the first read. */
-    moment: MomentView | null;
-    /** The address the moment was read for: it is said only there. */
-    firstHref: string;
+    /** The route's loader, until the first page is read. */
+    skeleton: ReactNode;
 }) {
     const search = useSearchParams();
     const query = useMemo(
@@ -63,25 +67,28 @@ export function OrdersContainer({
 
     // A failed read is the page failing (`error.tsx`), never an empty list.
     if (list.isError && !page) throw list.error;
-    if (!page) return null;
+    if (!page) return skeleton;
 
     return (
-        <OrdersScreen
-            {...screen}
-            notices={
-                <>
-                    {notices}
-                    {moment && ordersHref(query) === firstHref ? (
-                        <Moment moment={moment} className="mb-4" />
-                    ) : null}
-                </>
-            }
-            query={query}
-            page={page}
-            filterOptions={options.data?.filters ?? null}
-            openByStore={options.data?.openByStore ?? null}
-            pending={list.isPlaceholderData}
-            onRetry={() => void list.refetch()}
-        />
+        <PageContainer width="full">
+            <OrdersScreen
+                {...screen}
+                notices={
+                    <>
+                        {notices}
+                        {page.moment ? (
+                            <Moment moment={page.moment} className="mb-4" />
+                        ) : null}
+                    </>
+                }
+                query={query}
+                page={page}
+                filterOptions={options.data?.filters ?? null}
+                openByStore={options.data?.openByStore ?? null}
+                pending={list.isPlaceholderData}
+                share={page.share}
+                onRetry={() => void list.refetch()}
+            />
+        </PageContainer>
     );
 }

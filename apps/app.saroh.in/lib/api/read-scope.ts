@@ -42,9 +42,12 @@ export function scopedOrg(): string | undefined {
     return scope.getStore()?.activeOrg;
 }
 
-/** The business list's URL, for `inReadScope`'s `only`. */
+/**
+ * The business list's URL, or one row of it (`/organizations/:id/me`), for
+ * `inReadScope`'s `only`: a write changes neither.
+ */
 export const isOrganizationList = (url: string): boolean =>
-    new URL(url).pathname === "/organizations";
+    /^\/organizations(\/[^/]+\/me)?$/.test(new URL(url).pathname);
 
 /** A GET to the API: once per URL inside a scope, else as ever. */
 export function readOnce(url: string, init: RequestInit): Promise<Response> {

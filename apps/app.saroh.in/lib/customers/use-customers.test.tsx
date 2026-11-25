@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
- * Customers on React Query (DEC-259), in the browser: a customer's page is
- * mounted over the prefetch without a read; a save that landed reads that
+ * Customers on React Query (DEC-259), in the browser: a customer's page
+ * reads them once on first load (nothing comes with the page's HTML) and
+ * is mounted over what was already read without a read; a save that landed reads that
  * page once and nothing else, marking the list, orders, bookings, invoices
  * and Home stale for their next visit; a payment recorded on their Invoices
  * tab does the same (`InvoiceSaveFor`), naming the tab's business.
@@ -61,7 +62,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** The page's prefetch, and the screens this tab saw earlier. */
+/** Their page already read, and the screens this tab saw earlier. */
 function hydrated() {
     const server = makeTestClient();
     server.setQueryData(
@@ -115,6 +116,20 @@ describe("the list's key", () => {
     });
 });
 
+describe("a customer's page, first load", () => {
+    it("reads them once, in the browser", async () => {
+        const { unmount } = renderWithQuery(<Page report={() => undefined} />, {
+            client: makeTestClient(),
+            orgId: ORG,
+        });
+        await tick();
+        expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+            "/api/customers/c1",
+        ]);
+        unmount();
+    });
+});
+
 describe("a save on a customer's page", () => {
     it("reads the page once, nothing else, and marks what names them stale", async () => {
         let save: CustomerSave | undefined;
@@ -130,7 +145,7 @@ describe("a save on a customer's page", () => {
             { client, orgId: ORG },
         );
         await tick();
-        // Mounted over the prefetch: no read of its own.
+        // Mounted over what was already read: no read of its own.
         expect(fetchMock).not.toHaveBeenCalled();
         expect(save?.orgId).toBe(ORG);
 

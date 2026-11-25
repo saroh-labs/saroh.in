@@ -1,18 +1,14 @@
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 
 import { InvoiceDetailContainer } from "@/components/invoices/details/invoice-detail-container";
 import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
-import { PageContainer } from "@/components/shared/page/page-container";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
-import { invoiceServer, readInvoiceOnce } from "@/lib/invoices/access-server";
-import { invoiceRead } from "@/lib/invoices/queries";
+import { readInvoiceOnce } from "@/lib/invoices/access-server";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
-import { ReadFailed } from "@/lib/query/client";
-import { prefetchRead } from "@/lib/query/prefetch";
-import { getServerQueryClient } from "@/lib/query/server-client";
 import { requireSession } from "@/lib/session";
+
+import Loading from "./loading";
 
 /**
  * "Invoice INV-0042" in the tab (a credit note says so): its number, never
@@ -42,9 +38,11 @@ export async function generateMetadata({
  * button, Share and More, what happened, and what it is connected to.
  * Print leaves only the paper.
  *
- * On React Query (DEC-259): the gate is decided here; the invoice's details
- * (`/api/invoices/[invoiceId]`, the same read as the side sheet's) are
- * prefetched and hydrated, and `InvoiceDetailContainer` draws the page.
+ * On React Query (DEC-259), loaded in the browser: the gate is decided
+ * here, with the invoice the tab's title reads anyway (missing, or another
+ * business's, is this page's 404); its details (`/api/invoices/[invoiceId]`,
+ * the same read as the side sheet's) are `InvoiceDetailContainer`'s query,
+ * read from the browser behind the route's loader.
  */
 export default async function InvoicePage({
     params,
@@ -64,26 +62,12 @@ export default async function InvoicePage({
         );
     }
     if (!organization) notFound();
-    const client = getServerQueryClient();
-    const ask = { invoiceId };
-    await prefetchRead(client, invoiceServer, organization.id, ask);
-    const query = client.getQueryState(
-        invoiceRead.options(organization.id, ask).queryKey,
-    );
-    // Missing, or another business's. A read that failed otherwise is the
-    // page failing (`error.tsx`), as before.
-    if (query?.error instanceof ReadFailed && query.error.status === 404) {
-        notFound();
-    }
-    if (query?.status === "error") {
-        throw query.error ?? new Error("The invoice couldn't be read");
-    }
+    // Missing, or another business's: the same read as the tab's title
+    // (`readInvoiceOnce`), so it costs nothing more. A read that failed
+    // otherwise is the page failing (`error.tsx`), as before.
+    if (!(await readInvoiceOnce(invoiceId))) notFound();
 
     return (
-        <PageContainer width="full">
-            <HydrationBoundary state={dehydrate(client)}>
-                <InvoiceDetailContainer ask={ask} />
-            </HydrationBoundary>
-        </PageContainer>
+        <InvoiceDetailContainer ask={{ invoiceId }} skeleton={<Loading />} />
     );
 }

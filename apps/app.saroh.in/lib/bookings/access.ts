@@ -5,6 +5,7 @@ import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { readCalendarBusy } from "@/lib/google-calendar/service";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { moduleAccess } from "@/lib/modules/guard";
+import { bookingsListMoment } from "@/lib/moments/read";
 import { permitsFor } from "@/lib/organizations/permits";
 import type { Organization } from "@/lib/organizations/service";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
@@ -23,6 +24,8 @@ import {
     readNow,
 } from "@/lib/services/service";
 import { readServiceHours } from "@/lib/services/service-hours-read";
+import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import type { StaffList } from "@/lib/staff/service";
 import { listStaff } from "@/lib/staff/service";
 import { withClosures } from "@/lib/staff/time-off";
@@ -91,18 +94,30 @@ export async function bookingsCan(organization: Organization | null) {
 export async function readBookingsList(
     ask: BookingsAsk,
 ): Promise<BookingsList> {
+    const dated = [ask.date, ask.from, ask.to].some(Boolean);
     const [calendar, organization] = await Promise.all([
-        ask.date || ask.from || ask.to
-            ? readBookingsByDay(ask)
-            : readBookingsRegister(),
+        dated ? readBookingsByDay(ask) : readBookingsRegister(),
         activeOrganizationOnce(),
     ]);
     if (!calendar) throw new Error("Bookings: the list couldn't be read");
     const every = flattenCalendar(calendar);
+    const bookings = seesAmounts(organization) ? every : withoutAmounts(every);
+    // The first booking and the first run's share, read only when they
+    // can be said: the whole register, and no bookings at all.
+    const [moment, share] = await Promise.all([
+        dated ? null : bookingsListMoment(bookings, organization),
+        !dated && every.length === 0
+            ? readWebAddressLinks().then((links) =>
+                  shareLink(links, BOOKINGS_FIRST_RUN),
+              )
+            : null,
+    ]);
     return {
-        bookings: seesAmounts(organization) ? every : withoutAmounts(every),
+        bookings,
         timezone: calendar.timezone || DEFAULT_BUSINESS_ZONE,
         now: Date.now(),
+        moment,
+        share,
     };
 }
 

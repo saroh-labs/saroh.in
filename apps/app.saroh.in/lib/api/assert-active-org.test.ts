@@ -4,12 +4,29 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-const active = vi.hoisted((): { id: string | null } => ({ id: "org_a" }));
+const active = vi.hoisted(
+    (): { id: string | null; cookie?: string; lists: number } => ({
+        id: "org_a",
+        lists: 0,
+    }),
+);
 vi.mock("@/lib/api/http", () => ({
-    getActiveOrgId: () => Promise.resolve(active.id),
+    ACTIVE_ORG_COOKIE: "active_org",
+    // Stands for the business list: counted.
+    getActiveOrgId: () => {
+        active.lists += 1;
+        return Promise.resolve(active.id);
+    },
+}));
+vi.mock("next/headers", () => ({
+    cookies: () =>
+        Promise.resolve({
+            get: () => (active.cookie ? { value: active.cookie } : undefined),
+        }),
 }));
 
 import { assertActiveOrg, ORG_MOVED, writeAsOrg } from "./assert-active-org";
+import { scopedOrg } from "./read-scope";
 
 /** An action as a migrated screen writes it. */
 const write = vi.fn();
@@ -51,5 +68,28 @@ describe("writeAsOrg", () => {
             error: ORG_MOVED,
         });
         expect(save).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("writeAsOrg, the tab's business the cookie's", () => {
+    it("writes with the business settled and no business list read", async () => {
+        active.cookie = "org_a";
+        active.lists = 0;
+        const save = vi.fn(() => Promise.resolve(scopedOrg()));
+        await expect(writeAsOrg("org_a", save)).resolves.toBe("org_a");
+        expect(active.lists).toBe(0);
+    });
+
+    it("a cookie on another business: the list decides, as before", async () => {
+        active.cookie = "org_b";
+        active.id = "org_b";
+        active.lists = 0;
+        const save = vi.fn();
+        await expect(writeAsOrg("org_a", save)).resolves.toEqual({
+            ok: false,
+            error: ORG_MOVED,
+        });
+        expect(save).not.toHaveBeenCalled();
+        expect(active.lists).toBe(1);
     });
 });

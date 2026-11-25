@@ -2,7 +2,8 @@
 /**
  * `useLiveRefresh` on a page moved to React Query (DEC-259): the refresh
  * invalidates the page's domains for the open business instead of reading
- * the page again (a chrome page: `router.refresh()` instead), under the
+ * the page again (a chrome page: `router.refresh()` as well, for its
+ * chrome; its rows are read in the browser all the same), under the
  * same guards plus a read or a save still on its way. Pages off the
  * registry keep today's path (`use-live-refresh.test.tsx`).
  */
@@ -173,15 +174,11 @@ afterEach(() => {
 });
 
 describe("useLiveRefresh on a React Query page", () => {
-    it("on a chrome page, refreshes it once and leaves the reads to its render's prefetch", async () => {
+    it("on a chrome page, reads its queries again and refreshes the page once for its chrome", async () => {
         await ready();
         comeBack();
-        // Read once (mount); the server render hydrates the new rows.
-        expect(reads.count("home", "org_1")).toBe(1);
-        expect(
-            client.getQueryState(domainKey("home", "org_1", "summary"))
-                ?.isInvalidated,
-        ).toBe(true);
+        // Its render sends no rows (DEC-259): the browser reads them again.
+        expect(reads.count("home", "org_1")).toBe(2);
         expect(reads.count("orders", "org_1")).toBe(1);
         expect(h.refresh).toHaveBeenCalledTimes(1);
     });

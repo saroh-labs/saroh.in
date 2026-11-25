@@ -5,27 +5,34 @@ import { cache } from "react";
 import { businessModeOf } from "@/lib/gst/price-mode";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { moduleAccess } from "@/lib/modules/guard";
+import { ordersListMoment } from "@/lib/moments/read";
 import { permitsFor } from "@/lib/organizations/permits";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { getOrderPayments } from "@/lib/payments/service";
 import { invitationState } from "@/lib/product-reviews/service";
 import { listProducts } from "@/lib/products/service";
 import type { ServerRead } from "@/lib/query/route";
+import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import { listBusinessStores } from "@/lib/stores/service";
 
 import { orderPowers, ordersAccess } from "./access";
 import { allergyNotesOf } from "./attention";
-import type { OrderListPage } from "./business-service";
 import { getOrderFilterOptions, listOrderRows } from "./business-service";
 import {
     getAttentionAllergies,
     getOrderRead,
     readOrderQuickView,
 } from "./kitchen-service";
-import { orderListParams, readOrdersQuery } from "./list-query";
+import {
+    orderListParams,
+    ordersEmptyCopy,
+    readOrdersQuery,
+} from "./list-query";
 import type {
     OrderAsk,
     OrdersAsk,
+    OrdersListView,
     OrdersOptions,
     OrdersOptionsAsk,
     OrderView,
@@ -59,9 +66,33 @@ export async function mayReadOrders(): Promise<boolean> {
     return access.state === "available" || access.state === "unknown";
 }
 
-/** A page of the list; the API's empty page when there is no business. */
-export function readOrdersList(ask: OrdersAsk): Promise<OrderListPage> {
-    return listOrderRows(orderListParams(readOrdersQuery(ask)));
+/**
+ * A page of the list (the API's empty page when there is no business), and
+ * what its first run says from it. The business's first, 10th or 100th
+ * order (wave G), only on the whole list's first page, where the count is
+ * every order. No orders yet: share the online shop while it is live, else
+ * the website (B7; DEC-069, L8); a web address that can't be read (or a
+ * role it isn't shown to) leaves the button out. Each is read only then.
+ */
+export async function readOrdersList(ask: OrdersAsk): Promise<OrdersListView> {
+    const query = readOrdersQuery(ask);
+    const [page, viewer] = await Promise.all([
+        listOrderRows(orderListParams(query)),
+        activeOrganizationOnce(),
+    ]);
+    const unnarrowed = ordersEmptyCopy(query, null).kind === "first-run";
+    const [moment, share] = await Promise.all([
+        ordersListMoment(page, {
+            plain: unnarrowed && !query.storefront && query.page === 1,
+            viewer,
+        }),
+        page.rows.length === 0 && unnarrowed
+            ? readWebAddressLinks().then((links) =>
+                  shareLink(links, ORDERS_FIRST_RUN),
+              )
+            : null,
+    ]);
+    return { ...page, moment, share };
 }
 
 /** The filter bar's choices and the storefront menu's open counts. */
@@ -195,7 +226,7 @@ export async function readTickets({ ids }: TicketsAsk): Promise<TicketsView> {
     };
 }
 
-export const ordersListServer: ServerRead<OrdersAsk, OrderListPage> = {
+export const ordersListServer: ServerRead<OrdersAsk, OrdersListView> = {
     read: ordersListRead,
     service: readOrdersList,
 };

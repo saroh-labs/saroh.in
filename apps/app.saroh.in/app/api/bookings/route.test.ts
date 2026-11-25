@@ -1,6 +1,7 @@
 /**
  * The bookings list's read route (DEC-259): the page's prefetch and the
- * route answer the same JSON; amounts go only to whoever may see money or
+ * route answer the same JSON; the first booking and the first run's share
+ * come with the whole register only; amounts go only to whoever may see money or
  * take it at the desk; the list goes to a role with `booking:read` while
  * Bookings is on, as the section's layout decides, and to nobody else.
  */
@@ -15,12 +16,16 @@ const h = vi.hoisted(
         modules: { state: string };
         register: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
         byDay: ReturnType<typeof vi.fn<(ask: object) => Promise<unknown>>>;
+        moment: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
+        links: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
     } => ({
         active: "org_a",
         business: null,
         modules: { state: "available" },
         register: vi.fn(),
         byDay: vi.fn(),
+        moment: vi.fn(),
+        links: vi.fn(),
     }),
 );
 vi.mock("@/lib/api/http", () => ({
@@ -39,6 +44,12 @@ vi.mock("@/lib/services/bookings-by-day", () => ({
 vi.mock("@/lib/services/service", () => ({
     readBookingsRegister: () => h.register(),
     flattenCalendar: (c: { rows: unknown[] }) => c.rows,
+}));
+vi.mock("@/lib/moments/read", () => ({
+    bookingsListMoment: () => h.moment(),
+}));
+vi.mock("@/lib/sites/share-links-read", () => ({
+    readWebAddressLinks: () => h.links(),
 }));
 // The page's own `bookingsCan` reads; not the route's.
 vi.mock("@/lib/invoices/payments-on", () => ({ onlinePayReady: vi.fn() }));
@@ -88,6 +99,12 @@ const as =
             fn.mockReset();
             fn.mockImplementation(() => Promise.resolve(read()));
         }
+        h.moment.mockReset();
+        h.moment.mockResolvedValue(null);
+        h.links.mockReset();
+        h.links.mockResolvedValue({
+            links: { book: "https://rye.saroh.app/book" },
+        });
     };
 
 const get = (params: Record<string, string> = {}) =>
@@ -116,7 +133,32 @@ describe("/api/bookings", () => {
             ],
             timezone: "Asia/Kolkata",
             now: Date.parse("2026-10-19T06:00:00.000Z"),
+            moment: null,
+            share: null,
         });
+        // A register with a booking has nothing to share.
+        expect(h.links).not.toHaveBeenCalled();
+    });
+
+    it("says the first booking and the empty register's share only on the whole register", async () => {
+        const first = { key: "first-booking", title: "Your first booking" };
+        h.moment.mockResolvedValue(first);
+        expect(await (await get()).json()).toMatchObject({ moment: first });
+
+        as(OWNER, () => ({ timezone: "Asia/Kolkata", rows: [] }))();
+        expect(await (await get()).json()).toMatchObject({
+            moment: null,
+            share: { kind: "book", url: "https://rye.saroh.app/book" },
+        });
+
+        // Dated: neither is asked.
+        as(OWNER, () => ({ timezone: "Asia/Kolkata", rows: [] }))();
+        expect(await (await get({ date: "7d" })).json()).toMatchObject({
+            moment: null,
+            share: null,
+        });
+        expect(h.moment).not.toHaveBeenCalled();
+        expect(h.links).not.toHaveBeenCalled();
     });
 
     it("asks the API for the days the address names, the register otherwise", async () => {

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { Moment } from "@/components/shared/notices/moment";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { ScreenPending } from "@/components/shared/page/screen-pending";
 import { bookingsAsk } from "@/lib/bookings/queries";
 import {
@@ -12,8 +13,6 @@ import {
     useBookingSaveWithQuery,
     useBookingsList,
 } from "@/lib/bookings/use-bookings";
-import type { MomentView } from "@/lib/moments/keys";
-import type { ShareLink } from "@/lib/sites/share-links";
 import { dateRangeOn, readDateRange } from "@/lib/views/date-range";
 import { viewParam } from "@/lib/views/search-params";
 import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
@@ -40,21 +39,17 @@ export function BookingsListSaves({ children }: { children: ReactNode }) {
  * rows are read for those days and the last ones stay, greyed, until they
  * land; Back draws a seen range from the cache. `?since=` (Home's "Last 24
  * hours") and `?cancelled=1` narrow or open what was read, in the browser.
- * The parts stay props-in.
+ * The first read is the browser's too: the loader's body stands under the
+ * page's header until it lands. The parts stay props-in.
  */
 export function BookingsContainer({
     can,
     me,
     initialStaff,
-    share,
-    moment,
 }: {
     can: AllBookingsCan;
     me: { id: string; name: string } | null;
     initialStaff: string | null;
-    share: ShareLink | null;
-    /** The business's first booking (wave G), from the page's first read. */
-    moment: MomentView | null;
 }) {
     const search = useSearchParams();
     const params = Object.fromEntries(search);
@@ -62,7 +57,18 @@ export function BookingsContainer({
     const dated = dateRangeOn(dates);
     const query = useBookingsList(bookingsAsk(dates));
     const data = query.data;
-    if (!data) return query.isError ? <BookingsCouldntLoad /> : null;
+    if (!data) {
+        return query.isError ? (
+            <BookingsCouldntLoad />
+        ) : (
+            <PageLoading
+                bare
+                shape="list"
+                width="full"
+                label="Loading bookings"
+            />
+        );
+    }
 
     const since = sinceParam(params);
     // From Home's "Last 24 hours" (F6): the confirmed bookings made since
@@ -76,7 +82,7 @@ export function BookingsContainer({
     return (
         <ScreenPending inPlace={{ pending: query.isPlaceholderData }}>
             {/* Only the whole register can say it is the first. */}
-            {moment && !dated ? <Moment moment={moment} /> : null}
+            {data.moment && !dated ? <Moment moment={data.moment} /> : null}
             {since ? (
                 <SinceNotice
                     count={rows.length}
@@ -93,7 +99,8 @@ export function BookingsContainer({
                 // for: those days may all be past.
                 initialView={viewParam(params) ?? (dated ? "all" : undefined)}
                 dates={dates}
-                share={share}
+                // Not while `?since=` narrows the list: it isn't empty.
+                share={since ? null : data.share}
                 me={me}
                 showCancelled={search.get("cancelled") === "1"}
                 initialStaff={initialStaff}

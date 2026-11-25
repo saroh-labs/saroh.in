@@ -198,8 +198,14 @@ export function OrderDetail({
             ? (order.next.stages[0] ?? null)
             : null;
     const open = isOpen(order);
+    // Before the clock is read (the server's paint and hydration) the pill's
+    // place is kept, so it doesn't push the page down under a tap.
     const age =
-        open && clock !== null && !appointment ? waiting(order, clock) : null;
+        open && !appointment
+            ? clock === null
+                ? ("soon" as const)
+                : waiting(order, clock)
+            : null;
     const delivery = goesToAddress(order);
     const provider =
         payments?.intents.find((i) => i.status === "SUCCEEDED")?.provider ??
