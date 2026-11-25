@@ -4,7 +4,6 @@ import { FormDialog } from "@saroh/ui/form-dialog";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
@@ -31,6 +30,7 @@ import {
     sellTerms,
     soldMessage,
 } from "@/lib/class-packs/sell-words";
+import { useClassPackSave } from "@/lib/class-packs/use-class-packs";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { ChipGroup } from "@saroh/ui/choice-group";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -96,7 +96,7 @@ export function SellPackDialog({
     /** Purchases the page read, for first-pack-only and "Has 4 left". */
     held?: readonly HeldPack[];
 }) {
-    const router = useRouter();
+    const save = useClassPackSave();
     const ids = {
         who: useId(),
         pack: useId(),
@@ -137,12 +137,15 @@ export function SellPackDialog({
         : null;
     const missing = !contactId || !paidBy || !pack;
 
-    async function save() {
+    async function submit() {
         setTried(true);
         if (!pack || !contactId || !paidBy || blocked) return;
         // No GST rate on the pack: chosen here, saved on it, then sold.
         const res = await runAction(
-            () => rates.run(() => sellPack(pack.id, contactId, paidBy)),
+            () =>
+                rates.run(() =>
+                    sellPack(pack.id, contactId, paidBy, save.orgId),
+                ),
             { setBusy },
         );
         // Unreached, or the rate sheet was closed: nothing was sold.
@@ -153,8 +156,8 @@ export function SellPackDialog({
         setContactId(initialContactId ?? "");
         setPaidBy("");
         setTried(false);
-        // rq-refresh-ok: shared with a server-rendered list; on a customer's page it also redraws the tabs still drawn there (Courses, packs, plans) and hydrates the customer read again (until their units).
-        router.refresh();
+        // Class packs and the customer's page read again (DEC-259).
+        await save.saved();
     }
 
     const nothingToSell = onSale.length === 0 || (initialPackId && !fixed);
@@ -194,7 +197,7 @@ export function SellPackDialog({
                     setTried(false);
                     onOpenChange(false);
                 }}
-                onSubmit={save}
+                onSubmit={submit}
             >
                 {nothingToSell ? (
                     <p className="text-[13px] text-muted-foreground">

@@ -43,6 +43,11 @@ export const RQ_ROUTES: readonly string[] = [
     "/commerce/locations",
     "/billing/subscriptions",
     "/billing/subscriptions/[subscriptionId]",
+    "/class-packs",
+    "/class-packs/purchases",
+    "/class-packs/[packId]",
+    "/class-packs/[packId]/edit",
+    "/class-packs/new",
     "/social",
 ];
 
@@ -63,5 +68,6 @@ export const RQ_DOMAINS: readonly string[] = [
     "subscriptions",
     "collections",
     "product-reviews",
+    "class-packs",
     "social",
 ];

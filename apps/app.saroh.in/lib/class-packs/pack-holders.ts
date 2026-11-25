@@ -177,9 +177,11 @@ export function extendedToast(
  * happened without a code.
  */
 export function extendFailure(
-    res: { error: string; status: number },
+    res: { error: string; status?: number },
     name: string,
 ): string {
+    // No status: refused before the API (another business was opened).
+    if (res.status === undefined) return res.error;
     const first = name.trim().split(/\s+/)[0] || name;
     if (res.status === 409) {
         return `${first} has nothing left on this pack, so there's nothing to extend.`;

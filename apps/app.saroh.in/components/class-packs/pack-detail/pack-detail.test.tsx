@@ -2,7 +2,7 @@
 /**
  * Pack Detail (E16) with its Server Actions answered by the test: Who has
  * it lists each holder with Extend; extending by 7 days says the new date
- * and refreshes; E13's 409 is said in words inside the dialog; a pack
+ * and reads Class packs again; E13's 409 is said in words inside the dialog; a pack
  * nobody holds offers Sell this pack; a failed holders read is named in
  * that tab only; and a role without `pack:write` sees Extend off, with why.
  */
@@ -23,9 +23,18 @@ import type {
 import { openOptions, pickOption } from "./pick-option.test-kit";
 
 const refresh = vi.fn();
+const retry = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh, replace: vi.fn() }),
     usePathname: () => "/class-packs/pk_1",
+}));
+
+// The tab's business and Class packs' invalidation (DEC-259).
+const packSave = vi.hoisted(() => ({
+    saved: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+}));
+vi.mock("@/lib/class-packs/use-class-packs", () => ({
+    useClassPackSave: () => ({ orgId: "org_1", saved: packSave.saved }),
 }));
 
 const toast = vi.hoisted(() => ({
@@ -121,6 +130,8 @@ beforeEach(() => {
     for (const fn of Object.values(actions)) fn.mockReset();
     for (const fn of Object.values(toast)) fn.mockReset();
     refresh.mockReset();
+    retry.mockReset();
+    packSave.saved.mockClear();
     window.history.replaceState(null, "", "/class-packs/pk_1?tab=who");
 });
 
@@ -180,6 +191,7 @@ function render(
                     invoicesOnSale: false,
                 }}
                 initialTab={opts.tab ?? "who"}
+                onRetry={retry}
             />,
         );
     });
@@ -275,11 +287,14 @@ describe("Pack Detail's Who has it", () => {
             "pp_1",
             7,
             "Knee injury",
+            "org_1",
         );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Asha's pack now runs to 17 Nov.",
         );
-        expect(refresh).toHaveBeenCalled();
+        // Class packs and the customer's page read again, no refresh.
+        expect(packSave.saved).toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
         expect(text()).not.toContain("Extend Asha Rao's pack");
     });
 
@@ -299,7 +314,7 @@ describe("Pack Detail's Who has it", () => {
         );
         expect(text()).not.toContain("Nothing left to extend");
         expect(text()).toContain("Extend Asha Rao's pack");
-        expect(refresh).not.toHaveBeenCalled();
+        expect(packSave.saved).not.toHaveBeenCalled();
     });
 
     it("a pack nobody holds offers Sell this pack", () => {
@@ -316,7 +331,7 @@ describe("Pack Detail's Who has it", () => {
         // The header and the tabs are still there.
         expect(document.querySelector("h1")?.textContent).toBe("Ten classes");
         click(button("Try again"));
-        expect(refresh).toHaveBeenCalled();
+        expect(retry).toHaveBeenCalled();
         click(button("Overview"));
         expect(text()).toContain("Linked to this pack");
         expect(text()).not.toContain("Couldn't load");
@@ -467,7 +482,7 @@ describe("Pack Detail's Used this week (E17)", () => {
         expect(text()).toContain("Couldn't load what this pack paid for");
         expect(tabCount("used")).toBeNull();
         click(button("Try again"));
-        expect(refresh).toHaveBeenCalled();
+        expect(retry).toHaveBeenCalled();
         click(button(/^Who has it/));
         expect(text()).not.toContain("Couldn't load");
         expect(text()).toContain("6 of 10");

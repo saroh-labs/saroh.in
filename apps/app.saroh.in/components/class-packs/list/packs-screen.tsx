@@ -11,13 +11,18 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
-import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import { setPackArchived } from "@/lib/class-packs/actions";
-import type { CardNote } from "@/lib/class-packs/pack-card-notes";
 import type { PackListItem } from "@/lib/class-packs/pack-cards";
 import { orderForList, packCard } from "@/lib/class-packs/pack-cards";
-import type { MembershipPlan } from "@/lib/class-packs/packs-page";
-import type { HeldPack } from "@/lib/class-packs/sell-words";
+import type { PacksView } from "@/lib/class-packs/queries";
+import {
+    useClassPackSave,
+    usePacksList,
+} from "@/lib/class-packs/use-class-packs";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import { gstAskOf } from "@/lib/gst-rates/missing";
 
@@ -36,24 +41,30 @@ function archiveToast(pack: PackListItem, archived: boolean): string {
         : `${pack.name} archived. Nobody new can buy it.`;
 }
 
+/** The Packs list's container: its one read, which failing fails the page. */
+export function PacksContainer(
+    props: Omit<Parameters<typeof PacksScreen>[0], "data">,
+) {
+    const packs = usePacksList();
+    if (packs.isError && !packs.data) throw packs.error;
+    return <PacksScreen {...props} data={packs.data ?? null} />;
+}
+
 /**
  * Bookings › Packs (round-2 E15, after "Saroh Packs"): one card per pack —
  * kind, price, terms, first-pack-only, Draft or "Changes not published",
  * what it sold and what is still to use — with Sell at the desk on each.
  * What was bought is frozen at the sale, so a change here never rewrites
  * anyone's classes. "Who holds one" stays a tab away.
+ *
+ * On React Query (DEC-259): the frame (header, New pack, tabs) is drawn at
+ * once from the page's gates; the cards, the summary and the rule line
+ * come with `data`, skeletons until then.
  */
 export function PacksScreen({
-    packs,
-    notes,
-    contacts,
-    held,
+    data,
     canWrite,
     canSell,
-    invoicesOnSale,
-    summary,
-    rules,
-    memberships,
     openSell,
     missingRates = null,
 }: {
@@ -62,25 +73,15 @@ export function PacksScreen({
      * business; null when it couldn't be told, which draws nothing.
      */
     missingRates?: MissingRates | null;
-    packs: PackListItem[];
-    /** Each card's lines under its figures, by pack id (running out first). */
-    notes?: Record<string, CardNote[]>;
-    contacts: ContactOption[];
-    /** The purchases the page read, for first-pack-only and "Has 4 left". */
-    held: HeldPack[];
+    /** The packs read (`/api/class-packs`); null while on its way. */
+    data: PacksView | null;
     canWrite: boolean;
     canSell: boolean;
-    invoicesOnSale: boolean;
-    /** "12 classes still owed to 5 people · …". */
-    summary: string;
-    /** How a booking spends a class, and when a cancel gives it back. */
-    rules: string;
-    /** Live membership plans; null or empty draws no note. */
-    memberships: MembershipPlan[] | null;
     /** Opened from ⌘K's "Sell a pack". */
     openSell: boolean;
 }) {
     const router = useRouter();
+    const save = useClassPackSave();
     const [selling, setSelling] = useState<{ packId?: string } | null>(
         openSell ? {} : null,
     );
@@ -100,7 +101,7 @@ export function PacksScreen({
         setBusyId(pack.id);
         start(async () => {
             const res = await runAction(() =>
-                setPackArchived(pack.id, archived),
+                setPackArchived(pack.id, archived, save.orgId),
             );
             setBusyId(null);
             if (!res) return;
@@ -108,23 +109,24 @@ export function PacksScreen({
                 showError(res.error);
                 return;
             }
-            router.refresh();
+            await save.saved();
             // One Undo on screen at a time: an older one would undo the
             // wrong pack.
             dismissToasts();
             showUndo(archiveToast(pack, archived), () =>
                 start(async () => {
                     const back = await runAction(() =>
-                        setPackArchived(pack.id, !archived),
+                        setPackArchived(pack.id, !archived, save.orgId),
                     );
                     if (!back) return;
-                    if (!back.ok) showError(back.error);
-                    router.refresh();
+                    if (!back.ok) return showError(back.error);
+                    await save.saved();
                 }),
             );
         });
     }
 
+    const packs = data?.packs ?? [];
     const ordered = orderForList(packs);
 
     return (
@@ -143,17 +145,21 @@ export function PacksScreen({
                     "Class packs",
                 ]}
                 title="Class packs"
-                count={countLabel(packs.length, {
-                    one: "pack",
-                    other: "packs",
-                })}
+                count={
+                    data
+                        ? countLabel(packs.length, {
+                              one: "pack",
+                              other: "packs",
+                          })
+                        : undefined
+                }
                 description={
                     <span className="block max-w-[720px] text-pretty text-[13px] leading-[1.5] text-foreground/80">
-                        {rules}
+                        {data ? data.rules : <FigureLoading className="w-72" />}
                     </span>
                 }
                 // A summary, not a button: before the actions.
-                meta={summary}
+                meta={data ? data.summary : <FigureLoading className="w-40" />}
                 actions={
                     canWrite ? (
                         <>
@@ -185,7 +191,14 @@ export function PacksScreen({
                 already have keep their classes, price and dates.
             </p>
 
-            {ordered.length === 0 ? (
+            {!data ? (
+                <PageLoading
+                    bare
+                    shape="rows"
+                    width="full"
+                    label="Loading class packs"
+                />
+            ) : ordered.length === 0 ? (
                 <EmptyState
                     icon={<Ticket />}
                     title="No class packs yet"
@@ -206,7 +219,7 @@ export function PacksScreen({
                         <li key={p.id} className="min-w-0">
                             <PackCard
                                 card={packCard(p, canWrite)}
-                                notes={notes?.[p.id] ?? []}
+                                notes={data.notes[p.id] ?? []}
                                 canWrite={canWrite}
                                 canSell={canSell}
                                 busy={busyId === p.id}
@@ -220,19 +233,19 @@ export function PacksScreen({
                 </ul>
             )}
 
-            {memberships && memberships.length > 0 ? (
-                <MembershipsNote plans={memberships} />
+            {data?.memberships && data.memberships.length > 0 ? (
+                <MembershipsNote plans={data.memberships} />
             ) : null}
 
-            {canSell && selling ? (
+            {canSell && selling && data ? (
                 <SellPackDialog
                     open
                     onOpenChange={onSellOpenChange}
-                    contacts={contacts}
+                    contacts={data.contacts}
                     packs={packs}
                     initialPackId={selling.packId}
-                    invoicesOnSale={invoicesOnSale}
-                    held={held}
+                    invoicesOnSale={data.invoicesOnSale}
+                    held={data.held}
                     gst={gstAskOf(missingRates)}
                 />
             ) : null}
