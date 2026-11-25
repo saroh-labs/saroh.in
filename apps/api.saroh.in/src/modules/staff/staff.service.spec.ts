@@ -11,7 +11,11 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             updateMany: jest.fn(),
         },
-        staffService: { createMany: jest.fn(), deleteMany: jest.fn() },
+        staffService: {
+            createMany: jest.fn(),
+            deleteMany: jest.fn(),
+            findMany: jest.fn(),
+        },
         staffHours: {
             deleteMany: jest.fn(),
             createMany: jest.fn(),
@@ -38,7 +42,7 @@ jest.mock("@saroh/database", () => {
         organizationModule: { findFirst: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
-        service: { findFirst: jest.fn(), count: jest.fn() },
+        service: { findFirst: jest.fn(), findMany: jest.fn() },
         membership: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
@@ -456,7 +460,7 @@ describe("StaffService — who a person is", () => {
     });
 
     it("404s a service that is not the business's", async () => {
-        db.service!.count!.mockResolvedValue(0);
+        db.service!.findMany!.mockResolvedValue([]);
         await expect(
             service.create(ctx(), { name: "Asha", serviceIds: ["svc_x"] }),
         ).rejects.toBeInstanceOf(NotFoundException);
@@ -493,6 +497,52 @@ describe("StaffService — who a person is", () => {
     });
 });
 
+describe("StaffService — the services a person takes", () => {
+    it("drops a service they took that has since been deleted, and saves the rest", async () => {
+        db.staffService!.findMany!.mockResolvedValue([
+            { serviceId: "svc_gone" },
+        ]);
+        db.service!.findMany!.mockResolvedValue([{ id: "svc_1" }]);
+        await service.setServices(ctx(), "staff_1", ["svc_gone", "svc_1"]);
+        expect(db.staffService!.findMany).toHaveBeenCalledWith({
+            where: { staffId: "staff_1", organizationId: "org_1" },
+            select: { serviceId: true },
+        });
+        expect(db.staffService!.deleteMany).toHaveBeenCalledWith({
+            where: { staffId: "staff_1", serviceId: { notIn: ["svc_1"] } },
+        });
+        expect(db.staffService!.createMany).toHaveBeenCalledWith({
+            data: [
+                {
+                    organizationId: "org_1",
+                    staffId: "staff_1",
+                    serviceId: "svc_1",
+                },
+            ],
+            skipDuplicates: true,
+        });
+    });
+
+    it("still 404s a service they don't take that isn't the business's", async () => {
+        db.staffService!.findMany!.mockResolvedValue([
+            { serviceId: "svc_gone" },
+        ]);
+        db.service!.findMany!.mockResolvedValue([]);
+        await expect(
+            service.setServices(ctx(), "staff_1", ["svc_gone", "svc_other"]),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(db.service!.findMany).toHaveBeenCalledWith({
+            where: {
+                id: { in: ["svc_gone", "svc_other"] },
+                organizationId: "org_1",
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        expect(db.staffService!.deleteMany).not.toHaveBeenCalled();
+    });
+});
+
 describe("StaffService — It's just me", () => {
     const WEEK = [{ dayOfWeek: 1, startMinute: 540, endMinute: 1080 }];
     const me = (staffMember: unknown) => ({
@@ -507,7 +557,7 @@ describe("StaffService — It's just me", () => {
         db.membership!.findMany!.mockResolvedValue([
             { id: "m_me", role: "OWNER", extraActions: [] },
         ]);
-        db.service!.count!.mockResolvedValue(1);
+        db.service!.findMany!.mockResolvedValue([{ id: "svc_1" }]);
         db.staffMember!.create!.mockResolvedValue({ id: "staff_1" });
         await service.addSelf(ctx({ role: "OWNER" }), {
             hours: WEEK,

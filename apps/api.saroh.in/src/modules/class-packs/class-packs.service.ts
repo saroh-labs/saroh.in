@@ -64,6 +64,7 @@ import {
     timesSold,
 } from "./pack-draft-view";
 import {
+    assertPackServices,
     createPackDraft,
     deletePackDraft,
     discardPackChanges,
@@ -350,7 +351,8 @@ export class ClassPacksService {
         if (!dto.serviceIds?.length) {
             fieldError(`Choose the ${units} it pays for`, "serviceIds");
         }
-        const serviceIds = await this.assertServices(
+        const serviceIds = await assertPackServices(
+            prisma,
             ctx.organizationId,
             dto.serviceIds,
         );
@@ -424,7 +426,12 @@ export class ClassPacksService {
             );
         }
         const serviceIds = dto.serviceIds
-            ? await this.assertServices(ctx.organizationId, dto.serviceIds)
+            ? await assertPackServices(
+                  prisma,
+                  ctx.organizationId,
+                  dto.serviceIds,
+                  id,
+              )
             : undefined;
         if (serviceIds?.length === 0) {
             fieldError("Choose the classes it pays for", "serviceIds");
@@ -1014,24 +1021,6 @@ export class ClassPacksService {
             });
         }
         return row.status;
-    }
-
-    /** Every service id from the client belongs to this business, or it is a 404. */
-    private async assertServices(
-        organizationId: string,
-        ids: string[],
-    ): Promise<string[]> {
-        const unique = [...new Set(ids)];
-        const found = await prisma.service.count({
-            where: { id: { in: unique }, organizationId, deletedAt: null },
-        });
-        if (found !== unique.length) {
-            throw new NotFoundException({
-                message: "One of those services was not found",
-                details: { field: "serviceIds" },
-            });
-        }
-        return unique;
     }
 
     private async readPack(

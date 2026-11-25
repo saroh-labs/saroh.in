@@ -71,7 +71,9 @@ jest.mock("@saroh/database", () => {
             },
             packPurchase: { findFirst: jest.fn(), findMany: jest.fn() },
             contact: { findFirst: jest.fn() },
-            service: { count: jest.fn(), findFirst: jest.fn() },
+            service: { findMany: jest.fn(), findFirst: jest.fn() },
+            // The services a pack already covers, read on a change.
+            classPackService: { findMany: jest.fn().mockResolvedValue([]) },
             membership: { findMany: jest.fn() },
             user: { findMany: jest.fn() },
             // Whether the business is registered, asked at a desk sale.
@@ -166,7 +168,10 @@ beforeEach(() => {
     db.classPack!.findFirst!.mockResolvedValue(PACK);
     db.classPack!.findMany!.mockResolvedValue([PACK]);
     db.contact!.findFirst!.mockResolvedValue({ id: "c_1" });
-    db.service!.count!.mockResolvedValue(1);
+    db.service!.findMany!.mockImplementation(
+        ({ where }: { where: { id: { in: string[] } } }) =>
+            Promise.resolve(where.id.in.map((id) => ({ id }))),
+    );
     db.packPurchase!.findFirst!.mockResolvedValue(PURCHASE);
     db.packPurchase!.findMany!.mockResolvedValue([]);
     tx.classPack!.create!.mockResolvedValue({ id: "pack_1" });
@@ -318,16 +323,17 @@ describe("making a pack", () => {
     });
 
     it("answers another business's service with a 404 and writes nothing", async () => {
-        db.service!.count!.mockResolvedValue(0);
+        db.service!.findMany!.mockResolvedValue([]);
         await expect(
             service.createPack(owner, { ...INPUT, serviceIds: ["svc_other"] }),
         ).rejects.toBeInstanceOf(NotFoundException);
-        expect(db.service!.count).toHaveBeenCalledWith({
+        expect(db.service!.findMany).toHaveBeenCalledWith({
             where: {
                 id: { in: ["svc_other"] },
                 organizationId: "org_1",
                 deletedAt: null,
             },
+            select: { id: true },
         });
         expect(tx.classPack!.create).not.toHaveBeenCalled();
     });
@@ -336,6 +342,43 @@ describe("making a pack", () => {
         await expect(
             service.createPack(owner, { ...INPUT, serviceIds: [] }),
         ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("drops a service the pack covers that has since been deleted, on a change", async () => {
+        tx.classPack!.findFirst!.mockResolvedValue({ status: "ACTIVE" });
+        db.classPackService!.findMany!.mockResolvedValueOnce([
+            { serviceId: "svc_gone" },
+        ]);
+        db.service!.findMany!.mockResolvedValueOnce([{ id: "svc_1" }]);
+        await service.updatePack(owner, "pack_1", {
+            serviceIds: ["svc_gone", "svc_1"],
+        });
+        expect(db.classPackService!.findMany).toHaveBeenCalledWith({
+            where: { packId: "pack_1", organizationId: "org_1" },
+            select: { serviceId: true },
+        });
+        expect(tx.classPackService!.createMany).toHaveBeenCalledWith({
+            data: [
+                {
+                    packId: "pack_1",
+                    serviceId: "svc_1",
+                    organizationId: "org_1",
+                },
+            ],
+        });
+    });
+
+    it("still 404s a service on a change that the pack doesn't cover and isn't live", async () => {
+        db.classPackService!.findMany!.mockResolvedValueOnce([
+            { serviceId: "svc_gone" },
+        ]);
+        db.service!.findMany!.mockResolvedValueOnce([]);
+        await expect(
+            service.updatePack(owner, "pack_1", {
+                serviceIds: ["svc_gone", "svc_other"],
+            }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(tx.classPack!.updateMany).not.toHaveBeenCalled();
     });
 });
 

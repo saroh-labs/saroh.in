@@ -25,6 +25,7 @@ import {
     loadBookingRules,
 } from "../bookings/booking-rules";
 import { pausedDiaryIds } from "../bookings/diary-paused";
+import { liveServiceIds } from "../bookings/live-service-ids";
 import { loadOpeningHours } from "../bookings/opening-hours";
 import { ownDiaryOf } from "../bookings/own-diary";
 import type { PersonRules } from "../bookings/person-rules";
@@ -306,8 +307,11 @@ export class StaffService {
         const hours = dto.hours ?? [];
         const refusal = weeklyHoursRefusal(hours);
         if (refusal) refuse(refusal.message, refusal.field);
-        const serviceIds = [...new Set(dto.serviceIds ?? [])];
-        await this.assertServices(ctx, serviceIds);
+        const serviceIds = await this.assertServices(
+            ctx,
+            dto.serviceIds ?? [],
+            [],
+        );
         if (dto.membershipId) {
             await this.assertMembership(ctx, dto.membershipId);
         }
@@ -672,8 +676,15 @@ export class StaffService {
     ): Promise<StaffView> {
         requireBookingPower(ctx, "service:write");
         const person = await this.requireStaff(ctx, staffId);
-        const ids = [...new Set(serviceIds)];
-        await this.assertServices(ctx, ids);
+        const held = await prisma.staffService.findMany({
+            where: { staffId: person.id, organizationId: ctx.organizationId },
+            select: { serviceId: true },
+        });
+        const ids = await this.assertServices(
+            ctx,
+            serviceIds,
+            held.map((h) => h.serviceId),
+        );
         await prisma.$transaction(async (tx) => {
             await tx.staffService.deleteMany({
                 where: { staffId: person.id, serviceId: { notIn: ids } },
@@ -1020,25 +1031,29 @@ export class StaffService {
         return person;
     }
 
-    /** Every service id belongs to this business and is not deleted, or 404. */
+    /**
+     * Every service id belongs to this business and is not deleted, or 404.
+     * One the person already takes whose service was deleted since is
+     * dropped, not refused. Answers the ids to keep.
+     */
     private async assertServices(
         ctx: OrganizationContext,
-        ids: string[],
-    ): Promise<void> {
-        if (ids.length === 0) return;
-        const found = await prisma.service.count({
-            where: {
-                id: { in: ids },
-                organizationId: ctx.organizationId,
-                deletedAt: null,
-            },
-        });
-        if (found !== ids.length) {
+        ids: readonly string[],
+        held: readonly string[],
+    ): Promise<string[]> {
+        const live = await liveServiceIds(
+            prisma,
+            ctx.organizationId,
+            ids,
+            held,
+        );
+        if (!live) {
             throw new NotFoundException({
                 message: "One of those services was not found",
                 field: "serviceIds",
             });
         }
+        return live;
     }
 
     /**

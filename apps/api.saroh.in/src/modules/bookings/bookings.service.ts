@@ -694,7 +694,8 @@ export class BookingsService {
 
     /**
      * Soft-delete a Service: set `deletedAt` + ARCHIVED so it stops accepting
-     * bookings while its historical bookings survive. `service:write`;
+     * bookings while its historical bookings survive, and take it off every
+     * team member who took it. `service:write`;
      * cross-tenant/missing → 404.
      */
     async removeService(
@@ -704,10 +705,20 @@ export class BookingsService {
         requireBookingPower(ctx, "service:write");
 
         const service = await this.requireOwnedService(ctx, serviceId);
-        await prisma.service.update({
-            where: { id: service.id },
-            data: { deletedAt: new Date(), status: "ARCHIVED" },
-        });
+        await prisma.$transaction([
+            prisma.service.update({
+                where: { id: service.id },
+                data: { deletedAt: new Date(), status: "ARCHIVED" },
+            }),
+            // Nobody takes it any more. Bookings keep their own staff and
+            // service, so their history doesn't hang on these links.
+            prisma.staffService.deleteMany({
+                where: {
+                    serviceId: service.id,
+                    organizationId: ctx.organizationId,
+                },
+            }),
+        ]);
         return { id: service.id, deleted: true };
     }
 

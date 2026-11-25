@@ -16,6 +16,7 @@ import {
 } from "../../common/drafts/draft-record";
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { liveServiceIds } from "../bookings/live-service-ids";
 import { businessCurrency } from "../stores/currency";
 import type { PackDraftDto, PackInputDto } from "./dto";
 import type { PackDraftRow, PackValues } from "./pack-draft-view";
@@ -85,25 +86,35 @@ async function lockedRow(
 
 /**
  * Every service id belongs to this business and is still offered, or it is
- * a 404 on the field. Answers the set as a pack's values hold it.
+ * a 404 on the field. One the pack already covers whose service was deleted
+ * since is dropped, not refused, so an old set heals on its next save.
+ * Answers the set as a pack's values hold it.
  */
 export async function assertPackServices(
     db: Prisma.TransactionClient | typeof prisma,
     organizationId: string,
     ids: readonly string[],
+    packId?: string,
 ): Promise<string[]> {
-    const unique = serviceSet(ids);
-    if (unique.length === 0) return unique;
-    const found = await db.service.count({
-        where: { id: { in: unique }, organizationId, deletedAt: null },
-    });
-    if (found !== unique.length) {
+    const held = packId
+        ? await db.classPackService.findMany({
+              where: { packId, organizationId },
+              select: { serviceId: true },
+          })
+        : [];
+    const live = await liveServiceIds(
+        db,
+        organizationId,
+        ids,
+        held.map((h) => h.serviceId),
+    );
+    if (!live) {
         throw new NotFoundException({
             message: "One of those services was not found",
             details: { field: "serviceIds" },
         });
     }
-    return unique;
+    return serviceSet(live);
 }
 
 /**
@@ -114,6 +125,7 @@ export async function assertPackServices(
 async function patchOf(
     organizationId: string,
     dto: PackInputDto,
+    packId?: string,
 ): Promise<DraftPatch<PackValues>> {
     // The DTO's @IsOptional lets an explicit null through every field.
     const sent = dto as Record<string, unknown>;
@@ -138,6 +150,7 @@ async function patchOf(
             prisma,
             organizationId,
             patch.serviceIds ?? [],
+            packId,
         );
     }
     return patch;
@@ -234,7 +247,7 @@ export async function savePackDraft(
     dto: PackDraftDto,
 ): Promise<void> {
     const { organizationId } = ctx;
-    const patch = await patchOf(organizationId, dto);
+    const patch = await patchOf(organizationId, dto, id);
     await prisma.$transaction(async (tx) => {
         const row = await lockedRow(tx, organizationId, id);
         if (row.status !== PACK_DRAFT && row.status !== PACK_ON_SALE) {
