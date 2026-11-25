@@ -1,9 +1,11 @@
 import { z } from "zod";
 
+import type { MomentView } from "@/lib/moments/keys";
 import { defineRead } from "@/lib/query/define-read";
 import type { DomainKey } from "@/lib/query/keys";
 import { domainKey } from "@/lib/query/keys";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
+import type { ShareLink } from "@/lib/sites/share-links";
 import type { DateRange } from "@/lib/views/date-range";
 import { dateRangeAsk } from "@/lib/views/date-range";
 
@@ -25,6 +27,16 @@ export interface BookingsList {
     timezone: string;
     /** The server's now at the read, so the rows and their views agree. */
     now: number;
+    /**
+     * The business's first booking (wave G), said once: only the whole
+     * register (no date asked) can say it is the first.
+     */
+    moment: MomentView | null;
+    /**
+     * No bookings at all yet: "Share your booking page" while it is live
+     * (DEC-069, L8); null otherwise, or when the web address can't be read.
+     */
+    share: ShareLink | null;
 }
 
 const day = z

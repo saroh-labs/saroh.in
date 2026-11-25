@@ -5,7 +5,10 @@ import { toWire } from "@/lib/query/define-read";
 import type { ServerRead } from "@/lib/query/route";
 
 /**
- * A page's prefetch of a read (DEC-259): the service, asked directly, its
+ * A read asked of its service directly (DEC-259), as the contract test
+ * compares it with its route (`expectReadContract`). Pages no longer
+ * prefetch: their data loads in the browser (DEC-259, amended 24 Nov
+ * 2026). Formerly a page's prefetch of a read: the service, asked directly, its
  * answer put on the wire as the route would (`toWire`). Never throws: a
  * failure leaves the query failed, it isn't dehydrated, and the browser
  * asks the route, landing in the section's failed state. Awaited or not,

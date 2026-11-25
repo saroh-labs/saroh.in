@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 /**
- * Orders on React Query (DEC-259), in the browser: the page's prefetch is
- * mounted over without a read; a tab change is a new list key while the
+ * Orders on React Query (DEC-259), in the browser: the first load reads
+ * the page and the filter bar once each (nothing comes with the page's
+ * HTML); a page already in the cache is mounted over without a read; a
+ * tab change is a new list key while the
  * filter bar's read stays; a step that landed reads the list once (the
  * filter bar's counts, Home, Products and Invoices only marked stale); a
  * refused one shows the refusal and reads nothing.
@@ -29,8 +31,8 @@ vi.mock("@/lib/orders/actions", () => ({
 }));
 
 import { useOrderStep } from "@/components/commerce/orders/use-order-step";
-import type { OrderListPage } from "@/lib/orders/business-service";
 import { readOrdersQuery } from "@/lib/orders/list-query";
+import type { OrdersListView } from "@/lib/orders/queries";
 import {
     ordersAsk,
     ordersListRead,
@@ -44,7 +46,9 @@ const ORG = "org_1";
 const PAGE = {
     rows: [],
     counts: { all: 0, open: 0, refunded: 0 },
-} as unknown as OrderListPage;
+    moment: null,
+    share: null,
+} as unknown as OrdersListView;
 const OPTIONS = { filters: null, openByStore: null };
 const ALL = ordersAsk(readOrdersQuery({}));
 const OPEN = ordersAsk(readOrdersQuery({ tab: "open" }));
@@ -78,7 +82,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** A browser client holding what the page's server render sent. */
+/** A browser client that has already read the list (an earlier visit). */
 function hydrated() {
     const server = makeTestClient();
     server.setQueryData(ordersListRead.options(ORG, ALL).queryKey, PAGE);
@@ -108,7 +112,18 @@ function Screen({
 }
 
 describe("the list's reads", () => {
-    it("first load draws the hydrated page with no read of its own", async () => {
+    it("first load reads the page and the filter bar once each, in the browser", async () => {
+        const { unmount } = renderWithQuery(
+            <Screen ask={ALL} report={() => undefined} />,
+            { client: makeTestClient(), orgId: ORG },
+        );
+        await tick();
+        expect(reads("/api/orders")).toBe(1);
+        expect(reads("/api/orders/options")).toBe(1);
+        unmount();
+    });
+
+    it("a page already read is mounted over without a read", async () => {
         const { unmount } = renderWithQuery(
             <Screen ask={ALL} report={() => undefined} />,
             { client: hydrated(), orgId: ORG },

@@ -24,6 +24,8 @@ const h = vi.hoisted(
         filters: ReturnType<typeof vi.fn<(p?: string) => Promise<unknown>>>;
         stores: { id: string; name: string }[];
         quick: ReturnType<typeof vi.fn<(id: string) => Promise<unknown>>>;
+        moment: ReturnType<typeof vi.fn<(p: object) => Promise<unknown>>>;
+        links: ReturnType<typeof vi.fn<() => Promise<unknown>>>;
     } => ({
         active: "org_a",
         business: null,
@@ -32,6 +34,8 @@ const h = vi.hoisted(
         filters: vi.fn<(p?: string) => Promise<unknown>>(),
         stores: [],
         quick: vi.fn<(id: string) => Promise<unknown>>(),
+        moment: vi.fn<(p: object) => Promise<unknown>>(),
+        links: vi.fn<() => Promise<unknown>>(),
     }),
 );
 vi.mock("@/lib/api/http", () => ({
@@ -57,6 +61,12 @@ vi.mock("@/lib/orders/kitchen-service", () => ({
     readOrderQuickView: (id: string) => h.quick(id),
 }));
 vi.mock("@/lib/payments/service", () => ({ getOrderPayments: vi.fn() }));
+vi.mock("@/lib/moments/read", () => ({
+    ordersListMoment: (_page: unknown, how: object) => h.moment(how),
+}));
+vi.mock("@/lib/sites/share-links-read", () => ({
+    readWebAddressLinks: () => h.links(),
+}));
 vi.mock("@/lib/product-reviews/service", () => ({ invitationState: vi.fn() }));
 vi.mock("@/lib/products/service", () => ({ listProducts: vi.fn() }));
 vi.mock("@/lib/invoices/tax", () => ({ getInvoiceBusiness: vi.fn() }));
@@ -115,6 +125,12 @@ const as = (who: Business) => () => {
     h.list.mockResolvedValue(PAGE);
     h.filters.mockReset();
     h.filters.mockResolvedValue({ types: [], steps: [], product: null });
+    h.moment.mockReset();
+    h.moment.mockResolvedValue(null);
+    h.links.mockReset();
+    h.links.mockResolvedValue({
+        links: { shop: "https://rye.saroh.app/shop" },
+    });
     h.quick.mockReset();
     h.quick.mockImplementation((id: string) =>
         Promise.resolve(
@@ -192,9 +208,39 @@ describe("/api/orders", () => {
         const scoped = { ...PAGE, counts: { all: 1, open: 1, refunded: 0 } };
         h.list.mockResolvedValue(scoped);
         const res = await list();
-        expect(await res.json()).toEqual(scoped);
+        expect(await res.json()).toEqual({
+            ...scoped,
+            moment: null,
+            share: null,
+        });
         // The route never widens or narrows the person's scope itself.
         expect(h.list.mock.calls[0]?.[0]).toMatchObject({ storeId: undefined });
+    });
+
+    it("says the moment only on the whole list's first page, and shares only with no orders", async () => {
+        const first = { key: "first-order", title: "Your first order" };
+        h.moment.mockImplementation((how: object) =>
+            Promise.resolve((how as { plain: boolean }).plain ? first : null),
+        );
+        expect(await (await list()).json()).toMatchObject({
+            moment: first,
+            share: null,
+        });
+        expect(await (await list({ tab: "open" })).json()).toMatchObject({
+            moment: null,
+        });
+        expect(h.links).not.toHaveBeenCalled();
+
+        h.list.mockResolvedValue({ rows: [], counts: PAGE.counts });
+        expect(await (await list()).json()).toMatchObject({
+            share: { kind: "shop", url: "https://rye.saroh.app/shop" },
+        });
+        // A search that finds nothing isn't the first run.
+        h.links.mockClear();
+        expect(await (await list({ q: "asha" })).json()).toMatchObject({
+            share: null,
+        });
+        expect(h.links).not.toHaveBeenCalled();
     });
 
     it("refuses an unknown param, and every method but GET", async () => {

@@ -50,7 +50,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** Hydrated as the page's prefetch leaves it, past its fresh moment. */
+/** Already read on an earlier visit, past its fresh moment. */
 function seeded(keys: readonly (readonly unknown[])[]) {
     const client = makeTestClient();
     for (const key of [...keys, ...SEEN]) {

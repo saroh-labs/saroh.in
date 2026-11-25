@@ -1,4 +1,3 @@
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 
 import { ProductPageFrame } from "@/components/commerce/product-page/page-state";
@@ -11,22 +10,20 @@ import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
 import { readPriceHistory } from "@/lib/price-history/service";
-import { productServer, readOverview } from "@/lib/products/access";
+import { readOverview } from "@/lib/products/access";
 import { productTabOf } from "@/lib/products/links";
 import { shopProductUrl } from "@/lib/products/overview-words";
-import { productAsk, productRead } from "@/lib/products/queries";
+import { productAsk } from "@/lib/products/queries";
 import { listCategories } from "@/lib/products/service";
 import { listAllergens } from "@/lib/products/settings";
 import { countsStock } from "@/lib/products/tracking";
-import { prefetchRead } from "@/lib/query/prefetch";
-import { getServerQueryClient } from "@/lib/query/server-client";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { readShareSetup } from "@/lib/share-item/read";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
-import { stockChecksServer, stockLogServer } from "@/lib/stock/access";
-import { ALL_CHECKS, productLogAsk } from "@/lib/stock/queries";
 import { getWaitingCount, stockTrackingOnce } from "@/lib/stock/service";
+
+import Loading from "./loading";
 
 /** The product's own name in the tab; "Product" when it can't be read. */
 export async function generateMetadata({
@@ -69,9 +66,12 @@ const ROLE_WORD = {
  * The tab is in the address (`?tab=stock`; `?tab=variants` still opens it)
  * so a notification, a link in chat or Back lands on the same view.
  *
- * On React Query (DEC-259): the gates are decided here, the product's read
- * (`/api/products/[productId]`) is prefetched and hydrated, and
- * `ProductContainer` draws the page from it.
+ * On React Query (DEC-259), loaded in the browser: the gates are decided
+ * here, from the product the tab's title reads anyway (`readOverview`: not
+ * this business's is this page's 404), with the side reads that hang on
+ * it; the product's view (`/api/products/[productId]`) and the Stock tab's
+ * log and checks are `ProductContainer`'s queries, read from the browser
+ * behind the route's loader.
  */
 export default async function ProductPage({
     params,
@@ -117,18 +117,16 @@ export default async function ProductPage({
     // The business's product (#531), as the storefront in the address sees
     // it — or the first that sells it — with its shelves where this view
     // draws them (`lib/products/access.ts`, shared with its read route).
-    // Awaited: what else the page reads hangs on it. On React Query
-    // (DEC-259): the container draws everything from the product's query.
+    // Awaited: what else the page reads hangs on it. The same read as the
+    // tab's title, so it costs nothing more; the container draws
+    // everything from the product's query (DEC-259).
     const ask = productAsk(productId, {
         storefront: query.storefront,
         tab,
         view,
     });
-    const client = getServerQueryClient();
-    const [, business, web, paused] = await Promise.all([
-        organization
-            ? prefetchRead(client, productServer, organization.id, ask)
-            : null,
+    const [found, business, web, paused] = await Promise.all([
+        organization ? readOverview(query.storefront, productId) : null,
         // The business's Track stock switch (#515). Optional: unknown, the
         // product's own switch decides.
         stockTrackingOnce(),
@@ -137,17 +135,10 @@ export default async function ProductPage({
         // Past the plan's products limit (#800): read-only, and why.
         pausedOrNull(),
     ]);
-    const read = organization
-        ? client.getQueryData(
-              productRead.options(organization.id, ask).queryKey,
-          )
-        : undefined;
-    if (!read) notFound();
+    if (!found) notFound();
     const cut = activeCut(paused, "products");
-    const isPaused = pausedByCut(read.overview.product, cut);
-    const overview = isPaused
-        ? { ...read.overview, canWrite: false }
-        : read.overview;
+    const isPaused = pausedByCut(found.product, cut);
+    const overview = isPaused ? { ...found, canWrite: false } : found;
     const shopUrl = isPaused
         ? null
         : shopProductUrl(web?.links.shop, overview.product);
@@ -191,24 +182,6 @@ export default async function ProductPage({
             : Promise.resolve(null),
         // Share as a post (#1375): only for a page that is live.
         shopUrl ? readShareSetup(web) : Promise.resolve(null),
-        // The Stock tab's log and checks (Stock's queries): a failed read
-        // is said on the tab.
-        onStock && organization
-            ? prefetchRead(
-                  client,
-                  stockLogServer,
-                  organization.id,
-                  productLogAsk(productId),
-              )
-            : null,
-        onStock && organization
-            ? prefetchRead(
-                  client,
-                  stockChecksServer,
-                  organization.id,
-                  ALL_CHECKS,
-              )
-            : null,
     ]);
     const may = (action: string) =>
         organization?.actions
@@ -216,25 +189,27 @@ export default async function ProductPage({
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
 
     return (
-        <HydrationBoundary state={dehydrate(client)}>
-            <ProductContainer
-                ask={ask}
-                tab={tab}
-                view={view}
-                ordersFilter={query.orders === "recent" ? "recent" : "open"}
-                roleLabel={roleLabel}
-                cut={cut}
-                businessTracks={business?.tracked ?? null}
-                webShop={web ? (web.links.shop ?? null) : undefined}
-                share={shareSetup}
-                canReplyReviews={may("product-review:write")}
-                categories={categories}
-                collections={collections}
-                priceHistory={priceHistory}
-                sellsFood={(allergens?.length ?? 0) > 0}
-                waiting={waiting}
-                now={new Date()}
-            />
-        </HydrationBoundary>
+        <ProductContainer
+            skeleton={<Loading />}
+            // The Stock tab's log and checks (Stock's queries), asked
+            // beside the product; a failed read is said on the tab.
+            stockShown={Boolean(onStock)}
+            ask={ask}
+            tab={tab}
+            view={view}
+            ordersFilter={query.orders === "recent" ? "recent" : "open"}
+            roleLabel={roleLabel}
+            cut={cut}
+            businessTracks={business?.tracked ?? null}
+            webShop={web ? (web.links.shop ?? null) : undefined}
+            share={shareSetup}
+            canReplyReviews={may("product-review:write")}
+            categories={categories}
+            collections={collections}
+            priceHistory={priceHistory}
+            sellsFood={(allergens?.length ?? 0) > 0}
+            waiting={waiting}
+            now={new Date()}
+        />
     );
 }
