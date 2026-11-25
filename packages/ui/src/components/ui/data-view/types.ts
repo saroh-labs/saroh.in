@@ -148,6 +148,11 @@ export interface DataViewProps<TRow> {
      */
     initialFilterId?: string;
     isLoading?: boolean;
+    /**
+     * The screen's own row skeleton while `isLoading`, so it matches its
+     * route's loader (owner, 25 Nov). Left out: five plain bars.
+     */
+    loading?: ReactNode;
     error?: string | null;
     /**
      * What a row is, in the thing's own word, for counts and states:

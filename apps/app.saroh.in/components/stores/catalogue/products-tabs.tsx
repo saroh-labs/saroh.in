@@ -10,7 +10,7 @@ export type ProductsTab = "all" | "collections" | "inventory" | "reviews";
  * inbox, Home and a product's rating can point at.
  *
  * A count that couldn't be read is "—", never 0; an empty tab shows no
- * count at all.
+ * count at all, nor does one still on its way (`undefined`).
  */
 export function ProductsTabs({
     active,
@@ -20,7 +20,7 @@ export function ProductsTabs({
     showReviews = true,
 }: {
     active: ProductsTab;
-    counts: Record<ProductsTab, number | null>;
+    counts: Record<ProductsTab, number | null | undefined>;
     hrefs: Record<ProductsTab, string>;
     /** Off while the business doesn't track stock. */
     showInventory?: boolean;

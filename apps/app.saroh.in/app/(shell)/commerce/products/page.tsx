@@ -40,8 +40,6 @@ import { listBusinessStores } from "@/lib/stores/service";
 import { listStorefronts } from "@/lib/stores/storefronts";
 import { isSince, sinceParam } from "@/lib/views/since";
 
-import Loading from "./loading";
-
 /**
  * Sell → Products: the business's catalogue, across every storefront
  * (#519, #520).
@@ -56,7 +54,8 @@ import Loading from "./loading";
  * On React Query (DEC-259), loaded in the browser: the gates and side reads
  * are decided here; the list's page (`/api/products`,
  * `lib/products/access.ts`) is `CatalogueContainer`'s query, read from the
- * browser behind the route's loader, and every later one in place.
+ * browser into the screen's frame, drawn at once with its rows as
+ * skeletons, and every later one in place.
  */
 export const metadata = { title: "Products" };
 
@@ -238,7 +237,6 @@ export default async function CataloguePage({
 
     return (
         <CatalogueContainer
-            skeleton={<Loading />}
             defaultSize={remembered}
             reviewsCount={reviews ? reviews.length : null}
             showInventory={tracking?.tracked !== false}

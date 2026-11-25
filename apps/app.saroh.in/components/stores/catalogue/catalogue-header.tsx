@@ -12,6 +12,7 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronDown, Store } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import type { PlanMeter } from "@/lib/billing/meter";
@@ -38,7 +39,7 @@ export function CatalogueHeader({
     count,
 }: {
     /** "12 products across 2 locations", beside the title; none at zero. */
-    count?: string;
+    count?: ReactNode;
     stores: { id: string; name: string }[];
     /** The storefront filter, if one is picked. */
     storeId: string | null;

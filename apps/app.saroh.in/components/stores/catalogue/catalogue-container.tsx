@@ -4,7 +4,7 @@ import { pagesOf } from "@saroh/ui/lib/paging";
 import { PageContainer } from "@saroh/ui/page-container";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { useEffect, useMemo, useTransition } from "react";
 
 import { QuickEditsContext } from "@/components/commerce/quick-edits/quick-edits";
@@ -30,8 +30,10 @@ type Screen = ComponentProps<typeof CatalogueScreen>;
 
 /**
  * Sell → Products on React Query (DEC-259): the same `CatalogueScreen`, its
- * page a query keyed on what the address asks for, read in the browser
- * behind the route's loader (`skeleton`). A filter, a sort or a search changes the address in place (no
+ * page a query keyed on what the address asks for, read in the browser.
+ * The frame (header, New product, tabs, search, filters) is drawn at once
+ * and works; the rows, counts and Needs you wait for the first page (owner,
+ * 25 Nov). A filter, a sort or a search changes the address in place (no
  * server render) and the key; the last rows stay, greyed, until the new
  * ones land, and Back draws a seen page from the cache. A quick edit
  * writes the cache first (`useQuickEditsHost`). Collections and Reviews
@@ -42,11 +44,8 @@ export function CatalogueContainer({
     reviewsCount,
     showInventory,
     showReviews,
-    skeleton,
     ...screen
 }: Omit<Screen, "query" | "page" | "tabs" | "adapter"> & {
-    /** The route's loader, until the first page is read. */
-    skeleton: ReactNode;
     /** Rows per page when the address names none (the remembered size). */
     defaultSize: number;
     reviewsCount: number | null;
@@ -89,7 +88,6 @@ export function CatalogueContainer({
 
     // A failed read is not an empty list: the segment's error boundary.
     if (list.isError && !page) throw list.error;
-    if (!page) return skeleton;
 
     const adapter: ListAdapter = {
         navigate(href) {
@@ -119,9 +117,9 @@ export function CatalogueContainer({
         <ProductsTabs
             active={active}
             counts={{
-                all: page.counts.all,
-                collections: page.counts.collections,
-                inventory: page.counts.inventory,
+                all: page?.counts.all,
+                collections: page?.counts.collections,
+                inventory: page?.counts.inventory,
                 reviews: reviewsCount,
             }}
             hrefs={{
@@ -141,7 +139,7 @@ export function CatalogueContainer({
                 <CatalogueScreen
                     {...screen}
                     query={query}
-                    page={page}
+                    page={page ?? null}
                     tabs={tabs}
                     adapter={adapter}
                 />
