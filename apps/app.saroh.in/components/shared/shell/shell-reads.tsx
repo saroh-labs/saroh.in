@@ -117,6 +117,7 @@ export function ShellHeader({
                     ? {
                           locked: state?.reason === "locked",
                           upgradeTo: state?.upgradeTo ?? null,
+                          pending: !settings,
                       }
                     : null
             }
@@ -147,12 +148,17 @@ export function ShellPlanBanners() {
     );
 }
 
+/**
+ * Ask AI's panel, mounted once its state is read: the conversation starts
+ * from that state (the plan's lock, the usage), so a panel opened before it
+ * would say "didn't open" for good. The button waits with it.
+ */
 export function ShellAskAi(
     props: Omit<ComponentProps<typeof AskAiHost>, "state">,
 ) {
-    const settings = useShellSettings();
-    if (settings?.askAi === null) return null;
-    return <AskAiHost {...props} state={settings?.askAi?.state ?? null} />;
+    const askAi = useShellSettings()?.askAi;
+    if (!askAi) return null;
+    return <AskAiHost {...props} state={askAi.state} />;
 }
 
 export function ShellWebsiteArea({ children }: { children: React.ReactNode }) {

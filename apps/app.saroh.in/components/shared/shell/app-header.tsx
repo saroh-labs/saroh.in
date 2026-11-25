@@ -57,7 +57,12 @@ type AppHeaderProps =
            * screen switch off, a Reviewer, no business open); `locked`
            * draws it with a lock on a plan without Ask AI.
            */
-          askAi?: { locked: boolean; upgradeTo: string | null } | null;
+          askAi?: {
+              locked: boolean;
+              upgradeTo: string | null;
+              /** Its state isn't read yet: the button is drawn, not pressable. */
+              pending?: boolean;
+          } | null;
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -122,6 +127,7 @@ export function AppHeader(props: AppHeaderProps) {
                     <AskAiButton
                         locked={askAi.locked}
                         upgradeTo={askAi.upgradeTo}
+                        pending={askAi.pending}
                     />
                 ) : null}
                 {unread !== null ? <NotificationsLink unread={unread} /> : null}
