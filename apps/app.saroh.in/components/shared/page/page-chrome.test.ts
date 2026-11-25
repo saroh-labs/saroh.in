@@ -69,6 +69,14 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "settings/(sections)/developers/keys": "full",
     "settings/(sections)/developers/usage": "full",
     "settings/(sections)/developers/webhooks": "full",
+    // React Query screens: the page checks access and hands over to its
+    // container, which draws the `PageContainer` (and the loader until data
+    // lands).
+    ".": "full", // `HomeContainer`
+    "billing/invoices": "full", // `InvoicesContainer`
+    "billing/invoices/[invoiceId]": "full", // `InvoiceDetailContainer`
+    "commerce/stock": "full", // `StockContainer`
+    "contacts/[contactId]": "full", // `CustomerDetailContainer`
     // Ask AI's full page draws its list and conversation edge to edge.
     ask: "full",
     // The post editor owns its viewport.
