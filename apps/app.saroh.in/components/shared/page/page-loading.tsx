@@ -24,6 +24,8 @@ export type PageShape =
     | "rows"
     | "figures"
     | "panels"
+    // The Bookings diary's day or week: a column strip over hour rows.
+    | "diary"
     // The Calendar's month grid and its day panel, under its toolbar.
     | "calendar"
     // The header alone: the shell's own loader, before a section's.
@@ -287,6 +289,36 @@ function DetailBody(panels = 3) {
             <div className="space-y-4">
                 <Panel />
             </div>
+        </div>
+    );
+}
+
+/**
+ * The Bookings diary's grid: its people (or days) across the top, hour
+ * rows down, a booking's block here and there.
+ */
+function DiaryBody(hours = 8) {
+    return (
+        <div className={CARD}>
+            <div className="flex h-[46px] items-center gap-4 border-b border-border bg-muted/60 px-4">
+                {Array.from({ length: 3 }, (_, i) => (
+                    <Skeleton
+                        key={i}
+                        className={cn("h-3 w-24", i > 0 && "max-sm:hidden")}
+                    />
+                ))}
+            </div>
+            {Array.from({ length: hours }, (_, i) => (
+                <div
+                    key={i}
+                    className="flex h-14 items-center gap-4 border-b border-border/70 px-4 last:border-b-0"
+                >
+                    <Skeleton className="h-3 w-10 shrink-0" />
+                    {i % 3 === 1 ? (
+                        <Skeleton className="h-9 w-[40%] rounded-lg" />
+                    ) : null}
+                </div>
+            ))}
         </div>
     );
 }
@@ -609,6 +641,7 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     rows: RowsBody,
     figures: FiguresBody,
     panels: PanelsBody,
+    diary: DiaryBody,
     calendar: CalendarBody,
     none: () => null,
     writing: WritingBody,
