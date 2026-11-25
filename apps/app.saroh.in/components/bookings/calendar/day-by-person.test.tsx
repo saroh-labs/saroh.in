@@ -210,7 +210,7 @@ describe("a booking block", () => {
         expect(html.match(/bg-diary-one/g)).toHaveLength(1);
     });
 
-    it("wears one pill: Pays at the visit while money is still to take", () => {
+    it("wears one pill: Awaiting payment while money is still to take", () => {
         const owing = draw([
             asha([
                 block("b1", "Tariq Ali", 600, 660, {
@@ -219,9 +219,9 @@ describe("a booking block", () => {
                 }),
             ]),
         ]);
-        expect(owing).toMatch(/data-day-pill=""[^>]*>Pays at the visit</);
+        expect(owing).toMatch(/data-day-pill=""[^>]*>Awaiting payment</);
         expect(tag(owing, 'data-diary-block="one"')).toMatch(
-            /aria-label="[^"]*, awaiting payment"/,
+            /aria-label="[^"]*, Awaiting payment"/,
         );
         // The same colour as a paid booking: the pill is words, not a hue.
         expect(tag(owing, 'data-diary-block="one"')).toContain("bg-diary-one");
@@ -252,7 +252,7 @@ describe("the column heads (desk)", () => {
         expect(html).toContain(">AR<");
         expect(html).toContain(">Asha Rao<");
         expect(html).toContain(">Stylist · 9 am to 5 pm<");
-        expect(html).toContain(">1 booked<");
+        expect(html).toContain(">1 session · 1 person<");
         expect(draw([asha([])])).toContain(">Nothing booked<");
     });
 

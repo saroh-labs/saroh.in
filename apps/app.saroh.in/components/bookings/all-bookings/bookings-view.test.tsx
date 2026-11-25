@@ -431,7 +431,7 @@ describe.each([
             "Next 7 days",
             "This month",
             "Pick dates",
-            "Bookings for",
+            "Whose bookings",
             "Everyone",
             "Just me",
             "Service",
@@ -928,7 +928,7 @@ describe("a class on the List (DEC-260)", () => {
                 />,
             ),
         );
-        const head = all("section > h2")[0];
+        const head = all("section > h2").at(0);
         expect(head?.textContent).toContain("2 sessions · 3 people");
         const klass = document.querySelector("[data-class-row]");
         expect(klass?.textContent).toContain("Yoga flow · 2 of 15");

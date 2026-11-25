@@ -214,7 +214,9 @@ describe("cancelled bookings", () => {
         const sw = cancelledSwitch();
         expect(sw?.getAttribute("aria-checked")).toBe("false");
         expect(sw?.getAttribute("aria-label")).toBe("Show cancelled bookings");
-        expect(document.body.textContent).toContain("1 cancelled today");
+        expect(document.body.textContent).toContain(
+            "1 cancelled on Tue 29 Sep",
+        );
     });
 
     it("draw as a thin line when switched on, and the address remembers", () => {
@@ -260,7 +262,9 @@ describe("cancelled bookings", () => {
         draw(calendarOf([booking("b1", "Tariq Ali", 10, 60)]));
         openOptions();
         expect(cancelledSwitch()).not.toBeNull();
-        expect(document.body.textContent).toContain("None cancelled today");
+        expect(document.body.textContent).toContain(
+            "None cancelled on Tue 29 Sep",
+        );
     });
 });
 
@@ -492,7 +496,7 @@ describe("whose bookings", () => {
             expect.stringContaining("Asha Rao"),
             expect.stringContaining("Arjun Rao"),
         ]);
-        expect(rows[2]?.textContent).toContain("2bookings today");
+        expect(rows[2]?.textContent).toContain("2sessions on Tue 29 Sep");
         act(() => rows[2]?.click());
         expect(push).toHaveBeenCalledWith(
             `/bookings?date=${DAY}&layout=day&person=arjun`,

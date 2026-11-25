@@ -76,7 +76,7 @@ export function datesWords(dates: DateRange, today: LocalDate): string | null {
 }
 
 /**
- * All bookings' one Filters button (BLHB, variant B): Sort, Bookings for,
+ * All bookings' one Filters button (BLHB, variant B): Sort, Whose bookings,
  * Dates, Service and Status, held in one popover at a desk and one sheet
  * from the foot of a phone. Each choice narrows the list at once; Clear
  * puts them all back and "Show 2 bookings" closes it on what is showing.
@@ -259,9 +259,9 @@ export function BookingFilters({
                         </div>
                     ) : null}
                 </Group>
-                <Group label="Bookings for">
+                <Group label="Whose bookings">
                     <ChipGroup
-                        label="Bookings for"
+                        label="Whose bookings"
                         value={who}
                         onChange={(v) =>
                             onChange({ ...value, staff: v === ANY ? null : v })

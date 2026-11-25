@@ -25,13 +25,8 @@ import { useHold } from "@/components/shared/undo/use-hold";
 import { formatClockRange, formatDay } from "@/lib/format/datetime";
 import { readBookingPerson } from "@/lib/services/actions";
 import type { Block, DiaryState } from "@/lib/services/diary";
-import {
-    bookingState,
-    liveSeats,
-    localDateOf,
-    STATE_LABEL,
-    whoFor,
-} from "@/lib/services/diary";
+import { bookingState, localDateOf, whoFor } from "@/lib/services/diary";
+import { blockStatus } from "@/lib/services/diary-view";
 import type { PeekPerson } from "@/lib/services/peek";
 import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
@@ -279,7 +274,6 @@ function Steps({
 
     if (block.kind === "class") {
         const s = block.session;
-        const full = liveSeats(s).length >= s.capacity;
         return (
             <>
                 <LookHead
@@ -290,14 +284,7 @@ function Steps({
                             ? `Group class with ${s.staff.name}`
                             : "Group class"
                     }
-                    badge={
-                        full && block.state !== "cancelled"
-                            ? { label: "Full", state: "full" }
-                            : {
-                                  label: STATE_LABEL[block.state],
-                                  state: block.state,
-                              }
-                    }
+                    badge={blockStatus(block)}
                     isClass
                     onClose={onClose}
                 />
@@ -382,7 +369,7 @@ function Steps({
                         title={whoFor(b)}
                         when={when}
                         what={what}
-                        badge={{ label: STATE_LABEL[state], state }}
+                        badge={blockStatus({ ...block, booking: b, state })}
                         onClose={onClose}
                     />
                     <OneLook

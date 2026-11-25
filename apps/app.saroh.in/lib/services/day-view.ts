@@ -1,5 +1,4 @@
 import { formatClock, formatClockRange } from "@/lib/format/datetime";
-import { count } from "@/lib/format/plural";
 
 import type { BookingsCalendar } from "./booking-calendar";
 import { BOOKING_WORDS } from "./booking-words";
@@ -7,6 +6,7 @@ import { callName } from "./call-name";
 import type { Block, Column, PersonDay } from "./diary";
 import { isLive, liveSeats, mergeSpans } from "./diary";
 import { toPay, toPayText } from "./diary-view";
+import { countBlocks, countedWords } from "./session-counts";
 
 /**
  * What the Day calendar says on each thing it draws (U4, #1020; boards
@@ -32,11 +32,8 @@ export function dayPill(block: Block): string | null {
     if (block.state === "in")
         return owes ? BOOKING_WORDS.awaitingPayment : BOOKING_WORDS.came;
     if (block.state === "pending") return BOOKING_WORDS.awaitingPayment;
-    if (owes) {
-        return b.paidWith === "DESK"
-            ? BOOKING_WORDS.paysAtVisit
-            : BOOKING_WORDS.awaitingPayment;
-    }
+    // One payment word (DEC-257), however it will be paid.
+    if (owes) return BOOKING_WORDS.awaitingPayment;
     if (b.paidAtDesk || b.paidWith === "PAID") return "Paid";
     return null;
 }
@@ -70,16 +67,11 @@ export function dayLine(block: Block): string {
 }
 
 /**
- * A column's count, beside its name: "5 booked", "2 classes" when all it
- * holds are classes, or "Nothing booked".
+ * A column's count, beside its name, in the one unit (DEC-260): "3
+ * sessions · 9 people", or "Nothing booked".
  */
 export function columnCount(blocks: readonly Block[]): string {
-    const live = blocks.filter(isLive);
-    if (live.length === 0) return "Nothing booked";
-    if (live.every((b) => b.kind === "class")) {
-        return count(live.length, "class", "classes");
-    }
-    return `${live.length} booked`;
+    return countedWords(countBlocks(blocks));
 }
 
 /**

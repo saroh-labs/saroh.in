@@ -18,7 +18,12 @@ import { formatDay } from "@/lib/format/datetime";
 import type { BookingsOpens, ShowFor } from "@/lib/services/bookings-opens";
 import { EVERYONE } from "@/lib/services/bookings-opens";
 import type { DayFacts } from "@/lib/services/calendar-header";
-import { dayRange, headerTitle } from "@/lib/services/calendar-header";
+import {
+    cancelledLine,
+    dayRange,
+    headerTitle,
+    periodWord as periodWordOf,
+} from "@/lib/services/calendar-header";
 import type { CalendarLayout, GoogleShow } from "@/lib/services/calendar-href";
 import { callName } from "@/lib/services/call-name";
 import type { LocalDate } from "@/lib/services/diary";
@@ -156,7 +161,8 @@ export function CalendarHeader({
     const unit = layout === "week" ? "week" : "day";
     const inWeek = layout === "week";
     const weekStart = weekStartOf(date);
-    const periodWord = inWeek ? "this week" : "today";
+    // "today" only on today: another day is named ("on Tue 20 Oct").
+    const periodWord = periodWordOf(layout, date, today);
     const period = inWeek
         ? `${dayRange(weekStart, addDays(weekStart, 6), " to ")}${weekStart === weekStartOf(today) ? " · this week" : ""}`
         : `${formatDay(date, { weekday: "short", today })}${date === today ? " · today" : ""}`;
@@ -385,9 +391,7 @@ export function CalendarHeader({
                         line:
                             cancelled.count === null
                                 ? `Cancelled ${periodWord}`
-                                : cancelled.count > 0
-                                  ? `${cancelled.count} cancelled ${periodWord}`
-                                  : `None cancelled ${periodWord}`,
+                                : cancelledLine(cancelled.count, periodWord),
                     }}
                     hours={{ href: hoursHref, label: hoursLabel }}
                     start={opens.start}

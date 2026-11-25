@@ -84,8 +84,8 @@ describe("the pill a booking wears", () => {
         );
     });
 
-    it("says Pays at the visit, Paid, or nothing", () => {
-        expect(dayPill(one({ paidWith: "DESK" }))).toBe("Pays at the visit");
+    it("says Awaiting payment, Paid, or nothing", () => {
+        expect(dayPill(one({ paidWith: "DESK" }))).toBe("Awaiting payment");
         expect(dayPill(one({ paidWith: "PAID" }))).toBe("Paid");
         expect(dayPill(one({ paidWith: "PACK" }))).toBeNull();
         expect(dayPill(one({ status: "CANCELLED" }, "cancelled"))).toBeNull();
@@ -116,10 +116,14 @@ describe("a booking's line", () => {
 });
 
 describe("a column's head", () => {
-    it("counts what is booked, classes as classes", () => {
+    it("counts sessions and people (DEC-260)", () => {
         expect(columnCount([])).toBe("Nothing booked");
-        expect(columnCount([one(), one({ id: "x" })])).toBe("2 booked");
-        expect(columnCount([klass(6, 8), klass(8, 8)])).toBe("2 classes");
+        expect(columnCount([one(), one({ id: "x" })])).toBe(
+            "2 sessions · 2 people",
+        );
+        expect(columnCount([klass(6, 8), klass(8, 8)])).toBe(
+            "2 sessions · 14 people",
+        );
         expect(columnCount([one({}, "cancelled")])).toBe("Nothing booked");
     });
 

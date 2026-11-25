@@ -94,7 +94,7 @@ import { MoveSheet } from "./move-sheet";
  * - The views are one picker, "Showing: Upcoming 2 ▾" (Upcoming, Needs an
  *   outcome, Awaiting payment, Today, Next 7 days, All, each with its
  *   count; BLHB variant B). Search is an icon; one Filters button holds
- *   Sort, Dates, Bookings for, Service and Status. `?view=` names the
+ *   Sort, Dates, Whose bookings, Service and Status. `?view=` names the
  *   view, as Home's links do. Counts hold only bookings still on: each
  *   day's cancelled ones fold under it ("2 cancelled · Show").
  * - Rows sit under day headings ("Today · Mon 19 Oct", "Earlier today"),

@@ -319,7 +319,7 @@ describe("Whose bookings", () => {
         draw();
         click(button(/^Whose bookings/));
         const pop = popover();
-        expect(pop?.textContent).toContain("Whose bookings?");
+        expect(pop?.textContent).toContain("Whose bookings");
         expect(pop?.textContent).toContain("Mon 19 Oct · today");
         const rows = Array.from(
             pop?.querySelectorAll(
@@ -333,7 +333,7 @@ describe("Whose bookings", () => {
             "false",
         ]);
         expect(rows[0]?.textContent).toContain("A column for each person");
-        expect(rows[2]?.textContent).toContain("3bookings today");
+        expect(rows[2]?.textContent).toContain("3sessions today");
         expect(pop?.textContent).toContain("Add someone who takes bookings");
         expect(pop?.textContent).toContain(
             "Bookings remembers who you pick here",
