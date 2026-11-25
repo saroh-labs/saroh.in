@@ -15,9 +15,12 @@ import { permits } from "@/lib/organizations/permits";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import type { ServerRead } from "@/lib/query/route";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
+import { readServicesForPicker } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import { businessAddress } from "@/lib/sites/default-site";
+import type { GridCatalogueRead } from "@/lib/sites/grid-catalogue";
+import { readGridCatalogue } from "@/lib/sites/grid-catalogue";
 import { readPublishRequest } from "@/lib/sites/publish-requests-api";
 import {
     getReviewState,
@@ -38,6 +41,8 @@ import { restoresAsDraft } from "@/lib/sites/website-area-switch";
 
 import type {
     FormRow,
+    PickerKind,
+    ServicesPick,
     SiteFrame,
     SiteLinksScreen,
     SiteOverviewScreen,
@@ -46,6 +51,7 @@ import type {
     SiteVersionsScreen,
 } from "./queries";
 import {
+    pickerRead,
     postCategoriesRead,
     publishRequestRead,
     siteFormsRead,
@@ -335,4 +341,18 @@ export const publishRequestServer: ServerRead<
     read: publishRequestRead,
     // Null (a 404): unknown, or another business's or site's.
     service: ({ siteId, requestId }) => readPublishRequest(siteId, requestId),
+};
+
+type PickerAnswer = ServicesPick | GridCatalogueRead;
+
+/**
+ * The editor's pickers (U33): the services, or the products and
+ * collections a Product grid picks from. A refusal by the API (a role that
+ * may not read them) is the picker's own "you can't see these", never an
+ * empty list, and never anything the role may not read.
+ */
+export const pickerServer: ServerRead<{ kind: PickerKind }, PickerAnswer> = {
+    read: pickerRead,
+    service: ({ kind }) =>
+        kind === "services" ? readServicesForPicker() : readGridCatalogue(),
 };

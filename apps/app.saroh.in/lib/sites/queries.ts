@@ -1,12 +1,14 @@
 import { z } from "zod";
 
 import type { SitePublishData } from "@/components/sites/publish/site-publish";
+import type { ServiceOption } from "@/components/sites/section-fields/types";
 import type { ScheduledGoLives } from "@/components/sites/versions/site-versions";
 import type { Post, PostCategory } from "@/lib/content/service";
 import type { FormSummary } from "@/lib/forms/service";
 import { defineRead } from "@/lib/query/define-read";
 import type { DomainKey } from "@/lib/query/keys";
 import { domainKey } from "@/lib/query/keys";
+import type { GridCatalogueRead } from "@/lib/sites/grid-catalogue";
 import type { PublishRequestView } from "@/lib/sites/publish-requests";
 import type {
     ChangeUnit,
@@ -214,3 +216,24 @@ export const publishRequestRead = defineRead<PublishRequestView>()({
     },
     tier: "records",
 });
+
+/** What the editor's pickers read: a refusal is said, never an empty list. */
+export type ServicesPick =
+    { ok: true; services: ServiceOption[] } | { ok: false; forbidden: boolean };
+
+/**
+ * The editor's pickers (booking, services list, embeds, Add, Product
+ * grid): one entry per kind under that kind's own domain (`services`,
+ * `products`), so every picker shares it and a save on the Products
+ * screen, which invalidates `products`, marks it stale too.
+ */
+export const pickerRead = defineRead<ServicesPick | GridCatalogueRead>()({
+    key: (orgId, { kind }) => domainKey(kind, orgId, "picker"),
+    route: {
+        path: "/api/sites/pickers",
+        params: { kind: z.enum(["services", "products"]) },
+    },
+    tier: "records",
+});
+
+export type PickerKind = "services" | "products";
