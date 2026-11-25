@@ -2,6 +2,7 @@ import { QueryCache, QueryClient } from "@tanstack/react-query";
 
 import { ROLE_DENIED } from "@/lib/api/role-denied";
 import { shouldDehydrateQuery } from "@/lib/query/dehydrate-allow";
+import { isSettingsQuery } from "@/lib/query/freshness";
 import { ORGANIZATIONS_KEY } from "@/lib/query/keys";
 
 /**
@@ -35,6 +36,8 @@ export function setReadErrorHooks(next: ReadErrorHooks | null): void {
 /** When the last stale-list refresh ran: one refresh, never a loop. */
 let refreshedAt = 0;
 const REFRESH_ONCE_MS = 10_000;
+/** When the settings were last re-read for a refusal: once, never a loop. */
+let settingsAt = 0;
 
 /**
  * A failed read's app-wide answer; the screen still shows its own failed
@@ -43,6 +46,10 @@ const REFRESH_ONCE_MS = 10_000;
  * (`org_mismatch`), or a refusal that isn't about the role (removed from
  * the business in another tab or device): the list is stale, so mark it
  * and render the page again once. A role refusal is the screen's to say.
+ *
+ * Any refusal (403) can also mean a setting changed elsewhere (a module
+ * turned off, the plan moved, a role's permissions): the settings reads,
+ * kept for the visit, are read again, at most once in 10 seconds.
  */
 export function onReadError(client: QueryClient, error: unknown): void {
     if (!(error instanceof ReadFailed)) return;
@@ -50,6 +57,10 @@ export function onReadError(client: QueryClient, error: unknown): void {
         client.clear();
         hooks?.signIn();
         return;
+    }
+    if (error.status === 403 && Date.now() - settingsAt >= REFRESH_ONCE_MS) {
+        settingsAt = Date.now();
+        void client.invalidateQueries({ predicate: isSettingsQuery });
     }
     const stale =
         (error.status === 409 && error.code === "org_mismatch") ||
@@ -67,6 +78,7 @@ export function onReadError(client: QueryClient, error: unknown): void {
 /** For tests: forget the last refresh. */
 export function resetReadErrorGuard(): void {
     refreshedAt = 0;
+    settingsAt = 0;
 }
 
 export function makeQueryClient(): QueryClient {

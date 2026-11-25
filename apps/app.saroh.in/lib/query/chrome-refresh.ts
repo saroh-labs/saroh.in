@@ -7,8 +7,9 @@ import { matchRoute } from "@/lib/query/live-routes";
  * most 6 entries; the last unit of the move retires the list.
  */
 export const CHROME_REFRESH_ROUTES: readonly string[] = [
-    // Home: the tab title's unread count is the shell's.
-    "/",
+    // Empty since the shell reads its unread count and badges in the
+    // browser (`/api/shell/live`, owner 25 Nov 2026): Home no longer needs
+    // a server render for the tab title.
 ];
 
 /** The cap on {@link CHROME_REFRESH_ROUTES}. */

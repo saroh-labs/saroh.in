@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { confirmCheckoutAction } from "@/lib/saroh-billing/billing-actions";
 import type { ConfirmResult } from "@/lib/saroh-billing/plan-view";
 
@@ -35,6 +36,7 @@ export function useCheckoutConfirm(planName: string) {
                     const state = res.ok ? res.data.state : "waiting";
                     if (state !== "waiting") {
                         setPhase("settled");
+                        afterSettingsSave();
                         const name = res.ok
                             ? (res.data.plan?.name ?? planName)
                             : planName;

@@ -56,7 +56,7 @@ function ShowOrg() {
     return <span>{useOrgId()}</span>;
 }
 /** What another tab's `announce` sends: its own tab id. */
-function fromOtherTab(kind: "switch" | "signout") {
+function fromOtherTab(kind: "switch" | "signout" | "settings") {
     const c = new BroadcastChannel("saroh-query");
     c.postMessage({ kind, from: "other-tab" });
     c.close();
@@ -111,6 +111,28 @@ describe("QueryProvider", () => {
         expect(qc().getQueryData(domainKey("orders", "o1", "list"))).toEqual([
             1,
         ]);
+    });
+
+    it("another tab's settings save reads this tab's settings again, nothing else", async () => {
+        draw([org("o1", "Northwind")]);
+        const settings = domainKey("shell", "o1", "settings");
+        qc()
+            .getQueryCache()
+            .build(qc(), {
+                queryKey: settings,
+                meta: { tier: "settings" },
+            });
+        qc().setQueryData(settings, { moduleKeys: [] });
+        qc().setQueryData(domainKey("orders", "o1", "list"), [1]);
+        fromOtherTab("settings");
+        await vi.waitFor(() =>
+            expect(qc().getQueryState(settings)?.isInvalidated).toBe(true),
+        );
+        expect(
+            qc().getQueryState(domainKey("orders", "o1", "list"))
+                ?.isInvalidated,
+        ).toBe(false);
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it("a business gone from a fresh list is dropped, the others kept", () => {

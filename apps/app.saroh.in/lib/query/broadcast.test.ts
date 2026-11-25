@@ -9,7 +9,7 @@ import { announce, listen } from "@/lib/query/broadcast";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("broadcast", () => {
-    it("another tab hears switch and signout", async () => {
+    it("another tab hears switch, signout and settings", async () => {
         const heard: string[] = [];
         const stop = listen((kind) => heard.push(kind));
         const other = new BroadcastChannel("saroh-query");
@@ -17,12 +17,15 @@ describe("broadcast", () => {
         other.onmessage = (e) => sent.push(e.data);
         announce("switch");
         announce("signout");
+        announce("settings");
         // What another tab receives carries a sender id; replay it as theirs.
-        await vi.waitFor(() => expect(sent).toHaveLength(2));
+        await vi.waitFor(() => expect(sent).toHaveLength(3));
         for (const m of sent) {
             other.postMessage({ ...(m as object), from: "other-tab" });
         }
-        await vi.waitFor(() => expect(heard).toEqual(["switch", "signout"]));
+        await vi.waitFor(() =>
+            expect(heard).toEqual(["switch", "signout", "settings"]),
+        );
         other.close();
         stop();
     });

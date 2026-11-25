@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getBrowserQueryClient } from "@/lib/query/client";
 import {
+    afterSettingsSave,
     afterSignOut,
     afterSwitch,
     clearAll,
@@ -83,5 +84,23 @@ describe("invalidateOrganizations", () => {
         expect(
             qc.getQueryState(domainKey("orders", "o1", "list"))?.isInvalidated,
         ).toBe(false);
+    });
+});
+
+describe("afterSettingsSave", () => {
+    it("reads this tab's settings again, leaves records alone, tells the other tabs", () => {
+        const qc = getBrowserQueryClient();
+        const shell = domainKey("shell", "o1", "settings");
+        qc.getQueryCache().build(qc, {
+            queryKey: shell,
+            meta: { tier: "settings" },
+        });
+        qc.setQueryData(shell, { moduleKeys: [] });
+        afterSettingsSave();
+        expect(qc.getQueryState(shell)?.isInvalidated).toBe(true);
+        expect(
+            qc.getQueryState(domainKey("orders", "o1", "list"))?.isInvalidated,
+        ).toBe(false);
+        expect(announce).toHaveBeenCalledWith("settings");
     });
 });

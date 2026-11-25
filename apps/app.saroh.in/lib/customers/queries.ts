@@ -41,6 +41,7 @@ export const customersListRead = defineRead<CustomersListView>()({
             size: z.string().regex(/^\d{1,3}$/),
         },
     },
+    tier: "records",
 });
 
 export type CustomersAsk = Parameters<typeof customersListRead.options>[1];
@@ -69,6 +70,7 @@ export const customerRequestsRead = defineRead<CustomerRequestsView>()({
         path: "/api/customers/requests",
         params: { status: z.enum(REQUEST_FILTERS) },
     },
+    tier: "records",
 });
 
 export type CustomerRequestsAsk = Parameters<
@@ -95,6 +97,7 @@ export const customerRead = defineRead<CustomerView>()({
         path: "/api/customers/[customerId]",
         params: { customerId: ID },
     },
+    tier: "records",
 });
 
 export type CustomerAsk = Parameters<typeof customerRead.options>[1];

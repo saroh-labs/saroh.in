@@ -119,8 +119,10 @@ There is no global client store. React Query holds server state only, in
   removed (`dropLeftBusinesses`). Membership is still the API's to check on
   every read, and a route answers 409 when the key's business isn't the
   open one.
-- **`staleTime: 0`** for every domain until the epic's close-out; `retry: false`,
-  no refetch on window focus or reconnect (live refresh owns those).
+- **How fresh a read is comes from its tier** (owner, 25 Nov 2026; see
+  [Reads by how often they change](#reads-by-how-often-they-change)), not
+  one `staleTime` for all; `retry: false`, no refetch on window focus or
+  reconnect (live refresh owns those).
 - **The business list is the exception** (owner, 24 Nov 2026):
   `['organizations']`, the person's and not a business's, is held for the
   whole visit (`staleTime` and `gcTime` `Infinity`), seeded from the shell's
@@ -134,6 +136,35 @@ There is no global client store. React Query holds server state only, in
 - **Never cached:** billing secrets, API keys, tokens, provider credentials. The
   dehydrate allowlist (`dehydrate-allow.ts`) stays explicit, though no page
   dehydrates any more.
+
+### Reads by how often they change
+
+Every `defineRead` names its `tier` (`lib/query/freshness.ts`), and
+`pnpm check:query-keys` fails a read without one. The tier sets `staleTime`,
+`gcTime` and `refetchInterval`; the API stays the boundary, the tier only
+decides how often the browser asks.
+
+| Tier       | Who changes it                  | Rule                                                                                                                                                                                                                      | Reads                                                                                                                                      |
+| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `settings` | someone in Settings, rarely     | `staleTime`/`gcTime` `Infinity`; read again by its saves (`afterSettingsSave()`, which tells the other tabs on the `BroadcastChannel`), by any 403 on a read (`onReadError`, once per 10 s), and quietly every 10 minutes | `/api/shell`                                                                                                                               |
+| `records`  | the team                        | `staleTime` 5 min; its own saves invalidate what they changed                                                                                                                                                             | products, product, customers, customer, requests, invoices, invoice, invoice summary, stock levels, log, checks, order options, Home setup |
+| `live`     | customers and the outside world | `staleTime` 30 s; the 45 s live refresh and coming back to the tab read it again (no timer of its own)                                                                                                                    | Home, orders, order, tickets, bookings list and diary, calendar, `/api/shell/live`                                                         |
+
+- **The shell reads in the browser.** The `(shell)` layout's server render
+  reads only what a gate needs: the session, the business list, the open
+  business (the role) and, only when needed, a closing business's refunds
+  and the person's recording choice. What the rail, top bar, tab bar,
+  command menu and plan banners draw is one `settings` read, `/api/shell`
+  (modules, plan locks and banners, sites, storefronts, Track stock, the
+  account manager, Ask AI, the Website area switch), and the bell and the
+  rail's badges are one `live` read, `/api/shell/live`, which the live
+  refresh reads again on every page (`shell-reads.tsx`). Until the settings
+  land the frame is drawn with skeleton rows in the rail and tab bar; a
+  badge, a count and a plan banner appear when their read does.
+- **A save that changes a shell setting calls `afterSettingsSave()`** after
+  it worked: a module on or off, a plan, an add-on or checkout, Ask AI on or
+  off, a new site or web address, a storefront made or closed, Track stock.
+  A new kind of setting the shell draws adds its writers here.
 
 ### The read-route contract
 

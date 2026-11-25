@@ -22,6 +22,7 @@ import {
 } from "@/components/shared/navigation/nav-items";
 import { rememberRail } from "@/lib/nav/rail-cookie";
 import { CountBadge } from "@saroh/ui/count-badge";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { Tip } from "@saroh/ui/tooltip";
 
 /**
@@ -38,8 +39,10 @@ import { Tip } from "@saroh/ui/tooltip";
  * through a flyout on the parent instead, so the only path to a child screen
  * survives the collapse.
  *
- * Client-only for `usePathname` active state; the `unread` count is fetched
- * server-side by `AppShell` and passed in (this component never fetches).
+ * Client-only for `usePathname` active state; what it draws is read by the
+ * shell (`shell-reads.tsx`) and passed in (this component never fetches).
+ * Until the business's modules are read (`pending`) the rows are skeleton
+ * pieces in the rail's own frame, so no row appears and then vanishes.
  */
 
 /**
@@ -75,7 +78,10 @@ export function AppSidebar({
     stockTracked = null,
     collapsed: collapsedAtLoad = false,
     kind,
+    pending = false,
 }: {
+    /** The modules aren't read yet: rows are drawn as skeleton pieces. */
+    pending?: boolean;
     /** What is being set up (DEC-070); see `navFor`. */
     kind?: string | null;
     /** Rows the business's plan locks (U14): drawn with a lock. */
@@ -161,7 +167,8 @@ export function AppSidebar({
                 aria-label="Primary"
                 className="flex flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2.5 py-3 group-data-[collapsed=true]/rail:px-1.5 max-[1100px]:px-1.5"
             >
-                {groups.map((group, index) => (
+                {pending ? <RowsLoading /> : null}
+                {(pending ? [] : groups).map((group, index) => (
                     <Fragment key={group.label ?? `group-${index}`}>
                         {/*
                          * The pinned group's space is a spacer, not `mt-auto`:
@@ -415,6 +422,23 @@ export function AppSidebar({
                 </Tip>
             </div>
         </aside>
+    );
+}
+
+/** The rail's rows while the modules are read: the rows' own height. */
+function RowsLoading() {
+    return (
+        <div aria-hidden className="flex flex-col gap-px">
+            {Array.from({ length: 9 }, (_, i) => (
+                <div
+                    key={i}
+                    className="flex items-center gap-2.5 px-2.5 py-2 group-data-[collapsed=true]/rail:justify-center max-[1100px]:justify-center"
+                >
+                    <Skeleton className="size-[19px] shrink-0 rounded-md" />
+                    <Skeleton className="h-3.5 flex-1 group-data-[collapsed=true]/rail:hidden max-[1100px]:hidden" />
+                </div>
+            ))}
+        </div>
     );
 }
 

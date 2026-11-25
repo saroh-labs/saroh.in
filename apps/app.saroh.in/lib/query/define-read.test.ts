@@ -28,6 +28,7 @@ interface Row {
 const read = defineRead<Row[]>()({
     key: (orgId, p) => domainKey("probe", orgId, "list", p),
     route: { path: "/api/probe", params: { q: searchText } },
+    tier: "records",
 });
 const service = vi.fn<(p: { q?: string }) => Promise<Row[] | null>>();
 const def = { read, service };

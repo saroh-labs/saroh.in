@@ -34,6 +34,7 @@ import { lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 import { TemplateChoice } from "@/components/sites/templates/template-choice";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { TextLink } from "@saroh/ui/text-link";
 
 /**
@@ -173,6 +174,8 @@ export function CreateSiteForm({
             }
             return;
         }
+        // The command menu's sites.
+        afterSettingsSave();
         router.push(`/sites/${res.data.siteId}`);
     }
 

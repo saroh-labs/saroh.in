@@ -29,6 +29,7 @@ import { domainKey } from "@/lib/query/keys";
 export const ordersList = defineRead<Order[]>()({
     key: (orgId, p) => domainKey("orders", orgId, "list", p),
     route: { path: "/api/orders", params: { q: searchText } },
+    tier: "live",
 });`;
     assert.deepEqual(whys("lib/orders/queries.ts", src), []);
     // and a component using it
@@ -57,4 +58,18 @@ test("tests and files outside the app are not checked", () => {
     assert.deepEqual(whys("components/x.test.tsx", src), []);
     assert.deepEqual(whys("lib/query/test-utils.tsx", src), []);
     assert.deepEqual(keyProblems("apps/admin.saroh.in/x.tsx", src), []);
+});
+
+test("a read without a tier fails; one with a tier passes", () => {
+    const without = `export const r = defineRead<Order[]>()({
+    key: (orgId) => domainKey("orders", orgId, "list"),
+    route: { path: "/api/orders", params: { q: z.string().optional() } },
+});`;
+    const out = whys("lib/orders/queries.ts", without);
+    assert.equal(out.length, 1);
+    assert.match(out[0], /without its tier/);
+    const withTier = without.replace("});", '    tier: "live",\n});');
+    assert.deepEqual(whys("lib/orders/queries.ts", withTier), []);
+    const wrong = without.replace("});", '    tier: "often",\n});');
+    assert.equal(whys("lib/orders/queries.ts", wrong).length, 1);
 });

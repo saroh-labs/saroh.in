@@ -13,7 +13,11 @@
  * server render, as today.
  */
 
-export type BroadcastKind = "switch" | "signout";
+/**
+ * `settings`: a save here changed what the settings reads answer (a module,
+ * the plan, a site, Ask AI); the other tabs read theirs again.
+ */
+export type BroadcastKind = "switch" | "signout" | "settings";
 
 const CHANNEL = "saroh-query";
 
@@ -45,7 +49,9 @@ export function listen(onMessage: (kind: BroadcastKind) => void): () => void {
         const data = e.data as { kind?: unknown; from?: unknown } | null;
         if (data?.from === TAB) return;
         const kind = data?.kind;
-        if (kind === "switch" || kind === "signout") onMessage(kind);
+        if (kind === "switch" || kind === "signout" || kind === "settings") {
+            onMessage(kind);
+        }
     };
     return () => c.close();
 }

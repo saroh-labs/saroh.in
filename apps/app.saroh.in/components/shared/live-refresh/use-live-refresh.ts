@@ -22,6 +22,7 @@ import { isChromeRefresh } from "@/lib/query/chrome-refresh";
 import { isOrgKey } from "@/lib/query/keys";
 import { liveDomains } from "@/lib/query/live-routes";
 import { useOrgIdOrNull } from "@/lib/query/org";
+import { shellLiveRead } from "@/lib/shell/queries";
 
 /** Two refreshes are never closer together than this. */
 const MIN_GAP_MS = 2_000;
@@ -89,6 +90,15 @@ export function useLiveRefresh({
             orgId: org,
         } = page.current;
         const domains = client && org ? liveDomains(path) : null;
+        // The bell and the rail's badges read again on every refresh, on
+        // every page (`/api/shell/live`), and are never what waits.
+        const shellLive = () => {
+            if (client && org) {
+                void client.invalidateQueries({
+                    queryKey: shellLiveRead.key(org, {}),
+                });
+            }
+        };
         if (client && org && domains) {
             const predicate = (q: { queryKey: readonly unknown[] }) =>
                 domains.includes(q.queryKey[0] as string) &&
@@ -101,9 +111,11 @@ export function useLiveRefresh({
             // for the chrome alone (the unread count); nothing it sends
             // carries the rows.
             void client.invalidateQueries({ predicate });
+            shellLive();
             if (!isChromeRefresh(path)) return;
         } else {
             startedAt.current = Date.now();
+            shellLive();
         }
         startTransition(() => {
             router.refresh();

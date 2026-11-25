@@ -35,6 +35,7 @@ import {
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 
 import { runAction } from "@/lib/api/run-action";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { ChangeBillingProfileSheet } from "./billing-profile-sheets";
 import type {
     DetailErrors,
@@ -135,7 +136,11 @@ export function ChangePlanDialog({
     returnTo?: string;
 }) {
     const router = useRouter();
-    const changed = onChanged ?? (() => router.refresh());
+    // A new plan changes the rail's locks and the plan banners.
+    const changed = () => {
+        afterSettingsSave();
+        (onChanged ?? (() => router.refresh()))();
+    };
     // Paying: hidden while Razorpay's window is up (a dialog over it would
     // trap its focus), then back to say it's confirming.
     const [paying, setPaying] = useState<"no" | "away" | "confirming">("no");

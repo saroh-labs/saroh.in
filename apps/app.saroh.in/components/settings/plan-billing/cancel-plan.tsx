@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import {
     changePlanAction,
     quoteChangeAction,
@@ -70,6 +71,7 @@ export function CancelPlan({ offer }: { offer: CancelOffer }) {
         if (res.data.kind !== "TO_FREE") {
             return { ok: false, error: NOT_CANCELLED };
         }
+        afterSettingsSave();
         const at = res.data.effectiveAt;
         showSuccess(
             new Date(at) > new Date()

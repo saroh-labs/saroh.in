@@ -3,6 +3,8 @@ import { queryOptions } from "@tanstack/react-query";
 import type { z } from "zod";
 
 import { apiRead } from "@/lib/query/api-read";
+import type { Tier } from "@/lib/query/freshness";
+import { FRESHNESS } from "@/lib/query/freshness";
 import type { DomainKey } from "@/lib/query/keys";
 
 /**
@@ -16,10 +18,13 @@ import type { DomainKey } from "@/lib/query/keys";
  *     export const ordersList = defineRead<Order[]>()({
  *         key: (orgId, p) => domainKey("orders", orgId, "list", p),
  *         route: { path: "/api/orders", params: { q: searchText } },
+ *         tier: "live",
  *     });
  */
 export interface Read<P, T> {
     path: string;
+    /** How often its answer changes (`freshness.ts`). */
+    tier: Tier;
     params: z.ZodRawShape;
     key: (orgId: string, params: P) => DomainKey;
     options: (
@@ -30,15 +35,14 @@ export interface Read<P, T> {
     };
 }
 
-/** How long a read just made counts as fresh: a remount reads nothing. */
-export const HYDRATED_FRESH_MS = 5_000;
-
 export function defineRead<T>() {
     return <S extends z.ZodRawShape>(def: {
         key: (orgId: string, params: z.output<z.ZodObject<S>>) => DomainKey;
         route: { path: string; params: S };
+        tier: Tier;
     }): Read<z.output<z.ZodObject<S>>, T> => ({
         path: def.route.path,
+        tier: def.tier,
         params: def.route.params,
         key: def.key,
         options: (orgId, params) =>
@@ -46,10 +50,10 @@ export function defineRead<T>() {
                 queryKey: def.key(orgId, params),
                 queryFn: ({ signal }) =>
                     apiRead<T>(def.route.path, params, { orgId, signal }),
-                // A read just made is fresh for a moment, so a second
-                // mount (Back, a sheet) reads nothing (KTD-4); an
+                // Fresh for as long as its tier says (owner, 25 Nov); an
                 // invalidation still reads.
-                staleTime: HYDRATED_FRESH_MS,
+                ...FRESHNESS[def.tier],
+                meta: { tier: def.tier },
             }),
     });
 }

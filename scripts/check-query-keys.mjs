@@ -6,7 +6,9 @@
 // its own key (`x-organization-id`), never the cookie alone (U2 security
 // review, 24 Nov 2026), so `apiRead` and `queryFn` live in `lib/query/`.
 // The server QueryClient (`lib/query/server-client`) is per request and
-// `server-only`; a "use client" file never imports it.
+// `server-only`; a "use client" file never imports it. Every `defineRead`
+// names its tier (`lib/query/freshness.ts`: settings, records or live), so
+// no read falls back to "fetch every time" (owner, 25 Nov 2026).
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -49,6 +51,21 @@ const CLIENT = /^\s*(\/\/[^\n]*\n\s*)*["']use client["']/;
 const SERVER_CLIENT =
     /from\s+["'](@\/lib\/query\/server-client|[./]+\/server-client)["']/g;
 
+const DEFINE_READ = /\bdefineRead\s*<[^;]*?>\s*\(\s*\)\s*\(\s*\{/g;
+const TIER = /\btier\s*:\s*["'](settings|records|live)["']/;
+
+/** The text of the object literal that opens at `start` (a `{`). */
+function objectAt(text, start) {
+    let depth = 0;
+    for (let i = start; i < text.length; i += 1) {
+        if (text[i] === "{") depth += 1;
+        else if (text[i] === "}" && --depth === 0) {
+            return text.slice(start, i + 1);
+        }
+    }
+    return text.slice(start);
+}
+
 /** Problems in one app file: `{ line, why }`. */
 export function keyProblems(file, text) {
     if (!file.startsWith(APP) || isTest(file)) return [];
@@ -58,6 +75,15 @@ export function keyProblems(file, text) {
         if (rule.allowed(file)) continue;
         for (const m of text.matchAll(rule.re)) {
             out.push({ line: at(m.index), why: rule.why });
+        }
+    }
+    for (const m of text.matchAll(DEFINE_READ)) {
+        const def = objectAt(text, m.index + m[0].length - 1);
+        if (!TIER.test(def)) {
+            out.push({
+                line: at(m.index),
+                why: 'a read without its tier: add tier: "settings" | "records" | "live" (lib/query/freshness.ts)',
+            });
         }
     }
     if (CLIENT.test(text)) {

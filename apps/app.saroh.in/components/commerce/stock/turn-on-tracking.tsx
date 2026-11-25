@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { productsKeys } from "@/lib/products/queries";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { useOrgId } from "@/lib/query/org";
 import { stockKeys } from "@/lib/stock/queries";
 import { setBusinessStockTracking } from "@/lib/stock/screen-actions";
@@ -48,6 +49,8 @@ export function TurnOnTracking() {
                 onConfirm={async () => {
                     const res = await setBusinessStockTracking(true, orgId);
                     if (!res.ok) return { ok: false, error: res.error };
+                    // The rail's Stock row.
+                    afterSettingsSave();
                     showSuccess(
                         "Track stock turned on.",
                         "Every shelf starts at 0. Count them to start selling.",

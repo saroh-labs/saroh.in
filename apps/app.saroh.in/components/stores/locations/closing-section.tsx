@@ -15,6 +15,7 @@ import {
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { runAction } from "@/lib/api/run-action";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import type { SectionProps } from "./location-save";
 import { Note, Section } from "./storefront-section";
 
@@ -122,6 +123,7 @@ export function ClosingSection({
                 onConfirm={async () => {
                     const res = await closeStorefront(store.id);
                     if (!res.ok) return { ok: false, error: res.error };
+                    afterSettingsSave();
                     showSuccess("Location closed.");
                     router.replace(LOCATIONS_HREF);
                 }}

@@ -31,6 +31,7 @@ export interface CalendarSpan {
 export const calendarRead = defineRead<CalendarRead>()({
     key: (orgId, span) => domainKey("calendar", orgId, "range", span),
     route: { path: "/api/calendar", params: { from: day, to: day } },
+    tier: "live",
 });
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
