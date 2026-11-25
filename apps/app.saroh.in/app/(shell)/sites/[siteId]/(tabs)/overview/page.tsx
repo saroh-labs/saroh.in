@@ -1,21 +1,12 @@
-import { notFound, redirect, unstable_rethrow } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { navCan } from "@/components/shared/navigation/nav-items";
-import { Overview } from "@/components/sites/overview/overview";
-import { mayReadForms, siteGroups } from "@/components/sites/shell/group-map";
-import { SiteHome } from "@/components/sites/shell/site-home-phone";
-import { listPosts } from "@/lib/content/service";
+import { SiteOverviewContainer } from "@/components/sites/area/site-screens";
+import { mayReadForms } from "@/components/sites/shell/group-map";
 import { businessZone } from "@/lib/format/business-zone";
-import { count } from "@/lib/format/plural";
+import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { businessAddress } from "@/lib/sites/default-site";
-import { getSite, getSiteOverview } from "@/lib/sites/service";
-import {
-    readWebAddressLinks,
-    RENDERER_APEX,
-} from "@/lib/sites/share-links-read";
-import { siteStatus } from "@/lib/sites/site-status";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 
 export const metadata = { title: "Overview · Website" };
@@ -24,9 +15,11 @@ export const metadata = { title: "Overview · Website" };
  * A site's Overview (plan 2026-11-18-001 U4): address and status, what the
  * site brought in, what needs doing and activity. On a phone the four
  * groups come right after the status, each with one line of how it stands
- * (the site home). A
- * failed overview read costs only its own parts; the header and the groups
- * stay. With the Website area off it forwards to the Pages tab.
+ * (the site home). With the Website area off it forwards to the Pages tab.
+ *
+ * On React Query (DEC-259): the page awaits only its gates (the switch,
+ * the session, what this person may do, the business's zone); the overview
+ * loads in the browser, and a failed read costs only its own region.
  */
 export default async function SiteOverviewPage({
     params,
@@ -36,60 +29,21 @@ export default async function SiteOverviewPage({
     const { siteId } = await params;
     if (!(await websiteAreaOn())) redirect(`/sites/${siteId}/pages`);
     await requireSession();
-    const [site, organization, posts, webAddress, overview] = await Promise.all(
-        [
-            getSite(siteId),
-            resolveActiveOrganization(),
-            // A line on a row: without it the row still opens.
-            listPosts(siteId).catch(() => null),
-            readWebAddressLinks(),
-            getSiteOverview(siteId).catch((error: unknown): null => {
-                unstable_rethrow(error);
-                return null;
-            }),
-        ],
-    );
-    if (!site) notFound();
-
+    const organization = await resolveActiveOrganization();
     const actor = {
         role: organization?.role ?? null,
         actions: organization?.actions,
     };
-    const groups = siteGroups(site.id, {
-        canEdit: site.can.edit,
-        mayReadForms: mayReadForms(organization),
-        mayBusiness: navCan(actor, "org:settings:read"),
-        mayTeam: navCan(actor, "member:read"),
-    });
-    const pages = site.can.edit ? count(site.pages.length, "page") : null;
-    const written = posts ? count(posts.length, "post") : null;
-    const address = businessAddress(site, webAddress, RENDERER_APEX);
-    const host = address?.host;
-    const home = site.pages.find((p) => p.isHome && !p.hidden);
-
     return (
-        <Overview
-            siteId={site.id}
-            overview={overview}
-            status={siteStatus(site, { reader: !site.can.edit })}
-            live={site.currentPublicationId !== null}
-            host={host ?? null}
-            url={address?.url ?? null}
-            canEdit={site.can.edit}
-            canPublish={site.can.publish}
+        <SiteOverviewContainer
+            siteId={siteId}
+            access={{
+                canEdit: permits(organization, "section:write"),
+                mayReadForms: mayReadForms(organization),
+                mayBusiness: navCan(actor, "org:settings:read"),
+                mayTeam: navCan(actor, "member:read"),
+            }}
             timeZone={businessZone(organization)}
-            share={home ? { page: home, business: site.name } : null}
-            phoneHome={
-                <SiteHome
-                    groups={groups}
-                    lines={{
-                        "pages-and-posts":
-                            [pages, written].filter(Boolean).join(" · ") ||
-                            undefined,
-                        reach: host,
-                    }}
-                />
-            }
         />
     );
 }

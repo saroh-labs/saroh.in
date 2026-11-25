@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrgIfSent } from "@/lib/api/assert-active-org";
+
 import type { PostCategoryInput, PostInput, Result } from "./service";
 import {
     approvePost as approvePostApi,
@@ -45,23 +47,30 @@ export async function deletePost(
 export async function createPostCategory(
     storeId: string,
     input: PostCategoryInput,
+    /** The tab's business, from a React Query screen (DEC-259). */
+    orgId?: string,
 ): Promise<Result> {
-    return createPostCategoryApi(storeId, input);
+    const write = () => createPostCategoryApi(storeId, input);
+    return writeAsOrgIfSent(orgId, write);
 }
 
 export async function updatePostCategory(
     storeId: string,
     categoryId: string,
     input: PostCategoryInput,
+    orgId?: string,
 ): Promise<Result> {
-    return updatePostCategoryApi(storeId, categoryId, input);
+    const write = () => updatePostCategoryApi(storeId, categoryId, input);
+    return writeAsOrgIfSent(orgId, write);
 }
 
 export async function deletePostCategory(
     storeId: string,
     categoryId: string,
+    orgId?: string,
 ): Promise<Result> {
-    return deletePostCategoryApi(storeId, categoryId);
+    const write = () => deletePostCategoryApi(storeId, categoryId);
+    return writeAsOrgIfSent(orgId, write);
 }
 
 /** Put a post on the site (#232). */

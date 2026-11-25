@@ -6,7 +6,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import type { PostCategory } from "@/lib/content/service";
+import { usePostCategories, useSiteSave } from "@/lib/sites/use-sites";
 
 import { PostCategoriesSheet } from "@/components/sites/posts/post-categories-sheet";
 
@@ -23,17 +23,19 @@ export function SiteSectionHeading({
     siteId,
     groups,
     canEdit,
-    postCategories,
 }: {
     siteId: string;
     groups: readonly SiteGroup[];
     canEdit: boolean;
-    /** As `WebsiteHeader`'s: `undefined` hides Categories, `null` failed. */
-    postCategories?: PostCategory[] | null;
 }) {
     const pathname = usePathname();
     const search = useSearchParams();
     const here = currentSection(groups, siteId, pathname, search);
+    const writing = here.section === "writing" && canEdit;
+    // The Categories sheet's list, read only over Writing; until it lands
+    // the button waits (a list not read is never "none yet").
+    const categories = usePostCategories(siteId, writing);
+    const save = useSiteSave(siteId);
     if (here.section === null) return null;
     const title =
         here.section === "overview"
@@ -41,7 +43,6 @@ export function SiteSectionHeading({
             : (groups
                   .flatMap((g) => g.sections)
                   .find((s) => s.id === here.section)?.label ?? "");
-    const writing = here.section === "writing" && canEdit;
 
     return (
         <PageHeader
@@ -55,12 +56,14 @@ export function SiteSectionHeading({
             actions={
                 writing ? (
                     <>
-                        {postCategories === undefined ? null : (
+                        {categories.data || categories.isError ? (
                             <PostCategoriesSheet
                                 siteId={siteId}
-                                categories={postCategories}
+                                categories={categories.data ?? null}
+                                save={save}
+                                onRetry={() => void categories.refetch()}
                             />
-                        )}
+                        ) : null}
                         <Button asChild>
                             <IntentLink href={`/sites/${siteId}/posts/new`}>
                                 New post

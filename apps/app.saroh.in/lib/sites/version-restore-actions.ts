@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrgIfSent } from "@/lib/api/assert-active-org";
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, orgBase } from "@/lib/api/http";
@@ -26,7 +27,14 @@ export async function restoreVersionAsDraft(
     siteId: string,
     publicationId: string,
     input: { pageId?: string; revision?: number } = {},
+    /** The tab's business, from a React Query screen (DEC-259). */
+    orgId?: string,
 ): Promise<ApiResult<RestoreAsDraftResult>> {
+    if (orgId) {
+        return writeAsOrgIfSent(orgId, () =>
+            restoreVersionAsDraft(siteId, publicationId, input),
+        );
+    }
     const fallback = "Couldn't restore that version. Try again.";
     try {
         const base = await orgBase();

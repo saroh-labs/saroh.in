@@ -363,9 +363,13 @@ describe("Add a page (G16)", () => {
         render();
         await press(button("Add a page"));
         await press(button(/^Book\/book/));
-        expect(actions.createPage).toHaveBeenCalledWith("site_1", {
-            kind: "BOOK",
-        });
+        expect(actions.createPage).toHaveBeenCalledWith(
+            "site_1",
+            {
+                kind: "BOOK",
+            },
+            undefined,
+        );
         expect(toast.showSuccess).toHaveBeenCalledWith("Added Book.");
         expect(push).toHaveBeenCalledWith("/sites/site_1?page=p-new");
     });
@@ -400,10 +404,14 @@ describe("Add a page (G16)", () => {
         await press(button("Add a page"));
         await press(button(/^Prices\/prices/));
         await press(button("Add it at /pricing"));
-        expect(actions.createPage).toHaveBeenLastCalledWith("site_1", {
-            kind: "PRICES",
-            path: "/pricing",
-        });
+        expect(actions.createPage).toHaveBeenLastCalledWith(
+            "site_1",
+            {
+                kind: "PRICES",
+                path: "/pricing",
+            },
+            undefined,
+        );
         expect(push).toHaveBeenCalledWith("/sites/site_1?page=p-prices");
     });
 
@@ -430,10 +438,14 @@ describe("Add a page (G16)", () => {
         set(title, "FAQ");
         set(path, "/faq");
         await press(button("Add page"));
-        expect(actions.createPage).toHaveBeenCalledWith("site_1", {
-            title: "FAQ",
-            path: "/faq",
-        });
+        expect(actions.createPage).toHaveBeenCalledWith(
+            "site_1",
+            {
+                title: "FAQ",
+                path: "/faq",
+            },
+            undefined,
+        );
     });
 
     it("is off without site:update, with the reason beside it", () => {

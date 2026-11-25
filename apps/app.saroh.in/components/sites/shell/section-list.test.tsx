@@ -1,5 +1,9 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
 
 import { siteGroups } from "./group-map";
 import { SitePhoneNav, SiteSectionList } from "./section-list";
@@ -96,29 +100,34 @@ describe("the site header keeps today's controls (00-universal §15)", () => {
 
     it("opens Publish from the status chip for whoever may publish; a Reviewer's is a badge (U11)", () => {
         expect(header(false)).not.toContain("data-status-chip");
+        // The Publish sheet reads the site again after a publish (DEC-259).
         const html = renderToStaticMarkup(
-            <SiteHeader
-                site={site}
-                sites={[site]}
-                address="gulmohar.saroh.app"
-                liveUrl="https://gulmohar.saroh.app"
-                qrUrl="https://gulmohar.saroh.app"
-                canEdit
-                mayCreate
-                askAi
-                publish={{
-                    siteId: "s1",
-                    siteName: "Gulmohar",
-                    host: "gulmohar.saroh.app",
-                    pages: [],
-                    neverPublished: false,
-                    pendingSectionChanges: 2,
-                    pendingSiteChanges: [],
-                    needsApproval: false,
-                    canOverride: false,
-                    addressFix: null,
-                }}
-            />,
+            <QueryClientProvider client={makeTestClient()}>
+                <OrgProvider orgId="org_1">
+                    <SiteHeader
+                        site={site}
+                        sites={[site]}
+                        address="gulmohar.saroh.app"
+                        liveUrl="https://gulmohar.saroh.app"
+                        qrUrl="https://gulmohar.saroh.app"
+                        canEdit
+                        mayCreate
+                        askAi
+                        publish={{
+                            siteId: "s1",
+                            siteName: "Gulmohar",
+                            host: "gulmohar.saroh.app",
+                            pages: [],
+                            neverPublished: false,
+                            pendingSectionChanges: 2,
+                            pendingSiteChanges: [],
+                            needsApproval: false,
+                            canOverride: false,
+                            addressFix: null,
+                        }}
+                    />
+                </OrgProvider>
+            </QueryClientProvider>,
         );
         expect(html).toContain("data-status-chip");
         expect(html).toContain("Live · 2 changes waiting: open Publish");

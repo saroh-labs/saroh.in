@@ -24,6 +24,7 @@ import {
     confirmLabel,
     routeLine,
 } from "@/lib/sites/publish-requests";
+import type { SiteSave } from "@/lib/sites/use-sites";
 import { usePublishRequest } from "./use-publish-request";
 
 /**
@@ -37,14 +38,16 @@ import { usePublishRequest } from "./use-publish-request";
 export function PublishRequestScreen({
     view,
     requestId,
+    save,
 }: {
     view: PublishRequestView;
     requestId: string;
+    save?: SiteSave;
 }) {
     const zone = useBusinessZone();
     const phone = usePhone();
     const router = useRouter();
-    const r = usePublishRequest(view, requestId);
+    const r = usePublishRequest(view, requestId, save);
     const siteHref = `/sites/${encodeURIComponent(view.siteId)}`;
 
     if (r.state === "published") {

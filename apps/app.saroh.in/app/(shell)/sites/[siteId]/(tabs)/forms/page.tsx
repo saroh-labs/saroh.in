@@ -1,13 +1,5 @@
-import { count } from "@/lib/format/plural";
-import { Badge } from "@saroh/ui/badge";
-import { EmptyState } from "@saroh/ui/data-state";
-import { IntentLink } from "@saroh/ui/intent-link";
-import { Inbox } from "lucide-react";
-
-import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { listForms } from "@/lib/forms/service";
+import { SiteFormsContainer } from "@/components/sites/area/site-screens";
 import { requireSession } from "@/lib/session";
-import { ListCard, ListRow } from "@saroh/ui/list-card";
 
 export const metadata = { title: "Forms · Website" };
 
@@ -18,7 +10,8 @@ export const metadata = { title: "Forms · Website" };
  * A form is made in the editor, by adding an enquiry section, so there is
  * nothing to create here — this is where what people sent is read. Each entry
  * also became a contact and a lead; this is the raw record of what they
- * typed, which outlives both.
+ * typed, which outlives both. On React Query (DEC-259): read in the browser,
+ * `form:read` asked by the route.
  */
 export default async function SiteFormsPage({
     params,
@@ -27,59 +20,5 @@ export default async function SiteFormsPage({
 }) {
     const { siteId } = await params;
     await requireSession();
-    const forms = (await listForms()).filter((f) => f.siteId === siteId);
-
-    if (forms.length === 0) {
-        return (
-            <EmptyState
-                icon={<Inbox />}
-                title="No forms yet"
-                description="Add an enquiry section to a page in the editor and its form shows here."
-            />
-        );
-    }
-
-    return (
-        <ListCard
-            main="Form"
-            paged={{ list: "site-forms", things: "forms" }}
-            end="Latest entry"
-            note="Each entry also becomes a contact and a lead. Here is what they typed, kept as they sent it."
-        >
-            {forms.map((form) => (
-                <li
-                    key={form.id}
-                    className="border-b border-border last:border-b-0"
-                >
-                    <IntentLink
-                        href={`/sites/${siteId}/forms/${form.id}`}
-                        className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    >
-                        <ListRow
-                            title={form.name}
-                            tag={
-                                form.status === "ACTIVE" ? null : (
-                                    <Badge variant="neutral">Closed</Badge>
-                                )
-                            }
-                            sub={`${count(form.submissionCount, "entry", "entries")} · asks for ${form.fields
-                                .map((f) => f.label.toLowerCase())
-                                .join(", ")}`}
-                            end={
-                                <span className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
-                                    {form.lastSubmissionAt ? (
-                                        <ViewerDate
-                                            iso={form.lastSubmissionAt}
-                                        />
-                                    ) : (
-                                        "None yet"
-                                    )}
-                                </span>
-                            }
-                        />
-                    </IntentLink>
-                </li>
-            ))}
-        </ListCard>
-    );
+    return <SiteFormsContainer siteId={siteId} />;
 }

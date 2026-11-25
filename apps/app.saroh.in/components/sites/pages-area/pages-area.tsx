@@ -17,7 +17,7 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { showSuccess } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -31,6 +31,7 @@ import type {
     SitePage,
     SiteRedirect,
 } from "@/lib/sites/service";
+import type { SiteSave } from "@/lib/sites/use-sites";
 
 import { PageRowMenu } from "./page-row-menu";
 import { PageSheet } from "./page-sheet";
@@ -87,6 +88,7 @@ export function PagesArea({
     redirects,
     changes = null,
     footer,
+    save,
 }: {
     siteId: string;
     siteName: string;
@@ -109,8 +111,9 @@ export function PagesArea({
     changes?: readonly ChangeUnit[] | null;
     /** A line under the list (the AI way in). */
     footer?: ReactNode;
+    /** Writes take the tab's business; a landed one reads Pages again. */
+    save: SiteSave;
 }) {
-    const router = useRouter();
     const pathname = usePathname();
     const params = useSearchParams();
     const query = readPagesQuery(params);
@@ -215,13 +218,14 @@ export function PagesArea({
                         >
                             <AddPagePanel
                                 siteId={siteId}
+                                orgId={save.orgId}
                                 offers={addPageOffers(addableKinds)}
                                 onCancel={() => setAdding(false)}
                                 onAdded={(page) => {
                                     setAdding(false);
                                     showSuccess(`Added ${page.title}.`);
                                     goTo(page.id);
-                                    router.refresh();
+                                    void save.saved();
                                 }}
                             />
                         </PopoverContent>
@@ -511,10 +515,11 @@ export function PagesArea({
                                         shareable={live && !page.hidden}
                                         canUpdate={canUpdate}
                                         onSettings={() => goTo(page.id)}
-                                        onChanged={() => router.refresh()}
+                                        orgId={save.orgId}
+                                        onChanged={() => void save.saved()}
                                         onDuplicated={(copy) => {
                                             goTo(copy.id);
-                                            router.refresh();
+                                            void save.saved();
                                         }}
                                     />
                                 </li>
@@ -541,10 +546,11 @@ export function PagesArea({
                 waiting={open ? waits(open) : false}
                 editorHref={open ? `/sites/${siteId}?page=${open.id}` : null}
                 onClose={() => goTo(null)}
-                onSaved={() => router.refresh()}
+                orgId={save.orgId}
+                onSaved={() => void save.saved()}
                 onDeleted={() => {
                     goTo(null);
-                    router.refresh();
+                    void save.saved();
                 }}
             />
         </div>

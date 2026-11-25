@@ -7,12 +7,12 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { ListCard, ListRow } from "@saroh/ui/list-card";
 import { showSuccess } from "@saroh/ui/toast";
 import { Link2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { removeSiteRedirect } from "@/lib/sites/actions";
 import type { SitePage, SiteRedirect } from "@/lib/sites/service";
+import type { SiteSave } from "@/lib/sites/use-sites";
 
 import { AddOldLinkSheet } from "./add-old-link-sheet";
 
@@ -38,6 +38,8 @@ export function OldLinksList({
     pages,
     redirects,
     canEdit,
+    save,
+    onRetry,
 }: {
     siteId: string;
     host: string | null;
@@ -45,8 +47,10 @@ export function OldLinksList({
     /** Null: couldn't be read, which is not "none yet". */
     redirects: readonly SiteRedirect[] | null;
     canEdit: boolean;
+    /** Writes take the tab's business; a landed one reads the links again. */
+    save: SiteSave;
+    onRetry: () => void;
 }) {
-    const router = useRouter();
     const [adding, setAdding] = useState(false);
     const [removing, setRemoving] = useState<SiteRedirect | null>(null);
     const hasAuto = redirects?.some((r) => r.source === "AUTO") ?? false;
@@ -74,7 +78,7 @@ export function OldLinksList({
                 <FailedState
                     size="panel"
                     title={couldntLoad("old links")}
-                    onRetry={() => router.refresh()}
+                    onRetry={onRetry}
                 />
             ) : redirects.length === 0 ? (
                 <EmptyState
@@ -142,6 +146,7 @@ export function OldLinksList({
                     pages={pages}
                     open={adding}
                     onClose={() => setAdding(false)}
+                    save={save}
                 />
             ) : null}
             <ConfirmDialog
@@ -153,11 +158,15 @@ export function OldLinksList({
                 keepLabel="Keep old link"
                 onConfirm={async () => {
                     if (!removing) return;
-                    const res = await removeSiteRedirect(siteId, removing.id);
+                    const res = await removeSiteRedirect(
+                        siteId,
+                        removing.id,
+                        save.orgId,
+                    );
                     if (!res.ok) return res;
                     setRemoving(null);
                     showSuccess("Old link removed. It stops once you publish.");
-                    router.refresh();
+                    await save.saved();
                 }}
             />
         </section>
