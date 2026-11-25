@@ -50,6 +50,7 @@ export function ProvidersContainer() {
                 <SettingsPanel
                     header={
                         <SettingsPanelHeader
+                            holdsData={false}
                             title="Integrations"
                             description={INTEGRATIONS_SAYS}
                         />

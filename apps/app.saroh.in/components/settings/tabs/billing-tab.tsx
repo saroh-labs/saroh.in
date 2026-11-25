@@ -56,7 +56,7 @@ export function BillingContainer() {
 
 /** The tab as read: props in, nothing fetched. */
 export function BillingView({ screen: b }: { screen: BillingScreen }) {
-    const header = <SettingsPanelHeader title={TITLE} />;
+    const header = <SettingsPanelHeader title={TITLE} holdsData={false} />;
     if (b.kind === "free") {
         return (
             <SettingsPanel header={header}>

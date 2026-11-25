@@ -35,6 +35,7 @@ export function ModulesContainer() {
                 <SettingsPanel
                     header={
                         <SettingsPanelHeader
+                            holdsData={false}
                             title="Modules"
                             description={MODULES_SAYS}
                             readOnlyNote={
