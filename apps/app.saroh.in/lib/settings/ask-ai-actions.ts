@@ -15,6 +15,7 @@ export async function saveAskAiOn(
     on: boolean,
 ): Promise<CrmResult<AskAiSettings>> {
     const result = await setAskAiOn(on);
+    // rq-revalidate-ok: Developers › Ask AI isn't on React Query yet (U35).
     if (result.ok) revalidatePath("/", "layout");
     return result;
 }

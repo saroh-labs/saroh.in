@@ -15,7 +15,6 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -99,7 +98,6 @@ function ChangeForm({
     onChanged?: (view: WebAddressView) => void;
     onDone: () => void;
 }) {
-    const router = useRouter();
     const suffix = suffixOf(view);
     const form = useForm<Values>({
         resolver: zodResolver(schema),
@@ -153,10 +151,10 @@ function ChangeForm({
             `It is now ${hostOf(res.data.platformOrigin)}.`,
         );
         onChanged?.(res.data);
+        // The action revalidates the layout (the pages the address is
+        // drawn on); Settings' reads and the shell read it again here.
         onDone();
         afterSettingsSave();
-        // rq-refresh-ok: the address is drawn by the server pages it is on.
-        router.refresh();
     }
 
     return (

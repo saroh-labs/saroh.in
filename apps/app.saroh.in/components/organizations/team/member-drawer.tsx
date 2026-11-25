@@ -8,6 +8,7 @@ import {
 } from "@/lib/organizations/member-actions";
 import type { OrganizationMember } from "@/lib/organizations/members";
 import type { RolesLock } from "@/lib/organizations/roles-lock";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { RoleDot } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
 import { ChoiceGroup } from "@saroh/ui/choice-group";
@@ -15,7 +16,6 @@ import { FormSheet } from "@saroh/ui/form-sheet";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, Info } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ExtraPermissions, useMemberExtras } from "./member-extras";
 import type { RoleBook } from "./role-book";
@@ -53,7 +53,7 @@ export function MemberDrawer({
     /** Hands an owner to the one Remove confirmation; see below. */
     onRemove: (member: OrganizationMember) => void;
 }) {
-    const router = useRouter();
+    const settings = useSettingsSave();
     const [draft, setDraft] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
@@ -109,14 +109,22 @@ export function MemberDrawer({
                 // The role first: the extras are judged against the role
                 // they'll sit on top of.
                 const res = roleChanged
-                    ? await updateMemberRole(userId, {
-                          role,
-                          ...(role === "REVIEWER" ? { siteIds } : {}),
-                      })
+                    ? await updateMemberRole(
+                          userId,
+                          {
+                              role,
+                              ...(role === "REVIEWER" ? { siteIds } : {}),
+                          },
+                          ...asOrg(settings.orgId),
+                      )
                     : null;
                 const extrasRes =
                     (res === null || res.ok) && extras.changed
-                        ? await setMemberExtraActions(userId, extras.chosen)
+                        ? await setMemberExtraActions(
+                              userId,
+                              extras.chosen,
+                              ...asOrg(settings.orgId),
+                          )
                         : null;
                 return { res, extrasRes };
             },
@@ -128,7 +136,7 @@ export function MemberDrawer({
         if (failed && !failed.ok) {
             showError(failed.error);
             // A role that saved before the extras were refused is still new.
-            if (res?.ok) router.refresh();
+            if (res?.ok) settings.saved({ organizations: true, shell: true });
             return;
         }
         showSuccess(
@@ -138,7 +146,7 @@ export function MemberDrawer({
                 : undefined,
         );
         close();
-        router.refresh();
+        settings.saved({ organizations: true, shell: true });
     }
 
     return (
@@ -187,7 +195,7 @@ export function MemberDrawer({
                                 photo={profile.photo}
                                 about={profile.about}
                                 byOther={!member.isSelf}
-                                onSaved={() => router.refresh()}
+                                onSaved={() => settings.saved()}
                             />
                         </div>
                     ) : null}

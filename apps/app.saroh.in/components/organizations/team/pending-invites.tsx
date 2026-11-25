@@ -9,13 +9,13 @@ import {
     revokeInvitation,
 } from "@/lib/organizations/member-actions";
 import type { OrganizationInvitation } from "@/lib/organizations/members";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import { Tip } from "@saroh/ui/tooltip";
 import { Mail } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { RoleBook } from "./role-book";
 
@@ -40,7 +40,7 @@ export function PendingInvites({
     /** Invitations past the plan's limit (#800): can't be accepted yet. */
     pausedIds?: string[];
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const zone = useBusinessZone();
     const { hold, send, pending } = useHold();
     const [cancelled, setCancelled] = useState<readonly string[]>([]);
@@ -51,15 +51,18 @@ export function PendingInvites({
         send(`resend:${invitation.id}`, {
             description: `A new link goes to ${invitation.email}. The old one stops working.`,
             run: () =>
-                inviteMember({
-                    email: invitation.email,
-                    role,
-                    ...(role === "REVIEWER"
-                        ? { siteIds: invitation.siteIds }
-                        : {}),
-                }),
+                inviteMember(
+                    {
+                        email: invitation.email,
+                        role,
+                        ...(role === "REVIEWER"
+                            ? { siteIds: invitation.siteIds }
+                            : {}),
+                    },
+                    ...asOrg(save.orgId),
+                ),
             sent: `Sent to ${invitation.email}.`,
-            onSent: () => router.refresh(),
+            onSent: () => save.saved(),
         });
     }
 
@@ -71,12 +74,16 @@ export function PendingInvites({
             `invitation:${invitation.id}`,
             "Invitation cancelled.",
             async () => {
-                const res = await revokeInvitation(invitation.id);
+                const res = await revokeInvitation(
+                    invitation.id,
+                    ...asOrg(save.orgId),
+                );
                 if (!res.ok) {
                     showError("The invitation wasn't cancelled.", res.error);
                     back();
                 }
-                router.refresh();
+                // A cancelled invitation frees its seat: the shell's paused note.
+                save.saved({ shell: true });
             },
             back,
             { description: "Its link no longer works." },

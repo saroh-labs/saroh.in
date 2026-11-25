@@ -4,12 +4,12 @@ import { Button } from "@saroh/ui/button";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { showSuccess } from "@saroh/ui/toast";
 import { Unplug } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { disconnectMember } from "@/lib/google-calendar/actions";
 import type { CalendarMember } from "@/lib/google-calendar/types";
 import { teamCalendarWords } from "@/lib/google-calendar/words";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 /**
  * Team's Google Calendar column (DEC-233): whether this person's bookings
@@ -23,7 +23,7 @@ export function GoogleCalendarCell({
     member: CalendarMember | null;
     canDisconnect: boolean;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [confirming, setConfirming] = useState(false);
     const words = teamCalendarWords(member);
     return (
@@ -56,10 +56,11 @@ export function GoogleCalendarCell({
                         onConfirm={async () => {
                             const res = await disconnectMember(
                                 member.membershipId,
+                                ...asOrg(save.orgId),
                             );
                             if (!res.ok) return { ok: false, error: res.error };
                             showSuccess(res.data.kept.message);
-                            router.refresh();
+                            save.saved();
                             return { ok: true };
                         }}
                     />

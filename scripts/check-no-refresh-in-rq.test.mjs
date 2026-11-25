@@ -8,6 +8,7 @@ import {
     matchRoute,
     refreshLines,
     routeOf,
+    stringList,
 } from "./check-no-refresh-in-rq.mjs";
 
 const APP = "apps/app.saroh.in/";
@@ -108,4 +109,19 @@ test("routeOf drops groups and private folders; matchRoute is exact", () => {
     assert.ok(matchRoute("/a/[id]", "/a/[orderId]"));
     assert.ok(!matchRoute("/a", "/a/b"));
     assert.ok(!matchRoute("/a/[id]", "/a/settings"));
+});
+
+test("a registry's comments never swallow its entries", () => {
+    assert.deepEqual(
+        stringList(
+            `export const R: readonly string[] = [
+    "/",
+    // the others' writers
+    "/a",
+    "/b",
+];`,
+            "R",
+        ),
+        ["/", "/a", "/b"],
+    );
 });

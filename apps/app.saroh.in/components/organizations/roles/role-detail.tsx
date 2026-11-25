@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { count, plural } from "@/lib/format/plural";
 import { deleteRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { RoleDot } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
@@ -11,7 +12,6 @@ import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { showSuccess } from "@saroh/ui/toast";
 import { Info } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Permissions } from "./permissions";
 import { aboveRoleNote } from "./role-reach";
@@ -49,7 +49,7 @@ export function RoleDetail({
         const c = catalogue?.capabilities.find((x) => x.action === a);
         return c ? [c.label] : [];
     });
-    const router = useRouter();
+    const save = useSettingsSave();
     // Which opening of the sheet this is: each one is a fresh draft.
     const [editing, setEditing] = useState(0);
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -57,11 +57,11 @@ export function RoleDetail({
     const saved = useMemo(() => new Set(role.actions), [role.actions]);
 
     async function remove(): Promise<ConfirmResult> {
-        const res = await deleteRole(role.key);
+        const res = await deleteRole(role.key, ...asOrg(save.orgId));
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Role removed.");
         onRemoved();
-        router.refresh();
+        save.saved({ organizations: true });
     }
 
     const held = role.members;

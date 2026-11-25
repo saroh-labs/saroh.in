@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import {
     chooseAccountCalendars,
     disconnectGoogleAccount,
@@ -36,8 +37,11 @@ export async function disconnectAccount(accountId: string) {
     return disconnectGoogleAccount(accountId);
 }
 
-export async function disconnectMember(membershipId: string) {
-    return disconnectGoogleMember(membershipId);
+/** From Team on React Query, with the tab's business last (`writeAsOrg`). */
+export async function disconnectMember(membershipId: string, orgId?: string) {
+    return orgId
+        ? writeAsOrg(orgId, () => disconnectGoogleMember(membershipId))
+        : disconnectGoogleMember(membershipId);
 }
 
 export async function moveMyBookings() {

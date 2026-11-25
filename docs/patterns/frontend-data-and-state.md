@@ -96,6 +96,19 @@ There is no global client store. React Query holds server state only, in
   holds the last answer greyed (`keepPreviousData`) until the new one lands,
   and Back draws a seen one from the cache. The page and the container turn
   the address into the key through one pure function (`calendarAt`).
+- **Sibling routes drawn in place** (Settings › Team, Your profile and
+  Business): each page checks its own gate and renders one client screen
+  (`SettingsTabScreen`) that draws the tab its address names; the side
+  list's links between them `pushState` (`onNavigate`) instead of asking the
+  server, and the title follows the address. Their reads are `settings`
+  tier, so a tab seen before is drawn with no read. A save there reads the
+  tab shown again and marks the others stale (`useSettingsSave`); one the
+  shell draws (a membership, an invitation: who is paused) calls
+  `afterSettingsSave()`; a role or membership marks `['organizations']`
+  stale. Nothing `router.refresh()`es; the Business tab's actions keep their
+  `revalidatePath` (the header's name, the words for what is set up), and
+  "Help improve Saroh" revalidates the layout, whose gate starts the
+  recorder.
 - **A write from a shared component** (a sheet used by a React Query screen
   and by a server-rendered one, like the bookings cancel sheet): it saves
   through the domain's save context (`useBookingSave`), whose default is
@@ -159,7 +172,7 @@ decides how often the browser asks.
 
 | Tier       | Who changes it                  | Rule                                                                                                                                                                                                                      | Reads                                                                                                                                      |
 | ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `settings` | someone in Settings, rarely     | `staleTime`/`gcTime` `Infinity`; read again by its saves (`afterSettingsSave()`, which tells the other tabs on the `BroadcastChannel`), by any 403 on a read (`onReadError`, once per 10 s), and quietly every 10 minutes | `/api/shell`                                                                                                                               |
+| `settings` | someone in Settings, rarely     | `staleTime`/`gcTime` `Infinity`; read again by its saves (`afterSettingsSave()`, which tells the other tabs on the `BroadcastChannel`), by any 403 on a read (`onReadError`, once per 10 s), and quietly every 10 minutes | `/api/shell`, Settings › Team, Your profile, Business                                                                                      |
 | `records`  | the team                        | `staleTime` 5 min; its own saves invalidate what they changed                                                                                                                                                             | products, product, customers, customer, requests, invoices, invoice, invoice summary, stock levels, log, checks, order options, Home setup |
 | `live`     | customers and the outside world | `staleTime` 30 s; the 45 s live refresh and coming back to the tab read it again (no timer of its own)                                                                                                                    | Home, orders, order, tickets, bookings list and diary, calendar, `/api/shell/live`                                                         |
 
