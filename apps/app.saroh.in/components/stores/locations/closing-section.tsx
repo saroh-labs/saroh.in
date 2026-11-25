@@ -16,6 +16,7 @@ import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 import { runAction } from "@/lib/api/run-action";
 import { afterSettingsSave } from "@/lib/query/invalidate";
+import { useLocationSave } from "@/lib/stores/use-stores";
 import type { SectionProps } from "./location-save";
 import { Note, Section } from "./storefront-section";
 
@@ -36,6 +37,7 @@ export function ClosingSection({
     setStore,
 }: SectionProps & { businessName: string; canClose: boolean }) {
     const router = useRouter();
+    const located = useLocationSave();
     const [open, setOpen] = useState(false);
     const [closing, startClosing] = useTransition();
     const orders = store.orderCount;
@@ -49,15 +51,16 @@ export function ClosingSection({
     const pause = () => {
         startClosing(async () => {
             const res = await runAction(() =>
-                updateStorefront(store.id, { paused: true }),
+                updateStorefront(store.id, { paused: true }, located.orgId),
             );
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
-            setStore(() => res.data);
-            router.refresh();
+            const data = res.data;
+            setStore(() => data);
+            await located.listed();
             showUndo(
                 `${store.name} is paused. Customers can't pay until it's back on.`,
                 resume,
@@ -121,8 +124,9 @@ export function ClosingSection({
                 busyLabel="Closing…"
                 keepLabel="Keep location"
                 onConfirm={async () => {
-                    const res = await closeStorefront(store.id);
+                    const res = await closeStorefront(store.id, located.orgId);
                     if (!res.ok) return { ok: false, error: res.error };
+                    located.closed(store.id);
                     afterSettingsSave();
                     showSuccess("Location closed.");
                     router.replace(LOCATIONS_HREF);

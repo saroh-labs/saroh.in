@@ -1,13 +1,11 @@
 import { apiFetch } from "@/lib/api/http";
 import { listInvitations, listMembers } from "@/lib/members/service";
-import type { Organization } from "@/lib/organizations/service";
 
 import type { LocationAbilities, OrderPlace } from "./abilities";
 import { abilitiesOf, orderPlaces } from "./abilities";
 import type { LocationDetails, StoreLogos } from "./location-details";
 import { detailsOf } from "./location-details";
-import type { LocationPeople } from "./people";
-import { peopleAccess } from "./people";
+import type { LocationRoster } from "./queries";
 
 /**
  * The two reads a location's page makes beside its settings: its
@@ -74,25 +72,21 @@ export async function readOrderPlaces(
 }
 
 /**
- * `null` when the roster couldn't be read, which the People tab shows as
- * its own failed state. An empty roster is someone the API doesn't show it
- * to (`listMembers` answers a 403 with none).
+ * Who works at a location and the invitations still out; `null` when it
+ * couldn't be read, which the People tab shows as its own failed state.
+ * An empty roster is someone the API doesn't show it to (`listMembers`
+ * answers a 403 with none). What the reader may do with it is the
+ * screen's (`peopleAccess`), from the page's own gates.
  */
-export async function readLocationPeople(
+export async function readLocationRoster(
     storeId: string,
-    userId: string,
-    organization: Pick<Organization, "actions" | "role"> | null,
-): Promise<LocationPeople | null> {
+): Promise<LocationRoster | null> {
     try {
         const [members, invitations] = await Promise.all([
             listMembers(storeId),
             listInvitations(storeId),
         ]);
-        return {
-            members,
-            invitations,
-            ...peopleAccess(members, userId, organization),
-        };
+        return { members, invitations };
     } catch {
         return null;
     }

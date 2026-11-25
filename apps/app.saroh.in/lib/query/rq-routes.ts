@@ -30,6 +30,7 @@ export const RQ_ROUTES: readonly string[] = [
     "/commerce/customers",
     "/contacts/[contactId]",
     "/commerce/stock",
+    "/commerce/locations",
 ];
 
 export const RQ_DOMAINS: readonly string[] = [
@@ -41,4 +42,5 @@ export const RQ_DOMAINS: readonly string[] = [
     "invoices",
     "customers",
     "stock",
+    "stores",
 ];

@@ -5,10 +5,10 @@ import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { SettingsColumns } from "@/components/shared/page/settings-columns";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { pausedWords } from "@/lib/billing/paused";
@@ -28,9 +28,11 @@ import type { LocationPeople } from "@/lib/stores/people";
 import { placeSheetFor, placeSheetToOpen } from "@/lib/stores/place-rows";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type {
+    StorefrontInput,
     StorefrontSettings,
     StorefrontSummary,
 } from "@/lib/stores/storefronts";
+import { useLocationSave } from "@/lib/stores/use-stores";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 import { FulfilmentSection } from "@/components/stores/delivery/fulfilment-section";
@@ -76,7 +78,13 @@ export function StorefrontsScreen({
     canClose,
     canLinkCustomers = false,
     notTakingOrders = [],
+    loading = false,
+    onRetry,
 }: {
+    /** The chosen location is still on its way: its part is a skeleton. */
+    loading?: boolean;
+    /** Read the chosen location again, after it failed. */
+    onRetry?: () => void;
     /**
      * May add an image to the library (`media:write`): a logo upload is
      * offered only then. Absent: yes, and the API decides.
@@ -113,7 +121,6 @@ export function StorefrontsScreen({
      */
     notTakingOrders?: string[];
 }) {
-    const router = useRouter();
     // A business with one location sees "Location"; the list appears once
     // there are several (ADR-010), and New while the plan allows another
     // (`canCreate` carries that). The crumb keeps the word; the title is
@@ -174,7 +181,16 @@ export function StorefrontsScreen({
                     />
                 ) : null}
                 <div className="flex min-w-0 flex-[1_1_420px] items-start gap-6">
-                    {selected ? (
+                    {loading ? (
+                        <div className="min-w-0 max-w-[760px] flex-1">
+                            <PageLoading
+                                bare
+                                shape="settings"
+                                width="full"
+                                label="Loading the location"
+                            />
+                        </div>
+                    ) : selected ? (
                         // Keyed by storefront, so picking another one starts
                         // from its own values rather than the last one's edits.
                         <StorefrontDetail
@@ -197,7 +213,7 @@ export function StorefrontsScreen({
                         <div className="min-w-0 max-w-[760px] flex-1">
                             <FailedState
                                 title={couldntLoad("this location")}
-                                onRetry={() => router.refresh()}
+                                onRetry={onRetry}
                             />
                         </div>
                     )}
@@ -217,6 +233,16 @@ export function aboutOnlyNote(canUploadLogo: boolean): string {
         ? "name, description and logo"
         : "name and description";
     return `You can change this location's ${what}. Your role can read the rest but not change it.`;
+}
+
+/** A save the list of locations and the title show. */
+export function listsChange(input: StorefrontInput): boolean {
+    return (
+        input.name !== undefined ||
+        input.kind !== undefined ||
+        input.address !== undefined ||
+        input.paused !== undefined
+    );
 }
 
 function StorefrontDetail({
@@ -246,8 +272,14 @@ function StorefrontDetail({
     /** The list of locations is drawn beside this one. */
     beside: boolean;
 }) {
-    const router = useRouter();
-    const [store, setStore] = useState(initial);
+    const located = useLocationSave();
+    const [store, setLocal] = useState(initial);
+    // What the page shows is the location's cached read too, so coming
+    // back to it draws what was saved (DEC-259).
+    const setStore = (fn: (s: StorefrontSettings) => StorefrontSettings) => {
+        setLocal(fn);
+        located.patch(initial.id, fn);
+    };
     const [pending, startTransition] = useTransition();
 
     /**
@@ -258,7 +290,7 @@ function StorefrontDetail({
     const save: Saver = (input, said, onFail, inline, onSaved) => {
         startTransition(async () => {
             const res = await runAction(() =>
-                updateStorefront(store.id, input),
+                updateStorefront(store.id, input, located.orgId),
             );
             if (!res) return;
             if (!res.ok) {
@@ -267,19 +299,13 @@ function StorefrontDetail({
                 else showError(res.error);
                 return;
             }
-            setStore(res.data);
+            const data = res.data;
+            setStore(() => data);
             onSaved?.();
             showSuccess(said);
             // The title, the line under it and the list on the left show
             // the name, the kind, the address and the pause.
-            if (
-                input.name !== undefined ||
-                input.kind !== undefined ||
-                input.address !== undefined ||
-                input.paused !== undefined
-            ) {
-                router.refresh();
-            }
+            if (listsChange(input)) await located.listed();
         });
     };
 
@@ -296,7 +322,7 @@ function StorefrontDetail({
     ) => {
         startTransition(async () => {
             const res = await runAction(() =>
-                updateStore(store.id, { name, description }),
+                updateStore(store.id, { name, description }, located.orgId),
             );
             if (!res) return;
             if (!res.ok) {
@@ -306,7 +332,7 @@ function StorefrontDetail({
             setStore((s) => ({ ...s, name }));
             onSaved?.();
             showSuccess(said);
-            router.refresh();
+            await located.listed();
         });
     };
 

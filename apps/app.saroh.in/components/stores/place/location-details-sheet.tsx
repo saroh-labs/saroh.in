@@ -28,6 +28,7 @@ import {
     LOGO_STATE,
     logoSource,
 } from "@/lib/stores/location-details";
+import { useLocationSave } from "@/lib/stores/use-stores";
 
 import { Refusal } from "@/components/shared/states/refusal";
 
@@ -97,6 +98,7 @@ export function LocationDetailsSheet({
     /** What the row says from now on. */
     onSaved: (details: LocationDetails) => void;
 }) {
+    const located = useLocationSave();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: { description: details.description ?? "" },
@@ -121,13 +123,17 @@ export function LocationDetailsSheet({
             return;
         }
         setRefusal(null);
-        const res = await updateStore(storeId, {
-            name,
-            description,
-            // Only a changed logo is sent: an upload's image, or `null`
-            // for the business logo.
-            ...(logoChanged ? { logoMediaId: logo?.mediaId ?? null } : {}),
-        });
+        const res = await updateStore(
+            storeId,
+            {
+                name,
+                description,
+                // Only a changed logo is sent: an upload's image, or `null`
+                // for the business logo.
+                ...(logoChanged ? { logoMediaId: logo?.mediaId ?? null } : {}),
+            },
+            located.orgId,
+        );
         if (!res.ok) {
             if (res.field === "logo") {
                 setRefusal(res.error);
