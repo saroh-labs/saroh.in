@@ -1,5 +1,9 @@
 "use client";
 
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { countLabel } from "@saroh/ui/page-header";
@@ -72,7 +76,10 @@ import { useOrderSelection } from "./use-order-selection";
  *
  * On React Query (DEC-259, `orders-container.tsx`): a tab, filter or search
  * changes the address in place and the container reads that page, the last
- * rows greyed (`pending`) until it lands.
+ * rows greyed (`pending`) until it lands. Before the first page is read
+ * (`page` null) the whole frame is here and works, a search or a filter
+ * keying the read; the rows, the counts and Export wait for the page
+ * (owner, 25 Nov).
  */
 export function OrdersScreen({
     query,
@@ -96,8 +103,8 @@ export function OrdersScreen({
     /** The page's notices, drawn under its header. */
     notices?: React.ReactNode;
     query: OrdersQuery;
-    /** The page on screen, read on the server. */
-    page: OrderListPage;
+    /** The page on screen; null until the first one is read. */
+    page: OrderListPage | null;
     /**
      * What the filter bar offers (B4); null when it couldn't be read, and
      * the bar leaves out the menus it would fill.
@@ -167,7 +174,7 @@ export function OrdersScreen({
     const narrow = useNarrow();
     const many = stores.length > 1;
     const store = stores.find((s) => s.id === query.storefront) ?? null;
-    const rows = page.rows;
+    const rows = page?.rows ?? NO_ROWS;
     const money = !kitchen && rows.some((r) => r.total !== undefined);
     // The row whose quick view is open (B5).
     const [peekId, setPeekId] = useState<string | null>(null);
@@ -199,8 +206,9 @@ export function OrdersScreen({
         [query],
     );
 
-    const total = page.counts[query.tab];
-    const range = pageRange(query, rows.length, total);
+    // Unknown until the page is read: Export waits, and no pages are drawn.
+    const total = page?.counts[query.tab] ?? 0;
+    const range = page ? pageRange(query, rows.length, total) : null;
     const firstStore = stores.length === 1 ? stores[0] : undefined;
     // Anything narrowed, a search with words in it included: the toolbar
     // then offers the way back to every order.
@@ -218,10 +226,16 @@ export function OrdersScreen({
     return (
         <div className="min-w-0">
             <OrdersHeading
-                count={countLabel(page.counts.all, {
-                    one: "order",
-                    other: "orders",
-                })}
+                count={
+                    page ? (
+                        countLabel(page.counts.all, {
+                            one: "order",
+                            other: "orders",
+                        })
+                    ) : (
+                        <FigureLoading />
+                    )
+                }
                 actions={
                     stores.length > 0 &&
                     (!kitchen || orderStores.length > 0) ? (
@@ -231,7 +245,7 @@ export function OrdersScreen({
                             {can.export ? (
                                 <OrderExport
                                     query={query}
-                                    total={page.counts[query.tab]}
+                                    total={total}
                                     storeName={store?.name}
                                 />
                             ) : null}
@@ -281,7 +295,7 @@ export function OrdersScreen({
                     <>
                         <OrderStatusFilter
                             query={query}
-                            counts={page.counts}
+                            counts={page?.counts ?? null}
                             go={go}
                         />
                         {/* The desk's; a phone has the date in the sheet. */}
@@ -367,7 +381,7 @@ export function OrdersScreen({
             {query.since ? (
                 <div className="pt-3.5">
                     <SinceNotice
-                        count={page.counts[query.tab]}
+                        count={page ? total : null}
                         noun={{ one: "order", other: "orders" }}
                         verb="placed"
                         clearHref={ordersHref(query, { since: null })}
@@ -379,7 +393,14 @@ export function OrdersScreen({
                 {attentionUnread ? (
                     <OrdersAttentionPartial onRetry={onRetry} />
                 ) : null}
-                {rows.length === 0 ? (
+                {!page ? (
+                    <PageLoading
+                        bare
+                        width="full"
+                        shape="rows"
+                        label="Loading orders"
+                    />
+                ) : rows.length === 0 ? (
                     <OrdersEmpty
                         query={query}
                         storeName={store?.name ?? firstStore?.name ?? null}
@@ -502,6 +523,8 @@ export function OrdersScreen({
         </div>
     );
 }
+
+const NO_ROWS: OrderListPage["rows"] = [];
 
 /** Before the page says: nothing beyond opening the order. */
 const NO_ABILITIES: OrderAbilities = {
