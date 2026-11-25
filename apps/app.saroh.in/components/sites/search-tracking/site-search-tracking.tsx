@@ -1,12 +1,12 @@
 "use client";
 
+import { useSettingsSaved } from "@/components/sites/settings/settings-saved";
 import type { TrackerKind } from "@saroh/block-contract";
 import { VERIFICATION_SERVICES } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronDown } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
@@ -105,7 +105,7 @@ function Editable({
     address: SiteAddress | null;
     planLock: TrackersLock | null;
 }) {
-    const router = useRouter();
+    const { saved, orgId } = useSettingsSaved();
     const [view, setView] = useState(initial);
     const [refusedLock, setRefusedLock] = useState<TrackersLock | null>(null);
     const [setup, setSetup] = useState<TrackerKind | null>(null);
@@ -113,7 +113,7 @@ function Editable({
     const lock = planLock ?? refusedLock;
 
     const save: SaveSection = async (input) => {
-        const res = await saveSearchTracking(siteId, input);
+        const res = await saveSearchTracking(siteId, input, orgId);
         if (res.ok) {
             setView(res.data);
             return { ok: true };
@@ -132,7 +132,7 @@ function Editable({
         // Switched off by Saroh meanwhile, or anything else: say it, and
         // read the section again so it draws what is so.
         showError(res.error);
-        router.refresh();
+        await saved();
         return { ok: false, error: res.error };
     };
 

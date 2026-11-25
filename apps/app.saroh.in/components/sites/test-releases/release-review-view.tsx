@@ -46,6 +46,7 @@ export function ReleaseReviewView({
     sitePages,
     canComment,
     can,
+    saved,
 }: {
     siteId: string;
     release: TestRelease;
@@ -69,6 +70,8 @@ export function ReleaseReviewView({
     sitePages: SitePage[];
     canComment: boolean;
     can: ReviewPanelAbilities;
+    /** After a note, a verdict or a request: the release is read again. */
+    saved: () => Promise<void>;
 }) {
     const router = useRouter();
     const base = `/sites/${siteId}/releases/${release.id}`;
@@ -133,6 +136,7 @@ export function ReleaseReviewView({
                         variables={variables}
                         canComment={canComment && pageId !== null}
                         testReleaseId={release.id}
+                        onChanged={saved}
                     />
                 )}
                 {activePath !== null && pageId === null && canComment ? (
@@ -173,7 +177,7 @@ export function ReleaseReviewView({
                         name: release.name,
                     }}
                     can={can}
-                    onChanged={() => router.refresh()}
+                    onChanged={() => void saved()}
                     onJump={(jumpPageId) => {
                         // A note names a draft page; the release names its
                         // pages by path. Open that path here.

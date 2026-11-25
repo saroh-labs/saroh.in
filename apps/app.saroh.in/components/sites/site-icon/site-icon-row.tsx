@@ -40,7 +40,7 @@ export function SiteIconRow({
         let next: SiteIconSaved | null = null;
         run(
             async () => {
-                const res = await saveSiteIcon(site.id, mediaId);
+                const res = await saveSiteIcon(site.id, mediaId, state.orgId);
                 if (res.ok) next = res.data.icon;
                 return res;
             },

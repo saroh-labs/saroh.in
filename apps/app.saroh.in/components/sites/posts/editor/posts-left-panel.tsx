@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { Heading, Settings2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { PostCategoriesSheet } from "../post-categories-sheet";
 import type { PostEditorData, PostEditorModel } from "./post-model";
@@ -57,6 +58,15 @@ export function PostsLeftPanel({
     busy?: boolean;
 }) {
     const { siteId, readOnly, categories } = data;
+    const router = useRouter();
+    // The editor's categories are its page's read (the draft is not on
+    // React Query): a change draws the page again, as it always did.
+    const refresh = {
+        saved: () => {
+            router.refresh();
+            return Promise.resolve();
+        },
+    };
     const outline = model ? headingsOf(model.draft.fields.content) : null;
     return (
         <aside
@@ -112,6 +122,8 @@ export function PostsLeftPanel({
                     <PostCategoriesSheet
                         siteId={siteId}
                         categories={categories}
+                        save={refresh}
+                        onRetry={() => router.refresh()}
                         trigger={
                             <Button
                                 type="button"

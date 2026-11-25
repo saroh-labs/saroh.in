@@ -171,13 +171,19 @@ export async function publishSite(
 export async function updateSiteSettings(
     siteId: string,
     input: SiteSettingsInput,
+    /** The tab's business, from a React Query screen (DEC-259). */
+    orgId?: string,
 ) {
-    return updateSiteSettingsApi(siteId, input);
+    return writeAsOrgIfSent(orgId, () => updateSiteSettingsApi(siteId, input));
 }
 
 /** Set the site's own icon from the library, or take it off (null). */
-export async function saveSiteIcon(siteId: string, mediaId: string | null) {
-    return saveSiteIconApi(siteId, mediaId);
+export async function saveSiteIcon(
+    siteId: string,
+    mediaId: string | null,
+    orgId?: string,
+) {
+    return writeAsOrgIfSent(orgId, () => saveSiteIconApi(siteId, mediaId));
 }
 
 /**
@@ -252,15 +258,19 @@ export async function updateSiteStyle(siteId: string, style: SiteStyle) {
 export async function updateSiteNavigation(
     siteId: string,
     navigation: SiteNavigation | null,
+    orgId?: string,
 ) {
-    return updateSiteNavigationApi(siteId, navigation);
+    return writeAsOrgIfSent(orgId, () =>
+        updateSiteNavigationApi(siteId, navigation),
+    );
 }
 
 export async function updateSiteFooter(
     siteId: string,
     footer: SiteFooter | null,
+    orgId?: string,
 ) {
-    return updateSiteFooterApi(siteId, footer);
+    return writeAsOrgIfSent(orgId, () => updateSiteFooterApi(siteId, footer));
 }
 
 export async function createPage(
@@ -413,8 +423,12 @@ export async function listPlansForCompare(): Promise<
  * Turn "Publishing needs approval" on or off (DEC-071, T13). The owner's
  * alone, and it takes effect at once.
  */
-export async function setPublishNeedsApproval(siteId: string, on: boolean) {
-    return savePublishNeedsApproval(siteId, on);
+export async function setPublishNeedsApproval(
+    siteId: string,
+    on: boolean,
+    orgId?: string,
+) {
+    return writeAsOrgIfSent(orgId, () => savePublishNeedsApproval(siteId, on));
 }
 
 /**
@@ -425,6 +439,7 @@ export async function setPublishNeedsApproval(siteId: string, on: boolean) {
 export async function saveSearchTracking(
     siteId: string,
     input: SearchTrackingSave,
+    orgId?: string,
 ) {
-    return saveSearchTrackingApi(siteId, input);
+    return writeAsOrgIfSent(orgId, () => saveSearchTrackingApi(siteId, input));
 }

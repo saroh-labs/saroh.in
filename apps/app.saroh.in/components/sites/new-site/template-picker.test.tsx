@@ -143,6 +143,8 @@ function render(props: Partial<Parameters<typeof CreateSiteForm>[0]> = {}) {
                 trade="food"
                 kind="BUSINESS"
                 modules={SELL_OFF}
+                // The catalogue's own read again (the screen's refetch).
+                onRetry={refresh}
                 {...props}
             />,
         );
