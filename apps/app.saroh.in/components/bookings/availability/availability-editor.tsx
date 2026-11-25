@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { count } from "@/lib/format/plural";
@@ -134,7 +133,6 @@ export function AvailabilityEditor({
     /** Each person's own rules: who you are, and the requests (U20). */
     personRules?: PersonRulesData | null;
 }) {
-    const router = useRouter();
     const phone = useNarrow();
     const people = staff.filter((p) => p.status === "ACTIVE");
     const { weeks, save, outside } = useHours(staff);
@@ -183,9 +181,12 @@ export function AvailabilityEditor({
     function pickWho(id: string) {
         setWho(id);
         setPanel(null);
-        router.replace(
+        // The address only: the person is the screen's own state, so no
+        // server render (Next keeps `useSearchParams` in step).
+        window.history.replaceState(
+            null,
+            "",
             `/bookings/availability?person=${encodeURIComponent(id)}`,
-            { scroll: false },
         );
     }
 

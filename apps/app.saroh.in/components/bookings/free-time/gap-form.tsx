@@ -237,7 +237,7 @@ export function GapForm({
         refresh();
     }
 
-    const after = { onClose, refresh: refresh };
+    const after = { onClose, refresh, org };
     function saveBlock() {
         if (saving) return;
         void blockGapTime(

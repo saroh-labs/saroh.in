@@ -104,7 +104,7 @@ function Form({
     today: LocalDate;
     onClose: () => void;
 }) {
-    const { refresh } = useBookingSave();
+    const { refresh, org } = useBookingSave();
     const ids = { len: useId(), repeat: useId() };
     const { staff, date, from, windows, blocks } = target;
     const who = firstName(staff.name);
@@ -151,14 +151,18 @@ function Form({
             const before = staff.hours;
             const res = await runAction(
                 () =>
-                    replaceStaffHours(staff.id, [
-                        ...before,
-                        {
-                            dayOfWeek: weekdayOf(date),
-                            startMinute: from,
-                            endMinute: to,
-                        },
-                    ]),
+                    replaceStaffHours(
+                        staff.id,
+                        [
+                            ...before,
+                            {
+                                dayOfWeek: weekdayOf(date),
+                                startMinute: from,
+                                endMinute: to,
+                            },
+                        ],
+                        ...org,
+                    ),
                 { setBusy: setSaving },
             );
             if (!res) return;
@@ -175,6 +179,7 @@ function Form({
                     const back = await replaceStaffHours(
                         staff.id,
                         withoutRange(saved, weekdayOf(date), from, to),
+                        ...org,
                     );
                     refresh();
                     return back;
@@ -184,11 +189,15 @@ function Form({
         }
         const res = await runAction(
             () =>
-                addExtraHours(staff.id, {
-                    date,
-                    startMinute: from,
-                    endMinute: to,
-                }),
+                addExtraHours(
+                    staff.id,
+                    {
+                        date,
+                        startMinute: from,
+                        endMinute: to,
+                    },
+                    ...org,
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -205,7 +214,7 @@ function Form({
             `Opened ${range} for ${who}${onTheDay(date, today)}`,
             async () => {
                 if (!added) return false;
-                const back = await removeExtraHours(staff.id, added.id);
+                const back = await removeExtraHours(staff.id, added.id, ...org);
                 refresh();
                 return back;
             },

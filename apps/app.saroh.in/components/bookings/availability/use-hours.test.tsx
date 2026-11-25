@@ -2,7 +2,7 @@
 /**
  * Hours saved as you go, under quick changes: a read that lands while
  * saves are queued doesn't draw an older week, the page is read again once
- * the queue empties, a refusal puts back what the server last accepted
+ * the queue empties (only when a save landed), a refusal puts back what the server last accepted
  * and drops what was built on it, and Undo waits its turn.
  */
 import { act, useEffect } from "react";
@@ -128,7 +128,8 @@ describe("useHours", () => {
         );
         expect(days()).toEqual([1]);
         expect(replaceStaffHours).toHaveBeenCalledTimes(1);
-        expect(refresh).toHaveBeenCalledTimes(1);
+        // Nothing landed: nothing is read again.
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it("Undo waits for a save on its way, then puts back the week before its change", async () => {

@@ -7,10 +7,10 @@ import {
     showSuccess,
     showUndo,
 } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { firstName } from "@/lib/names";
 import {
     approveRuleRequest,
@@ -83,7 +83,7 @@ export function usePersonRules({
     business: BookingRules | null;
     data: PersonRulesData | null;
 }) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const [overrides, setOverrides] = useState<Record<string, PersonRules>>({});
     const [request, setRequest] = useState(data?.mine?.request ?? null);
     const [requests, setRequests] = useState(data?.requests ?? []);
@@ -142,7 +142,7 @@ export function usePersonRules({
             return;
         }
         const res = await runAction(
-            () => updatePersonRules(person.id, { [key]: value }),
+            () => updatePersonRules(person.id, { [key]: value }, ...org),
             { setBusy: (b) => setBusy(b ? "pick" : null) },
         );
         if (!res) return;
@@ -155,7 +155,7 @@ export function usePersonRules({
         }
         const saved = res.data;
         setOverrides((o) => ({ ...o, [person.id]: saved.rules.own }));
-        router.refresh();
+        refresh();
         if (!saved.applied) {
             // Waiting for an owner or admin: the line on the page says so.
             setRequest(saved.rules.request);
@@ -171,13 +171,13 @@ export function usePersonRules({
         lastUndo.current = showUndo(
             personRuleSaved(key, value, name),
             async () => {
-                const back = await updatePersonRules(person.id, undo);
+                const back = await updatePersonRules(person.id, undo, ...org);
                 if (!back.ok) return back;
                 setOverrides((o) => ({
                     ...o,
                     [person.id]: back.data.rules.own,
                 }));
-                router.refresh();
+                refresh();
                 return { ok: true };
             },
         );
@@ -185,11 +185,14 @@ export function usePersonRules({
 
     async function withdraw() {
         if (!request) return;
-        const res = await runAction(() => withdrawRuleRequest(request.id), {
-            setBusy: (b) => setBusy(b ? "withdraw" : null),
-        });
+        const res = await runAction(
+            () => withdrawRuleRequest(request.id, ...org),
+            {
+                setBusy: (b) => setBusy(b ? "withdraw" : null),
+            },
+        );
         if (!res) return;
-        router.refresh();
+        refresh();
         if (!res.ok) {
             showError("Couldn't withdraw the request.", res.error);
             return;
@@ -202,16 +205,19 @@ export function usePersonRules({
     /** OK on an outcome; `then` opens what comes next once it is cleared. */
     async function dismiss(then?: () => void) {
         if (!request) return;
-        const res = await runAction(() => dismissRuleRequest(request.id), {
-            setBusy: (b) => setBusy(b ? "dismiss" : null),
-        });
+        const res = await runAction(
+            () => dismissRuleRequest(request.id, ...org),
+            {
+                setBusy: (b) => setBusy(b ? "dismiss" : null),
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError("Couldn't clear that.", res.error);
             return;
         }
         setRequest(null);
-        router.refresh();
+        refresh();
         if (then) then();
         else focusRow();
     }
@@ -230,11 +236,11 @@ export function usePersonRules({
 
     async function approve(r: RuleRequest) {
         const name = nameOfRequest(r);
-        const res = await runAction(() => approveRuleRequest(r.id), {
+        const res = await runAction(() => approveRuleRequest(r.id, ...org), {
             setBusy: (b) => setBusy(b ? "approve" : null),
         });
         if (!res) return;
-        router.refresh();
+        refresh();
         if (!res.ok) {
             showError("Couldn't approve the request.", res.error);
             return;
@@ -260,11 +266,11 @@ export function usePersonRules({
         const name = nameOfRequest(r);
         const words = reason.trim();
         const res = await runAction(
-            () => turnDownRuleRequest(r.id, words || undefined),
+            () => turnDownRuleRequest(r.id, words || undefined, ...org),
             { setBusy: (b) => setBusy(b ? "turnDown" : null) },
         );
         if (!res) return;
-        router.refresh();
+        refresh();
         if (!res.ok) {
             showError("Couldn't turn down the request.", res.error);
             return;

@@ -72,7 +72,7 @@ export function AddPersonDialog({
      */
     hoursScreen?: boolean;
 }) {
-    const { refresh } = useBookingSave();
+    const { refresh, org } = useBookingSave();
     const ids = { name: useId(), title: useId() };
     const [name, setName] = useState("");
     const [title, setTitle] = useState("");
@@ -96,10 +96,13 @@ export function AddPersonDialog({
         setError(null);
         const res = await runAction(
             () =>
-                addPerson({
-                    name: name.trim(),
-                    title: title.trim() || undefined,
-                }),
+                addPerson(
+                    {
+                        name: name.trim(),
+                        title: title.trim() || undefined,
+                    },
+                    ...org,
+                ),
             { setBusy: setSaving, quiet: true, onUnreached: setError },
         );
         if (!res) return;
