@@ -110,7 +110,7 @@ export function HeaderOverlay({
                                     else change(false);
                                 }
                             }}
-                            className="mx-auto flex h-6 w-16 shrink-0 cursor-grab touch-none items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="mx-auto flex h-6 w-16 shrink-0 cursor-grab touch-none items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             <span className="h-[5px] w-10 rounded-full bg-border" />
                         </button>
