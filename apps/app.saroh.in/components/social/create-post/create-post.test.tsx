@@ -8,12 +8,15 @@
  * someone without `social:post` can still share items and reads one
  * message on own posts.
  */
-import type { AnchorHTMLAttributes } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
 import type { ShareSetup } from "@/lib/share-item/share";
 import type { LinkChoice } from "@/lib/social/links";
 import type { PickRow } from "@/lib/social/pick";
@@ -212,21 +215,30 @@ async function flush(ms = 0) {
     }
 }
 
+/** Inside React Query and a business, as the shell draws it. */
+const withQuery = (node: ReactNode, client = makeTestClient()) => (
+    <QueryClientProvider client={client}>
+        <OrgProvider orgId="org_1">{node}</OrgProvider>
+    </QueryClientProvider>
+);
+
 function render(canPost = true, start?: Step) {
     act(() =>
         root.render(
-            <CreatePost
-                rows={ROWS}
-                setup={FREE}
-                origin={ORIGIN}
-                fixedLinks={FIXED}
-                pageLinks={PAGES}
-                canPost={canPost}
-                business="Rye & Co."
-                failed={[]}
-                ownCount={2}
-                start={start}
-            />,
+            withQuery(
+                <CreatePost
+                    rows={ROWS}
+                    setup={FREE}
+                    origin={ORIGIN}
+                    fixedLinks={FIXED}
+                    pageLinks={PAGES}
+                    canPost={canPost}
+                    business="Rye & Co."
+                    failed={[]}
+                    ownCount={2}
+                    start={start}
+                />,
+            ),
         ),
     );
 }

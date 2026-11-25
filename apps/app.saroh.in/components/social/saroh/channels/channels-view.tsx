@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { DeleteMenu } from "@/components/shared/confirm/delete-menu";
@@ -28,6 +27,7 @@ import {
     connectResultLine,
     SOCIAL_WORDS,
 } from "@/lib/social/saroh-social-words";
+import { useSocialSave } from "@/lib/social/use-social";
 
 import { ChannelIcon } from "./channel-icon";
 import { ConnectButton } from "./connect-sheet";
@@ -48,20 +48,25 @@ export function ChannelsView({
     canPost,
     params,
     pages,
+    go,
+    onRetry,
 }: {
     channels: Read<SocialChannel[]>;
     canPost: boolean;
     params: SocialParams;
     /** The Pages (or Instagram accounts) to pick from, when a sign-in offers several. */
     pages: Read<PageChoice[]> | null;
+    /** Open an address of Social, in place. */
+    go: (href: string) => void;
+    /** Read the channels again. */
+    onRetry: () => void;
 }) {
-    const router = useRouter();
     if (!channels.ok) {
         return (
             <FailedRead
                 size="panel"
                 things={SOCIAL_WORDS.channelsFailed}
-                onRetry={() => router.refresh()}
+                onRetry={onRetry}
             />
         );
     }
@@ -102,11 +107,8 @@ export function ChannelsView({
                     kind={back}
                     choiceId={params.choice}
                     pages={pages}
-                    onClose={() =>
-                        router.replace("/social?tab=channels", {
-                            scroll: false,
-                        })
-                    }
+                    go={go}
+                    onClose={() => go("/social?tab=channels")}
                 />
             ) : null}
         </div>
@@ -120,18 +122,18 @@ function ChannelRow({
     channel: SocialChannel;
     canPost: boolean;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useSocialSave();
     const zone = useBusinessZone();
     const [busy, setBusy] = useState(false);
     const { kind, state } = channel;
     const name = CHANNEL_NAMES[kind];
 
     async function postThem() {
-        const res = await runAction(() => postHeld(kind), { setBusy });
+        const res = await runAction(() => postHeld(kind, orgId), { setBusy });
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(SOCIAL_WORDS.postingNow);
-        router.refresh();
+        await saved();
     }
 
     return (
@@ -178,9 +180,12 @@ function ChannelRow({
                         keep={SOCIAL_WORDS.keepIt}
                         title={SOCIAL_WORDS.disconnectTitle(kind)}
                         description={SOCIAL_WORDS.disconnectWhat}
-                        onDelete={() => disconnect(kind)}
+                        onDelete={async () => {
+                            const res = await disconnect(kind, orgId);
+                            if (res.ok) await saved();
+                            return res;
+                        }}
                         done={() => SOCIAL_WORDS.disconnected(kind)}
-                        then="/social?tab=channels"
                     />
                 ) : null}
             </div>
