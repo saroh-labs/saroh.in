@@ -113,20 +113,21 @@ export function SiteFrame({
 /** The header's place while it's read: its height, so nothing below moves. */
 function HeaderLoading() {
     return (
-        <div
-            role="status"
-            aria-busy="true"
-            className="flex flex-col gap-3 border-b border-border pb-4 min-[760px]:flex-row min-[760px]:items-center"
-        >
+        <div role="status" aria-busy="true">
             <span className="sr-only">Loading the site</span>
-            <div aria-hidden className="flex min-w-0 flex-1 items-center gap-3">
-                <Skeleton className="size-9 rounded-lg" />
-                <div className="grid gap-1.5">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-56" />
+            <div className="flex flex-col gap-3 border-b border-border pb-4 min-[760px]:flex-row min-[760px]:items-center">
+                <div
+                    aria-hidden
+                    className="flex min-w-0 flex-1 items-center gap-3"
+                >
+                    <Skeleton className="size-9 rounded-lg" />
+                    <div className="grid gap-1.5">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-3 w-56" />
+                    </div>
                 </div>
+                <Skeleton aria-hidden className="h-9 w-44 rounded-md" />
             </div>
-            <Skeleton aria-hidden className="h-9 w-44 rounded-md" />
         </div>
     );
 }
