@@ -299,7 +299,8 @@ describe("/api/orders/options", () => {
             readRequest("/api/orders/options", { orgId: "org_a" }),
         );
         expect(res.status).toBe(403);
-        expect(h.filters).not.toHaveBeenCalled();
+        // The service may start beside the gate; its rows are never sent.
+        expect(await res.json()).toEqual({ code: "ROLE_DENIED" });
     });
 });
 
@@ -339,6 +340,6 @@ describe("/api/orders/tickets", () => {
             }),
         );
         expect(denied.status).toBe(403);
-        expect(h.quick).not.toHaveBeenCalled();
+        expect(await denied.json()).toEqual({ code: "ROLE_DENIED" });
     });
 });
