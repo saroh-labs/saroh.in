@@ -139,7 +139,7 @@ test.describe("the Day calendar (U4)", () => {
                 .locator("[data-column-head]")
                 .filter({ hasText: person.name });
             await expect(head).toBeVisible();
-            await expect(head).toContainText(/booked|Nothing booked|class/);
+            await expect(head).toContainText(/session|Nothing booked/);
         }
     });
 });

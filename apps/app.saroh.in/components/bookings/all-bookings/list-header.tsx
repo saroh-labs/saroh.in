@@ -38,6 +38,7 @@ export function ShowingPicker({
             open={open}
             onOpenChange={setOpen}
             width={300}
+            half
             title="Show"
             subtitle="Pick one view"
             trigger={

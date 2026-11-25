@@ -6,7 +6,7 @@ import {
 } from "@/components/bookings/all-bookings/bookings-container";
 import { BookingsCouldntLoad } from "@/components/bookings/all-bookings/bookings-view";
 import { BookingsModeSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
-import { ListOptions } from "@/components/bookings/all-bookings/list-options";
+import { ListPageHeader } from "@/components/bookings/all-bookings/list-page-header";
 import {
     NewBookingButton,
     NewBookingHost,
@@ -23,6 +23,7 @@ import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { businessZone } from "@/lib/format/business-zone";
 import { googleMeetOffered } from "@/lib/google-calendar/service";
+import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { EVERYONE, openingPerson } from "@/lib/services/bookings-opens";
@@ -30,7 +31,7 @@ import { readBookingsOpens } from "@/lib/services/bookings-opens-read";
 import { listServices, readNow } from "@/lib/services/service";
 import { zoneShortName } from "@/lib/services/time-picker";
 import { requireSession } from "@/lib/session";
-import { listStaff } from "@/lib/staff/service";
+import { getBookingRules, listStaff } from "@/lib/staff/service";
 
 /**
  * Every booking as one list (S4-003; U11 of the bookings plan,
@@ -64,15 +65,20 @@ export default async function BookingsPage() {
 
     // The date filter is the container's, read from the address.
     const organizationRead = resolveActiveOrganization();
-    const [services, organization, staffList, opens, can] = await Promise.all([
-        listServices().catch(() => []),
-        organizationRead,
-        // Who they'll see, in New booking (U8); without it, anyone.
-        listStaff().catch(() => null),
-        // Where Bookings opens, and for whom, for this person (DEC-170).
-        readBookingsOpens(),
-        organizationRead.then(bookingsCan),
-    ]);
+    const [services, organization, staffList, opens, can, rules, notices] =
+        await Promise.all([
+            listServices().catch(() => []),
+            organizationRead,
+            // Who they'll see, in New booking (U8); without it, anyone.
+            listStaff().catch(() => null),
+            // Where Bookings opens, and for whom, for this person (DEC-170).
+            readBookingsOpens(),
+            organizationRead.then(bookingsCan),
+            // A row's quick look, as on the calendar: the free-cancel window
+            // and what a cancel tells the customer with (A14).
+            getBookingRules().catch(() => null),
+            readNoticeReach(),
+        ]);
     const mine = staffList?.staff.find(
         (p) =>
             p.status === "ACTIVE" && p.membership?.userId === session.user.id,
@@ -108,24 +114,20 @@ export default async function BookingsPage() {
 
     const page = (
         <PageContainer width="full">
-            <PageHeader
-                title="All bookings"
-                holdsData={false}
-                meta={<BookingsModeSwitch current="list" />}
-                description={`Times in ${zoneName(timezone)}`}
-                actions={
+            <ListPageHeader
+                opens={opens}
+                me={me}
+                zone={zoneName(timezone)}
+                newBooking={
                     // Only someone who may book: the API refuses the save
                     // otherwise, as the diary already asks. On a phone it
                     // floats above the tab bar (BKMAllBookings).
-                    <>
-                        <ListOptions opens={opens} me={me} />
-                        {canBook ? (
-                            <NewBookingButton className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]" />
-                        ) : null}
-                    </>
+                    canBook ? (
+                        <NewBookingButton className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]" />
+                    ) : null
                 }
             />
-            <div className="space-y-4 max-[759px]:pb-20">
+            <div className="space-y-4 max-[759px]:pb-24">
                 {canBook ? null : (
                     <ReadOnlyNote className="mb-0">
                         {readOnlyLine("these bookings", true)}
@@ -137,6 +139,8 @@ export default async function BookingsPage() {
                     initialStaff={who === EVERYONE ? null : who}
                     zone={timezone}
                     now={readNow()}
+                    rules={rules}
+                    notices={notices}
                 />
             </div>
         </PageContainer>

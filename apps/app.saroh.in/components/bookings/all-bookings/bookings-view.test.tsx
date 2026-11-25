@@ -39,6 +39,7 @@ vi.mock("@/lib/services/actions", () => ({
     listAvailability: vi.fn(() => Promise.resolve([])),
     takeDeskPayment: vi.fn(),
     createBookingPayLink: vi.fn(),
+    readBookingPerson: vi.fn(() => Promise.resolve(null)),
 }));
 
 // Server-only plumbing the desk's Take ₹X reaches (GST rates).
@@ -378,8 +379,8 @@ describe.each([
     it("sets rows under day headings, in the business's zone", () => {
         draw();
         expect(all("section > h2").map((h) => h.textContent)).toEqual([
-            "Today · Mon 19 Oct2 bookings",
-            "Tomorrow · Tue 20 Oct1 booking",
+            "Today · Mon 19 Oct2 sessions · 2 people",
+            "Tomorrow · Tue 20 Oct1 session · 1 person",
             "Wed 21 Oct",
         ]);
         expect(text()).toContain("When · IST");
@@ -431,7 +432,7 @@ describe.each([
             "Next 7 days",
             "This month",
             "Pick dates",
-            "Bookings for",
+            "Whose bookings",
             "Everyone",
             "Just me",
             "Service",
@@ -521,8 +522,8 @@ describe.each([
         ).toBe(true);
         // The latest first.
         expect(all("section > h2").map((h) => h.textContent)).toEqual([
-            "Today · Mon 19 Oct1 booking",
-            "Sat 17 Oct1 booking",
+            "Today · Mon 19 Oct1 session · 1 person",
+            "Sat 17 Oct1 session · 1 person",
         ]);
         const row = rowOf("Ananya");
         expect(
@@ -896,6 +897,75 @@ describe("All bookings, first run and failure", () => {
         expect(loader).toMatch(
             /<PageLoading[\s\S]*shape="list"[\s\S]*width="full"/,
         );
+    });
+});
+
+describe("a class on the List (DEC-260)", () => {
+    beforeEach(() => phone(true));
+
+    it("is one row, 'Yoga flow · 2 of 15', that opens to its people", () => {
+        const yoga = {
+            serviceId: "svc_yoga",
+            service: {
+                id: "svc_yoga",
+                name: "Yoga flow",
+                timezone: ZONE,
+                capacity: 15,
+                durationMinutes: 60,
+            },
+        };
+        n = 0;
+        act(() =>
+            root.render(
+                <BookingsView
+                    bookings={[
+                        booking(2, "Asha", yoga),
+                        booking(2, "Ravi", yoga),
+                        booking(3, "Kabir"),
+                    ]}
+                    timezone={ZONE}
+                    now={NOW}
+                    can={OWNER}
+                />,
+            ),
+        );
+        const head = all("section > h2").at(0);
+        expect(head?.textContent).toContain("2 sessions · 3 people");
+        const klass = document.querySelector("[data-class-row]");
+        expect(klass?.textContent).toContain("Yoga flow · 2 of 15");
+        expect(klass?.textContent).toContain("13 places left");
+        expect(rowOf("Asha")).toBeUndefined();
+        const open = klass?.querySelector<HTMLButtonElement>("button");
+        expect(open?.getAttribute("aria-expanded")).toBe("false");
+        press(open ?? undefined);
+        expect(rowOf("Asha")).toBeDefined();
+        expect(rowOf("Ravi")).toBeDefined();
+    });
+});
+
+describe("a row's press on the List", () => {
+    beforeEach(() => phone(true));
+
+    it("opens the booking's quick look, as the Calendar does", async () => {
+        draw();
+        const kabir = rowOf("Kabir");
+        const open = kabir?.querySelector<HTMLButtonElement>(
+            'button[aria-haspopup="dialog"]',
+        );
+        expect(open?.textContent).toBe("Kabir Singh");
+        press(open ?? undefined);
+        await flush();
+        const look = document.querySelector('[role="dialog"]');
+        expect(look?.textContent).toContain("Kabir Singh");
+        expect(look?.textContent).toContain("Awaiting payment");
+    });
+
+    it("draws one line: time over length, a bar, who, what, how it stands", () => {
+        draw();
+        const kabir = rowOf("Kabir");
+        expect(kabir?.querySelector("[data-line-bar]")).not.toBeNull();
+        expect(kabir?.textContent).toContain("45 min");
+        expect(kabir?.textContent).toContain("Physio assessment · Meera");
     });
 });
 

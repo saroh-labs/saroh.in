@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import type { CSSProperties } from "react";
 
+import { count } from "@/lib/format/plural";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
 import { isLive } from "@/lib/services/diary";
 import type { DayHours } from "@/lib/services/diary-view";
@@ -15,6 +16,7 @@ import {
     offSpans,
     weekLanes,
 } from "@/lib/services/diary-view";
+import { countBlocks, countedWords } from "@/lib/services/session-counts";
 
 import { BusyBands } from "./busy-bands";
 import { Hatches, HourRail } from "./day-by-person";
@@ -40,7 +42,7 @@ export interface WeekDay {
     busy?: readonly Span[];
 }
 
-/** Live bookings on a day: the count its heading and the strip show. */
+/** Live sessions on a day (DEC-260): the count its heading and the strip show. */
 export const liveCount = (d: Pick<WeekDay, "blocks">) =>
     d.blocks.filter(isLive).length;
 
@@ -159,7 +161,6 @@ export function WeekView({
                 {weekHelp({
                     lanes: split ? lanes.map((l) => l.name) : [],
                     canBook,
-                    phone: false,
                 })}
             </p>
         </div>
@@ -298,7 +299,7 @@ function DayHeading({
         <button
             type="button"
             onClick={() => onOpen(d.date)}
-            aria-label={`${d.label}${d.today ? ", today" : ""}, ${d.closed ? "closed" : `${n} booked`}${full !== null && !d.closed ? `, ${fullWords(full)}` : ""}. Open the day`}
+            aria-label={`${d.label}${d.today ? ", today" : ""}, ${d.closed ? "closed" : countedWords(countBlocks(d.blocks)).toLowerCase()}${full !== null && !d.closed ? `, ${fullWords(full)}` : ""}. Open the day`}
             className={cn(
                 "flex flex-col items-stretch gap-1 border-b border-l border-b-border border-l-border/60 px-3 pb-2 pt-2.5 text-left transition-colors duration-fast hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted",
                 d.selected ? "bg-muted/60" : d.today ? "bg-muted/20" : "",
@@ -317,7 +318,7 @@ function DayHeading({
                     {rest[0]}
                 </span>
                 <span className="ml-auto text-[11.5px] tabular-nums text-muted-foreground">
-                    {d.closed ? "Closed" : `${n} booked`}
+                    {d.closed ? "Closed" : count(n, "session")}
                 </span>
             </span>
             {full !== null ? (

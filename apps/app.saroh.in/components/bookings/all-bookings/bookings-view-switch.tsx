@@ -1,4 +1,6 @@
 import { Segmented } from "@saroh/ui/segmented";
+import { CalendarDays, List } from "lucide-react";
+import type { ReactNode } from "react";
 
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
@@ -69,6 +71,7 @@ export function BookingsModeSwitch({
     calendarTo?: string;
     className?: string;
 }) {
+    const phone = "max-[759px]:h-11 max-[759px]:flex-1 max-[759px]:text-[15px]";
     return (
         <Segmented
             label="Bookings"
@@ -86,15 +89,48 @@ export function BookingsModeSwitch({
                             ? "/bookings?calendar=1"
                             : "/bookings"),
                     label: "Calendar",
-                    className: "max-[759px]:flex-1",
+                    icon: <CalendarDays />,
+                    className: phone,
                 },
                 {
                     value: "list",
                     href: "/bookings/all",
                     label: "List",
-                    className: "max-[759px]:flex-1",
+                    icon: <List />,
+                    className: phone,
                 },
             ]}
         />
+    );
+}
+
+/**
+ * The first row of Bookings on a phone, the same on Calendar and List
+ * (BKVListBPhone, BKVCalendarBPhone): Calendar | List across the width and
+ * the view's "…" beside it, in the same place on both. It stays under the
+ * app's bar as the page scrolls, so Day's move to now never hides it.
+ */
+export function BookingsPhoneBar({
+    current,
+    calendarTo,
+    options,
+}: {
+    current: "calendar" | "list";
+    calendarTo?: string;
+    /** The view's "…" and its sheet. */
+    options: ReactNode;
+}) {
+    return (
+        <div
+            data-bookings-bar=""
+            className="sticky top-[61px] z-20 flex items-center gap-2 bg-background py-1.5"
+        >
+            <BookingsModeSwitch
+                current={current}
+                calendarTo={calendarTo}
+                className="min-w-0 flex-1"
+            />
+            {options}
+        </div>
     );
 }

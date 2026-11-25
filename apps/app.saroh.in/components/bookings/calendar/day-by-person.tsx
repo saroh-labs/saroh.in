@@ -16,11 +16,13 @@ import {
     everyoneBlocks,
 } from "@/lib/services/day-view";
 import type { Block, Column, Span } from "@/lib/services/diary";
-import { UNASSIGNED } from "@/lib/services/diary";
+import { isLive, UNASSIGNED } from "@/lib/services/diary";
 import {
     closedSpans,
     drawnLanes,
+    everyoneFree,
     firstSight,
+    hoursAcross,
     offSpans,
 } from "@/lib/services/diary-view";
 
@@ -391,6 +393,19 @@ export function DayByPerson({
 
     const all = everyoneBlocks(columns);
     const lanes = drawnLanes(all.map((e) => e.block));
+    // Everyone's day as one column (BKVCalendarBPhone): closed while nobody
+    // works, off while somebody is off and nobody works, and free wherever
+    // someone takes bookings, each stretch booked with whoever is free.
+    const across = hoursAcross(columns);
+    const freeTimes = canBook
+        ? everyoneFree(
+              columns,
+              (c) => c.key !== UNASSIGNED,
+              all
+                  .filter((e) => isLive(e.block))
+                  .map((e): Span => [e.block.start, e.block.end]),
+          )
+        : [];
     return (
         <>
             {desk}
@@ -413,7 +428,34 @@ export function DayByPerson({
                         style={{ height }}
                     >
                         <HourLines span={span} />
+                        {across
+                            ? closedSpans(across, span).map((c) => (
+                                  <ClosedTime
+                                      key={`c${c[0]}`}
+                                      span={c}
+                                      from={from}
+                                      name="everyone"
+                                      dayText={dayText}
+                                  />
+                              ))
+                            : null}
+                        {across ? (
+                            <Hatches
+                                closed={[]}
+                                off={offSpans(across, span)}
+                                from={from}
+                            />
+                        ) : null}
                         <BusyBands spans={busy?.all ?? []} from={from} />
+                        {freeTimes.map(({ column, free }) => (
+                            <FreeGap
+                                key={`f${column.key}${free[0]}`}
+                                column={column}
+                                free={free}
+                                from={from}
+                                onBook={onFree}
+                            />
+                        ))}
                         {all.map(({ block: b, who }) => (
                             <DayBlock
                                 key={b.key}

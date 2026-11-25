@@ -402,10 +402,10 @@ describe.each([
     it("says who, when, how it is paid and what to do next", async () => {
         await draw(kabir());
         expect(text()).toContain("Kabir Singh");
-        expect(text()).toContain("Booked");
+        expect(text()).toContain("Awaiting payment");
         expect(text()).toContain("Today · 11:30 am to 12:15 pm");
         expect(text()).toContain("Physio assessment with Meera Iyer");
-        expect(text()).toContain("Pays at the visit · ₹500");
+        expect(text()).toContain("₹500 · Awaiting payment");
         expect(text()).toContain("Needs attention.");
         expect(text()).toContain("Allergy: Latex");
         expect(text()).toContain("+91");
@@ -448,7 +448,7 @@ describe.each([
         await press("Mark Kabir arrived");
         expect(act$.checkIn).toHaveBeenCalledOnce();
         expect(text()).toContain("Came");
-        expect(text()).toContain("Pays at the visit · ₹500 to take now");
+        expect(text()).toContain("₹500 · Awaiting payment");
         expect(button("Take ₹500")).toBeDefined();
         expect(text()).toContain("Book their next visit?");
         expect(button(/Move or cancel/)).toBeUndefined();

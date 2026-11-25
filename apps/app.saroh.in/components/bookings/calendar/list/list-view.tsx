@@ -7,25 +7,14 @@ import type { ReactNode } from "react";
 import { useNewBookingLauncher } from "@/components/bookings/new-booking/launcher";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatClock, formatDay } from "@/lib/format/datetime";
-import { count } from "@/lib/format/plural";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
-import {
-    blockTitle,
-    isLive,
-    localMinuteOf,
-    STATE_LABEL,
-    weekdayOf,
-} from "@/lib/services/diary";
-import {
-    listLine,
-    nextLine,
-    nextTitle,
-    nextUp,
-    placesLeft,
-} from "@/lib/services/diary-list";
+import { localMinuteOf, weekdayOf } from "@/lib/services/diary";
+import { nextLine, nextTitle, nextUp } from "@/lib/services/diary-list";
 import { closedKind } from "@/lib/services/diary-view";
+import { countBlocks, countedWords } from "@/lib/services/session-counts";
 import type { StaffView } from "@/lib/staff/types";
 
+import { BlockLine } from "../booking-line";
 import { STATE_TONE } from "../parts";
 import { closedWords } from "../week-words";
 import { ListDayEmpty } from "./list-day-empty";
@@ -124,7 +113,6 @@ export function ListView({
 
     const nowMinute = localMinuteOf(new Date(now), timezone);
     const next = isToday ? nextUp(blocks, nowMinute) : null;
-    const live = blocks.filter(isLive).length;
 
     if (blocks.length === 0) {
         const empty = (
@@ -230,7 +218,7 @@ export function ListView({
                             Booked
                         </span>
                         <span className="text-[12.5px] text-muted-foreground">
-                            {count(live, "booking")}
+                            {countedWords(countBlocks(blocks))}
                         </span>
                     </div>
                     <ul className="m-0 list-none p-0">
@@ -297,7 +285,7 @@ function NextCard({
     );
 }
 
-/** One booked row: the time, a bar in the kind's colour, who and what, and how it stands. */
+/** One booked row: the one line (`BlockLine`), "Next" on today's next. */
 function BookedRow({
     block: b,
     next,
@@ -309,78 +297,18 @@ function BookedRow({
     selected: boolean;
     onOpen: () => void;
 }) {
-    const cancelled = b.state === "cancelled";
-    const places = placesLeft(b);
-    const label = STATE_LABEL[b.state];
     return (
-        <button
-            type="button"
-            onClick={onOpen}
-            aria-current={selected ? "true" : undefined}
-            className={cn(
-                "flex min-h-[60px] w-full cursor-pointer items-stretch gap-2.5 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring min-[760px]:min-h-[52px] min-[760px]:items-center min-[760px]:gap-3 min-[760px]:px-4",
-                next ? "bg-muted" : "bg-card hover:bg-muted/40",
-                selected && "shadow-[inset_3px_0_0_hsl(var(--foreground))]",
-                cancelled && "text-muted-foreground",
-            )}
-        >
-            {/* Wide enough for "12:30 pm" in bold: at 64px "pm" dropped
-                under the time. */}
-            <span className="w-[76px] shrink-0 whitespace-nowrap tabular-nums">
-                <span className="block text-[14px] font-semibold">
-                    {formatClock(b.start)}
-                </span>
-                <span className="block text-[11.5px] text-muted-foreground min-[760px]:text-[12px]">
-                    {formatClock(b.end)}
-                </span>
-            </span>
-            <span
-                aria-hidden
-                className={cn(
-                    "w-1 shrink-0 self-stretch rounded-sm min-[760px]:w-[3px]",
-                    cancelled || b.state === "noshow"
-                        ? "bg-border-strong"
-                        : b.kind === "class"
-                          ? "bg-diary-class"
-                          : "bg-diary-one",
-                )}
-            />
-            <span className="min-w-0 flex-1 self-center">
-                <span
-                    className={cn(
-                        "block text-[14.5px] font-semibold min-[760px]:text-[14px]",
-                        cancelled && "line-through",
-                    )}
-                >
-                    {blockTitle(b)}
-                </span>
-                <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
-                    {listLine(b)}
-                </span>
-            </span>
-            <span className="shrink-0 self-center">
-                {places ? (
-                    <StatusBadge tone={STATE_TONE.open}>
-                        <span className="min-[760px]:hidden">
-                            {places.short}
-                        </span>
-                        <span className="max-[759px]:hidden">
-                            {places.long}
-                        </span>
-                    </StatusBadge>
-                ) : next && b.state === "booked" ? (
+        <BlockLine
+            block={b}
+            selected={selected}
+            onOpen={onOpen}
+            badge={
+                next && b.state === "booked" ? (
                     <StatusBadge tone={STATE_TONE.booked}>
-                        <span data-ph-unmask="" className="min-[760px]:hidden">
-                            Next
-                        </span>
-                        <span className="max-[759px]:hidden">{label}</span>
+                        <span data-ph-unmask="">Next</span>
                     </StatusBadge>
-                ) : (
-                    <StatusBadge tone={STATE_TONE[b.state]}>
-                        {label}
-                    </StatusBadge>
-                )}
-            </span>
-        </button>
+                ) : undefined
+            }
+        />
     );
 }

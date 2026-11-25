@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import { Moment } from "@/components/shared/notices/moment";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
@@ -48,6 +48,8 @@ export function BookingsContainer({
     initialStaff,
     zone,
     now,
+    rules = null,
+    notices = null,
 }: {
     /** The business's zone and the page's now, until the read says. */
     zone: string;
@@ -55,6 +57,10 @@ export function BookingsContainer({
     can: AllBookingsCan;
     me: { id: string; name: string } | null;
     initialStaff: string | null;
+    /** For the rows' quick look: the free-cancel window. */
+    rules?: ComponentProps<typeof BookingsView>["rules"];
+    /** For the rows' quick look: what customers are told with (A14). */
+    notices?: ComponentProps<typeof BookingsView>["notices"];
 }) {
     const search = useSearchParams();
     const params = Object.fromEntries(search);
@@ -102,6 +108,8 @@ export function BookingsContainer({
                 showCancelled={search.get("cancelled") === "1"}
                 initialStaff={initialStaff}
                 can={can}
+                rules={rules}
+                notices={notices}
             />
         </ScreenPending>
     );

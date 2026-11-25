@@ -5,13 +5,9 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { CSSProperties } from "react";
 
 import type { Block } from "@/lib/services/diary";
+import { blockLine, blockTitle, isLive } from "@/lib/services/diary";
 import {
-    blockLine,
-    blockTitle,
-    isLive,
-    STATE_LABEL,
-} from "@/lib/services/diary";
-import {
+    blockStatus,
     MIN_BLOCK_MINUTES,
     ONE_LINE_UNDER_MINUTES,
     toPayText,
@@ -27,10 +23,12 @@ export function blockColour(block: Block): string {
         : "bg-diary-one text-diary-foreground";
 }
 
-/** "9:00 to 10:00 am Tariq Ali, Personal training, Booked, awaiting payment". */
+/** "9:00 to 10:00 am Tariq Ali, Personal training, Awaiting payment". */
 export function blockLabel(block: Block): string {
-    const owes = toPayText(block);
-    return `${formatClockRange(block.start, block.end)} ${blockTitle(block)}, ${blockLine(block)}, ${STATE_LABEL[block.state]}${owes ? `, ${owes.toLowerCase()}` : ""}`;
+    const status = blockStatus(block).label;
+    // A class says how many owe; a booking's status already says it.
+    const owes = block.kind === "class" ? toPayText(block) : null;
+    return `${formatClockRange(block.start, block.end)} ${blockTitle(block)}, ${blockLine(block)}, ${status}${owes ? `, ${owes.toLowerCase()}` : ""}`;
 }
 
 const FOCUS =

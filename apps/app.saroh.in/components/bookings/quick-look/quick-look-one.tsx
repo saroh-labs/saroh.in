@@ -73,7 +73,7 @@ export const FRONT_DESK_LINE =
 export const CALENDAR_ONLY_LINE =
     "Your role sees the calendar only, so you can't change bookings. An owner can change this in Settings › Team.";
 
-/** "Pays at the visit · ₹500", how it was paid, or its treatment's order. */
+/** "₹500 · Awaiting payment", how it was paid, or its treatment's order. */
 export function paidWords(
     b: DiaryBooking,
     ctx: QuickLookContext,
@@ -88,11 +88,12 @@ export function paidWords(
     if (b.paidWith === "DESK") {
         if (state === "in" && b.take) {
             const due = formatMoney(b.take.cents, b.service.currency ?? null);
-            return `${BOOKING_WORDS.paysAtVisit} · ${due} to take now`;
+            return `${due} · ${BOOKING_WORDS.awaitingPayment}`;
         }
+        // The one payment word (DEC-257), as the block and the list say it.
         return price
-            ? `${BOOKING_WORDS.paysAtVisit} · ${price}`
-            : BOOKING_WORDS.paysAtVisit;
+            ? `${price} · ${BOOKING_WORDS.awaitingPayment}`
+            : BOOKING_WORDS.awaitingPayment;
     }
     return paidText(b);
 }

@@ -2,13 +2,14 @@
 
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
-import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { listTable } from "@saroh/ui/list-table";
 import { Check, X } from "lucide-react";
 
+import { LineBar, LineTime } from "@/components/bookings/calendar/booking-line";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatTime } from "@/lib/format/datetime";
+import { firstName } from "@/lib/names";
 import type { RowStatus } from "@/lib/services/all-bookings";
 import {
     cancelledLine,
@@ -33,7 +34,8 @@ import { RowMenu } from "./row-menu";
  */
 export const ROW_GRID = (money: boolean) =>
     cn(
-        "grid grid-cols-[68px_minmax(0,1fr)_auto_auto] items-center gap-x-3",
+        // A phone's line (BKVListBPhone): time, bar, who and what, "…".
+        "grid grid-cols-[64px_4px_minmax(0,1fr)_44px] items-center gap-x-2.5 min-[760px]:gap-x-3",
         money
             ? "min-[760px]:grid-cols-[110px_minmax(0,1fr)_minmax(0,1.2fr)_150px_230px_44px]"
             : "min-[760px]:grid-cols-[110px_minmax(0,1fr)_minmax(0,1.2fr)_230px_44px]",
@@ -63,6 +65,7 @@ export function BookingRow({
     heading,
     triggerRef,
     showMoney,
+    onOpen,
 }: {
     booking: DiaryBooking;
     /** The business's zone (Q10). */
@@ -84,10 +87,12 @@ export function BookingRow({
     triggerRef?: (el: HTMLButtonElement | null) => void;
     /** `payment:read`: the Money column (owners and admins, DEC-098). */
     showMoney: boolean;
+    /** The row's press: its quick look, as on the Calendar. */
+    onOpen: () => void;
 }) {
     const who = whoFor(b);
     const what = b.staff
-        ? `${b.service.name} · ${b.staff.name}`
+        ? `${b.service.name} · ${firstName(b.staff.name)}`
         : b.service.name;
     const shownStatus: RowStatus = marked
         ? marked.outcome === "ATTENDED"
@@ -183,33 +188,29 @@ export function BookingRow({
                 "relative gap-y-2 px-[14px] py-[11px] focus-within:bg-foreground/[0.035]",
             )}
         >
-            <span className={cn(listTable.time, "text-[13.5px]")}>
-                <span className="block font-semibold">
-                    {formatTime(b.startAt, zone)}
-                </span>
-                <span className="block text-[12px] text-muted-foreground">
-                    {lengthWord(b.startAt, b.endAt)}
-                </span>
-            </span>
+            <LineTime
+                time={formatTime(b.startAt, zone)}
+                length={lengthWord(b.startAt, b.endAt)}
+                className={cn(listTable.time, "self-start")}
+            />
+            <LineBar
+                kind={b.service.capacity > 1 ? "class" : "one"}
+                muted={shownStatus === "cancelled" || shownStatus === "didnt"}
+                className="max-[759px]:row-span-2 min-[760px]:hidden"
+            />
             <span className="min-w-0 min-[760px]:contents">
-                <IntentLink
-                    href={`/bookings/${b.id}`}
+                <button
+                    type="button"
+                    onClick={onOpen}
+                    aria-haspopup="dialog"
                     data-ph-mask=""
-                    className="block truncate rounded-sm text-[14.5px] font-semibold text-foreground after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[760px]:text-[14px]"
+                    className="block w-full cursor-pointer rounded-sm text-left text-[14.5px] font-semibold leading-snug text-foreground after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[759px]:break-words min-[760px]:truncate min-[760px]:text-[14px]"
                 >
                     {who}
-                </IntentLink>
-                <span className="block truncate text-[12.5px] text-muted-foreground min-[760px]:text-[13.5px]">
+                </button>
+                <span className="block text-[12.5px] text-muted-foreground min-[760px]:truncate min-[760px]:text-[13.5px]">
                     {what}
                 </span>
-                {moneyWords ? (
-                    <span
-                        data-money-line=""
-                        className="block truncate text-[12.5px] tabular-nums text-muted-foreground min-[760px]:hidden"
-                    >
-                        {moneyWords}
-                    </span>
-                ) : null}
             </span>
             {money ? (
                 <span
@@ -234,14 +235,23 @@ export function BookingRow({
             ) : null}
             <span
                 className={cn(
-                    "min-w-0 max-[759px]:order-3",
-                    lineBelow &&
-                        "max-[759px]:order-5 max-[759px]:col-span-full",
+                    "min-w-0",
+                    lineBelow
+                        ? "max-[759px]:col-span-full max-[759px]:row-start-3"
+                        : "max-[759px]:col-start-3 max-[759px]:row-start-2 max-[759px]:flex max-[759px]:flex-wrap max-[759px]:items-center max-[759px]:gap-x-2",
                 )}
             >
                 {outcome}
+                {moneyWords && !lineBelow ? (
+                    <span
+                        data-money-line=""
+                        className="text-[12.5px] tabular-nums text-muted-foreground min-[760px]:hidden"
+                    >
+                        {moneyWords}
+                    </span>
+                ) : null}
             </span>
-            <span className="flex justify-end max-[759px]:order-4">
+            <span className="flex justify-end self-start max-[759px]:col-start-4 max-[759px]:row-start-1">
                 <RowMenu
                     who={who}
                     when={when}

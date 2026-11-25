@@ -8,6 +8,7 @@ import { Plus, Search } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { plural } from "@/lib/format/plural";
 import type { ShowFor } from "@/lib/services/bookings-opens";
 import { EVERYONE } from "@/lib/services/bookings-opens";
 
@@ -54,7 +55,7 @@ export function PersonFace({
 }
 
 /**
- * "Whose bookings?" (U2; BKMBookingsDayPeopleSheet, BKDCalendarDay's person
+ * "Whose bookings" (U2; BKMBookingsDayPeopleSheet, BKDCalendarDay's person
  * popover): find someone, Everyone, each person with their count for the
  * view's period, and Add someone who takes bookings. Picking one shows
  * their bookings; with "Show bookings for: The last person I picked",
@@ -102,9 +103,10 @@ export function PeopleSheet({
                 onOpenChange(o);
             }}
             trigger={trigger}
-            title="Whose bookings?"
+            title="Whose bookings"
             subtitle={period}
             width={360}
+            half
             footer={
                 onAdd ? (
                     <Button
@@ -172,7 +174,7 @@ export function PeopleSheet({
                                         {c.count}
                                     </span>
                                     <span className="block text-[11px] text-muted-foreground max-[759px]:text-[11.5px]">
-                                        {c.count === 1 ? "booking" : "bookings"}{" "}
+                                        {plural(c.count, "session")}{" "}
                                         {periodWord}
                                     </span>
                                 </span>

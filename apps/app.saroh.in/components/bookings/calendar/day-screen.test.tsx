@@ -268,9 +268,8 @@ describe("the first day", () => {
     it("is not shown once anything is booked, or to someone who can't book", () => {
         draw(busy);
         expect(host.querySelector("[data-first-day]")).toBeNull();
-        expect(host.textContent).toContain(
-            "Swipe the calendar left or right to change day.",
-        );
+        // No swipe help in its place (critique, 25 Nov).
+        expect(host.textContent).not.toContain("Swipe");
         draw(nothing, { can: { book: false, hours: false } });
         expect(host.querySelector("[data-first-day]")).toBeNull();
     });
@@ -397,11 +396,17 @@ describe("Everyone", () => {
         const phone = host.querySelector("[data-everyone-column]");
         expect(phone?.textContent).toContain("Ananya Desai · Meera");
         expect(phone?.textContent).toContain("Vikram Nair · Arjun");
+        // Free times and closed time are drawn on the phone's one column
+        // too (BKVCalendarBPhone).
+        expect(
+            phone?.querySelectorAll("[data-free-gap]").length,
+        ).toBeGreaterThan(0);
+        expect(phone?.querySelector('[data-hatch="closed"]')).not.toBeNull();
         // The desk's column heads count each person's day.
         const heads = Array.from(
             host.querySelectorAll("[data-column-head]"),
         ).map((h) => h.textContent);
-        expect(heads[0]).toContain("1 booked");
+        expect(heads[0]).toContain("1 session · 1 person");
         expect(heads[1]).toContain("Sports therapist · 9 am to 5 pm");
     });
 

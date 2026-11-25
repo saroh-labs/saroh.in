@@ -1,11 +1,12 @@
 import type { DiaryBooking } from "./booking-calendar";
 import { BOOKING_WORDS } from "./booking-words";
-import type { Block, Column, PersonDay, Span } from "./diary";
+import type { Block, Column, DiaryState, PersonDay, Span } from "./diary";
 import {
     isLive,
     liveSeats,
     mergeSpans,
     MIN_FREE_MINUTES,
+    STATE_LABEL,
     subtractSpans,
 } from "./diary";
 import type { Laned } from "./diary-lanes";
@@ -97,6 +98,91 @@ export function toPayText(block: Block): string | null {
         return toPay(block.booking) ? BOOKING_WORDS.awaitingPayment : null;
     const n = liveSeats(block.session).filter(toPay).length;
     return n > 0 ? `${n} ${BOOKING_WORDS.awaitingPayment.toLowerCase()}` : null;
+}
+
+/**
+ * How a block stands, in the one word every view says (Day, Week, Agenda
+ * and the quick look): a class is "Full" or "2 places left" ("2 left"
+ * where room is short), a one-to-one with money still to take "Awaiting
+ * payment" (DEC-257's one payment word), else its state's own word. The
+ * `state` picks the badge's tone.
+ */
+export function blockStatus(block: Block): {
+    label: string;
+    short: string;
+    state: DiaryState;
+} {
+    const word = (label: string, state: DiaryState, short = label) => ({
+        label,
+        short,
+        state,
+    });
+    if (!isLive(block)) return word(STATE_LABEL.cancelled, "cancelled");
+    if (block.kind === "class") {
+        const left = block.session.capacity - liveSeats(block.session).length;
+        if (left <= 0) return word(STATE_LABEL.full, "full");
+        return word(
+            `${left} ${left === 1 ? "place" : "places"} left`,
+            "open",
+            `${left} left`,
+        );
+    }
+    if (block.state === "booked" && toPay(block.booking)) {
+        return word(BOOKING_WORDS.awaitingPayment, "pending");
+    }
+    return word(STATE_LABEL[block.state], block.state);
+}
+
+/**
+ * Free time on a phone's Everyone day (BKVCalendarBPhone), drawn as one
+ * column: where anybody is free, each stretch booked with someone free all
+ * through it (the one before while they still are, else the first in
+ * column order), so a tap books someone who is.
+ * Only the columns `bookable` lets through are offered.
+ */
+export function everyoneFree(
+    columns: readonly Column[],
+    bookable: (column: Column) => boolean,
+    /**
+     * What the one column draws as bookings (anyone's, Unassigned too): a
+     * free time is split around each, so its words never sit on one.
+     */
+    drawn: readonly Span[] = [],
+): { column: Column; free: Span }[] {
+    const offered = columns.filter((c) => bookable(c) && c.day);
+    const cuts = Array.from(
+        new Set(offered.flatMap((c) => (c.day?.free ?? []).flat())),
+    ).sort((a, b) => a - b);
+    const out: { column: Column; free: Span }[] = [];
+    for (let i = 0; i + 1 < cuts.length; i++) {
+        const a = cuts[i] ?? 0;
+        const b = cuts[i + 1] ?? 0;
+        const frees = (c: Column) =>
+            (c.day?.free ?? []).some(([x, y]) => x <= a && y >= b);
+        const last = out.at(-1);
+        // Whoever the stretch before had keeps it while still free, so a
+        // free time isn't cut in two for nothing.
+        const column =
+            last?.free[1] === a && frees(last.column)
+                ? last.column
+                : offered.find(frees);
+        if (!column) continue;
+        if (last?.column === column && last.free[1] === a) {
+            last.free = [last.free[0], b];
+        } else {
+            out.push({ column, free: [a, b] });
+        }
+    }
+    // Around what is drawn; a piece too short for the person's shortest
+    // booking (never under 15 minutes) isn't offered.
+    return out.flatMap(({ column, free }) =>
+        subtractSpans([free], drawn)
+            .filter(
+                ([a, b]) =>
+                    b - a >= Math.max(MIN_FREE_MINUTES, column.shortest ?? 0),
+            )
+            .map((piece) => ({ column, free: piece })),
+    );
 }
 
 // ── What is drawn ───────────────────────────────────────────────────────────

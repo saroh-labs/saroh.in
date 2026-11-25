@@ -29,7 +29,12 @@ const STEP_SMALL =
 /** The eyebrow over each part: the `.label` utility. */
 const LABEL = "label";
 const HELP = "mt-1.5 text-[12.5px] leading-normal text-muted-foreground";
-const VIEW_NAME = { day: "Day", week: "Week", list: "Agenda" } as const;
+const VIEW_NAME = {
+    day: "Day",
+    week: "Week",
+    list: "Agenda",
+    register: "List",
+} as const;
 
 /**
  * "Go to a day" (U2; BKMBookingsDayMonthSheet, BKDCalendarDay's date
@@ -82,6 +87,7 @@ export function DateSheet({
             title="Go to a day"
             subtitle={title}
             width={372}
+            half
             footer={
                 <Button
                     variant="outline"
@@ -101,10 +107,10 @@ export function DateSheet({
                 onPick={(d) => onGo(hrefFor(layout, d))}
             />
             <p className={HELP}>
-                Numbers and dots show how many bookings a day has.{" "}
+                Numbers and dots show how many sessions a day has.
                 {phone
-                    ? `Swipe the calendar left or right to go a ${word} back or on.`
-                    : `The arrows beside the date go a ${word} back or on.`}
+                    ? null
+                    : ` The arrows beside the date go a ${word} back or on.`}
             </p>
             <div data-ph-unmask="" className={cn(LABEL, "mt-3.5")}>
                 Show as

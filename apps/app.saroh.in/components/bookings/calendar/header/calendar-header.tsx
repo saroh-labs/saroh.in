@@ -4,6 +4,7 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import {
+    CalendarDays,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -13,12 +14,21 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { BookingsModeSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
+import {
+    BookingsModeSwitch,
+    BookingsPhoneBar,
+} from "@/components/bookings/all-bookings/bookings-view-switch";
 import { formatDay } from "@/lib/format/datetime";
 import type { BookingsOpens, ShowFor } from "@/lib/services/bookings-opens";
 import { EVERYONE } from "@/lib/services/bookings-opens";
 import type { DayFacts } from "@/lib/services/calendar-header";
-import { dayRange, headerTitle } from "@/lib/services/calendar-header";
+import {
+    cancelledLine,
+    dayRange,
+    headerTitle,
+    periodWord as periodWordOf,
+    phoneTitle,
+} from "@/lib/services/calendar-header";
 import type { CalendarLayout, GoogleShow } from "@/lib/services/calendar-href";
 import { callName } from "@/lib/services/call-name";
 import type { LocalDate } from "@/lib/services/diary";
@@ -34,7 +44,7 @@ import { OptionsSheet } from "./options-sheet";
 import type { PersonChoice } from "./people-sheet";
 import { PeopleSheet, PersonFace } from "./people-sheet";
 import { useBookingsOpens } from "./use-bookings-opens";
-import { usePhone } from "./use-phone";
+import { usePhoneOrUnknown } from "./use-phone";
 import { WeekStrip } from "./week-strip";
 
 type Open = "date" | "people" | "opts" | null;
@@ -141,7 +151,9 @@ export function CalendarHeader({
     // The screen's transition: the diary greys while the header stays.
     const screenGo = useScreenGo();
     const screenLink = useScreenLink();
-    const phone = usePhone();
+    // Null on the server and while hydrating: both frames are drawn, CSS
+    // shows the right one, so the first paint never jumps.
+    const known = usePhoneOrUnknown();
     const [open, setOpen] = useState<Open>(null);
     const { opens, change } = useBookingsOpens(kept);
     const toggle = (which: Exclude<Open, null>) => (o: boolean) =>
@@ -152,11 +164,13 @@ export function CalendarHeader({
     };
 
     const title = headerTitle(layout, date, today);
+    const short = phoneTitle(layout, date, today);
     const step = layout === "week" ? 7 : 1;
     const unit = layout === "week" ? "week" : "day";
     const inWeek = layout === "week";
     const weekStart = weekStartOf(date);
-    const periodWord = inWeek ? "this week" : "today";
+    // "today" only on today: another day is named ("on Tue 20 Oct").
+    const periodWord = periodWordOf(layout, date, today);
     const period = inWeek
         ? `${dayRange(weekStart, addDays(weekStart, 6), " to ")}${weekStart === weekStartOf(today) ? " · this week" : ""}`
         : `${formatDay(date, { weekday: "short", today })}${date === today ? " · today" : ""}`;
@@ -197,7 +211,7 @@ export function CalendarHeader({
         else if (showFor === "me" && me) go(hrefFor(layout, date, me.id));
     };
 
-    const titleButton = (
+    const titleButton = (phone: boolean) => (
         <button
             type="button"
             aria-label={`${title}. Change the day or the view`}
@@ -207,7 +221,26 @@ export function CalendarHeader({
                 "max-[759px]:h-12 max-[759px]:flex-1 max-[759px]:gap-1 max-[759px]:rounded-none max-[759px]:px-0 max-[759px]:text-left max-[759px]:text-[19px] max-[759px]:tracking-[-0.02em] max-[759px]:hover:bg-transparent max-[759px]:data-[state=open]:bg-transparent",
             )}
         >
-            <span className="min-w-0 truncate">{title}</span>
+            {phone ? (
+                <>
+                    <span className="min-w-0 whitespace-nowrap">
+                        {short.lead ? (
+                            <span className="max-[359px]:hidden">
+                                {short.lead}{" "}
+                            </span>
+                        ) : null}
+                        {short.main}
+                    </span>
+                    <span
+                        data-view-name=""
+                        className="ml-1 shrink-0 rounded-full border border-border px-2 py-0.5 font-sans text-[12.5px] font-medium tracking-normal text-muted-foreground"
+                    >
+                        {VIEW_NAME[layout]}
+                    </span>
+                </>
+            ) : (
+                <span className="min-w-0 truncate">{title}</span>
+            )}
             <ChevronDown
                 aria-hidden
                 className="size-5 shrink-0 max-[759px]:size-[18px]"
@@ -256,16 +289,171 @@ export function CalendarHeader({
         </button>
     );
 
-    return (
-        <div
-            data-calendar-header=""
-            className="relative mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 max-[759px]:mb-3 max-[759px]:gap-x-2 max-[759px]:gap-y-0 max-[759px]:border-b max-[759px]:border-border max-[759px]:pb-0.5"
-        >
-            {phone ? (
-                <div className="order-0 mb-1.5 basis-full">
-                    <BookingsModeSwitch current="calendar" />
+    const options = (
+        <OptionsSheet
+            open={open === "opts"}
+            onOpenChange={toggle("opts")}
+            trigger={optsButton}
+            title={optsTitle}
+            summary={summary}
+            cancelled={{
+                shown: cancelled.shown,
+                onChange: cancelled.onChange,
+                line:
+                    cancelled.count === null
+                        ? `Cancelled ${periodWord}`
+                        : cancelledLine(cancelled.count, periodWord),
+            }}
+            hours={{ href: hoursHref, label: hoursLabel }}
+            listHref="/bookings/all"
+            start={opens.start}
+            onStart={(start) => void change({ start })}
+            showFor={opens.showFor}
+            onShowFor={pickShowFor}
+            google={
+                google
+                    ? {
+                          ...google,
+                          mine: me !== null,
+                          team: others.map((c) => ({
+                              key: c.key,
+                              name: c.name,
+                              state:
+                                  google.people.find((p) => p.staffId === c.key)
+                                      ?.state ?? "NONE",
+                          })),
+                          you: me?.id ?? null,
+                      }
+                    : null
+            }
+            me={me ? callName(me.name) : null}
+            whoNow={everyone ? "everyone" : whoName}
+            zone={zone}
+        />
+    );
+
+    const todayHref = hrefFor(layout, today);
+    const prevHref = hrefFor(layout, addDays(date, -step));
+    const nextHref = hrefFor(layout, addDays(date, step));
+
+    const phoneFrame = (onPhone: boolean, both: boolean) => {
+        // BKVCalendarBPhone: Calendar | List and "…" first (the List's
+        // row too), then the date naming its view, Today when away from
+        // today, whose bookings with the summary, and the week strip.
+        return (
+            // `contents`: the sticky Calendar | List row sticks across the
+            // whole screen, not only while this header is in view.
+            <div
+                data-calendar-header="phone"
+                className={cn("contents", both && "min-[760px]:hidden")}
+            >
+                <BookingsPhoneBar current="calendar" options={options} />
+                <div className="flex min-w-0 items-center gap-2 pt-1">
+                    <h1 className="m-0 flex min-w-0 flex-1">
+                        <DateSheet
+                            open={open === "date"}
+                            onOpenChange={toggle("date")}
+                            trigger={titleButton(onPhone)}
+                            title={title}
+                            layout={layout}
+                            date={date}
+                            today={today}
+                            facts={facts}
+                            start={opens.start}
+                            hrefFor={(l, d) => hrefFor(l, d, picked)}
+                            onGo={go}
+                        />
+                    </h1>
+                    {date === today ? null : (
+                        <IntentLink
+                            href={todayHref}
+                            onNavigate={screenLink(todayHref)}
+                            scroll={false}
+                            data-today-button=""
+                            data-ph-unmask=""
+                            className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-[14px] font-semibold text-foreground transition-colors duration-fast hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[359px]:px-0"
+                        >
+                            <CalendarDays aria-hidden className="size-4" />
+                            {/* At 320 the date keeps its room: the icon alone. */}
+                            <span className="max-[359px]:sr-only">Today</span>
+                        </IntentLink>
+                    )}
                 </div>
-            ) : null}
+                {/* For a keyboard and a screen reader: swipe is the touch. */}
+                <IntentLink
+                    href={prevHref}
+                    onNavigate={screenLink(prevHref)}
+                    scroll={false}
+                    aria-label={`Previous ${unit}`}
+                    className={cn(STEP, PHONE_STEP)}
+                >
+                    <ChevronLeft aria-hidden className="size-4" />
+                </IntentLink>
+                <IntentLink
+                    href={nextHref}
+                    onNavigate={screenLink(nextHref)}
+                    scroll={false}
+                    aria-label={`Next ${unit}`}
+                    className={cn(STEP, PHONE_STEP)}
+                >
+                    <ChevronRight aria-hidden className="size-4" />
+                </IntentLink>
+                <div className="flex min-h-11 min-w-0 items-center gap-2 text-[13.5px] tabular-nums text-foreground/80">
+                    {loadingPeople ? (
+                        <Skeleton
+                            aria-hidden
+                            className="h-11 w-32 shrink-0 rounded-full"
+                        />
+                    ) : null}
+                    {showChip && chip ? (
+                        <PeopleSheet
+                            open={open === "people"}
+                            onOpenChange={toggle("people")}
+                            trigger={chip}
+                            period={period}
+                            periodWord={periodWord}
+                            choices={choices ?? []}
+                            picked={everyone ? EVERYONE : picked}
+                            showFor={opens.showFor}
+                            onPick={pickPerson}
+                            onAdd={onAddPerson}
+                        />
+                    ) : null}
+                    <span role="status" className="min-w-0 flex-1">
+                        {summary}
+                    </span>
+                </div>
+                <WeekStrip
+                    layout={layout}
+                    date={date}
+                    today={today}
+                    facts={facts}
+                    hrefFor={(l, d) => hrefFor(l, d)}
+                />
+                {calOnly ? (
+                    <p
+                        data-ph-unmask=""
+                        className="m-0 pt-2 text-[12.5px] text-muted-foreground"
+                    >
+                        Your role sees the calendar only, so you can't book or
+                        change bookings. An owner can change this in Settings ›
+                        Team.
+                    </p>
+                ) : null}
+                {newBooking}
+                <span aria-hidden className="block h-3" />
+            </div>
+        );
+    };
+
+    const deskFrame = (onPhone: boolean, both: boolean) => (
+        <div
+            data-calendar-header="desk"
+            className={cn(
+                both && "max-[759px]:hidden",
+                "relative mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 max-[759px]:mb-3 max-[759px]:gap-x-2 max-[759px]:gap-y-0 max-[759px]:border-b max-[759px]:border-border max-[759px]:pb-0.5",
+            )}
+        >
             <IntentLink
                 href={hrefFor(layout, today)}
                 onNavigate={screenLink(hrefFor(layout, today))}
@@ -303,7 +491,7 @@ export function CalendarHeader({
                 <DateSheet
                     open={open === "date"}
                     onOpenChange={toggle("date")}
-                    trigger={titleButton}
+                    trigger={titleButton(onPhone)}
                     title={title}
                     layout={layout}
                     date={date}
@@ -372,48 +560,8 @@ export function CalendarHeader({
             </div>
 
             <div className="order-5 ml-auto flex items-center gap-2 max-[759px]:order-6 max-[759px]:ml-0">
-                {phone ? null : <BookingsModeSwitch current="calendar" />}
-                <OptionsSheet
-                    open={open === "opts"}
-                    onOpenChange={toggle("opts")}
-                    trigger={optsButton}
-                    title={optsTitle}
-                    summary={summary}
-                    cancelled={{
-                        shown: cancelled.shown,
-                        onChange: cancelled.onChange,
-                        line:
-                            cancelled.count === null
-                                ? `Cancelled ${periodWord}`
-                                : cancelled.count > 0
-                                  ? `${cancelled.count} cancelled ${periodWord}`
-                                  : `None cancelled ${periodWord}`,
-                    }}
-                    hours={{ href: hoursHref, label: hoursLabel }}
-                    start={opens.start}
-                    onStart={(start) => void change({ start })}
-                    showFor={opens.showFor}
-                    onShowFor={pickShowFor}
-                    google={
-                        google
-                            ? {
-                                  ...google,
-                                  mine: me !== null,
-                                  team: others.map((c) => ({
-                                      key: c.key,
-                                      name: c.name,
-                                      state:
-                                          google.people.find(
-                                              (p) => p.staffId === c.key,
-                                          )?.state ?? "NONE",
-                                  })),
-                                  you: me?.id ?? null,
-                              }
-                            : null
-                    }
-                    me={me ? callName(me.name) : null}
-                    whoNow={everyone ? "everyone" : whoName}
-                />
+                <BookingsModeSwitch current="calendar" />
+                {options}
                 {newBooking}
             </div>
 
@@ -438,5 +586,15 @@ export function CalendarHeader({
                 </p>
             ) : null}
         </div>
+    );
+
+    // Each frame keeps its place, so the one in use is the same element
+    // before and after hydration: never remounted, a press never lost.
+    const both = known === null;
+    return (
+        <>
+            {known === false ? null : phoneFrame(true, both)}
+            {known === true ? null : deskFrame(false, both)}
+        </>
     );
 }

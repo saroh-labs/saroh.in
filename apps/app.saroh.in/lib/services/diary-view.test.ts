@@ -7,6 +7,7 @@ import {
     closedSpans,
     dayFullness,
     drawnLanes,
+    everyoneFree,
     firstSight,
     hoursAcross,
     legendOf,
@@ -356,5 +357,52 @@ describe("the week's days (U5)", () => {
             { key: "meera", name: "Meera Iyer" },
             { key: "arjun", name: "Arjun Rao" },
         ]);
+    });
+});
+
+describe("Everyone's free time on a phone's day (BKVCalendarBPhone)", () => {
+    const col = (key: string, free: [number, number][]): Column => ({
+        key,
+        name: key,
+        title: null,
+        day: { windows: [[540, 1080]], off: [], free },
+        blocks: [],
+    });
+
+    it("is free wherever someone is, each stretch with whoever is free all through it", () => {
+        const meera = col("meera", [
+            [600, 780],
+            [840, 960],
+        ]);
+        const arjun = col("arjun", [[720, 900]]);
+        const out = everyoneFree([meera, arjun], () => true);
+        expect(out.map((f) => [f.column.key, f.free])).toEqual([
+            ["meera", [600, 780]],
+            ["arjun", [780, 900]],
+            ["meera", [900, 960]],
+        ]);
+    });
+
+    it("offers only who may be booked, and nothing under 15 minutes", () => {
+        const meera = col("meera", [[600, 610]]);
+        const arjun = col("arjun", [[600, 700]]);
+        expect(everyoneFree([meera, arjun], (c) => c.key !== "arjun")).toEqual(
+            [],
+        );
+    });
+
+    it("is split around any booking drawn on the column, Unassigned too", () => {
+        // Meera free 9 to 1; someone's booking 10 to 11 sits on the column.
+        const meera = { ...col("meera", [[540, 780]]), shortest: 30 };
+        expect(
+            everyoneFree([meera], () => true, [[600, 660]]).map((f) => f.free),
+        ).toEqual([
+            [540, 600],
+            [660, 780],
+        ]);
+        // A piece shorter than her shortest booking isn't offered.
+        expect(
+            everyoneFree([meera], () => true, [[560, 760]]).map((f) => f.free),
+        ).toEqual([]);
     });
 });

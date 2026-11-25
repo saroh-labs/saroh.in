@@ -207,12 +207,16 @@ describe("cancelled bookings", () => {
         expect(blocks("one")).toHaveLength(1);
         expect(blocks("cancelled")).toHaveLength(0);
         // 9 to 10 and 11 to 5 are free; 3 to 4 is free again once cancelled.
-        expect(summaryText()).toBe("1 booked · 2 free times · ₹500 booked");
+        expect(summaryText()).toBe(
+            "1 session · 1 person · 2 free times · ₹500 booked",
+        );
         openOptions();
         const sw = cancelledSwitch();
         expect(sw?.getAttribute("aria-checked")).toBe("false");
         expect(sw?.getAttribute("aria-label")).toBe("Show cancelled bookings");
-        expect(document.body.textContent).toContain("1 cancelled today");
+        expect(document.body.textContent).toContain(
+            "1 cancelled on Tue 29 Sep",
+        );
     });
 
     it("draw as a thin line when switched on, and the address remembers", () => {
@@ -258,7 +262,9 @@ describe("cancelled bookings", () => {
         draw(calendarOf([booking("b1", "Tariq Ali", 10, 60)]));
         openOptions();
         expect(cancelledSwitch()).not.toBeNull();
-        expect(document.body.textContent).toContain("None cancelled today");
+        expect(document.body.textContent).toContain(
+            "None cancelled on Tue 29 Sep",
+        );
     });
 });
 
@@ -311,7 +317,10 @@ describe("the colours", () => {
         expect(host.querySelector('ul[aria-label="Key"]')).toBeNull();
         openOptions();
         const sheet = document.querySelector("[data-header-popover]");
-        expect(sheet?.textContent).toContain("What the colours mean");
+        const row = Array.from(sheet?.querySelectorAll("button") ?? []).find(
+            (b) => b.textContent === "What the colours mean",
+        );
+        act(() => row?.click());
         for (const name of [
             "A booking for one person",
             "A group class",
@@ -457,13 +466,13 @@ describe("whose bookings", () => {
                 .querySelector('button[aria-label^="Whose bookings"]')
                 ?.getAttribute("aria-label"),
         ).toBe("Whose bookings: Everyone. Change");
-        expect(summaryText()).toMatch(/^3 booked/);
+        expect(summaryText()).toMatch(/^3 sessions · 3 people/);
     });
 
     it("one person draws their column, and the count matches theirs", () => {
         draw(two, { staff: [asha, arjun], person: "arjun" });
         expect(heads()).toEqual(["arjun"]);
-        expect(summaryText()).toMatch(/^2 booked/);
+        expect(summaryText()).toMatch(/^2 sessions · 2 people/);
         expect(
             host
                 .querySelector('button[aria-label^="Whose bookings"]')
@@ -490,7 +499,7 @@ describe("whose bookings", () => {
             expect.stringContaining("Asha Rao"),
             expect.stringContaining("Arjun Rao"),
         ]);
-        expect(rows[2]?.textContent).toContain("2bookings today");
+        expect(rows[2]?.textContent).toContain("2sessions on Tue 29 Sep");
         act(() => rows[2]?.click());
         expect(push).toHaveBeenCalledWith(
             `/bookings?date=${DAY}&layout=day&person=arjun`,

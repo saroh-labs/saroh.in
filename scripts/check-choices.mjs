@@ -20,7 +20,6 @@ const HOME_END =
 /** Files that had it before this check: each leaves the list when moved. */
 const ALLOWED = new Map([
     ["apps/app.saroh.in/components/calendar/week-strip.tsx", HOME_END],
-    ["apps/app.saroh.in/components/bookings/calendar/week-phone.tsx", HOME_END],
     [
         "apps/app.saroh.in/components/shared/share-item/card-picker.tsx",
         HOME_END,

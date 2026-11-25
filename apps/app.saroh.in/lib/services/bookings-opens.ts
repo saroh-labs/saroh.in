@@ -16,8 +16,11 @@ import type { CalendarLayout } from "./calendar-href";
  * every device. An address that names a view or a person always wins.
  */
 
-/** "Start Bookings on". `list` is the agenda (Q4). */
-export type StartView = "last" | "day" | "week" | "list";
+/**
+ * "Start Bookings on". `list` is the agenda (Q4); `register` is the List of
+ * every booking (`/bookings/all`, owner 25 Nov).
+ */
+export type StartView = "last" | "day" | "week" | "list" | "register";
 /** "Show bookings for". */
 export type ShowFor = "last" | "all" | "me";
 
@@ -44,7 +47,13 @@ export const LAST_VIEW_COOKIE = "saroh_bookings_view";
 /** The address's `person` for everyone's bookings. */
 export const EVERYONE = "all";
 
-const STARTS: readonly StartView[] = ["last", "day", "week", "list"];
+const STARTS: readonly StartView[] = [
+    "last",
+    "day",
+    "week",
+    "list",
+    "register",
+];
 const SHOWS: readonly ShowFor[] = ["last", "all", "me"];
 
 /**
@@ -94,7 +103,9 @@ export function openingLayout({
 }): CalendarLayout {
     return (
         layoutOf(asked) ??
-        (start === "last" ? null : layoutOfView(start)) ??
+        (start === "last" || start === "register"
+            ? null
+            : layoutOfView(start)) ??
         layoutOf(lastUsed) ??
         "day"
     );
@@ -122,9 +133,9 @@ export function nothingChoseView({
 }
 
 /**
- * Bookings was last left on List: nothing in the address chose a view, "Where
- * I left it" is on and the cookie says "list" (`/bookings` then opens the
- * register). The Calendar switch carries `?calendar=1`, so it always opens
+ * Bookings opens on List: nothing in the address chose a view, and either
+ * "Start Bookings on" is List or "Where I left it" is on and the cookie
+ * says "list" (`/bookings` then opens the register). The Calendar switch carries `?calendar=1`, so it always opens
  * the calendar.
  */
 export function opensOnList({
@@ -137,8 +148,7 @@ export function opensOnList({
     lastUsed: unknown;
 }): boolean {
     return (
-        start === "last" &&
-        lastUsed === "list" &&
+        (start === "register" || (start === "last" && lastUsed === "list")) &&
         Object.keys(params).length === 0
     );
 }

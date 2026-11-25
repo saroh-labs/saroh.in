@@ -26,3 +26,26 @@ export function usePhone(): boolean {
         () => false,
     );
 }
+
+/**
+ * The same answer, or null while it can't be known: on the server and
+ * while the page hydrates. A header draws both its phone and desk frames
+ * then, each hidden by the 760px breakpoint in CSS, so the first paint is
+ * already right at any width (owner, 25 Nov: no layout jump); once known,
+ * only the one in use is drawn.
+ */
+export function usePhoneOrUnknown(): boolean | null {
+    const subscribe = useCallback((onChange: () => void) => {
+        if (typeof window.matchMedia !== "function") return () => undefined;
+        const mq = window.matchMedia(PHONE_WIDTHS);
+        mq.addEventListener("change", onChange);
+        return () => mq.removeEventListener("change", onChange);
+    }, []);
+    return useSyncExternalStore<boolean | null>(
+        subscribe,
+        () =>
+            typeof window.matchMedia === "function" &&
+            window.matchMedia(PHONE_WIDTHS).matches,
+        () => null,
+    );
+}
