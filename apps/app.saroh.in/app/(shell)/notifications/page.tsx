@@ -1,8 +1,7 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { NotificationsInbox } from "@/components/notifications/notifications-inbox";
+import { NotificationsContainer } from "@/components/notifications/notifications-container";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { listNotifications } from "@/lib/notifications/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
@@ -14,6 +13,12 @@ import { requireSession } from "@/lib/session";
  * only the alerts addressed to them (`notification:read-own`, DEC-170):
  * the API decides which rows each person gets.
  *
+ * On React Query (DEC-259), loaded in the browser: the page awaits the
+ * session and the business (its name, for the empty state) and draws the
+ * header at once; the inbox (`/api/notifications`, a live read) is
+ * `NotificationsContainer`'s query. A mark-read reads the inbox and the
+ * shell's live read (the bell) again; nothing is drawn on the server again.
+ *
  * A page title is how a merchant with six tabs open finds this one.
  */
 export const metadata = { title: "Notifications" };
@@ -21,16 +26,12 @@ export const metadata = { title: "Notifications" };
 export default async function NotificationsPage() {
     await requireSession();
 
-    const [notifications, organization] = await Promise.all([
-        listNotifications(),
-        resolveActiveOrganization(),
-    ]);
+    const organization = await resolveActiveOrganization();
 
     return (
         <PageContainer width="full">
             <PageHeader breadcrumb={["Notifications"]} title="Notifications" />
-            <NotificationsInbox
-                notifications={notifications}
+            <NotificationsContainer
                 businessName={organization?.name ?? "this business"}
                 // The instant "5 min ago" is counted from, the same on the
                 // server and in the browser's first paint.

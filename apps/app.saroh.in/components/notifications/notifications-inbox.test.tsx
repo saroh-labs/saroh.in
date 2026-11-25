@@ -11,9 +11,9 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const refresh = vi.fn();
+/** What follows a save that landed: the inbox and the bell read again. */
+const saved = vi.fn(() => Promise.resolve());
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh, push: vi.fn() }),
     unstable_rethrow: () => undefined,
 }));
 vi.mock("next/link", () => ({
@@ -35,9 +35,11 @@ const markRead = vi.fn();
 const markAll = vi.fn();
 const undoAll = vi.fn();
 vi.mock("@/lib/notifications/actions", () => ({
-    markNotificationRead: (id: string) => markRead(id) as unknown,
-    markAllNotificationsRead: () => markAll() as unknown,
-    undoMarkAllNotificationsRead: (at: string) => undoAll(at) as unknown,
+    markNotificationRead: (id: string, orgId: string) =>
+        markRead(id, orgId) as unknown,
+    markAllNotificationsRead: (orgId: string) => markAll(orgId) as unknown,
+    undoMarkAllNotificationsRead: (at: string, orgId: string) =>
+        undoAll(at, orgId) as unknown,
 }));
 
 const toasts = {
@@ -121,6 +123,7 @@ function draw(notifications: Notification[]) {
                     notifications={notifications}
                     businessName="Rye & Co"
                     now={NOW}
+                    save={{ orgId: "org_1", saved }}
                 />
             </BusinessZoneProvider>,
         ),
@@ -167,7 +170,7 @@ beforeEach(() => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW));
-    for (const mock of [refresh, markRead, markAll, undoAll]) mock.mockReset();
+    for (const mock of [saved, markRead, markAll, undoAll]) mock.mockReset();
     for (const mock of Object.values(toasts)) mock.mockReset();
     markRead.mockResolvedValue({ ok: true, data: { id: "x" } });
     host = document.createElement("div");
@@ -223,12 +226,13 @@ describe("a Member's own alerts (DEC-170)", () => {
         draw([ANSWER]);
         press(link("answer"));
         await settle();
-        expect(markRead).toHaveBeenCalledWith("n-answer");
+        expect(markRead).toHaveBeenCalledWith("n-answer", "org_1");
     });
 });
 
 describe("opening a row is reading it", () => {
     it("marks it read, with one signal: the dot goes, and nothing is toasted", async () => {
+        markRead.mockResolvedValue({ ok: true, data: { id: "n-order" } });
         draw([ORDER, BOOKING]);
         expect(host.querySelectorAll("[data-unread-dot]")).toHaveLength(2);
         expect(host.textContent).toContain("2 unread");
@@ -237,19 +241,20 @@ describe("opening a row is reading it", () => {
         await settle();
 
         expect(markRead).toHaveBeenCalledTimes(1);
-        expect(markRead).toHaveBeenCalledWith("n-order");
+        expect(markRead).toHaveBeenCalledWith("n-order", "org_1");
         expect(host.querySelectorAll("[data-unread-dot]")).toHaveLength(1);
         expect(host.textContent).toContain("1 unread");
         expect(toasts.success).not.toHaveBeenCalled();
         expect(toasts.error).not.toHaveBeenCalled();
-        expect(refresh).not.toHaveBeenCalled();
+        // The bell's count is the shell's live read: read again once it landed.
+        expect(saved).toHaveBeenCalledTimes(1);
     });
 
     it("a review's notice is read by opening it too, so the count means one thing", async () => {
         draw([REVIEW]);
         press(link("review"));
         await settle();
-        expect(markRead).toHaveBeenCalledWith("n-review");
+        expect(markRead).toHaveBeenCalledWith("n-review", "org_1");
         expect(host.querySelector("[data-unread-dot]")).toBeNull();
     });
 
@@ -336,8 +341,8 @@ describe("Mark all as read", () => {
         press(button);
         await settle();
 
-        expect(markAll).toHaveBeenCalledTimes(1);
-        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(markAll).toHaveBeenCalledWith("org_1");
+        expect(saved).toHaveBeenCalledTimes(1);
         // One signal, and it carries the way back.
         expect(toasts.success).not.toHaveBeenCalled();
         expect(toasts.undo).toHaveBeenCalledTimes(1);
@@ -345,9 +350,12 @@ describe("Mark all as read", () => {
         expect(said).toBe("All notifications marked as read.");
 
         const outcome = await (undo as () => Promise<unknown>)();
-        expect(undoAll).toHaveBeenCalledWith("2026-10-10T09:30:01.000Z");
+        expect(undoAll).toHaveBeenCalledWith(
+            "2026-10-10T09:30:01.000Z",
+            "org_1",
+        );
         expect(outcome).toBe(true);
-        expect(refresh).toHaveBeenCalledTimes(2);
+        expect(saved).toHaveBeenCalledTimes(2);
     });
 
     it("an Undo that never got there says so, as a failed Undo", async () => {

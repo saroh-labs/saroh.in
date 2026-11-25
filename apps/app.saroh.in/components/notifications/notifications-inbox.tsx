@@ -6,7 +6,6 @@ import { EmptyState } from "@saroh/ui/empty-state";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { Bell } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -20,6 +19,7 @@ import {
 } from "@/lib/notifications/actions";
 import { notificationHref } from "@/lib/notifications/href";
 import type { Notification } from "@/lib/notifications/service";
+import type { NotificationsSave } from "@/lib/notifications/use-notifications";
 import type { NoticeGroup } from "@/lib/notifications/when";
 import { exactWhen, noticeGroup, relativeWhen } from "@/lib/notifications/when";
 import { ListCard, ListRow } from "@saroh/ui/list-card";
@@ -52,13 +52,16 @@ export function NotificationsInbox({
     notifications,
     businessName,
     now: renderedAt,
+    save,
 }: {
     notifications: Notification[];
     businessName: string;
     /** When the server drew this, so both sides count from one instant. */
     now: string;
+    /** The tab's business for each write, and what follows one that landed. */
+    save: NotificationsSave;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = save;
     const zone = useBusinessZone();
     const [pending, startTransition] = useTransition();
     // Opened here and on their way to being saved: read at once.
@@ -80,18 +83,23 @@ export function NotificationsInbox({
         setOpened((had) => new Set(Array.from(had).concat(n.id)));
         // Not awaited: the link is already on its way. A save that didn't
         // get there leaves it unread for next time, which is the truth.
-        void runAction(() => markNotificationRead(n.id), { quiet: true });
+        // One that landed reads the bell's count (the shell's) again.
+        void runAction(() => markNotificationRead(n.id, orgId), {
+            quiet: true,
+        }).then((res) => {
+            if (res?.ok) void saved();
+        });
     };
 
     const markAll = () => {
         startTransition(async () => {
-            const res = await runAction(() => markAllNotificationsRead());
+            const res = await runAction(() => markAllNotificationsRead(orgId));
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
-            router.refresh();
+            void saved();
             const readAt = res.data.readAt;
             if (!readAt) {
                 showSuccess("All notifications marked as read.");
@@ -99,11 +107,11 @@ export function NotificationsInbox({
             }
             showUndo("All notifications marked as read.", async () => {
                 const back = await runAction(
-                    () => undoMarkAllNotificationsRead(readAt),
+                    () => undoMarkAllNotificationsRead(readAt, orgId),
                     { quiet: true },
                 );
                 if (!back) return { ok: false, error: UNREACHED };
-                router.refresh();
+                if (back.ok) void saved();
                 return back.ok ? true : { ok: false, error: back.error };
             });
         });

@@ -38,6 +38,7 @@ import type {
     DiscountInput,
     DiscountReach,
 } from "@/lib/discounts/service";
+import { useDiscountsSave } from "@/lib/discounts/use-discounts";
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { Segmented } from "@saroh/ui/segmented";
@@ -129,6 +130,7 @@ export function DiscountForm({
     defaultCurrency: string;
 }) {
     const router = useRouter();
+    const { orgId, saved } = useDiscountsSave();
     const [mode, setMode] = useState<DiscountReach>(
         discount?.appliesTo ?? "BUSINESS",
     );
@@ -196,8 +198,8 @@ export function DiscountForm({
             usageLimit: values.usageLimit ? Number(values.usageLimit) : null,
         };
         const res = discount
-            ? await updateDiscount(discount.id, input)
-            : await createDiscount(input);
+            ? await updateDiscount(discount.id, input, orgId)
+            : await createDiscount(input, orgId);
         if (!res.ok) {
             const field = res.field ? FIELD[res.field] : undefined;
             if (field === "targets") setTargetsError(res.error);
@@ -206,17 +208,19 @@ export function DiscountForm({
             return;
         }
         showSuccess(discount ? "Code saved." : `${res.data.code} is ready.`);
+        await saved();
         router.push("/commerce/discounts");
-        router.refresh();
     }
 
     function endNow() {
         if (!discount) return;
         startEnding(async () => {
             const res = await runAction(() =>
-                updateDiscount(discount.id, {
-                    endsAt: new Date().toISOString(),
-                }),
+                updateDiscount(
+                    discount.id,
+                    { endsAt: new Date().toISOString() },
+                    orgId,
+                ),
             );
             if (!res) return;
             if (!res.ok) {
@@ -224,8 +228,8 @@ export function DiscountForm({
                 return;
             }
             showSuccess(`${discount.code} has ended. Its figures are kept.`);
+            await saved();
             router.push("/commerce/discounts");
-            router.refresh();
         });
     }
 
