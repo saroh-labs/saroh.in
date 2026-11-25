@@ -16,7 +16,7 @@ import {
     everyoneBlocks,
 } from "@/lib/services/day-view";
 import type { Block, Column, Span } from "@/lib/services/diary";
-import { UNASSIGNED } from "@/lib/services/diary";
+import { isLive, UNASSIGNED } from "@/lib/services/diary";
 import {
     closedSpans,
     drawnLanes,
@@ -398,7 +398,13 @@ export function DayByPerson({
     // someone takes bookings, each stretch booked with whoever is free.
     const across = hoursAcross(columns);
     const freeTimes = canBook
-        ? everyoneFree(columns, (c) => c.key !== UNASSIGNED)
+        ? everyoneFree(
+              columns,
+              (c) => c.key !== UNASSIGNED,
+              all
+                  .filter((e) => isLive(e.block))
+                  .map((e): Span => [e.block.start, e.block.end]),
+          )
         : [];
     return (
         <>

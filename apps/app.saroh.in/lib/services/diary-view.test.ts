@@ -390,4 +390,19 @@ describe("Everyone's free time on a phone's day (BKVCalendarBPhone)", () => {
             [],
         );
     });
+
+    it("is split around any booking drawn on the column, Unassigned too", () => {
+        // Meera free 9 to 1; someone's booking 10 to 11 sits on the column.
+        const meera = { ...col("meera", [[540, 780]]), shortest: 30 };
+        expect(
+            everyoneFree([meera], () => true, [[600, 660]]).map((f) => f.free),
+        ).toEqual([
+            [540, 600],
+            [660, 780],
+        ]);
+        // A piece shorter than her shortest booking isn't offered.
+        expect(
+            everyoneFree([meera], () => true, [[560, 760]]).map((f) => f.free),
+        ).toEqual([]);
+    });
 });

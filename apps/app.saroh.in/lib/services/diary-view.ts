@@ -143,6 +143,11 @@ export function blockStatus(block: Block): {
 export function everyoneFree(
     columns: readonly Column[],
     bookable: (column: Column) => boolean,
+    /**
+     * What the one column draws as bookings (anyone's, Unassigned too): a
+     * free time is split around each, so its words never sit on one.
+     */
+    drawn: readonly Span[] = [],
 ): { column: Column; free: Span }[] {
     const offered = columns.filter((c) => bookable(c) && c.day);
     const cuts = Array.from(
@@ -168,7 +173,16 @@ export function everyoneFree(
             out.push({ column, free: [a, b] });
         }
     }
-    return out.filter(({ free: [a, b] }) => b - a >= MIN_FREE_MINUTES);
+    // Around what is drawn; a piece too short for the person's shortest
+    // booking (never under 15 minutes) isn't offered.
+    return out.flatMap(({ column, free }) =>
+        subtractSpans([free], drawn)
+            .filter(
+                ([a, b]) =>
+                    b - a >= Math.max(MIN_FREE_MINUTES, column.shortest ?? 0),
+            )
+            .map((piece) => ({ column, free: piece })),
+    );
 }
 
 // ── What is drawn ───────────────────────────────────────────────────────────
