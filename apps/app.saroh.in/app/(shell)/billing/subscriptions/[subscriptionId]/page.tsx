@@ -1,22 +1,11 @@
-import { notFound } from "next/navigation";
-
 import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
-import { PageContainer } from "@/components/shared/page/page-container";
-import { SubscriptionDetail } from "@/components/subscriptions/subscription-detail/detail-screen";
+import { SubscriptionDetailContainer } from "@/components/subscriptions/subscription-detail/subscription-detail-container";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
-import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import {
-    getRenewals,
-    getSubscriberCard,
-    getSubscription,
-    listCharges,
-    listPlans,
-    listSubscriptionEvents,
-} from "@/lib/subscriptions/service";
-import { ranLine } from "@/lib/subscriptions/view";
+
+import Loading from "./loading";
 
 // "Subscription", never their name: a tab's title shows in a screen share, in
 // history and in bookmarks (`lib/page-title.ts`).
@@ -28,13 +17,16 @@ const STEPS = ["pause", "switch", "cancel", "restart"] as const;
  * Payments → Subscriptions → one subscription (plan 2026-09-23-003, U13),
  * after "Saroh Subscription Detail" layout 2a.
  *
- * The subscription and the plans are required; its charges, its Changes
- * log (D9), when renewals
- * last ran and the subscriber's phone and allergies are read on their own,
- * so a role without invoices, or one failed read, costs its own panel and
- * nothing else. `?do=pause|switch|cancel|restart` arrives from the list's
- * quick look and opens that step; `?do=autopay-link` from Home's "Send a
- * set-up link" (D14) opens that sheet.
+ * On React Query (DEC-259), loaded in the browser: the gate (the locked
+ * card for a role without `subscription:read`, D18) and what this person
+ * may do are decided here; the subscription with its plans, charges,
+ * Changes (D9), when renewals last ran and the subscriber's card
+ * (`/api/subscriptions/[subscriptionId]`, each optional part failing on
+ * its own) is `SubscriptionDetailContainer`'s query, read behind the
+ * route's loader. Missing, or another business's, is its 404.
+ * `?do=pause|switch|cancel|restart` arrives from the list's quick look and
+ * opens that step; `?do=autopay-link` from Home's "Send a set-up link"
+ * (D14) opens that sheet.
  */
 export default async function SubscriptionPage({
     params,
@@ -61,43 +53,17 @@ export default async function SubscriptionPage({
         );
     }
 
-    const sub = await getSubscription(subscriptionId);
-    if (!sub) notFound();
-
-    const canWrite = may("subscription:write");
-    const step = STEPS.find((s) => s === query.do) ?? null;
-    const [plans, charges, changes, renewals, card, contacts] =
-        await Promise.all([
-            listPlans(),
-            listCharges(sub.id),
-            listSubscriptionEvents(sub.id),
-            getRenewals().catch(() => null),
-            getSubscriberCard(sub.contact.id),
-            // Restarting picks the person again, so only then are they read.
-            canWrite && sub.status === "CANCELLED"
-                ? contactPickerOptions()
-                : Promise.resolve([]),
-        ]);
-    const now = new Date();
-
     return (
-        <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-            <SubscriptionDetail
-                sub={sub}
-                charges={charges}
-                changes={changes}
-                viewerId={session.user.id}
-                plans={plans}
-                card={card}
-                ran={renewals ? ranLine(renewals, sub.timezone, now) : null}
-                bizName={organization?.name ?? null}
-                canWrite={canWrite}
-                canPayLink={may("invoice:write")}
-                initialStep={step}
-                openSetUpLink={query.do === "autopay-link"}
-                contacts={contacts}
-                nowIso={now.toISOString()}
-            />
-        </PageContainer>
+        <SubscriptionDetailContainer
+            ask={{ subscriptionId }}
+            skeleton={<Loading />}
+            viewerId={session.user.id}
+            bizName={organization?.name ?? null}
+            canWrite={may("subscription:write")}
+            canPayLink={may("invoice:write")}
+            initialStep={STEPS.find((s) => s === query.do) ?? null}
+            openSetUpLink={query.do === "autopay-link"}
+            nowIso={new Date().toISOString()}
+        />
     );
 }

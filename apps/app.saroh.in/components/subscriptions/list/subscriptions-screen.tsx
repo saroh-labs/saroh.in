@@ -12,6 +12,10 @@ import { useEffect, useState } from "react";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import type { OnlinePaymentsLock } from "@/lib/billing/access";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import { LIST_LIMIT } from "@/lib/lists/capped";
@@ -51,6 +55,10 @@ import { SubscriptionQuickLook } from "./subscription-quick-look";
  *
  * `now` comes from the server, so the words a row says are the same when
  * the page is drawn and when it hydrates.
+ *
+ * On React Query (DEC-259) `subscriptions` is null until the list is read:
+ * the header, the tabs and the actions are drawn at once, the counts are
+ * bars and the rows the route loader's own, so nothing moves when they land.
  */
 export function SubscriptionsScreen({
     subscriptions,
@@ -77,7 +85,8 @@ export function SubscriptionsScreen({
      * notice; null when it couldn't be told, which draws nothing.
      */
     missingRates?: MissingRates | null;
-    subscriptions: Subscription[];
+    /** Null while the list is on its way. */
+    subscriptions: Subscription[] | null;
     /** The newest read hit its cap: older cancelled ones are not here. */
     truncated?: boolean;
     /** Null when the plans couldn't be read: the Plans tab says so. */
@@ -123,18 +132,22 @@ export function SubscriptionsScreen({
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
+    const loading = subscriptions === null;
+    const rows = subscriptions ?? [];
     const [tab, setTab] = useState<ScreenTab>(initialTab);
     // The view the address chose, until a tab is picked: the other tab
     // then opens on its own default.
     const [view, setView] = useState(initialView);
     const [peekId, setPeekId] = useState<string | null>(null);
     const [subscribing, setSubscribing] = useState(Boolean(openSubscribe));
-    const landing = defaultView(subscriptions);
+    const landing = defaultView(rows);
 
     // An older link says a list view as `?tab=failed`. The list writes
     // `?view=`, so the address is moved over once and the two never
     // disagree after a choice.
     useEffect(() => {
+        // The landing view is the rows', so it waits for them.
+        if (loading) return;
         const url = new URL(window.location.href);
         const old = url.searchParams.get("tab");
         if (!old || old === "plans") return;
@@ -143,7 +156,7 @@ export function SubscriptionsScreen({
         if (chosen && chosen !== landing) url.searchParams.set("view", chosen);
         else url.searchParams.delete("view");
         window.history.replaceState(null, "", url.pathname + url.search);
-    }, [landing]);
+    }, [landing, loading]);
 
     /** Drop `?subscribe=1` on close, so a refresh or Back doesn't reopen it. */
     function onSubscribeOpenChange(open: boolean) {
@@ -167,14 +180,16 @@ export function SubscriptionsScreen({
         window.history.replaceState(null, "", url.pathname + url.search);
     }
 
-    const summary = listSummary(subscriptions);
+    const summary = listSummary(rows);
     const plans = planRead ?? [];
     const onPlans = tab === "plans";
-    const peek = subscriptions.find((s) => s.id === peekId) ?? null;
+    const peek = rows.find((s) => s.id === peekId) ?? null;
     // Subscribing someone new, where the plan allows it.
     const canSubscribe = canWrite && !newLocked;
-    // A new plan, where the business's plan has memberships.
-    const canAddPlan = canWrite && !plansLocked && planRead !== null;
+    // A new plan, where the business's plan has memberships; while the
+    // plans are on their way too (only a failed read takes it away).
+    const canAddPlan =
+        canWrite && !plansLocked && (loading || planRead !== null);
 
     return (
         <>
@@ -182,14 +197,20 @@ export function SubscriptionsScreen({
                 className="mb-4"
                 breadcrumb={["Payments", "Subscriptions"]}
                 title="Subscriptions"
-                count={countLabel(subscriptions.length, {
-                    one: "subscription",
-                    other: "subscriptions",
-                })}
+                count={
+                    loading ? (
+                        <FigureLoading />
+                    ) : (
+                        countLabel(rows.length, {
+                            one: "subscription",
+                            other: "subscriptions",
+                        })
+                    )
+                }
                 // A summary, not a count of the list: before the button.
                 // What needs the owner comes first, and reads as it is.
                 meta={
-                    subscriptions.length > 0 ? (
+                    rows.length > 0 ? (
                         <>
                             {summary.lead ? (
                                 <span
@@ -215,6 +236,8 @@ export function SubscriptionsScreen({
                                             ? "outline"
                                             : "default"
                                     }
+                                    // The sheet offers the plans: once read.
+                                    disabled={loading}
                                     onClick={() => setSubscribing(true)}
                                 >
                                     Subscribe someone
@@ -264,7 +287,7 @@ export function SubscriptionsScreen({
                         value: "subscribers",
                         label: "Subscribers",
                         controls: "subscriptions-panel",
-                        count: subscriptions.length,
+                        count: loading ? undefined : rows.length,
                     },
                     {
                         value: "plans",
@@ -284,7 +307,16 @@ export function SubscriptionsScreen({
                 aria-labelledby={`tab-${tab}`}
                 className="pt-4"
             >
-                {onPlans ? (
+                {loading ? (
+                    <PageLoading
+                        bare
+                        width="full"
+                        shape="rows"
+                        label={
+                            onPlans ? "Loading plans" : "Loading subscriptions"
+                        }
+                    />
+                ) : onPlans ? (
                     <PlansTab
                         plans={planRead}
                         canWrite={canWrite}
@@ -295,7 +327,7 @@ export function SubscriptionsScreen({
                         missingRates={missingRates}
                         initialView={view}
                     />
-                ) : subscriptions.length === 0 ? (
+                ) : rows.length === 0 ? (
                     <EmptyState
                         icon={<Repeat />}
                         title="No one is subscribed yet"
@@ -311,7 +343,7 @@ export function SubscriptionsScreen({
                 ) : (
                     <>
                         <SubscribersList
-                            subscriptions={subscriptions}
+                            subscriptions={rows}
                             plans={plans}
                             now={now}
                             initialView={viewFromQuery(view)}
@@ -336,7 +368,7 @@ export function SubscriptionsScreen({
                 canWrite={canWrite}
                 now={now}
             />
-            {canSubscribe ? (
+            {canSubscribe && !loading ? (
                 <SubscribeDialog
                     open={subscribing}
                     onOpenChange={onSubscribeOpenChange}

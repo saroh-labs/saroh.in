@@ -5,7 +5,6 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
@@ -18,6 +17,7 @@ import { subscribe } from "@/lib/subscriptions/actions";
 import { renewalWords } from "@/lib/subscriptions/autopay";
 import { explainStart, intervalWords } from "@/lib/subscriptions/renewal";
 import type { Plan } from "@/lib/subscriptions/service";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -61,7 +61,7 @@ export function SubscribeDialog({
     /** The business offers autopay (D14); unknown reads as not. */
     autopayOffered?: boolean;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useSubscriptionSave();
     const ids = { who: useId(), plan: useId(), start: useId() };
     const active = plans.filter((p) => p.status === "ACTIVE");
     const [contactId, setContactId] = useState(initialContactId ?? "");
@@ -92,12 +92,15 @@ export function SubscribeDialog({
         const res = await runAction(
             () =>
                 rates.run(() =>
-                    subscribe({
-                        contactId,
-                        planId: plan.id,
-                        ...(start ? { startDate: ymd(start) } : {}),
-                        timezone: viewerTimeZone(),
-                    }),
+                    subscribe(
+                        {
+                            contactId,
+                            planId: plan.id,
+                            ...(start ? { startDate: ymd(start) } : {}),
+                            timezone: viewerTimeZone(),
+                        },
+                        orgId,
+                    ),
                 ),
             { setBusy },
         );
@@ -117,8 +120,9 @@ export function SubscribeDialog({
         onOpenChange(false);
         setContactId(initialContactId ?? "");
         setStart(new Date());
-        // rq-refresh-ok: shared with a server-rendered list; on a customer's page it also redraws the tabs still drawn there (Courses, packs, plans) and hydrates the customer read again (until their units).
-        router.refresh();
+        // Subscriptions reads its queries again; elsewhere (a person's page,
+        // not inside the provider) the page is drawn again, as before.
+        await saved();
     }
 
     return (

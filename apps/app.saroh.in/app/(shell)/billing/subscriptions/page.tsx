@@ -1,37 +1,30 @@
 import { PaymentsLocked } from "@/components/invoices/locked/payments-locked";
-import { PageContainer } from "@/components/shared/page/page-container";
-import { SubscriptionsScreen } from "@/components/subscriptions/list/subscriptions-screen";
+import { SubscriptionsContainer } from "@/components/subscriptions/list/subscriptions-container";
 import { membershipPlansLock, onlinePaymentsLock } from "@/lib/billing/access";
-import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
-import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
-import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
-import {
-    getAutopayOffer,
-    getRenewals,
-    getSubscriptionSettings,
-    listChargesBySubscription,
-    listPlansOptional,
-    listSubscriptions,
-} from "@/lib/subscriptions/service";
-import { ranLine, screenTabFromQuery } from "@/lib/subscriptions/view";
+import { getAutopayOffer } from "@/lib/subscriptions/service";
+import { screenTabFromQuery } from "@/lib/subscriptions/view";
 
 export const metadata = { title: "Subscriptions" };
 
-const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
-
 /**
  * Payments → Subscriptions (plan 2026-09-23-003, U12), with Plans as its
- * last tab (`?tab=plans`, D3). The list is the required read. The plans,
- * when renewals last ran and each subscription's charges are optional: a
- * Plans tab that says it couldn't read them, a line left out, or a quick
- * look that says its charges could not be read — never the page.
+ * last tab (`?tab=plans`, D3).
+ *
+ * On React Query (DEC-259): the gate (the locked card for a role without
+ * `subscription:read`, D18) and the business's facts that decide what is
+ * offered (the plan's locks, autopay offered, rates missing, Appointments
+ * on) are the page's; the list, the plans, each subscription's charges and
+ * when renewals last ran (`/api/subscriptions`), the settings for every
+ * plan (`/api/subscriptions/settings`) and who can be subscribed
+ * (`/api/subscriptions/contacts`) are `SubscriptionsContainer`'s queries,
+ * read in the browser into the frame drawn at once.
  *
  * `?view=` is the view someone chose in either tab's list. Without one,
  * Subscribers opens on who needs the owner when anyone does, else on the
@@ -66,69 +59,43 @@ export default async function SubscriptionsPage({
     }
 
     const canWrite = may("subscription:write");
-    const [{ rows: subscriptions, truncated }, planRead, modules] =
-        await Promise.all([
-            listSubscriptions(),
-            listPlansOptional(),
-            modulesOrUnknown(),
-        ]);
-    const [contacts, renewals, charges, settings, autopay, access, rates] =
-        await Promise.all([
-            canWrite ? contactPickerOptions() : Promise.resolve([]),
-            getRenewals().catch(() => null),
-            listChargesBySubscription(),
-            getSubscriptionSettings(),
-            // Whether the copy may promise autopay (D14).
-            getAutopayOffer(),
-            // A plan without memberships or online payments starts no new one;
-            // the ones it has keep renewing.
-            billingAccessOrNull(),
-            // What is on sale with no GST rate; null draws no notice.
-            readMissingRates(),
-        ]);
-    const plans = planRead.state === "ok" ? planRead.data : null;
-    const appointments = modules
-        ? modules.some(
-              (m) => m.key === "APPOINTMENTS" && m.readiness !== "DISABLED",
-          )
-        : null;
-
-    const now = new Date();
-    // Renewals run on each subscription's own zone; the line reads in the
-    // zone most of them share.
-    const zone = subscriptions[0]?.timezone ?? FALLBACK_ZONE;
-    const ran = renewals ? ranLine(renewals, zone, now) : null;
+    const [modules, autopay, access, rates] = await Promise.all([
+        modulesOrUnknown(),
+        // Whether the copy may promise autopay (D14).
+        getAutopayOffer(),
+        // A plan without memberships or online payments starts no new one;
+        // the ones it has keep renewing.
+        billingAccessOrNull(),
+        // What is on sale with no GST rate; null draws no notice.
+        readMissingRates(),
+    ]);
     const tab = screenTabFromQuery(params.tab ?? params.view);
 
     return (
-        <PageContainer width="full">
-            <SubscriptionsScreen
-                subscriptions={subscriptions}
-                truncated={truncated}
-                plans={plans}
-                showClasses={plansShowClasses(appointments, plans ?? [])}
-                contacts={contacts}
-                charges={charges}
-                // When renewals last ran is the system's status: said
-                // only when they are late, as the warning it is.
-                renewalsLate={ran?.late ? ran.text : null}
-                canWrite={canWrite}
-                initialTab={tab}
-                // The view someone chose: the list's on Subscribers
-                // (`?view=`, or `?tab=` on an older link), the plans' on
-                // Plans.
-                initialView={
-                    params.view ?? (tab === "plans" ? undefined : params.tab)
-                }
-                openSubscribe={canWrite && params.subscribe === "1"}
-                subscribePlanId={params.plan}
-                nowIso={now.toISOString()}
-                settings={settings}
-                autopayOffered={autopay?.offered ?? false}
-                newLocked={onlinePaymentsLock(access, "subscriptions")}
-                plansLocked={membershipPlansLock(access)}
-                missingRates={rates}
-            />
-        </PageContainer>
+        <SubscriptionsContainer
+            appointments={
+                modules
+                    ? modules.some(
+                          (m) =>
+                              m.key === "APPOINTMENTS" &&
+                              m.readiness !== "DISABLED",
+                      )
+                    : null
+            }
+            canWrite={canWrite}
+            initialTab={tab}
+            // The view someone chose: the list's on Subscribers (`?view=`,
+            // or `?tab=` on an older link), the plans' on Plans.
+            initialView={
+                params.view ?? (tab === "plans" ? undefined : params.tab)
+            }
+            openSubscribe={canWrite && params.subscribe === "1"}
+            subscribePlanId={params.plan}
+            nowIso={new Date().toISOString()}
+            autopayOffered={autopay?.offered ?? false}
+            newLocked={onlinePaymentsLock(access, "subscriptions")}
+            plansLocked={membershipPlansLock(access)}
+            missingRates={rates}
+        />
     );
 }

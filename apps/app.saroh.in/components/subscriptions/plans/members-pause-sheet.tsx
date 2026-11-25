@@ -8,6 +8,7 @@ import { useId, useState } from "react";
 import { runAction } from "@/lib/api/run-action";
 import { setMembersCanPause } from "@/lib/subscriptions/actions";
 import { PAUSE_LABEL } from "@/lib/subscriptions/plan-settings";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
@@ -38,12 +39,13 @@ export function MembersPauseSheet({
 }) {
     const id = useId();
     const [pending, setPending] = useState(false);
+    const { orgId } = useSubscriptionSave();
     // What was asked for, while the save is on its way.
     const [asked, setAsked] = useState<boolean | null>(null);
 
     async function change(next: boolean) {
         setAsked(next);
-        const res = await runAction(() => setMembersCanPause(next), {
+        const res = await runAction(() => setMembersCanPause(next, orgId), {
             setBusy: setPending,
         });
         setAsked(null);
