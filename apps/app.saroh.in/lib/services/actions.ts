@@ -175,8 +175,10 @@ export async function rescheduleBooking(
 export async function reassignBooking(
     bookingId: string,
     input: { staffId: string; startAt?: string },
+    orgId?: string,
 ) {
-    return reassignBookingApi(bookingId, input);
+    const write = () => reassignBookingApi(bookingId, input);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Who could take a booking at a time (#1157): Change who's list. */

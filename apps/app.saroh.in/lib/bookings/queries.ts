@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { CalendarBusy } from "@/lib/google-calendar/types";
+import type { BookingMeeting, CalendarBusy } from "@/lib/google-calendar/types";
 import type { MomentView } from "@/lib/moments/keys";
 import { defineRead } from "@/lib/query/define-read";
 import type { DomainKey } from "@/lib/query/keys";
@@ -9,8 +9,11 @@ import type {
     BookingsCalendar,
     DiaryBooking,
 } from "@/lib/services/booking-calendar";
+import type { PageBooking } from "@/lib/services/booking-page";
+import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import type { LocalDate, ServiceHours } from "@/lib/services/diary";
 import { addDays, monthDays, weekStartOf } from "@/lib/services/diary";
+import type { PeekPerson } from "@/lib/services/peek";
 import type { ShareLink } from "@/lib/sites/share-links";
 import type { StaffView } from "@/lib/staff/types";
 import type { DateRange } from "@/lib/views/date-range";
@@ -124,3 +127,46 @@ export interface DiaryAsk {
     to: LocalDate;
     week: LocalDate;
 }
+
+/** What a booking's page is asked: the booking, by its id in the path. */
+export interface BookingAsk {
+    bookingId: string;
+}
+
+/**
+ * One booking as its page draws it (U26): the booking, and beside it what
+ * the page shows from other reads, each failing on its own. A field left
+ * out is a panel not drawn; `null` is a read that failed or wasn't asked.
+ */
+export interface BookingView {
+    booking: PageBooking;
+    /** The server's now at the read: past or to come, and the outcome ask. */
+    now: number;
+    /** Class packs (ADR-007): left out for a role that can't read packs. */
+    packs?: {
+        paidWith: { name: string } | null;
+        usable: { id: string; label: string }[];
+        canWrite: boolean;
+    };
+    /** A class still to come's waitlist (A12); null: the read failed. */
+    waitlist?: ClassWaitlistRow[] | null;
+    /** Their phone, Needs attention and reach (`contact:read`); else null. */
+    person: PeekPerson | null;
+    /** Who is on the diary, for New booking and Change who (`booking:write`). */
+    staff: StaffView[] | null;
+    /** Its Meet and Google event (DEC-233); null draws Join online. */
+    meeting: BookingMeeting | null;
+    /** Google Calendar is on here: New booking offers a Meet (`booking:write`). */
+    meet?: boolean;
+}
+
+/** One booking's read: changes from outside (a reschedule, a payment). */
+export const bookingRead = defineRead<BookingView>()({
+    key: (orgId, { bookingId }) =>
+        domainKey("bookings", orgId, "booking", bookingId),
+    route: {
+        path: "/api/bookings/[bookingId]",
+        params: { bookingId: z.string().regex(/^[\w-]{1,64}$/) },
+    },
+    tier: "live",
+});

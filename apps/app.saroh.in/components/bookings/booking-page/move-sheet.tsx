@@ -2,7 +2,6 @@
 
 import { Notice } from "@saroh/ui/notice";
 import { showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
@@ -11,7 +10,7 @@ import {
     movedToldText,
 } from "@/components/bookings/quick-look/quick-look-state";
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
-import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { formatDateTime, formatTime } from "@/lib/format/datetime";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
 import { firstName } from "@/lib/names";
@@ -92,7 +91,7 @@ function MoveDraft({
     now?: number;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { save, saved, refresh, org } = useBookingSave();
     const [picked, setPicked] = useState<string | null>(null);
     const [taken, setTaken] = useState<string | null>(null);
     const [reload, setReload] = useState(0);
@@ -103,9 +102,10 @@ function MoveDraft({
     async function submit() {
         if (!picked || busy) return;
         const to = picked;
-        const res = await runAction(() => rescheduleBooking(booking.id, to), {
-            setBusy,
-        });
+        const res = await save(
+            (...orgId) => rescheduleBooking(booking.id, to, ...orgId),
+            { setBusy },
+        );
         if (!res) return;
         if (!res.ok) {
             if (isTakenRefusal(res.error)) {
@@ -121,15 +121,16 @@ function MoveDraft({
         }
         const told = movedToldText(reach, first);
         onClose();
-        router.refresh();
+        saved();
         showUndo(
             `Moved ${first || "the booking"} to ${formatDateTime(to, timezone, { weekday: "short", relative: "lower", now })}.${told ? ` ${told}` : ""}`,
             async () => {
                 const back = await rescheduleBooking(
                     booking.id,
                     booking.startAt,
+                    ...org,
                 );
-                router.refresh();
+                if (back.ok) refresh();
                 return back;
             },
         );

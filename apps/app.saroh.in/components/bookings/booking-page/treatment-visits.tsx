@@ -2,6 +2,7 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { ArrowRight } from "lucide-react";
 
 import { NewBookingDialog } from "@/components/bookings/new-booking/new-booking-dialog";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import type { TreatmentView } from "@/lib/services/booking-calendar";
 import {
     orderHref,
@@ -35,6 +36,7 @@ export function TreatmentVisits({
     who: string;
     canReadOrder: boolean;
 }) {
+    const { refresh } = useBookingSave();
     const next = visitToBook(treatment, who);
     const done = visitsDoneText(treatment);
     return (
@@ -73,6 +75,8 @@ export function TreatmentVisits({
                         ]}
                         people={{ canSearch: false, payLink: false }}
                         visit={next}
+                        // The booking page, the list and the diary read again.
+                        onBooked={refresh}
                     />
                 ) : null}
             </div>

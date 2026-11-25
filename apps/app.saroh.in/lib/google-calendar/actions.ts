@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import {
     chooseAccountCalendars,
     disconnectGoogleAccount,
@@ -10,6 +11,7 @@ import {
     setBusinessMeetAccess,
     startGoogleConnect,
 } from "./service";
+
 import type { MeetAccess } from "./types";
 
 /**
@@ -55,6 +57,9 @@ export async function saveBookingMeeting(
         meetingUrl?: string;
         meetAccess?: MeetAccess | null;
     },
+    orgId?: string,
 ) {
+    if (orgId)
+        return writeAsOrg(orgId, () => setBookingMeeting(bookingId, input));
     return setBookingMeeting(bookingId, input);
 }

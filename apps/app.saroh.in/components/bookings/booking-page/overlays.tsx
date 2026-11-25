@@ -1,9 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-
 import type { SendHeld } from "@/components/bookings/sheets/cancel-sheet";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { formatDateTime } from "@/lib/format/datetime";
 import { paidLine } from "@/lib/services/booking-money";
 import type { PageBooking } from "@/lib/services/booking-page";
@@ -63,7 +62,7 @@ export function PageOverlays({
     /** The page's own hold, so a plain cancel's Undo outlives the sheet. */
     send: SendHeld;
 }) {
-    const router = useRouter();
+    const { saved } = useBookingSave();
     const money = booking.money;
     const close = () => onOpen(null);
     return (
@@ -130,7 +129,7 @@ export function PageOverlays({
                     onClose={close}
                     onCancelled={() => {
                         close();
-                        router.refresh();
+                        saved();
                     }}
                 />
             ) : null}

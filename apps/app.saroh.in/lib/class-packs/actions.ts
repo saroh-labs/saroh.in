@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import * as detail from "./pack-detail-data";
 import type { DeskPaidBy } from "./sell-words";
 import type { PackInput, PackPurchase } from "./service";
@@ -53,10 +55,21 @@ export async function packsFor(
     return api.readPurchasesFor(contactId, serviceId);
 }
 
+/**
+ * From a booking's page on React Query (U26) the tab's business comes
+ * last: the write is refused when it isn't the open one, and nothing is
+ * revalidated (the page reads its own query again).
+ */
 export async function payBookingWithPack(
     bookingId: string,
     packPurchaseId: string,
+    orgId?: string,
 ) {
+    if (orgId) {
+        return writeAsOrg(orgId, () =>
+            api.payBookingWithPack(bookingId, packPurchaseId),
+        );
+    }
     const res = await then(api.payBookingWithPack(bookingId, packPurchaseId));
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);
     return res;
@@ -78,7 +91,8 @@ export async function olderPackEvents(packId: string, cursor: string) {
     return detail.readPackEvents(packId, cursor);
 }
 
-export async function takePackOffBooking(bookingId: string) {
+export async function takePackOffBooking(bookingId: string, orgId?: string) {
+    if (orgId) return writeAsOrg(orgId, () => api.removeFromBooking(bookingId));
     const res = await then(api.removeFromBooking(bookingId));
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);
     return res;

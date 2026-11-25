@@ -2,10 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import {
     payBookingWithPack,
     takePackOffBooking,
@@ -34,7 +33,7 @@ export function BookingPackControl({
     usable: { id: string; label: string }[];
     canWrite: boolean;
 }) {
-    const router = useRouter();
+    const { save, saved, refresh } = useBookingSave();
     const selectId = useId();
     const [busy, setBusy] = useState(false);
     const [pick, setPick] = useState(usable.at(0)?.id ?? "");
@@ -42,26 +41,28 @@ export function BookingPackControl({
     async function use() {
         const chosen = usable.find((p) => p.id === pick);
         if (!chosen) return;
-        const res = await runAction(
-            () => payBookingWithPack(bookingId, chosen.id),
+        const res = await save(
+            (...orgId) => payBookingWithPack(bookingId, chosen.id, ...orgId),
             { setBusy },
         );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);
-            router.refresh();
+            // The pack may have gone meanwhile: what can pay is read again.
+            refresh();
             return;
         }
         showSuccess(
             `Paid with ${res.data.purchase.pack.name}. ${res.data.purchase.left} left.`,
         );
-        router.refresh();
+        saved();
     }
 
     async function takeOff() {
-        const res = await runAction(() => takePackOffBooking(bookingId), {
-            setBusy,
-        });
+        const res = await save(
+            (...orgId) => takePackOffBooking(bookingId, ...orgId),
+            { setBusy },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
@@ -69,7 +70,7 @@ export function BookingPackControl({
                 ? "The pack is off this booking, and its class is back."
                 : "This booking was not paid with a pack.",
         );
-        router.refresh();
+        saved();
     }
 
     if (paidWith) {
