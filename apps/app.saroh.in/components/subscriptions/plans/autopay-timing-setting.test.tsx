@@ -274,6 +274,7 @@ describe("When autopay charges: the row and its sheet", () => {
         await press(button("Save", sheet()));
         expect(actions.setAutopayChargeTiming).toHaveBeenCalledWith(
             "ON_DUE_DATE",
+            undefined,
         );
         // The row reads the save at once, and the page is read again.
         expect(row()).toBe("Autopay charges on the due date.");
@@ -290,6 +291,7 @@ describe("When autopay charges: the row and its sheet", () => {
         });
         expect(actions.setAutopayChargeTiming).toHaveBeenLastCalledWith(
             "DAY_AFTER_RENEWAL",
+            undefined,
         );
         expect(row()).toBe("Autopay charges the day after renewal.");
     });

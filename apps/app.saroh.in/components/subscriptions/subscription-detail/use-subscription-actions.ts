@@ -2,7 +2,6 @@
 
 import { formatDate } from "@/lib/format/datetime";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
@@ -23,10 +22,13 @@ import {
 import type { PauseOption } from "@/lib/subscriptions/pause";
 import { pauseAgain } from "@/lib/subscriptions/pause";
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 import type { CollectionRow } from "@/lib/subscriptions/view";
 
 /**
- * Subscription Detail's writes. Each is one call, then the page reads again.
+ * Subscription Detail's writes. Each is one call as the tab's business,
+ * then the subscription and the list are read again (`useSubscriptionSave`);
+ * a refused one reads nothing.
  * Its toast carries the Undo (the inverse call), and `showUndo` says how
  * that went. Cancel tells the customer, so it waits ten seconds with Undo
  * before anything is written (`useHold`).
@@ -41,7 +43,7 @@ export function useSubscriptionActions(
     now: Date,
     closeStep: () => void,
 ) {
-    const router = useRouter();
+    const { orgId, saved } = useSubscriptionSave();
     const tz = sub.timezone;
     const [busy, setBusy] = useState(false);
     const [busyDate, setBusyDate] = useState<string | null>(null);
@@ -68,15 +70,19 @@ export function useSubscriptionActions(
             ok: false,
             error: UNREACHED,
         }));
-        setBusy(false);
-        if (!res) return false;
-        if (!res.ok) {
-            showError(res.error ?? "That didn't go through. Try again.");
-            router.refresh();
+        if (!res) {
+            setBusy(false);
             return false;
         }
+        if (!res.ok) {
+            setBusy(false);
+            showError(res.error ?? "That didn't go through. Try again.");
+            return false;
+        }
+        // Busy until the screen shows what changed.
+        await saved();
+        setBusy(false);
         done(res);
-        router.refresh();
         return true;
     }
 
@@ -84,7 +90,7 @@ export function useSubscriptionActions(
     const undo =
         (call: () => Promise<{ ok: boolean; error?: string }>) => async () => {
             const r = await call();
-            router.refresh();
+            if (r.ok) await saved();
             return r;
         };
 
@@ -95,14 +101,14 @@ export function useSubscriptionActions(
 
     function pause(option: PauseOption) {
         void run(
-            () => pauseSubscription(sub.id, option.choice),
+            () => pauseSubscription(sub.id, option.choice, orgId),
             () => {
                 closeStep();
                 showUndo(
                     option.until
                         ? `Paused until ${formatDate(option.until, tz, { now })}. It restarts on its own.`
                         : "Paused. Nothing is charged until you resume it.",
-                    undo(() => resumeSubscription(sub.id)),
+                    undo(() => resumeSubscription(sub.id, orgId)),
                 );
             },
         );
@@ -111,11 +117,11 @@ export function useSubscriptionActions(
         // Undo puts the same pause back, to the same day when it had one.
         const again = pauseAgain(sub, now);
         void run(
-            () => resumeSubscription(sub.id),
+            () => resumeSubscription(sub.id, orgId),
             () =>
                 showUndo(
                     "Resumed.",
-                    undo(() => pauseSubscription(sub.id, again)),
+                    undo(() => pauseSubscription(sub.id, again, orgId)),
                 ),
         );
     }
@@ -125,15 +131,15 @@ export function useSubscriptionActions(
         void run(
             // No GST rate on the plan they move to: chosen here, saved on
             // it, then the change is booked.
-            () => rates.run(() => changePlan(sub.id, planId)),
+            () => rates.run(() => changePlan(sub.id, planId, orgId)),
             () => {
                 closeStep();
                 showUndo(
                     `Switches to ${plan?.name ?? "the new plan"}${nextText ? ` on ${nextText}` : " at the next renewal"}.`,
                     undo(() =>
                         before
-                            ? changePlan(sub.id, before)
-                            : cancelPlanChange(sub.id),
+                            ? changePlan(sub.id, before, orgId)
+                            : cancelPlanChange(sub.id, orgId),
                     ),
                 );
             },
@@ -142,13 +148,13 @@ export function useSubscriptionActions(
     function keepCurrentPlan() {
         const before = sub.pendingPlan?.id;
         void run(
-            () => cancelPlanChange(sub.id),
+            () => cancelPlanChange(sub.id, orgId),
             () =>
                 showUndo(
                     `Stays on ${sub.plan.name}.`,
                     undo(() =>
                         before
-                            ? changePlan(sub.id, before)
+                            ? changePlan(sub.id, before, orgId)
                             : Promise.resolve({ ok: true }),
                     ),
                 ),
@@ -167,8 +173,12 @@ export function useSubscriptionActions(
                     sub.id,
                     when,
                     voidInvoiceId,
+                    orgId,
                 );
-                router.refresh();
+                // Cancelled with the invoice left open is still a change.
+                if (res.ok || res.error.startsWith("Cancelled")) {
+                    await saved();
+                }
                 return res.ok ? { ok: true } : { ok: false, error: res.error };
             },
             sent: "Subscription cancelled.",
@@ -181,11 +191,18 @@ export function useSubscriptionActions(
     }
     function keep() {
         void run(
-            () => keepSubscription(sub.id),
+            () => keepSubscription(sub.id, orgId),
             () =>
                 showUndo(
                     "It keeps renewing.",
-                    undo(() => cancelSubscription(sub.id, "periodEnd")),
+                    undo(() =>
+                        cancelSubscription(
+                            sub.id,
+                            "periodEnd",
+                            undefined,
+                            orgId,
+                        ),
+                    ),
                 ),
         );
     }
@@ -195,8 +212,8 @@ export function useSubscriptionActions(
         await run(
             () =>
                 skipped
-                    ? unskipCollection(sub.id, row.date)
-                    : skipCollection(sub.id, row.date),
+                    ? unskipCollection(sub.id, row.date, orgId)
+                    : skipCollection(sub.id, row.date, orgId),
             () =>
                 showUndo(
                     skipped
@@ -204,8 +221,8 @@ export function useSubscriptionActions(
                         : `Skipped ${row.label}. Nothing is refunded. It isn't collected.`,
                     undo(() =>
                         skipped
-                            ? skipCollection(sub.id, row.date)
-                            : unskipCollection(sub.id, row.date),
+                            ? skipCollection(sub.id, row.date, orgId)
+                            : unskipCollection(sub.id, row.date, orgId),
                     ),
                 ),
         );
@@ -215,7 +232,7 @@ export function useSubscriptionActions(
         const invoiceId = sub.failedCharge?.id;
         if (!invoiceId) return;
         void run(
-            () => makePayLink(invoiceId),
+            () => makePayLink(invoiceId, undefined, orgId),
             (res) => {
                 if ("data" in res) setPayLink(res.data.url);
                 showSuccess(
@@ -233,7 +250,7 @@ export function useSubscriptionActions(
      */
     function chargeAgain() {
         void run(
-            () => retrySubscription(sub.id, "MANDATE"),
+            () => retrySubscription(sub.id, "MANDATE", orgId),
             (res) => {
                 if ("data" in res && res.data.paid) {
                     showSuccess(

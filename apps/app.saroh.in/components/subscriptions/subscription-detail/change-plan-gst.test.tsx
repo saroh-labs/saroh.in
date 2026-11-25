@@ -203,7 +203,12 @@ describe("a plan change onto a plan with no GST rate", () => {
             { kind: "PLAN", id: "pl_gold", rate: "18" },
         ]);
         expect(actions.changePlan).toHaveBeenCalledTimes(2);
-        expect(actions.changePlan).toHaveBeenLastCalledWith("sub_1", "pl_gold");
+        expect(actions.changePlan).toHaveBeenLastCalledWith(
+            "sub_1",
+            "pl_gold",
+            // Outside Subscriptions' provider: no business named.
+            undefined,
+        );
         expect(closeStep).toHaveBeenCalled();
         expect(toast.showUndo).toHaveBeenCalledWith(
             expect.stringContaining("Switches to Gold monthly"),

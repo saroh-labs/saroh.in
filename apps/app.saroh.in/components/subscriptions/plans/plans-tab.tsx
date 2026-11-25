@@ -21,7 +21,6 @@ import {
     Repeat,
     RotateCcw,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
@@ -52,6 +51,7 @@ import {
 } from "@/lib/subscriptions/plan-cards";
 import { editHref } from "@/lib/subscriptions/plan-editor";
 import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 
 import { PlanSettings } from "./plan-settings";
 
@@ -137,7 +137,7 @@ export function PlansTab({
     /** `?view=`: the view the address chose. Unknown opens on Live. */
     initialView?: string;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useSubscriptionSave();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [, start] = useTransition();
 
@@ -145,7 +145,7 @@ export function PlansTab({
         setBusyId(plan.id);
         start(async () => {
             const res = await runAction(() =>
-                setPlanArchived(plan.id, archived),
+                setPlanArchived(plan.id, archived, orgId),
             );
             setBusyId(null);
             if (!res) return;
@@ -154,7 +154,7 @@ export function PlansTab({
                 reportFailure(res);
                 return;
             }
-            router.refresh();
+            await saved();
             // One Undo on screen at a time: an older one would undo the
             // wrong plan.
             dismissToasts();
@@ -169,11 +169,11 @@ export function PlansTab({
                 () =>
                     start(async () => {
                         const back = await runAction(() =>
-                            setPlanArchived(plan.id, !archived),
+                            setPlanArchived(plan.id, !archived, orgId),
                         );
                         if (!back) return;
-                        if (!back.ok) reportFailure(back);
-                        router.refresh();
+                        if (!back.ok) return reportFailure(back);
+                        await saved();
                     }),
                 { duration: HOLD_UNDO_MS },
             );
@@ -187,7 +187,7 @@ export function PlansTab({
                 description={nothingChanged(
                     "Every plan is still on sale, and subscriptions still renew.",
                 )}
-                onRetry={() => router.refresh()}
+                onRetry={() => void saved()}
             />
         );
     }
