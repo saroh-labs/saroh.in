@@ -24,6 +24,8 @@ export type PageShape =
     | "rows"
     | "figures"
     | "panels"
+    // The Calendar's month grid and its day panel, under its toolbar.
+    | "calendar"
     // The header alone: the shell's own loader, before a section's.
     | "none"
     // Regions of an editor, drawn `bare` inside the frame that stays.
@@ -565,6 +567,33 @@ function InspectorBody(rows = 5) {
     );
 }
 
+/**
+ * The Calendar (bookings U13): the month's grid, five weeks of seven days
+ * at MonthGrid's heights, and the day's panel beside it from a wide desk.
+ */
+function CalendarBody(weeks = 5) {
+    return (
+        <div className="grid gap-[18px] min-[1100px]:grid-cols-[minmax(0,1fr)_360px] min-[1100px]:items-start">
+            <div className={CARD}>
+                <div className="h-7 border-b border-border bg-muted/60" />
+                <div className="grid grid-cols-7">
+                    {Array.from({ length: weeks * 7 }, (_, i) => (
+                        <div
+                            key={i}
+                            className="flex h-[52px] justify-center border-b border-r border-border/70 pt-2 min-[760px]:h-[104px] min-[760px]:justify-start min-[760px]:px-2.5"
+                        >
+                            <Skeleton className="h-3 w-5" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="max-[1099px]:hidden">
+                <Panel />
+            </div>
+        </div>
+    );
+}
+
 const REGION = { writing: true, canvas: true, inspector: true };
 
 const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
@@ -580,6 +609,7 @@ const BODY: Record<PageShape, (rows?: number) => ReactNode> = {
     rows: RowsBody,
     figures: FiguresBody,
     panels: PanelsBody,
+    calendar: CalendarBody,
     none: () => null,
     writing: WritingBody,
     canvas: CanvasBody,

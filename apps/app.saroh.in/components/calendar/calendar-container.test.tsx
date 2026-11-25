@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
  * The Business Calendar on React Query (DEC-259), in the browser: the
- * first load shows the route's loader, then the month from one read
+ * first load draws the toolbar at once (working) over the grid's skeleton
+ * (owner, 25 Nov), then the month from one read
  * (nothing comes with the page's HTML); a month already read is mounted
  * over without a read; a new month is one read,
  * the old one kept and greyed meanwhile; Back opens a month seen from the
@@ -135,13 +136,11 @@ function hydrated() {
     return client;
 }
 
-const SKELETON = <p>loading</p>;
-
 function open(client = hydrated()) {
-    return renderWithQuery(
-        <CalendarContainer now={NOW} can={CAN} skeleton={SKELETON} />,
-        { client, orgId: ORG },
-    );
+    return renderWithQuery(<CalendarContainer now={NOW} can={CAN} />, {
+        client,
+        orgId: ORG,
+    });
 }
 
 /** The address changed in place (a link's `pushState`, or Back). */
@@ -178,18 +177,44 @@ class Boundary extends Component<{ children: ReactNode }, { error: unknown }> {
 }
 
 describe("the calendar's reads", () => {
-    it("first load shows the loader, then this month from one read", async () => {
+    it("first load draws the toolbar and the grid's skeleton, then this month from one read", async () => {
         const release = held();
         const { host, unmount } = open(makeTestClient());
-        expect(host.textContent).toBe("loading");
+        expect(host.querySelector("h1")?.textContent).toBe("November 2026");
+        expect(
+            host.querySelector('[aria-label="Previous month"]'),
+        ).not.toBeNull();
+        expect(host.textContent).toContain("This month");
+        expect(host.textContent).toContain("Week");
+        expect(host.querySelector('[data-shape="calendar"]')).not.toBeNull();
         expect(shown.props).toBeNull();
         release();
         await tick();
+        expect(host.querySelector('[data-shape="calendar"]')).toBeNull();
         expect(host.textContent).toBe("");
         expect(drawn()).toBe("2026-11");
         expect(reads()).toEqual([
             "/api/calendar?from=2026-11-01&to=2026-11-30",
         ]);
+        unmount();
+    });
+
+    it("‹ before the first read lands moves the key (its link's in-place address)", async () => {
+        held();
+        const { host, unmount } = open(makeTestClient());
+        // The link is there at once; Next's router runs its in-place
+        // `pushState`, which the test does by hand.
+        expect(
+            host
+                .querySelector('a[aria-label="Previous month"]')
+                ?.getAttribute("href"),
+        ).toBe("/calendar?month=2026-10");
+        go("month=2026-10");
+        await tick();
+        expect(host.querySelector("h1")?.textContent).toBe("October 2026");
+        expect(reads()).toContain(
+            "/api/calendar?from=2026-10-01&to=2026-10-31",
+        );
         unmount();
     });
 
@@ -287,7 +312,7 @@ describe("the calendar's reads", () => {
         const client = hydrated();
         const { host, unmount } = renderWithQuery(
             <Boundary>
-                <CalendarContainer now={NOW} can={CAN} skeleton={SKELETON} />
+                <CalendarContainer now={NOW} can={CAN} />
             </Boundary>,
             { client, orgId: ORG },
         );

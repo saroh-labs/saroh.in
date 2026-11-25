@@ -1,8 +1,8 @@
 "use client";
 
 import { PageContainer } from "@saroh/ui/page-container";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
 import { useEffect } from "react";
 
 import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
@@ -12,11 +12,16 @@ import {
     CalendarLocked,
     CalendarNothing,
 } from "@/components/calendar/calendar-nothing";
+import { MonthToolbar } from "@/components/calendar/month-toolbar";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { ScreenPending } from "@/components/shared/page/screen-pending";
 import { calendarMonthPage, calendarWeekPage } from "@/lib/ask-ai/page-hints";
-import type { CalendarNow } from "@/lib/calendar/queries";
+import { monthTitle, shiftMonth } from "@/lib/calendar/layers";
+import type { CalendarAt, CalendarNow } from "@/lib/calendar/queries";
 import { calendarAt, openHref } from "@/lib/calendar/queries";
+import { calendarHref } from "@/lib/calendar/team";
 import { CalendarReadAgain, useCalendar } from "@/lib/calendar/use-calendar";
+import { addDays, isThisWeek, weekHref, weekTitle } from "@/lib/calendar/week";
 import { ReadFailed } from "@/lib/query/client";
 
 type Can = React.ComponentProps<typeof BusinessWeek>["can"];
@@ -27,19 +32,19 @@ type Can = React.ComponentProps<typeof BusinessWeek>["can"];
  * place (`ScreenPending` `inPlace`), the month or week shown is read from
  * the calendar's query for the days it covers, and the last one stays,
  * greyed, until the new one arrives. Back opens the one before from the
- * cache. The first one too is read in the browser, behind the route's
- * loader (`skeleton`). The parts stay props-in.
+ * cache. The first one too is read in the browser: until it lands the
+ * toolbar is drawn at once from the address (‹ ›, This month, Month | Week,
+ * all working) and the grid is the route loader's calendar shape; What to
+ * show, which lists what the business has, waits as a bar (owner, 25 Nov).
+ * The parts stay props-in.
  */
 export function CalendarContainer({
     now,
     can,
-    skeleton,
 }: {
     /** Today and this month in the business's zone. */
     now: CalendarNow;
     can: Can;
-    /** The route's loader, until the first month or week is read. */
-    skeleton: ReactNode;
 }) {
     const search = useSearchParams();
     const team = search.get("team") ?? undefined;
@@ -80,7 +85,15 @@ export function CalendarContainer({
     }
     if (read?.kind === "locked") return <CalendarLocked />;
     // Not read yet, or moving to the month the API named (E20).
-    if (read?.kind !== "month") return skeleton;
+    if (read?.kind !== "month") {
+        return (
+            <PageContainer width="full">
+                <ScreenPending inPlace={{ pending: false }}>
+                    <CalendarReading at={at} now={now} team={team} />
+                </ScreenPending>
+            </PageContainer>
+        );
+    }
     const data = read.data;
     const pending = query.isPlaceholderData;
     // What is drawn is what was read: while a switch of view is on its way,
@@ -128,5 +141,114 @@ export function CalendarContainer({
                 </ScreenPending>
             </CalendarReadAgain.Provider>
         </PageContainer>
+    );
+}
+
+/**
+ * The Calendar before its first read: the toolbar as the address asks for
+ * it, and the grid's shape. The edges of what the calendar reaches come with
+ * the read, so ‹ › aren't stopped yet; a month out of reach is moved by the
+ * read (E20).
+ */
+function CalendarReading({
+    at,
+    now,
+    team,
+}: {
+    at: CalendarAt;
+    now: CalendarNow;
+    team?: string;
+}) {
+    const filter = (
+        <Skeleton aria-hidden className="h-8 w-[132px] max-[759px]:w-full" />
+    );
+    let toolbar: React.ReactNode;
+    if (at.view === "week") {
+        const from = at.span.from;
+        const href = (day: string) => weekHref({ day, today: now.today, team });
+        toolbar = (
+            <MonthToolbar
+                title={weekTitle(from, now.today)}
+                prev={{
+                    href: href(addDays(from, -7)),
+                    label: "Previous week",
+                    edge: null,
+                }}
+                next={{
+                    href: href(addDays(from, 7)),
+                    label: "Next week",
+                    edge: null,
+                }}
+                current={{
+                    label: "This week",
+                    href: href(now.today),
+                    here: isThisWeek(from, now.today),
+                }}
+                view={{
+                    value: "week",
+                    hrefs: {
+                        month: calendarHref({
+                            month: from.slice(0, 7),
+                            thisMonth: now.thisMonth,
+                            team,
+                        }),
+                        week: href(from),
+                    },
+                }}
+                filter={filter}
+            />
+        );
+    } else {
+        const month = at.span.from.slice(0, 7);
+        const href = (m: string) =>
+            calendarHref({ month: m, thisMonth: now.thisMonth, team });
+        toolbar = (
+            <MonthToolbar
+                title={monthTitle(month)}
+                prev={{
+                    href: href(shiftMonth(month, -1)),
+                    label: "Previous month",
+                    edge: null,
+                }}
+                next={{
+                    href: href(shiftMonth(month, 1)),
+                    label: "Next month",
+                    edge: null,
+                }}
+                current={{
+                    label: "This month",
+                    href: href(now.thisMonth),
+                    here: month === now.thisMonth,
+                }}
+                view={{
+                    value: "month",
+                    hrefs: {
+                        month: href(month),
+                        week: weekHref({
+                            day:
+                                month === now.thisMonth
+                                    ? now.today
+                                    : `${month}-01`,
+                            today: now.today,
+                            team,
+                        }),
+                    },
+                }}
+                filter={filter}
+            />
+        );
+    }
+    return (
+        <>
+            {toolbar}
+            <div className="!mt-3.5">
+                <PageLoading
+                    bare
+                    width="full"
+                    shape="calendar"
+                    label="Loading the calendar"
+                />
+            </div>
+        </>
     );
 }
