@@ -77,6 +77,7 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "billing/invoices/[invoiceId]": "full", // `InvoiceDetailContainer`
     "commerce/stock": "full", // `StockContainer`
     "contacts/[contactId]": "full", // `CustomerDetailContainer`
+    "leads/[leadId]": "default", // `LeadDetailContainer`
     // Ask AI's full page draws its list and conversation edge to edge.
     ask: "full",
     // The post editor owns its viewport.
