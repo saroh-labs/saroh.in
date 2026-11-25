@@ -23,6 +23,7 @@ import type {
 } from "@/lib/qr/types";
 import type { QrRefusalWords } from "@/lib/qr/words";
 import { defaultLabel, linkWords, refusalWords } from "@/lib/qr/words";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 import type {
     DownloadEnv,
@@ -144,6 +145,7 @@ function start(input: UseQrMakerInput): {
 export function useQrMaker(input: UseQrMakerInput) {
     const { siteId, origin, targets, codes, changing } = input;
     const env = input.env ?? BROWSER;
+    const { orgId } = useSettingsSave();
     const [initial] = useState(() => start(input));
     const [draft, setDraft] = useState(initial.draft);
     const [boundTo, setBound] = useState(initial.bound);
@@ -258,15 +260,19 @@ export function useQrMaker(input: UseQrMakerInput) {
         const label = draft.label.trim() || null;
         let res: QrResult<QrCodeView>;
         if (!bound) {
-            res = await createQrCode(siteId, {
-                targetKind: kind,
-                targetRef: ref,
-                place: draft.place,
-                placeNote: noteOf(draft),
-                label,
-                style: draft.style,
-                color: draft.color,
-            });
+            res = await createQrCode(
+                siteId,
+                {
+                    targetKind: kind,
+                    targetRef: ref,
+                    place: draft.place,
+                    placeNote: noteOf(draft),
+                    label,
+                    style: draft.style,
+                    color: draft.color,
+                },
+                ...asOrg(orgId),
+            );
         } else {
             const change: QrCodeChange = {};
             if (targetDirty) {
@@ -284,7 +290,7 @@ export function useQrMaker(input: UseQrMakerInput) {
             if (bound.color.toLowerCase() !== draft.color) {
                 change.color = draft.color;
             }
-            res = await updateQrCode(siteId, bound.id, change);
+            res = await updateQrCode(siteId, bound.id, change, ...asOrg(orgId));
         }
         if (!res.ok) {
             refused(res);

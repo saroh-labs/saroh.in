@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 
 import {
@@ -27,6 +28,11 @@ import {
  * Thin wrappers, as everywhere else: the API resolves the caller from the
  * session and decides what their role may do. Nothing here is a permission
  * check — the members screen hides what it can, and the API refuses it.
+ *
+ * Team on React Query (DEC-259) passes the tab's business last: the write
+ * goes through `writeAsOrg` (a moved tab is refused) and revalidates
+ * nothing; the screen reads its own queries again
+ * (`useSettingsSave`).
  */
 
 /**
@@ -36,7 +42,8 @@ import {
  */
 const TEAM_PATH = "/settings/people";
 
-export async function inviteMember(input: InviteMemberInput) {
+export async function inviteMember(input: InviteMemberInput, orgId?: string) {
+    if (orgId) return writeAsOrg(orgId, () => inviteMemberApi(input));
     const res = await inviteMemberApi(input);
     if (res.ok) revalidatePath(TEAM_PATH);
     return res;
@@ -46,7 +53,10 @@ export async function inviteMember(input: InviteMemberInput) {
 export async function updateMemberRole(
     userId: string,
     input: { role: string; siteIds?: string[] },
+    orgId?: string,
 ) {
+    if (orgId)
+        return writeAsOrg(orgId, () => updateMemberRoleApi(userId, input));
     const res = await updateMemberRoleApi(userId, input);
     if (res.ok) revalidatePath("/", "layout");
     return res;
@@ -56,13 +66,23 @@ export async function updateMemberRole(
  * A person's extra permissions (F17). Revalidates the layout: what someone
  * holds decides what their rail shows.
  */
-export async function setMemberExtraActions(userId: string, actions: string[]) {
+export async function setMemberExtraActions(
+    userId: string,
+    actions: string[],
+    orgId?: string,
+) {
+    if (orgId) {
+        return writeAsOrg(orgId, () =>
+            setMemberExtraActionsApi(userId, actions),
+        );
+    }
     const res = await setMemberExtraActionsApi(userId, actions);
     if (res.ok) revalidatePath("/", "layout");
     return res;
 }
 
-export async function removeMember(userId: string) {
+export async function removeMember(userId: string, orgId?: string) {
+    if (orgId) return writeAsOrg(orgId, () => removeMemberApi(userId));
     const res = await removeMemberApi(userId);
     if (res.ok) revalidatePath(TEAM_PATH);
     return res;
@@ -85,13 +105,17 @@ export async function leaveBusiness() {
     return res;
 }
 
-export async function revokeInvitation(invitationId: string) {
+export async function revokeInvitation(invitationId: string, orgId?: string) {
+    if (orgId)
+        return writeAsOrg(orgId, () => revokeInvitationApi(invitationId));
     const res = await revokeInvitationApi(invitationId);
     if (res.ok) revalidatePath(TEAM_PATH);
     return res;
 }
 
 /** Team's storefront-people notice, dismissed for the business (F16). */
-export async function dismissStorefrontTeamNotice() {
-    return dismissStorefrontTeamNoticeApi();
+export async function dismissStorefrontTeamNotice(orgId?: string) {
+    return orgId
+        ? writeAsOrg(orgId, () => dismissStorefrontTeamNoticeApi())
+        : dismissStorefrontTeamNoticeApi();
 }

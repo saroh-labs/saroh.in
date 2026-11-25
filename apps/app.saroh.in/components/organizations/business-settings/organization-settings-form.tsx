@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { DetailTab } from "@/components/organizations/business-details/business-detail-rows";
@@ -32,6 +31,7 @@ import {
 } from "@/lib/organizations/business-rows";
 import { savedWords } from "@/lib/organizations/business-sheet-words";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { useSettingsSave, useSettingsStale } from "@/lib/settings/use-settings";
 import type { StorefrontHoursRead } from "@/lib/stores/storefronts";
 import { TabStrip } from "@saroh/ui/tabs";
 import { BusinessFieldSheet } from "./business-field-sheet";
@@ -84,19 +84,28 @@ export function OrganizationSettingsForm({
      */
     webAddress?: React.ReactNode;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
+    const markStale = useSettingsStale();
     // What the API last said, so the rows read a save at once rather than
     // waiting for the page to be fetched again.
-    const [settings, setSettings] = useState(initial);
+    const [settings, setLocal] = useState(initial);
+    // Every save here: the tab's read (its checklist) is read again, and
+    // the other Settings tabs on their next visit.
+    const setSettings = (next: OrganizationSettings) => {
+        setLocal(next);
+        save.saved();
+    };
     // In the address, so Search settings can open the tab a setting is on.
     const tabs = businessTabsFor(PROFILE.payInstructionsOffered);
     const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, tabs, "identity");
     // Undo on a save (F12); what it saved back shows at once.
     const undo = useSettingsUndo();
     const applySaved = (next: OrganizationSettings) => {
-        setSettings(next);
-        // The header switcher renders the name: refresh so a rename shows.
-        router.refresh();
+        setLocal(next);
+        // The save's action draws the server's chrome again (the header's
+        // name, the words for what is set up); the tab's read and the
+        // business list are read again here.
+        save.saved({ organizations: true });
     };
     const saved = valuesOf(settings);
     const mayEditHours = canEdit && canEditHours && hasHoursToEdit(hours);
@@ -155,7 +164,12 @@ export function OrganizationSettingsForm({
                     hidden={tab !== "hours"}
                     canEdit={mayEditHours}
                     sheets={sheets}
-                    offerUndo={undo.offer}
+                    // The section keeps the weeks it saved; the held read is
+                    // marked so the tab, opened again, reads them.
+                    offerUndo={(...a: Parameters<typeof undo.offer>) => {
+                        undo.offer(...a);
+                        markStale();
+                    }}
                 />
                 {/* Its own preview: what customers see. Not offered where
                     the edition has no How to pay us (DEC-208). */}

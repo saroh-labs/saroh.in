@@ -24,7 +24,10 @@ export function stringList(text, name) {
         `export const ${name}\\b[^=]*=\\s*\\[([\\s\\S]*?)\\]\\s*;`,
     ).exec(text ?? "");
     if (!m) return [];
-    return [...m[1].matchAll(/["']([^"']+)["']/g)].map((s) => s[1]);
+    // Comments dropped first: an apostrophe in one ("the others' writers")
+    // would pair with a quote and swallow the entries after it.
+    const body = m[1].replace(/\/\/[^\n]*/g, "");
+    return [...body.matchAll(/["']([^"']+)["']/g)].map((s) => s[1]);
 }
 
 /** A file's route under `app/`, or null: groups, slots and `_private` folders dropped. */

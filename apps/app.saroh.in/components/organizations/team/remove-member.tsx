@@ -3,10 +3,10 @@
 import { count } from "@/lib/format/plural";
 import { removeMember } from "@/lib/organizations/member-actions";
 import type { OrganizationMember } from "@/lib/organizations/members";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { nameOf } from "./role-book";
 
 /**
@@ -28,12 +28,12 @@ export function RemoveMember({
     organizationName: string;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const name = member ? nameOf(member) : "They";
 
     async function remove(): Promise<ConfirmResult> {
         if (!member) return;
-        const res = await removeMember(member.userId);
+        const res = await removeMember(member.userId, ...asOrg(save.orgId));
         if (!res.ok) return { ok: false, error: res.error };
         const links = res.data.revokedLinks;
         showSuccess(
@@ -42,7 +42,7 @@ export function RemoveMember({
                 ? `They can no longer open ${organizationName}, and ${count(links, "share link")} they made stopped working.`
                 : `They can no longer open ${organizationName}.`,
         );
-        router.refresh();
+        save.saved({ organizations: true, shell: true });
     }
 
     return (

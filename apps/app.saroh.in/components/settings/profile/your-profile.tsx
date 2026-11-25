@@ -2,7 +2,10 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
 import { LeaveBusiness } from "@/components/organizations/team/leave-business";
-import type { AlertPreferencesRead } from "@/lib/notifications/preferences";
+import type {
+    AlertPreferences,
+    AlertPreferencesRead,
+} from "@/lib/notifications/preferences";
 
 import { StaffProfileFields } from "@/components/staff/profile-photo";
 
@@ -35,7 +38,18 @@ export function YourProfile({
     leave = null,
     sharesUsage,
     mine = null,
+    save,
 }: {
+    /**
+     * On React Query (DEC-259): the tab's business, and what each save
+     * puts back in the cache. Left out, each part saves as before.
+     */
+    save?: {
+        orgId: string;
+        alerts: (prefs: AlertPreferences) => void;
+        sharesUsage: (on: boolean) => void;
+        photo: () => void;
+    };
     /**
      * Your place on the diary, when you are on it: your photo and "About
      * them", which show on the website's Our team and the calendar. Null
@@ -97,6 +111,7 @@ export function YourProfile({
                             name={name}
                             photo={mine.photo}
                             about={mine.about}
+                            onSaved={save?.photo}
                         />
                     </div>
                 ) : null}
@@ -148,10 +163,18 @@ export function YourProfile({
                 </p>
             </section>
 
-            <AlertsGrid read={alerts} />
+            <AlertsGrid
+                read={alerts}
+                save={save && { orgId: save.orgId, saved: save.alerts }}
+            />
 
             {sharesUsage === undefined ? null : (
-                <UsageSharingCard on={sharesUsage} />
+                <UsageSharingCard
+                    on={sharesUsage}
+                    save={
+                        save && { orgId: save.orgId, saved: save.sharesUsage }
+                    }
+                />
             )}
 
             {leave ? (

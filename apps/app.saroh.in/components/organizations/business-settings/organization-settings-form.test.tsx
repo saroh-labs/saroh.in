@@ -158,8 +158,9 @@ describe("Identity's rows and sheets", () => {
             host.querySelector('aside[aria-label="How it prints"]')
                 ?.textContent,
         ).toContain("Northwind & Co.");
-        // The header switcher shows the name: the page reads again.
-        expect(refresh).toHaveBeenCalled();
+        // The save's action draws the page again (the header's name with
+        // it): no second read of the page from here (DEC-259).
+        expect(refresh).not.toHaveBeenCalled();
     });
 
     it("Cancel, Escape and Close save nothing, and the next opening starts from what is saved", async () => {

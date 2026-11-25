@@ -79,6 +79,16 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "billing/invoices/[invoiceId]": "full", // `InvoiceDetailContainer`
     "commerce/stock": "full", // `StockContainer`
     "contacts/[contactId]": "full", // `CustomerDetailContainer`
+    // Team, Your profile and Business are drawn in place by one client
+    // screen (`SettingsTabScreen`), each in its `SettingsPanel`.
+    "settings/(sections)/people": "settings",
+    "settings/(sections)/profile": "settings",
+    "settings/(sections)/organization": "settings",
+    // Share's page keeps the module gate; `ShareContainer` draws its panel.
+    "settings/(sections)/share": "settings",
+    "settings/(sections)/modules": "settings",
+    "settings/(sections)/integrations": "settings",
+    "settings/(sections)/billing": "settings",
     // Ask AI's full page draws its list and conversation edge to edge.
     ask: "full",
     // The post editor owns its viewport.

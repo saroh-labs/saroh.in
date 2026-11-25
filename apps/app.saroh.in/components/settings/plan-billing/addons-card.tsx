@@ -4,12 +4,12 @@ import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { setAddonAction } from "@/lib/saroh-billing/billing-actions";
 import type { AddonRow } from "@/lib/saroh-billing/plan-view";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 import { runAction } from "@/lib/api/run-action";
 import { afterSettingsSave } from "@/lib/query/invalidate";
@@ -32,7 +32,7 @@ export function AddonsCard({
     sum: string;
     canChange: boolean;
 }) {
-    const router = useRouter();
+    const { orgId } = useSettingsSave();
     const [pending, start] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
 
@@ -40,7 +40,7 @@ export function AddonsCard({
         setBusy(row.id);
         start(async () => {
             const res = await runAction(
-                () => setAddonAction(row.id, quantity),
+                () => setAddonAction(row.id, quantity, ...asOrg(orgId)),
                 { setBusy: (on) => setBusy(on ? row.id : null) },
             );
             if (!res) return;
@@ -64,7 +64,8 @@ export function AddonsCard({
                         "Nothing was charged. Check your connection and try again.",
                     );
                 }
-                router.refresh();
+                // What the window changed is read again.
+                afterSettingsSave();
                 return;
             }
             if (row.isModule) {
@@ -74,7 +75,6 @@ export function AddonsCard({
                         : `${row.name} removed.`,
                 );
             }
-            router.refresh();
         });
     }
 

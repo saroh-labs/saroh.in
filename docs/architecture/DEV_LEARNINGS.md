@@ -7076,3 +7076,10 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** (1) the week strip is drawn before the diary read lands, so its `aria-label` has no count yet. (2) The Calendar header drew both its phone and desk frames until the width was known, then returned only one: the frame in use changed its place in the tree and was remounted just after hydration, and a press around then was lost. (3) The flow's kept choice could be written after the previous test's `afterEach` cleared it.
 - **Fix:** the spec waits for the strip label to carry its count; each header frame keeps its slot (`{known === false ? null : phone}{known === true ? null : desk}`), so the one in use is never remounted; New booking is pressed with `pressUntil`; the flow tests clear the kept choice before each test too.
 - **Rule:** a component that draws alternatives until something is known keeps each alternative in a fixed slot. A spec reads a data-driven label only after waiting for its data, and presses a server-drawn button with `pressUntil`. `docs/patterns/frontend-verification.md`.
+
+## An apostrophe in a comment hid a registry's entries (25 Nov 2026)
+
+- **Symptom:** `check:rq-refresh` flagged a route's `router.refresh()` although the route was listed in `lib/query/chrome-refresh.ts` (U17's first build).
+- **Cause:** the check reads the registry as text and took every quoted string in the array; an apostrophe in a comment between entries ("the others' writers") paired with the next quote and swallowed the entries after it.
+- **Fix:** `stringList` in `scripts/check-no-refresh-in-rq.mjs` drops `//` comments before reading the strings (test in `check-no-refresh-in-rq.test.mjs`).
+- **Rule:** a list a check reads as text holds plain string literals; comments in it are fine now, but keep quotes out of them where another check parses the same way.

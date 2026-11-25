@@ -1,21 +1,15 @@
-import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { ActivityList } from "@/components/settings/activity/activity-list";
 import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/page/settings-panel";
-import { navCan } from "@/components/shared/navigation/nav-items";
+import { SettingsTabScreen } from "@/components/settings/settings-tab-screen";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
-import { listRoles } from "@/lib/organizations/roles";
-import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { getOrganizationSettings } from "@/lib/organizations/settings-service";
-import { DEFAULT_TIMEZONE } from "@/lib/organizations/time-zones";
+import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { activityLine } from "@/lib/settings/activity";
-import { activityDetail } from "@/lib/settings/activity-detail";
-import { listSettingsActivity } from "@/lib/settings/activity-service";
-import { History } from "lucide-react";
+import { mayReadActivity } from "@/lib/settings/activity-access";
+import { ACTIVITY_SAYS } from "@/lib/settings/queries";
 
 /**
  * Settings → Activity: who changed the business's settings and team, and
@@ -27,66 +21,33 @@ import { History } from "lucide-react";
  * anyone who types the address.
  *
  * A row opens the whole change, timed in the business's own zone (#509).
- * That zone is read from the settings; should the read fail, the times say
- * UTC — still true, since the zone is named beside each one.
+ *
+ * On React Query (DEC-259): the changes load in the browser
+ * (`/api/settings/activity`), drawn by `SettingsTabScreen`.
  */
 export const metadata = { title: "Activity · Settings" };
 
-const DENIED = (
-    <PermissionDeniedState {...whoCanChange({ thing: "Activity" })} />
-);
-
 export default async function ActivityPage() {
     await requireSession();
-    const org = await resolveActiveOrganization();
-    const header = (
-        <SettingsPanelHeader
-            title="Activity"
-            description="The last changes to this business's settings, team and customer records, newest first."
-        />
-    );
-    const may = navCan(
-        { role: org?.role ?? null, actions: org?.actions ?? null },
-        "audit:read",
-    );
-    if (!may) return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
-
-    const [read, roles, zone] = await Promise.all([
-        listSettingsActivity(),
-        // Only to name a role the business invented; the built-ins are
-        // known without it, so a failed read costs a word, not the page.
-        listRoles().catch(() => []),
-        getOrganizationSettings().then(
-            (settings) => settings?.profile?.timezone ?? DEFAULT_TIMEZONE,
-            () => "UTC",
-        ),
-    ]);
-    if (read.status === "denied") {
-        return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
-    }
-    const roleLabels = Object.fromEntries(
-        roles.map((role) => [role.key, role.label]),
-    );
-    const entries = read.events.flatMap((event) => {
-        const line = activityLine(event, roleLabels);
-        return line
-            ? [{ line, detail: activityDetail(event, zone, roleLabels) }]
-            : [];
-    });
-
-    return (
-        <SettingsPanel header={header}>
-            {entries.length === 0 ? (
-                <div className="max-w-[760px]">
-                    <EmptyState
-                        icon={<History />}
-                        title="No changes yet"
-                        description="When someone changes a setting, it shows here."
+    const org = await activeOrganizationOnce();
+    if (!(await mayReadActivity())) {
+        return (
+            <SettingsPanel
+                header={
+                    <SettingsPanelHeader
+                        holdsData={false}
+                        title="Activity"
+                        description={ACTIVITY_SAYS}
                     />
-                </div>
-            ) : (
-                <ActivityList entries={entries} />
-            )}
-        </SettingsPanel>
+                }
+            >
+                <PermissionDeniedState
+                    {...whoCanChange({ thing: "Activity" })}
+                />
+            </SettingsPanel>
+        );
+    }
+    return (
+        <SettingsTabScreen tab="/settings/activity" kind={org?.kind ?? null} />
     );
 }

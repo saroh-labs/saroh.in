@@ -19,12 +19,12 @@ import { listTable, ListTable, ListTableHead } from "@saroh/ui/list-table";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronRight, Plus, Send } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { relativeWhen } from "@/lib/notifications/when";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import {
     createWebhook,
     readDeliveries,
@@ -112,7 +112,7 @@ export function Webhooks({
     docs,
     zone,
 }: WebhooksProps) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [openId, setOpenId] = useState<string | null>(null);
     const [adding, setAdding] = useState(false);
     const [secret, setSecret] = useState<string | null>(null);
@@ -268,7 +268,7 @@ export function Webhooks({
                 thing="secret"
                 onDone={() => {
                     setSecret(null);
-                    router.refresh();
+                    save.saved();
                 }}
             />
         </div>
@@ -368,6 +368,7 @@ function AddFields({
     events: WebhookEvent[];
     onAdded: (s: string) => void;
 }) {
+    const save = useSettingsSave();
     const [url, setUrl] = useState("https://");
     const [name, setName] = useState("");
     const [picked, setPicked] = useState<Set<string>>(new Set(events));
@@ -380,11 +381,14 @@ function AddFields({
             return setError("Choose at least one thing to tell it.");
         const res = await runAction(
             () =>
-                createWebhook({
-                    url: url.trim(),
-                    name: name.trim() || null,
-                    events: Array.from(picked) as WebhookEvent[],
-                }),
+                createWebhook(
+                    {
+                        url: url.trim(),
+                        name: name.trim() || null,
+                        events: Array.from(picked) as WebhookEvent[],
+                    },
+                    ...asOrg(save.orgId),
+                ),
             { setBusy },
         );
         if (!res) return;
@@ -470,7 +474,7 @@ function EndpointFields({
     onClose: () => void;
     onSecret: (secret: string) => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [enabled, setEnabled] = useState(e.enabled);
     const [name, setName] = useState(e.name ?? "");
     // Events it already sends stay listed even when the person can't add them.
@@ -512,25 +516,32 @@ function EndpointFields({
             return setError("Choose at least one thing to tell it.");
         const res = await runAction(
             () =>
-                updateWebhook(e.id, {
-                    name: name.trim() || null,
-                    events: Array.from(picked) as WebhookEvent[],
-                    // Only when changed: a test may have turned it on meanwhile.
-                    ...(enabled !== e.enabled ? { enabled } : {}),
-                }),
+                updateWebhook(
+                    e.id,
+                    {
+                        name: name.trim() || null,
+                        events: Array.from(picked) as WebhookEvent[],
+                        // Only when changed: a test may have turned it on meanwhile.
+                        ...(enabled !== e.enabled ? { enabled } : {}),
+                    },
+                    ...asOrg(save.orgId),
+                ),
             { setBusy },
         );
         if (!res) return;
         if (!res.ok) return setError(res.error);
         showSuccess(`${title(res.data)} saved.`);
         onClose();
-        router.refresh();
+        save.saved();
     }
 
     async function test() {
-        const res = await runAction(() => testWebhook(e.id), {
-            setBusy: setTesting,
-        });
+        const res = await runAction(
+            () => testWebhook(e.id, ...asOrg(save.orgId)),
+            {
+                setBusy: setTesting,
+            },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
@@ -542,7 +553,9 @@ function EndpointFields({
     }
 
     async function resend(id: string) {
-        const res = await runAction(() => resendDelivery(e.id, id));
+        const res = await runAction(() =>
+            resendDelivery(e.id, id, ...asOrg(save.orgId)),
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess("Sent again.");
@@ -550,21 +563,26 @@ function EndpointFields({
     }
 
     async function roll() {
-        const res = await runAction(() => rollWebhookSecret(e.id), {
-            setBusy: setRolling,
-        });
+        const res = await runAction(
+            () => rollWebhookSecret(e.id, ...asOrg(save.orgId)),
+            {
+                setBusy: setRolling,
+            },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         onSecret(res.data.secret);
     }
 
     async function remove() {
-        const res = await runAction(() => removeWebhook(e.id));
+        const res = await runAction(() =>
+            removeWebhook(e.id, ...asOrg(save.orgId)),
+        );
         if (!res) return false;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${title(e)} is removed.`);
         onClose();
-        router.refresh();
+        save.saved();
         return true;
     }
 

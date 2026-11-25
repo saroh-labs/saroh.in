@@ -319,7 +319,8 @@ describe("the Change dialog", () => {
             "Web address changed.",
             "It is now rye-bakery-2.saroh.app.",
         );
-        expect(refresh).toHaveBeenCalled();
+        // The action revalidates the layout: no second read from here.
+        expect(refresh).not.toHaveBeenCalled();
         expect(host.querySelector('[role="dialog"]')).toBe(null);
     });
 });

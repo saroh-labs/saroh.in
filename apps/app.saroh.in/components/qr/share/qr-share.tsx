@@ -2,13 +2,13 @@
 
 import { showSuccess } from "@saroh/ui/toast";
 import { Archive } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { retireQrCode } from "@/lib/qr/actions";
 import type { QrScreen } from "@/lib/qr/screen";
 import type { QrCodeView } from "@/lib/qr/types";
 import { opensWords, placeWords } from "@/lib/qr/words";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { NotPublishedNotice } from "@saroh/ui/data-state";
@@ -24,7 +24,7 @@ const HEADING = "font-display text-[19px] font-semibold tracking-[-0.02em]";
 /**
  * The site's codes with what this page has just made or changed laid over
  * them, so the list and the maker's "you already have this code" agree at
- * once; the refresh that follows brings the server's own copy, which wins
+ * once; the read that follows brings the server's own copy, which wins
  * unless ours is newer.
  */
 export function mergeCodes(
@@ -58,7 +58,7 @@ export function QrShare({
     env?: DownloadEnv;
 }) {
     const { site, view, canChange } = screen;
-    const router = useRouter();
+    const save = useSettingsSave();
     const [local, setLocal] = useState<QrCodeView[]>([]);
     const [changing, setChanging] = useState<QrCodeView | null>(null);
     const [viewingId, setViewingId] = useState<string | null>(null);
@@ -80,7 +80,7 @@ export function QrShare({
 
     const took = (code: QrCodeView) => {
         setLocal((prev) => [...prev.filter((c) => c.id !== code.id), code]);
-        router.refresh();
+        save.saved();
     };
 
     const toTop = () => {
@@ -89,7 +89,7 @@ export function QrShare({
     };
 
     async function retire(code: QrCodeView): Promise<ConfirmResult> {
-        const res = await retireQrCode(site.id, code.id);
+        const res = await retireQrCode(site.id, code.id, ...asOrg(save.orgId));
         if (!res.ok) {
             return {
                 ok: false,

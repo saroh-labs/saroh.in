@@ -1,93 +1,29 @@
-import {
-    SettingsPanel,
-    SettingsPanelHeader,
-} from "@/components/settings/page/settings-panel";
-import { YourProfile } from "@/components/settings/profile/your-profile";
-import { env } from "@/env";
-import { accountSettingsUrl } from "@/lib/accounts";
-import { getAlertPreferences } from "@/lib/notifications/service";
-import { isOnlyOwner } from "@/lib/organizations/leave-business";
-import { listMembers } from "@/lib/organizations/members";
-import { permits } from "@/lib/organizations/permits";
-import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { SettingsTabScreen } from "@/components/settings/settings-tab-screen";
+import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { readMyStaff } from "@/lib/staff/service";
-import { usageSharingOrNull } from "@/lib/usage-sharing/service";
-import { replaySwitchedOn, sharesUsageNow } from "@/lib/usage-sharing/sharing";
 
 /**
  * Settings → Your profile: your login and the alerts you get. For everyone
  * signed in, whatever their role — it is about them, not the business.
  * Your identity is read from the session and changed on accounts.saroh.in;
  * your alerts are your own in this business ("Only for you — your team
- * picks their own", F14). A failed alerts read throws to this tab's
- * boundary rather than showing choices nobody made.
+ * picks their own", F14). A failed alerts read is the tab's failed state
+ * rather than choices nobody made.
  *
  * It ends with "Leave {business}" (UX audit, 10 Oct 2026): every role opens
- * this page, so it is where everyone finds the way out. The roster is read
- * only by someone who may (`member:read`), to know whether they are the
- * only owner and which locations they come off. Unread, the button is
- * offered and the API decides.
+ * this page, so it is where everyone finds the way out. "Help improve
+ * Saroh" (DEC-125) is here too, only where session recording is switched
+ * on for this environment.
  *
- * "Help improve Saroh" (DEC-125) is here too, only where session recording
- * is switched on for this environment: a switch that did nothing would not
- * be true. It is left out when the choice couldn't be read, rather than
- * shown as a choice nobody made.
+ * On React Query (DEC-259): the read (`lib/settings/access.ts`) loads in
+ * the browser, drawn by `SettingsTabScreen`.
  */
 export const metadata = { title: "Your profile · Settings" };
 
 export default async function ProfilePage() {
-    const { user } = await requireSession();
-    const recordingOn = replaySwitchedOn({
-        key: env.NEXT_PUBLIC_POSTHOG_KEY,
-        replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
-        analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
-    });
-    const [alerts, org, usageSharing, myStaff] = await Promise.all([
-        getAlertPreferences(),
-        resolveActiveOrganization(),
-        recordingOn ? usageSharingOrNull() : null,
-        // Your place on the diary, for your photo (null when not on it).
-        readMyStaff(),
-    ]);
-    // An owner always reads the roster. Anyone else only with the
-    // permission: a refused read would turn this page into a denial.
-    const mayReadTeam =
-        org !== null && (org.role === "OWNER" || permits(org, "member:read"));
-    const roster = mayReadTeam ? await listMembers().catch(() => null) : null;
-    const me = roster?.find((m) => m.isSelf);
-
+    await requireSession();
+    const org = await activeOrganizationOnce();
     return (
-        <SettingsPanel header={<SettingsPanelHeader title="Your profile" />}>
-            <YourProfile
-                name={user.name?.trim() ?? ""}
-                email={user.email}
-                accountUrl={accountSettingsUrl}
-                alerts={alerts}
-                mine={
-                    myStaff
-                        ? {
-                              staffId: myStaff.id,
-                              photo: myStaff.photo?.url ?? null,
-                              about: myStaff.about ?? null,
-                          }
-                        : null
-                }
-                leave={
-                    org
-                        ? {
-                              business: org.name,
-                              onlyOwner: isOnlyOwner(roster) === true,
-                              locations: (me?.storefronts ?? []).map(
-                                  (s) => s.name,
-                              ),
-                          }
-                        : null
-                }
-                sharesUsage={
-                    usageSharing ? sharesUsageNow(usageSharing) : undefined
-                }
-            />
-        </SettingsPanel>
+        <SettingsTabScreen tab="/settings/profile" kind={org?.kind ?? null} />
     );
 }

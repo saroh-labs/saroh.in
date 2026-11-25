@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import { readMyEmailSetup } from "@/lib/communications/email-setup-service";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
 import { connectLocksOf } from "@/lib/providers/connect-lock";
@@ -32,7 +34,15 @@ export async function readSetupDefaultsAction(
 export async function enableModuleAction(
     key: string,
     setup: object | undefined,
+    orgId?: string,
 ): Promise<EnableResult> {
+    // With the tab's business: nothing revalidated; the sheet reads the
+    // settings again (`afterSettingsSave()`) and a server-drawn page again.
+    if (orgId) {
+        const res = await writeAsOrg(orgId, () => enableModule(key, setup));
+        // Refused before the write (another business open): no field said.
+        return "fields" in res || res.ok ? res : { ...res, fields: {} };
+    }
     const result = await enableModule(key, setup);
     if (result.ok) revalidatePath("/", "layout");
     return result;
