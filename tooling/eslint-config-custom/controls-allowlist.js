@@ -74,8 +74,6 @@ export const RAW_ALLOWED = {
     "components/bookings/new-booking/flow-frame.tsx": ["button"],
     // button: the List's free times card that opens, and each free time a row
     "components/bookings/calendar/list/list-free-times.tsx": ["button"],
-    // button: each booked row of the List, one button
-    "components/bookings/calendar/list/list-view.tsx": ["button"],
     // button: a phone sheet's grab handle, dragged or tapped between half
     // and full height
     "components/bookings/calendar/header/header-overlay.tsx": ["button"],

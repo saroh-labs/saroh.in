@@ -39,6 +39,7 @@ vi.mock("@/lib/services/actions", () => ({
     listAvailability: vi.fn(() => Promise.resolve([])),
     takeDeskPayment: vi.fn(),
     createBookingPayLink: vi.fn(),
+    readBookingPerson: vi.fn(() => Promise.resolve(null)),
 }));
 
 // Server-only plumbing the desk's Take ₹X reaches (GST rates).
@@ -939,6 +940,32 @@ describe("a class on the List (DEC-260)", () => {
         press(open ?? undefined);
         expect(rowOf("Asha")).toBeDefined();
         expect(rowOf("Ravi")).toBeDefined();
+    });
+});
+
+describe("a row's press on the List", () => {
+    beforeEach(() => phone(true));
+
+    it("opens the booking's quick look, as the Calendar does", async () => {
+        draw();
+        const kabir = rowOf("Kabir");
+        const open = kabir?.querySelector<HTMLButtonElement>(
+            'button[aria-haspopup="dialog"]',
+        );
+        expect(open?.textContent).toBe("Kabir Singh");
+        press(open ?? undefined);
+        await flush();
+        const look = document.querySelector('[role="dialog"]');
+        expect(look?.textContent).toContain("Kabir Singh");
+        expect(look?.textContent).toContain("Awaiting payment");
+    });
+
+    it("draws one line: time over length, a bar, who, what, how it stands", () => {
+        draw();
+        const kabir = rowOf("Kabir");
+        expect(kabir?.querySelector("[data-line-bar]")).not.toBeNull();
+        expect(kabir?.textContent).toContain("45 min");
+        expect(kabir?.textContent).toContain("Physio assessment · Meera");
     });
 });
 

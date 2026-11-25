@@ -75,6 +75,8 @@ export async function bookingsCan(organization: Organization | null) {
         take: canTakeDeskPayments(organization),
         people: may("contact:read"),
         refund: may("payment:manage"),
+        // Give anyone's booking to someone else from the quick look (#1157).
+        assign: may("service:write"),
         readOrder: may("order:read"),
         // The Money column follows what the role may read (DEC-098): never
         // a Member or Reviewer by default.

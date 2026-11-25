@@ -174,7 +174,9 @@ export function OptionsSheet({
                 <span className={ICON}>
                     <ChevronLeft aria-hidden />
                 </span>
-                <span className="flex-1">Back</span>
+                <span data-ph-unmask="" className="flex-1">
+                    Back
+                </span>
             </button>
             <div data-ph-unmask="" className={cn(LABEL, "mt-3")}>
                 {label}
@@ -294,7 +296,9 @@ export function OptionsSheet({
                         <span className={ICON}>
                             <List aria-hidden />
                         </span>
-                        <span className="flex-1">All bookings</span>
+                        <span data-ph-unmask="" className="flex-1">
+                            All bookings
+                        </span>
                         <ChevronRight aria-hidden className={CHEVRON} />
                     </IntentLink>
                 ) : null}

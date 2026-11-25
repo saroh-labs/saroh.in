@@ -62,7 +62,7 @@ export function ClassRow({
                     listTable.rule,
                     listTable.wash,
                     ROW_GRID(showMoney),
-                    "relative gap-y-1 px-[14px] py-[11px] max-[759px]:grid-cols-[64px_4px_minmax(0,1fr)_44px]",
+                    "relative gap-y-1 px-[14px] py-[11px]",
                 )}
             >
                 <LineTime

@@ -23,6 +23,7 @@ import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { businessZone } from "@/lib/format/business-zone";
 import { googleMeetOffered } from "@/lib/google-calendar/service";
+import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { EVERYONE, openingPerson } from "@/lib/services/bookings-opens";
@@ -30,7 +31,7 @@ import { readBookingsOpens } from "@/lib/services/bookings-opens-read";
 import { listServices, readNow } from "@/lib/services/service";
 import { zoneShortName } from "@/lib/services/time-picker";
 import { requireSession } from "@/lib/session";
-import { listStaff } from "@/lib/staff/service";
+import { getBookingRules, listStaff } from "@/lib/staff/service";
 
 /**
  * Every booking as one list (S4-003; U11 of the bookings plan,
@@ -64,15 +65,20 @@ export default async function BookingsPage() {
 
     // The date filter is the container's, read from the address.
     const organizationRead = resolveActiveOrganization();
-    const [services, organization, staffList, opens, can] = await Promise.all([
-        listServices().catch(() => []),
-        organizationRead,
-        // Who they'll see, in New booking (U8); without it, anyone.
-        listStaff().catch(() => null),
-        // Where Bookings opens, and for whom, for this person (DEC-170).
-        readBookingsOpens(),
-        organizationRead.then(bookingsCan),
-    ]);
+    const [services, organization, staffList, opens, can, rules, notices] =
+        await Promise.all([
+            listServices().catch(() => []),
+            organizationRead,
+            // Who they'll see, in New booking (U8); without it, anyone.
+            listStaff().catch(() => null),
+            // Where Bookings opens, and for whom, for this person (DEC-170).
+            readBookingsOpens(),
+            organizationRead.then(bookingsCan),
+            // A row's quick look, as on the calendar: the free-cancel window
+            // and what a cancel tells the customer with (A14).
+            getBookingRules().catch(() => null),
+            readNoticeReach(),
+        ]);
     const mine = staffList?.staff.find(
         (p) =>
             p.status === "ACTIVE" && p.membership?.userId === session.user.id,
@@ -133,6 +139,8 @@ export default async function BookingsPage() {
                     initialStaff={who === EVERYONE ? null : who}
                     zone={timezone}
                     now={readNow()}
+                    rules={rules}
+                    notices={notices}
                 />
             </div>
         </PageContainer>

@@ -10,6 +10,8 @@ import { CalendarDays } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { TakePayment } from "@/components/bookings/booking-page/take-payment";
+import { useCalendarActions } from "@/components/bookings/calendar/use-calendar-actions";
+import { BookingQuickLook } from "@/components/bookings/quick-look/booking-quick-look";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
 import {
     FigureLoading,
@@ -25,6 +27,7 @@ import { UNREACHED } from "@/lib/api/unreached";
 import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatDateTime } from "@/lib/format/datetime";
+import type { NoticeChannels } from "@/lib/messages/notice-reach";
 import { firstName } from "@/lib/names";
 import { recordBookingOutcome } from "@/lib/services/actions";
 import type {
@@ -60,7 +63,13 @@ import {
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { BookingOutcome } from "@/lib/services/booking-state";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
-import { localDateOf, whoFor } from "@/lib/services/diary";
+import type { Block } from "@/lib/services/diary";
+import {
+    bookingState,
+    localDateOf,
+    localMinuteOf,
+    whoFor,
+} from "@/lib/services/diary";
 import {
     countedWords,
     countItems,
@@ -68,6 +77,7 @@ import {
 } from "@/lib/services/session-counts";
 import { zoneShortName } from "@/lib/services/time-picker";
 import type { ShareLink } from "@/lib/sites/share-links";
+import type { BookingRules } from "@/lib/staff/types";
 import type { DateRange } from "@/lib/views/date-range";
 import {
     dateRangeOn,
@@ -119,6 +129,8 @@ export interface AllBookingsCan extends RowAbilities {
     link: boolean;
     /** The plan takes payment online. */
     online: boolean;
+    /** `service:write`: give anyone's booking to someone else (#1157). */
+    assign?: boolean;
 }
 
 const EMPTY_LINE =
@@ -135,6 +147,8 @@ export function BookingsView({
     me = null,
     showCancelled = false,
     initialStaff = null,
+    rules = null,
+    notices = null,
 }: {
     /**
      * Null until the first read lands: the controls are here and work,
@@ -163,9 +177,32 @@ export function BookingsView({
     showCancelled?: boolean;
     /** "Show bookings for" opens on this person (Just me, or the last pick). */
     initialStaff?: string | null;
+    /** The business's booking rules: the quick look's free-cancel window. */
+    rules?: BookingRules | null;
+    /** What the business can tell its customers with (A14). */
+    notices?: NoticeChannels | null;
 }) {
     const loading = read === null;
-    const bookings = read ?? NO_BOOKINGS;
+    // The quick look's changes, each held for its Undo, shown over the read
+    // as on the Calendar.
+    const { overrides, act, heldFor } = useCalendarActions({
+        now,
+        timezone,
+        money: can.money,
+        rules,
+    });
+    const bookings = useMemo(
+        () =>
+            (read ?? NO_BOOKINGS).map((b) =>
+                b.id in overrides ? { ...b, ...overrides[b.id] } : b,
+            ),
+        [read, overrides],
+    );
+    // The booking whose quick look is open (a row's press, as on the Calendar).
+    const [peekId, setPeekId] = useState<string | null>(null);
+    const peekBooking = peekId
+        ? (bookings.find((b) => b.id === peekId) ?? null)
+        : null;
     const go = useScreenGo();
     const { save, saved } = useBookingSave();
     const [view, setViewState] = useState<ViewId>(() => readView(initialView));
@@ -375,6 +412,10 @@ export function BookingsView({
                         : null
                 }
                 onMark={(o) => mark(b, o)}
+                onOpen={() => {
+                    lastRow.current = b.id;
+                    setPeekId(b.id);
+                }}
                 onUndo={() => undo(markKey)}
                 when={whenLine(b)}
                 heading={`${whoFor(b)} · ${formatDateTime(b.startAt, timezone, { relative: "lower", now })}`}
@@ -654,6 +695,31 @@ export function BookingsView({
                 returnFocusTo={backToRow}
                 onClose={() => setMoving(null)}
             />
+            <BookingQuickLook
+                block={peekBooking ? blockOf(peekBooking, timezone) : null}
+                onClose={() => setPeekId(null)}
+                ctx={{
+                    timezone,
+                    now,
+                    money: can.money,
+                    rules,
+                    canBook: can.book,
+                    canRefund: can.refund,
+                    reassign: {
+                        any: can.assign ?? false,
+                        me: me?.id ?? null,
+                    },
+                    canReadOrder: can.readOrder,
+                    desk: {
+                        canTake: can.take,
+                        canLink: can.link,
+                        online: can.online,
+                    },
+                    notices,
+                }}
+                act={act}
+                heldFor={heldFor}
+            />
             {taking?.take ? (
                 <TakePayment
                     open
@@ -673,6 +739,23 @@ export function BookingsView({
 }
 
 const NO_BOOKINGS: DiaryBooking[] = [];
+
+/** A booking as the quick look takes it: a diary block on its own day. */
+function blockOf(b: DiaryBooking, zone: string): Block {
+    const start = localMinuteOf(b.startAt, zone);
+    const length = Math.round(
+        (Date.parse(b.endAt) - Date.parse(b.startAt)) / 60_000,
+    );
+    return {
+        kind: "one",
+        key: b.id,
+        start,
+        end: start + length,
+        state: bookingState(b),
+        staffId: b.staff?.id ?? null,
+        booking: b,
+    };
+}
 
 /**
  * The register couldn't be read: said, with Try again, never "No bookings
