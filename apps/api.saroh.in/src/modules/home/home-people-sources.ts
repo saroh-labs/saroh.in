@@ -179,6 +179,28 @@ export async function lowStarReviews(
     };
 }
 
+/** The booking-page notes this viewer may see: the rows and the count alike. */
+function notesWhere(viewer: OrganizationContext) {
+    return {
+        organizationId: viewer.organizationId,
+        source: "BOOKING_PAGE" as const,
+        status: "SUGGESTED" as const,
+        removedAt: null,
+        // A merged-away person's entries live on under the survivor.
+        contact: { mergedIntoId: null },
+        ...(canSeeSensitive(viewer) ? {} : { sensitive: false }),
+    };
+}
+
+/** The shell's badge: how many {@link bookingPageNotes} counts, rows unread. */
+export async function bookingPageNoteCount(
+    db: Db,
+    viewer: OrganizationContext,
+): Promise<number> {
+    if (!allows(viewer, "contact:write")) return 0;
+    return db.contactAttention.count({ where: notesWhere(viewer) });
+}
+
 /**
  * Notes left on the booking page (C12) that wait on the customer's record
  * for staff to check, as suggestions. Only someone who can add them to the
@@ -196,16 +218,7 @@ export async function bookingPageNotes(
     now: Date,
 ): Promise<HomeAction | null> {
     if (!allows(viewer, "contact:write")) return null;
-    const organizationId = viewer.organizationId;
-    const base = {
-        organizationId,
-        source: "BOOKING_PAGE" as const,
-        status: "SUGGESTED" as const,
-        removedAt: null,
-        // A merged-away person's entries live on under the survivor.
-        contact: { mergedIntoId: null },
-        ...(canSeeSensitive(viewer) ? {} : { sensitive: false }),
-    };
+    const base = notesWhere(viewer);
     const soonVisit = {
         status: "CONFIRMED",
         startAt: {

@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { InvoicesModule } from "../invoices/invoices.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PaymentsModule } from "../payments/payments.module";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
@@ -28,6 +29,8 @@ import { HomeService } from "./home.service";
         InvoicesModule,
         // Autopay's Retry on a failed renewal (D13).
         PaymentsModule,
+        // The bell's unread count beside the shell's badges.
+        NotificationsModule,
     ],
     controllers: [HomeController],
     providers: [HomeService, HomeInlineService, OrganizationGuard],
