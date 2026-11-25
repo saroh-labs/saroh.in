@@ -2,7 +2,6 @@
 
 import { formatDay, timeZoneName } from "@/lib/format/datetime";
 import { PartialRead } from "@saroh/ui/failed-read";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -165,7 +164,6 @@ export function CalendarScreen({
     /** The Google layer in What to show: everyone's, just mine, or hidden. */
     googleShow?: GoogleShow;
 }) {
-    const router = useRouter();
     // Flipped here and written to the address without a round trip; a
     // navigation that changes what the address says wins.
     const [cancelledShown, setCancelledShown] = useState(showCancelled);
@@ -179,9 +177,10 @@ export function CalendarScreen({
     const [addingPerson, setAddingPerson] = useState(false);
     // A phone that nothing has chosen a view for opens on List (Q4, U6);
     // else "Where I left it" (Q15): this device keeps the view it was left on.
+    const screenGo = useScreenGo();
     const replace = useCallback(
-        (href: string) => router.replace(href, { scroll: false }),
-        [router],
+        (href: string) => screenGo(href, "replace"),
+        [screenGo],
     );
     useOpeningView({
         layout,
@@ -304,7 +303,6 @@ export function CalendarScreen({
             google: googleMode,
         });
     // In the screen's transition: the diary greys, the header stays.
-    const screenGo = useScreenGo();
     const go = (l: CalendarLayout, d: LocalDate) => screenGo(hrefFor(l, d));
     const step = inWeek ? 7 : 1;
     const swipe = useSwipe({

@@ -1,12 +1,12 @@
 "use client";
 
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { Avatar, AvatarFallback, avatarInitials } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { showUndo } from "@saroh/ui/toast";
 import { ArrowRightLeft, UserRoundCog } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
@@ -213,7 +213,7 @@ export function MoveStep({
     onMoved: () => void;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const [picked, setPicked] = useState<string | null>(null);
     const [taken, setTaken] = useState<string | null>(null);
     const [reload, setReload] = useState(0);
@@ -227,9 +227,12 @@ export function MoveStep({
 
     async function move() {
         if (!picked || busy) return;
-        const res = await runAction(() => rescheduleBooking(b.id, picked), {
-            setBusy,
-        });
+        const res = await runAction(
+            () => rescheduleBooking(b.id, picked, ...org),
+            {
+                setBusy,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             if (isTakenRefusal(res.error)) {
@@ -248,12 +251,12 @@ export function MoveStep({
         });
         const told = movedToldText(reach, first);
         onMoved();
-        router.refresh();
+        refresh();
         showUndo(
             `Moved ${first || "the booking"} to ${day} at ${formatTime(picked, tz)}.${told ? ` ${told}` : ""}`,
             async () => {
-                const back = await rescheduleBooking(b.id, b.startAt);
-                router.refresh();
+                const back = await rescheduleBooking(b.id, b.startAt, ...org);
+                refresh();
                 return back;
             },
         );

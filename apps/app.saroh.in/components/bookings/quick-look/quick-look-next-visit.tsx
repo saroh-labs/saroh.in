@@ -1,5 +1,6 @@
 "use client";
 
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { Button } from "@saroh/ui/button";
 import { Calendar } from "@saroh/ui/calendar";
 import { chipClass } from "@saroh/ui/chip";
@@ -9,7 +10,6 @@ import { Notice } from "@saroh/ui/notice";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { CalendarDays, Clock, User } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
@@ -98,7 +98,7 @@ export function NextVisitStep({
     onBack: () => void;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const ids = { day: useId(), times: useId() };
     const tz = ctx.timezone;
     const today = localDateOf(new Date(ctx.now), tz);
@@ -171,14 +171,18 @@ export function NextVisitStep({
                   })
             : booker
               ? () =>
-                    bookByHand(b.serviceId, {
-                        ...booker,
-                        startAt: time,
-                        idempotencyKey: key,
-                        // A booking by hand pays at the visit (DEC-170).
-                        paidWith: "DESK",
-                        ...(person ? { staffId: person.id } : {}),
-                    })
+                    bookByHand(
+                        b.serviceId,
+                        {
+                            ...booker,
+                            startAt: time,
+                            idempotencyKey: key,
+                            // A booking by hand pays at the visit (DEC-170).
+                            paidWith: "DESK",
+                            ...(person ? { staffId: person.id } : {}),
+                        },
+                        ...org,
+                    )
               : null;
         if (!request) return;
         const res = await runAction(request, { setBusy });
@@ -205,7 +209,7 @@ export function NextVisitStep({
                 : undefined,
         );
         onClose();
-        router.refresh();
+        refresh();
     }
 
     const quick: { value: NextDayChoice; label: string }[] = [

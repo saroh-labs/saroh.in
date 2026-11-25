@@ -9,6 +9,7 @@
  */
 export const LIVE_QUERY_ROUTES: Readonly<Record<string, readonly string[]>> = {
     "/": ["home"],
+    "/bookings": ["bookings"],
     "/bookings/all": ["bookings"],
     "/commerce/products": ["products"],
     "/commerce/orders": ["orders"],

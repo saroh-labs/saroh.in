@@ -301,6 +301,7 @@ describe("the registries", () => {
     it("hold the routes moved so far, and the chrome list keeps its cap", () => {
         expect(LIVE_QUERY_ROUTES).toEqual({
             "/": ["home"],
+            "/bookings": ["bookings"],
             "/bookings/all": ["bookings"],
             "/commerce/products": ["products"],
             "/commerce/orders": ["orders"],

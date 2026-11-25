@@ -1,24 +1,21 @@
 import { FailedState } from "@saroh/ui/data-state";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { BookingsModeSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
-import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
+import { DiaryContainer } from "@/components/bookings/calendar/diary-container";
 import { GoogleCalendarLine } from "@/components/bookings/calendar/google-calendar-line";
-import {
-    NewBookingButton,
-    NewBookingHost,
-} from "@/components/bookings/new-booking/new-booking-host";
-import {
-    flowServices,
-    flowStaff,
-} from "@/components/bookings/new-booking/setup";
+import { flowServices } from "@/components/bookings/new-booking/setup";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { ScreenPending } from "@/components/shared/page/screen-pending";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { rowNotice, takesOnlinePayment } from "@/lib/billing/access";
+import { diaryServer } from "@/lib/bookings/access";
+import type { BookingsDiary } from "@/lib/bookings/queries";
+import { diaryAsk, diaryRead } from "@/lib/bookings/queries";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { arrivalContactId } from "@/lib/customers/prefill";
@@ -26,7 +23,6 @@ import { readCustomerPick } from "@/lib/customers/prefill-read";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import {
     googleMeetOffered,
-    readCalendarBusy,
     readGoogleCalendar,
 } from "@/lib/google-calendar/service";
 import { bookingsCalendarLine } from "@/lib/google-calendar/words";
@@ -35,38 +31,24 @@ import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { prefetchRead } from "@/lib/query/prefetch";
+import { getServerQueryClient } from "@/lib/query/server-client";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { canTakeDeskPayments } from "@/lib/services/booking-money";
 import {
     LAST_VIEW_COOKIE,
-    nothingChoseView,
     openingLayout,
-    openingPerson,
     opensOnList,
 } from "@/lib/services/bookings-opens";
 import { readBookingsOpens } from "@/lib/services/bookings-opens-read";
 import { calendarHref } from "@/lib/services/calendar-href";
 import type { LocalDate } from "@/lib/services/diary";
-import {
-    addDays,
-    dayBounds,
-    localDateOf,
-    monthDays,
-    weekStartOf,
-} from "@/lib/services/diary";
-import {
-    listServices,
-    readBookingsCalendar,
-    readNow,
-} from "@/lib/services/service";
-import { readServiceHours } from "@/lib/services/service-hours-read";
+import { localDateOf } from "@/lib/services/diary";
+import { listServices, readNow } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
-import type { StaffList } from "@/lib/staff/service";
-import { getBookingRules, listStaff } from "@/lib/staff/service";
-import { withClosures } from "@/lib/staff/time-off";
-import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { getBookingRules } from "@/lib/staff/service";
 
 /**
  * Bookings › Calendar (U15). The day by person, the week, or the Agenda (U6,
@@ -79,23 +61,16 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
  *
  * The register this page used to be lives on at /bookings/all, the List
  * of the header's Calendar | List switch.
+ *
+ * On React Query (DEC-259): the gates and what the viewer may do are
+ * decided here, the first diary read (`lib/bookings/access.ts`, shared
+ * with `/api/bookings/diary`) is prefetched and hydrated, and the
+ * container reads every later day, week or person from the address in
+ * place (`diary-container.tsx`).
  */
 export const metadata = { title: "Bookings" };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * The people, with the business's closures as everyone's time off (E3), so
- * the calendar offers no free time while the business is closed.
- */
-async function readStaff(): Promise<StaffList | null> {
-    try {
-        const list = await listStaff();
-        return list ? withClosures(list) : null;
-    } catch {
-        return null;
-    }
-}
 
 export default async function BookingsPage({
     searchParams,
@@ -103,36 +78,22 @@ export default async function BookingsPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const session = await requireSession();
-    const [
-        params,
-        organization,
-        staffList,
-        rules,
-        services,
-        notices,
-        opens,
-        jar,
-    ] = await Promise.all([
-        searchParams,
-        resolveActiveOrganization(),
-        readStaff(),
-        getBookingRules().catch(() => null),
-        listServices(),
-        // What a cancelled class tells everyone on it (A14).
-        readNoticeReach(),
-        // Where Bookings opens for this person (DEC-170).
-        readBookingsOpens(),
-        cookies(),
-    ]);
+    const [params, organization, rules, services, notices, opens, jar] =
+        await Promise.all([
+            searchParams,
+            resolveActiveOrganization(),
+            getBookingRules().catch(() => null),
+            listServices(),
+            // What a cancelled class tells everyone on it (A14).
+            readNoticeReach(),
+            // Where Bookings opens for this person (DEC-170).
+            readBookingsOpens(),
+            cookies(),
+        ]);
+    const lastUsed = jar.get(LAST_VIEW_COOKIE)?.value ?? null;
 
     // "Where I left it" was the List: `/bookings` opens it there (BKVKept).
-    if (
-        opensOnList({
-            params,
-            start: opens.start,
-            lastUsed: jar.get(LAST_VIEW_COOKIE)?.value,
-        })
-    ) {
+    if (opensOnList({ params, start: opens.start, lastUsed })) {
         redirect("/bookings/all");
     }
 
@@ -150,63 +111,39 @@ export default async function BookingsPage({
         canTakePayment: canTakeDeskPayments(organization),
         onlinePay: online,
     };
-    const timezone = staffList?.timezone ?? DEFAULT_BUSINESS_ZONE;
     const now = readNow();
-    const today = localDateOf(new Date(now), timezone);
-    // The view the address names; else the person's "Start Bookings on";
-    // else the one last used on this device (Q15, option C).
-    const chosen = {
+    const layout = openingLayout({
         asked: params.layout,
         start: opens.start,
-        lastUsed: jar.get(LAST_VIEW_COOKIE)?.value,
-    };
-    const layout = openingLayout(chosen);
-    // Whose bookings: the address's; else "Show bookings for" (DEC-170).
-    const active = (staffList?.staff ?? []).filter(
-        (p) => p.status === "ACTIVE",
-    );
-    const mine = active.find((p) => p.membership?.userId === session.user.id);
-    const person = openingPerson({
-        asked: params.person,
-        opens,
-        people: active.map((p) => p.id),
-        me: mine?.id ?? null,
+        lastUsed,
     });
-    const date: LocalDate =
+    const asked =
         typeof params.date === "string" && DATE.test(params.date)
             ? params.date
-            : today;
+            : null;
 
-    // The day's week and its month, whatever the layout: the view draws its
-    // day or week, and the date sheet counts each day of both (U2).
-    const { days } = monthDays(date);
-    const weekFirst = weekStartOf(date);
-    const weekLast = addDays(weekFirst, 6);
-    const monthFirst = days[0] ?? date;
-    const monthLast = days.at(-1) ?? date;
-    const first = weekFirst < monthFirst ? weekFirst : monthFirst;
-    const last = weekLast > monthLast ? weekLast : monthLast;
-    const [calendar, serviceHours, calendarRead, access, googleBusy] =
-        await Promise.all([
-            readBookingsCalendar(
-                dayBounds(first, timezone).from.toISOString(),
-                dayBounds(last, timezone).to.toISOString(),
-            ),
-            // With nobody on the diary, customers book each service in its own
-            // hours: the calendar draws them, as the booking page offers them
-            // (UX-023).
-            readServiceHours(services, staffList),
-            readGoogleCalendar(),
-            billingAccessOrNull(),
-            // Everyone's Google busy times for the week shown: start and end,
-            // never a title. A read that fails draws the diary without them.
-            readCalendarBusy(
-                dayBounds(weekFirst, timezone).from.toISOString(),
-                dayBounds(addDays(weekLast, 1), timezone).from.toISOString(),
-            ),
-        ]);
+    // The diary for the day's week and month, in the business's zone: the
+    // first read names it, and on the rare hour today there is another day
+    // than in the zone guessed, today's is read instead.
+    const client = getServerQueryClient();
+    const readFor = async (date: LocalDate) => {
+        if (!organization) return undefined;
+        const ask = diaryAsk(date);
+        await prefetchRead(client, diaryServer, organization.id, ask);
+        return client.getQueryData<BookingsDiary>(
+            diaryRead.key(organization.id, ask),
+        );
+    };
+    const guess = localDateOf(new Date(now), DEFAULT_BUSINESS_ZONE);
+    let diary = await readFor(asked ?? guess);
+    let zone = diary?.zone ?? DEFAULT_BUSINESS_ZONE;
+    if (diary && !asked && localDateOf(new Date(now), zone) !== guess) {
+        diary = await readFor(localDateOf(new Date(now), zone));
+    }
+    zone = diary?.zone ?? zone;
+    const date = asked ?? localDateOf(new Date(now), zone);
 
-    if (!calendar) {
+    if (!organization || !diary) {
         return (
             <PageContainer width="full">
                 <PageHeader
@@ -228,144 +165,98 @@ export default async function BookingsPage({
     // arrives open with them chosen, read only for someone who may book
     // and search. From the Calendar's "Book on this day" (`?date=…&new=1`)
     // it opens on that day (U8). With no service yet it says how to add one.
-    const arriving = params.new === "1" && may("booking:write");
+    const canBook = may("booking:write");
+    const arriving = params.new === "1" && canBook;
     const forContact = arriving ? arrivalContactId(params) : null;
     const initialWho =
         forContact && people.canSearch
             ? await readCustomerPick(forContact)
             : null;
-    // A quiet day on List offers "Share your booking page" while it is
-    // live (DEC-069, L8). Read only for List, for someone who may book; a
-    // read that fails, or a role it isn't shown to, leaves it out.
-    const share =
-        layout === "agenda" && may("booking:write")
-            ? shareLink(await readWebAddressLinks(), BOOKINGS_FIRST_RUN)
-            : null;
-    const canUsePacks =
-        canReadPacks(organization) &&
-        canUsePacksOnBookings(organization) &&
-        packsOn(await modulesOrUnknown());
+    // A quiet day on Agenda offers "Share your booking page" while it is
+    // live (DEC-069, L8), for someone who may book; the layout changes in
+    // place, so it is read on whichever view opens. A read that fails
+    // leaves it out.
+    const [calendarRead, access, modules, meet, links] = await Promise.all([
+        readGoogleCalendar(),
+        billingAccessOrNull(),
+        modulesOrUnknown(),
+        canBook ? googleMeetOffered() : false,
+        canBook ? readWebAddressLinks() : null,
+    ]);
+    const share = links ? shareLink(links, BOOKINGS_FIRST_RUN) : null;
     // The person's own Google Calendar: Connect, or a lapsed account,
     // held back while the plan's bookings notice is up (one at a time).
     const gcLine = rowNotice(access, "bookings").on
         ? null
         : bookingsCalendarLine(calendarRead);
-    // A day, a week, a person: only the diary greys (`ScreenPending`).
-    const screen = (
-        <ScreenPending>
-            <CalendarScreen
-                layout={layout}
-                date={date}
-                today={today}
-                now={now}
-                timezone={calendar.timezone || timezone}
-                calendar={calendar}
-                staff={staffList?.staff ?? null}
-                services={services}
-                rules={rules}
-                notices={notices}
-                limitNotice={<PlanLimitNotice moduleId="bookings" />}
-                calendarLine={
-                    gcLine ? (
-                        <GoogleCalendarLine
-                            line={gcLine}
-                            userId={session.user.id}
-                        />
-                    ) : null
-                }
-                serviceHours={serviceHours}
-                // Cancelled bookings stay off the diary unless the address
-                // asks for them, so a reload keeps the choice.
-                showCancelled={params.cancelled === "1"}
-                googleBusy={googleBusy}
-                googleShow={
-                    params.google === "0"
-                        ? "off"
-                        : params.google === "mine"
-                          ? "mine"
-                          : "all"
-                }
-                person={person}
-                opens={opens}
-                me={mine ? { id: mine.id, name: mine.name } : null}
-                share={
-                    share ? (
-                        <ShareLinkButton link={share} className="mt-0" />
-                    ) : null
-                }
-                // Nothing chose the view: a phone moves to List (Q4, U6).
-                listFirst={nothingChoseView(chosen)}
-                // A booked message names the business (U9, Q12).
-                business={organization?.name ?? null}
-                people={people}
-                can={{
-                    book: may("booking:write"),
-                    // Open or block time: a Member keeps anyone's hours
-                    // (DEC-170, Q13); adding people stays `service:write`.
-                    hours: may("hours:write"),
-                    addPeople: may("service:write"),
-                    order: may("order:read"),
-                    // Refund what a late cancel keeps, or keep what the
-                    // policy returns (DEC-170, Q14).
-                    refund: may("payment:manage"),
-                    // "Take ₹X" (P2): the pair a payment link needs, and the
-                    // link itself only where the plan and a provider take it.
-                    desk: {
-                        canTake: canTakeDeskPayments(organization),
-                        canLink: people.payLink,
-                        online: takesOnlinePayment(access),
-                    },
-                }}
-                newBooking={
-                    may("booking:write") ? (
-                        <NewBookingButton
-                            // Keyed: it renders among the screen's own children.
-                            key="new-booking"
-                            // Beside "…" on the desk; on a phone it floats
-                            // over the calendar, above the tab bar (U2).
-                            className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]"
-                            date={params.date === undefined ? null : date}
-                        />
-                    ) : null
-                }
-            />
-        </ScreenPending>
-    );
+
     return (
         <PageContainer width="full">
-            {may("booking:write") ? (
-                <NewBookingHost
-                    setup={{
-                        services: flowServices(services),
-                        staff: flowStaff(staffList?.staff ?? null),
-                        people,
-                        // Paying with a class pack spends one (ADR-007),
-                        // while Class packs is on (E12).
-                        canUsePacks,
-                        timezone: calendar.timezone || timezone,
-                        showMoney: calendar.money,
-                        business: organization?.name ?? null,
-                        meet: await googleMeetOffered(),
-                        now,
+            <HydrationBoundary state={dehydrate(client)}>
+                <DiaryContainer
+                    zone={zone}
+                    now={now}
+                    userId={session.user.id}
+                    opens={opens}
+                    lastUsed={lastUsed}
+                    services={services}
+                    rules={rules}
+                    notices={notices}
+                    limitNotice={<PlanLimitNotice moduleId="bookings" />}
+                    calendarLine={
+                        gcLine ? (
+                            <GoogleCalendarLine
+                                line={gcLine}
+                                userId={session.user.id}
+                            />
+                        ) : null
+                    }
+                    share={
+                        share ? (
+                            <ShareLinkButton link={share} className="mt-0" />
+                        ) : null
+                    }
+                    // A booked message names the business (U9, Q12).
+                    business={organization.name}
+                    people={people}
+                    can={{
+                        book: canBook,
+                        // Open or block time: a Member keeps anyone's hours
+                        // (DEC-170, Q13); adding people stays `service:write`.
+                        hours: may("hours:write"),
+                        addPeople: may("service:write"),
+                        order: may("order:read"),
+                        // Refund what a late cancel keeps, or keep what the
+                        // policy returns (DEC-170, Q14).
+                        refund: may("payment:manage"),
+                        // "Take ₹X" (P2): the pair a payment link needs, and the
+                        // link itself only where the plan and a provider take it.
+                        desk: {
+                            canTake: canTakeDeskPayments(organization),
+                            canLink: people.payLink,
+                            online: takesOnlinePayment(access),
+                        },
                     }}
-                    arrival={
-                        arriving
+                    setup={
+                        canBook
                             ? {
-                                  who: initialWho,
-                                  date:
-                                      typeof params.date === "string" &&
-                                      DATE.test(params.date)
-                                          ? params.date
-                                          : null,
+                                  services: flowServices(services),
+                                  people,
+                                  // Paying with a class pack spends one
+                                  // (ADR-007), while Class packs is on (E12).
+                                  canUsePacks:
+                                      canReadPacks(organization) &&
+                                      canUsePacksOnBookings(organization) &&
+                                      packsOn(modules),
+                                  business: organization.name,
+                                  meet,
+                                  now,
                               }
                             : null
                     }
-                >
-                    {screen}
-                </NewBookingHost>
-            ) : (
-                screen
-            )}
+                    arrival={arriving ? { who: initialWho, date: asked } : null}
+                />
+            </HydrationBoundary>
         </PageContainer>
     );
 }

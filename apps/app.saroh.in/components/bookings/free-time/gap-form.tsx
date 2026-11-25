@@ -1,10 +1,10 @@
 "use client";
 
 import { Refusal } from "@/components/shared/states/refusal";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { useOverlaySubmit, useToastsAboveFoot } from "@saroh/ui/overlay-form";
 import { Segmented } from "@saroh/ui/segmented";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
@@ -90,7 +90,7 @@ export function GapForm({
     onHead: (head: GapHead) => void;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const narrow = useNarrow();
     const { staff, date, free } = target;
     const [mode, setMode] = useState<"book" | "block">("book");
@@ -179,13 +179,17 @@ export function GapForm({
         const startAt = zonedInstant(date, at, timezone).toISOString();
         const res = await runAction(
             () =>
-                bookByHand(chosen.id, {
-                    startAt,
-                    idempotencyKey: attempt,
-                    staffId: staff.id,
-                    ...payInput(pay, paidBy),
-                    ...booker,
-                }),
+                bookByHand(
+                    chosen.id,
+                    {
+                        startAt,
+                        idempotencyKey: attempt,
+                        staffId: staff.id,
+                        ...payInput(pay, paidBy),
+                        ...booker,
+                    },
+                    ...org,
+                ),
             // Said here, where the choice is.
             { quiet: true, onUnreached: setRefusal },
         );
@@ -207,7 +211,7 @@ export function GapForm({
                 setRefusal(
                     `${formatClock(at)} was just booked by someone else. Close this to see the free times again.`,
                 );
-                router.refresh();
+                refresh();
                 return;
             }
             setRefusal(res.error);
@@ -230,10 +234,10 @@ export function GapForm({
             link,
             business,
         });
-        router.refresh();
+        refresh();
     }
 
-    const after = { onClose, refresh: () => router.refresh() };
+    const after = { onClose, refresh: refresh };
     function saveBlock() {
         if (saving) return;
         void blockGapTime(

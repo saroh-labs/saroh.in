@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useHold } from "@/components/shared/undo/use-hold";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { formatClock } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
@@ -77,7 +77,7 @@ export function useCalendarActions({
     /** The business's: its free-cancel window is everyone's (DEC-170). */
     rules: BookingRules | null;
 }) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const { hold, undo, pending } = useHold();
     const [overrides, setOverrides] = useState<Record<string, Override>>({});
 
@@ -105,7 +105,7 @@ export function useCalendarActions({
             try {
                 return await write();
             } finally {
-                router.refresh();
+                refresh();
             }
         };
 
@@ -123,7 +123,9 @@ export function useCalendarActions({
             hold(
                 `outcome:${b.id}`,
                 `${firstName(b)} ${BOOKING_WORDS.came.toLowerCase()}.${take ? ` Take ${take} now.` : ""}`,
-                andRefresh(() => recordBookingOutcome(b.id, "ATTENDED")),
+                andRefresh(() =>
+                    recordBookingOutcome(b.id, "ATTENDED", ...org),
+                ),
                 back,
             );
         },
@@ -132,7 +134,7 @@ export function useCalendarActions({
             hold(
                 `outcome:${b.id}`,
                 `Marked ${firstName(b)} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
-                andRefresh(() => recordBookingOutcome(b.id, "NO_SHOW")),
+                andRefresh(() => recordBookingOutcome(b.id, "NO_SHOW", ...org)),
                 back,
             );
         },
@@ -156,7 +158,7 @@ export function useCalendarActions({
             hold(
                 `cancel:${b.id}`,
                 message,
-                andRefresh(() => cancelBooking(b.id)),
+                andRefresh(() => cancelBooking(b.id, {}, ...org)),
                 back,
             );
         },
@@ -183,11 +185,15 @@ export function useCalendarActions({
                     for (const b of seats) {
                         let ok: boolean;
                         try {
-                            const res = await cancelBooking(b.id, {
-                                returnCredit: true,
-                                closesClass: true,
-                                reason,
-                            });
+                            const res = await cancelBooking(
+                                b.id,
+                                {
+                                    returnCredit: true,
+                                    closesClass: true,
+                                    reason,
+                                },
+                                ...org,
+                            );
                             ok = res.ok;
                         } catch {
                             ok = false;
