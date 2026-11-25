@@ -161,6 +161,11 @@ const MEMBER_DEFAULT = {
         "order:stage",
     ],
 };
+// A server failure (not a denial): someone who may read Business, whose
+// read of it fails, so the tab offers retry rather than a denial.
+PRODUCT_ROLES.failure = {
+    actions: [...MEMBER_DEFAULT.actions, "org:settings:read"],
+};
 const invented = (key, label, actions, members = 0) => ({
     key,
     label,
@@ -571,6 +576,9 @@ createServer((req, res) => {
     // Team → Roles (F19).
     if (path.endsWith("/roles/catalogue")) return reply(200, CATALOGUE);
     if (path.endsWith("/roles")) return reply(200, ROLES);
+    // Who has connected Google Calendar (DEC-233): nobody here. Before
+    // `/members` below, which is the team and has no calendar accounts.
+    if (path.endsWith("/calendar/google/members")) return reply(200, []);
     // A person's extra permissions (F17): the Manager's team.
     if (path.endsWith("/members"))
         return reply(200, scenario === "MANAGER" ? MANAGER_TEAM : []);

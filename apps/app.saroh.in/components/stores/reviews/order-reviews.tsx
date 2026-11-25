@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess, showWarning } from "@saroh/ui/toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTransition } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
@@ -12,6 +13,7 @@ import {
     invitationSentence,
     reviewEmailNote,
 } from "@/lib/product-reviews/describe";
+import { productReviewsKeys } from "@/lib/product-reviews/queries";
 import type { InvitationState } from "@/lib/product-reviews/service";
 import { Tip } from "@saroh/ui/tooltip";
 
@@ -33,7 +35,8 @@ export function OrderReviews({
     /** May connect a provider; may see the plans. */
     may: { connect: boolean; plans: boolean };
 }) {
-    const { saved } = useOrderSave();
+    const { orgId, saved } = useOrderSave();
+    const qc = useQueryClient();
     const [pending, startTransition] = useTransition();
     const verb = state.state === "none" ? "Invite a review" : "Resend";
     const note =
@@ -43,7 +46,7 @@ export function OrderReviews({
 
     const invite = () => {
         startTransition(async () => {
-            const res = await runAction(() => inviteReviews([orderId]));
+            const res = await runAction(() => inviteReviews([orderId], orgId));
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
@@ -59,6 +62,11 @@ export function OrderReviews({
             } else if (result) {
                 showWarning(result.message);
             }
+            // Invite reviews' list without it, for its next visit.
+            void qc.invalidateQueries({
+                queryKey: productReviewsKeys(orgId),
+                refetchType: "none",
+            });
             await saved();
         });
     };

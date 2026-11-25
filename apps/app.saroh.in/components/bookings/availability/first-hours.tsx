@@ -4,11 +4,11 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { addMyself, updateStaff } from "@/lib/staff/actions";
 
 import { firstName } from "@/lib/names";
@@ -180,10 +180,12 @@ export function FirstHours({
  * Answers whether it saved; `onAdded` is told who they are now.
  */
 export function useSetMine(onAdded: (staffId: string) => void) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const [busy, setBusy] = useState(false);
     async function setMine(hours?: WeeklyRange[]): Promise<boolean> {
-        const res = await runAction(() => addMyself(hours), { setBusy });
+        const res = await runAction(() => addMyself(hours, ...org), {
+            setBusy,
+        });
         if (!res) return false;
         if (!res.ok) {
             showError(
@@ -194,13 +196,17 @@ export function useSetMine(onAdded: (staffId: string) => void) {
         }
         const mine = res.data.staff;
         onAdded(mine.id);
-        router.refresh();
+        refresh();
         showUndo(
             `${firstName(mine.name) || "Your"}'s hours are set: ${openWeekSentence(hours ?? mine.hours)}.`,
             async () => {
-                const back = await updateStaff(mine.id, { status: "ARCHIVED" });
+                const back = await updateStaff(
+                    mine.id,
+                    { status: "ARCHIVED" },
+                    ...org,
+                );
                 if (!back.ok) return back;
-                router.refresh();
+                refresh();
                 return { ok: true };
             },
         );

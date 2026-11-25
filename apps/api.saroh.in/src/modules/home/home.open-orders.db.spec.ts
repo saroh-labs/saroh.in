@@ -12,7 +12,7 @@ import { prisma } from "@saroh/database";
 
 import { listOrderRows } from "../orders/order-list";
 import { isFresh, readSince } from "./home-last-day";
-import { readOpenOrders } from "./home-open-orders";
+import { countSoonOrders, readOpenOrders } from "./home-open-orders";
 import { readToday } from "./home-today";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -185,6 +185,35 @@ describe("Home's open orders (DB)", () => {
         expect(home.count).toBe(7);
         // On its way, and the shipping order due the day after tomorrow.
         expect(home.later).toBe(2);
+    });
+
+    it("badges the shell with the same count, by count alone (owner, 25 Nov)", async () => {
+        for (const now of [NOW, new Date(NOW.getTime() + 24 * HOUR)]) {
+            const home = await readOpenOrders(prisma, orgId, { ...view, now });
+            expect(
+                await countSoonOrders(prisma, orgId, { now, zone: ZONE }),
+            ).toBe(home.count);
+        }
+        // A staff member's storefronts only; another business's none.
+        expect(
+            await countSoonOrders(prisma, orgId, {
+                ...view,
+                storeIds: [storeId],
+            }),
+        ).toBe(
+            (
+                await readOpenOrders(prisma, orgId, {
+                    ...view,
+                    storeIds: [storeId],
+                })
+            ).count,
+        );
+        expect(
+            await countSoonOrders(prisma, orgId, { ...view, storeIds: [] }),
+        ).toBe(0);
+        expect(await countSoonOrders(prisma, quietOrgId, view)).toBe(
+            (await readOpenOrders(prisma, quietOrgId, view)).count,
+        );
     });
 
     it("shows a late order before five that are merely due, and none due later (H-1, DEC-163)", async () => {

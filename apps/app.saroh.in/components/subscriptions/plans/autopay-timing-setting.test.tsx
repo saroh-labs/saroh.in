@@ -274,6 +274,7 @@ describe("When autopay charges: the row and its sheet", () => {
         await press(button("Save", sheet()));
         expect(actions.setAutopayChargeTiming).toHaveBeenCalledWith(
             "ON_DUE_DATE",
+            undefined,
         );
         // The row reads the save at once, and the page is read again.
         expect(row()).toBe("Autopay charges on the due date.");
@@ -290,6 +291,7 @@ describe("When autopay charges: the row and its sheet", () => {
         });
         expect(actions.setAutopayChargeTiming).toHaveBeenLastCalledWith(
             "DAY_AFTER_RENEWAL",
+            undefined,
         );
         expect(row()).toBe("Autopay charges the day after renewal.");
     });
@@ -377,9 +379,11 @@ describe("a plan's own choice", () => {
             select.value = "ON_RENEWAL_DATE";
             select.dispatchEvent(new Event("change", { bubbles: true }));
         });
+        // Drawn outside the plan page's provider here: no business named.
         expect(actions.setPlanChargeTiming).toHaveBeenCalledWith(
             "plan_1",
             "ON_RENEWAL_DATE",
+            undefined,
         );
         await settle(() => {
             select.value = "BUSINESS";
@@ -388,6 +392,7 @@ describe("a plan's own choice", () => {
         expect(actions.setPlanChargeTiming).toHaveBeenLastCalledWith(
             "plan_1",
             null,
+            undefined,
         );
     });
 });

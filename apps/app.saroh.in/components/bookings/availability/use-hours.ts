@@ -2,11 +2,11 @@
 
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { sameHours } from "@/lib/services/availability-rules";
 import { replaceStaffHours } from "@/lib/staff/actions";
 import type { BookingBrief, StaffView, WeeklyRange } from "@/lib/staff/types";
@@ -26,7 +26,8 @@ function weeksOf(staff: readonly StaffView[]): Weeks {
  * Saves, and their Undos, go one after another through one queue, and only
  * the latest change keeps its Undo. While any is queued the page's own
  * read is not taken in (it would draw a week from before the queued
- * saves); the page is read again once, when the queue empties.
+ * saves); the page is read again once, when the queue empties, and only
+ * when one of them landed.
  *
  * A save that is refused, or got no answer, puts the person's week back
  * as the server last accepted it, and the changes queued after it for
@@ -35,7 +36,7 @@ function weeksOf(staff: readonly StaffView[]): Weeks {
  * them, kept here by person.
  */
 export function useHours(staff: readonly StaffView[]) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const [weeks, setWeeks] = useState<Weeks>(() => weeksOf(staff));
     const [seen, setSeen] = useState(staff);
     // Saves queued or on their way; the read waits for none.
@@ -62,6 +63,8 @@ export function useHours(staff: readonly StaffView[]) {
     const [outside, setOutside] = useState<Record<string, BookingBrief[]>>({});
     const queue = useRef<Promise<unknown>>(Promise.resolve());
     const queued = useRef(0);
+    // Whether a save in this run of the queue landed: a refusal reads nothing.
+    const wrote = useRef(false);
     // Bumped for a person when one of their saves is refused: the saves
     // queued behind it for them are dropped.
     const epoch = useRef<Record<string, number>>({});
@@ -84,12 +87,15 @@ export function useHours(staff: readonly StaffView[]) {
             const run = queue.current.then(job).finally(() => {
                 queued.current -= 1;
                 setBusy(queued.current);
-                if (queued.current === 0) router.refresh();
+                if (queued.current === 0 && wrote.current) {
+                    wrote.current = false;
+                    refresh();
+                }
             });
             queue.current = run.catch(() => undefined);
             return run;
         },
-        [router],
+        [refresh],
     );
 
     /**
@@ -112,7 +118,7 @@ export function useHours(staff: readonly StaffView[]) {
                 if ((epoch.current[staffId] ?? 0) !== mine) return false;
                 const prior = confirmed.current[staffId] ?? [];
                 const res = await runAction(
-                    () => replaceStaffHours(staffId, next),
+                    () => replaceStaffHours(staffId, next, ...org),
                     { quiet: true },
                 );
                 if (!res?.ok) {
@@ -123,17 +129,19 @@ export function useHours(staff: readonly StaffView[]) {
                     return false;
                 }
                 accept(staffId, next);
+                wrote.current = true;
                 setOutside((o) => ({ ...o, [staffId]: res.data.outside }));
                 if (lastUndo.current !== null) dismissToast(lastUndo.current);
                 lastUndo.current = showUndo(words.done, () =>
                     enqueue(async () => {
                         const back = await runAction(
-                            () => replaceStaffHours(staffId, prior),
+                            () => replaceStaffHours(staffId, prior, ...org),
                             { quiet: true },
                         );
                         if (!back) return { ok: false, error: UNREACHED };
                         if (!back.ok) return back;
                         accept(staffId, prior);
+                        wrote.current = true;
                         put(staffId, prior);
                         setOutside((o) => ({
                             ...o,
@@ -145,7 +153,7 @@ export function useHours(staff: readonly StaffView[]) {
                 return true;
             });
         },
-        [accept, enqueue, put],
+        [accept, enqueue, put, org],
     );
 
     return { weeks, save, outside };

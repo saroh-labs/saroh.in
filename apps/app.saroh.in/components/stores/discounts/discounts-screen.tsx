@@ -13,6 +13,10 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import { describeDiscount } from "@/lib/discounts/describe";
 import type { Discount, DiscountState } from "@/lib/discounts/service";
 
@@ -50,12 +54,16 @@ const FILTERS: DataFilter<Discount>[] = [
  * A code belongs to the business; what it applies to — everything, some
  * storefronts, categories or products — is part of the code, not a scope
  * the screen follows.
+ *
+ * `discounts` undefined: still on its way (DEC-259). The header, New code,
+ * the search and the filters are drawn and work; the count is a bar and
+ * the rows are skeletons until the codes land.
  */
 export function DiscountsScreen({
     discounts,
     canWrite,
 }: {
-    discounts: Discount[];
+    discounts: Discount[] | undefined;
     canWrite: boolean;
 }) {
     const columns: DataColumn<Discount>[] = [
@@ -131,10 +139,16 @@ export function DiscountsScreen({
             <PageHeader
                 breadcrumb={["Sell", "Discount codes"]}
                 title="Discount codes"
-                count={countLabel(discounts.length, {
-                    one: "code",
-                    other: "codes",
-                })}
+                count={
+                    discounts ? (
+                        countLabel(discounts.length, {
+                            one: "code",
+                            other: "codes",
+                        })
+                    ) : (
+                        <FigureLoading />
+                    )
+                }
                 className="mb-0"
                 actions={
                     canWrite ? (
@@ -148,7 +162,16 @@ export function DiscountsScreen({
             />
             <DataView
                 viewId="discounts"
-                rows={discounts}
+                rows={discounts ?? []}
+                isLoading={!discounts}
+                loading={
+                    <PageLoading
+                        bare
+                        width="full"
+                        shape="rows"
+                        label="Loading discount codes"
+                    />
+                }
                 columns={columns}
                 rowKey={(d) => d.id}
                 rowHref={(d) => `/commerce/discounts/${d.id}`}

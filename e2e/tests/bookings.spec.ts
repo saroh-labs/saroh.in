@@ -1612,7 +1612,10 @@ test.describe("a booking's page (U12)", () => {
                 .last()
                 .click();
             await sheet.getByRole("button", { name: /^Move to / }).click();
-            await expect(page.getByText(/^Moved .+ to /)).toBeVisible();
+            // The toast: "What happened" now also says "Moved from … to …" at once.
+            await expect(
+                page.locator("[data-sonner-toast]").getByText(/^Moved .+ to /),
+            ).toBeVisible();
             const after = await northwind(owner).get<{ startAt: string }>(
                 `/services/bookings/${booked.id}`,
             );

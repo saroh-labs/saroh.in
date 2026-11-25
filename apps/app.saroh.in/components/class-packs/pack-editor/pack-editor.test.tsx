@@ -29,6 +29,14 @@ import type { EditorResult } from "@/lib/editor-shell/types";
 
 const push = vi.fn();
 const refresh = vi.fn();
+// The tab's business and Class packs' invalidation (DEC-259).
+const packSave = vi.hoisted(() => ({
+    saved: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+}));
+vi.mock("@/lib/class-packs/use-class-packs", () => ({
+    useClassPackSave: () => ({ orgId: "org_1", saved: packSave.saved }),
+}));
+
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh, replace: vi.fn() }),
     usePathname: () => "/class-packs/new",
@@ -299,22 +307,25 @@ describe("the Pack Editor", () => {
         await wait(900);
         // The design's defaults went with the name: classes, 10, 90 days,
         // good for every class on offer — and no price yet.
-        expect(actions.createPackDraft).toHaveBeenCalledWith({
-            name: "Ten classes",
-            description: null,
-            credits: 10,
-            validityDays: 90,
-            price: null,
-            currency: "INR",
-            serviceIds: ["hatha"],
-            kind: "CLASSES",
-            firstPackOnly: false,
-            // Nothing is asked of a business that isn't registered: its
-            // GST goes as it stands, not set.
-            gstRate: null,
-            sacCode: null,
-            gstPriceMode: null,
-        });
+        expect(actions.createPackDraft).toHaveBeenCalledWith(
+            {
+                name: "Ten classes",
+                description: null,
+                credits: 10,
+                validityDays: 90,
+                price: null,
+                currency: "INR",
+                serviceIds: ["hatha"],
+                kind: "CLASSES",
+                firstPackOnly: false,
+                // Nothing is asked of a business that isn't registered: its
+                // GST goes as it stands, not set.
+                gstRate: null,
+                sacCode: null,
+                gstPriceMode: null,
+            },
+            "org_1",
+        );
         expect(window.location.pathname).toBe("/class-packs/pk-1/edit");
         expect(text()).toContain("Saved as a draft. Not on sale");
         expect(button("Publish").disabled).toBe(true);
@@ -333,6 +344,7 @@ describe("the Pack Editor", () => {
             "pk-1",
             expect.objectContaining({ price: "4500" }),
             1,
+            "org_1",
         );
         expect(button("Publish").disabled).toBe(false);
 
@@ -341,7 +353,10 @@ describe("the Pack Editor", () => {
         );
         click(button("Publish"));
         await wait();
-        expect(actions.publishPack).toHaveBeenCalledWith("pk-1", 2);
+        expect(actions.publishPack).toHaveBeenCalledWith("pk-1", 2, "org_1");
+        // Class packs' reads go stale, no refresh (DEC-259).
+        expect(packSave.saved).toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Ten classes is published. You can sell it now.",
         );
@@ -381,6 +396,7 @@ describe("the Pack Editor", () => {
                 serviceIds: ["pt"],
             }),
             1,
+            "org_1",
         );
     });
 
@@ -609,6 +625,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
                 gstPriceMode: null,
             }),
             4,
+            "org_1",
         );
         expect(rateRow().getAttribute("aria-invalid")).not.toBe("true");
         expect(button("Publish changes").disabled).toBe(false);
@@ -646,6 +663,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
                 gstPriceMode: "INCLUDED",
             }),
             4,
+            "org_1",
         );
         expect(text()).not.toContain("Choose a GST rate");
     });

@@ -26,6 +26,7 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh, push: vi.fn() }),
 }));
+const onBooked = vi.fn();
 const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
@@ -98,6 +99,7 @@ describe("Book visit N (E10)", () => {
                         visits: 3,
                         who: "Kabir",
                     }}
+                    onBooked={onBooked}
                 />,
             ),
         );
@@ -126,5 +128,8 @@ describe("Book visit N (E10)", () => {
             "Visit booked.",
             expect.stringContaining("Visit 2 of 3 for Kabir"),
         );
+        // The screen reads its own queries again; never the whole page.
+        expect(onBooked).toHaveBeenCalledTimes(1);
+        expect(refresh).not.toHaveBeenCalled();
     });
 });

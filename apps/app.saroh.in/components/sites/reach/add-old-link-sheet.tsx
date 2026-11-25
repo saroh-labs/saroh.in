@@ -5,13 +5,13 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { SAVE_LINES } from "@/components/sites/shell/save-footer";
 import { runAction } from "@/lib/api/run-action";
 import { createSiteRedirect } from "@/lib/sites/actions";
 import type { SitePage } from "@/lib/sites/service";
+import type { SiteSave } from "@/lib/sites/use-sites";
 
 /** "bridal-packages", "/bridal-packages" or a pasted full link → "/bridal-packages". */
 export function oldLinkPath(typed: string): string {
@@ -31,14 +31,16 @@ export function AddOldLinkSheet({
     pages,
     open,
     onClose,
+    save,
 }: {
     siteId: string;
     host: string | null;
     pages: readonly Pick<SitePage, "path" | "title">[];
     open: boolean;
     onClose: () => void;
+    /** The tab's business for the write; the links read again once it landed. */
+    save: SiteSave;
 }) {
-    const router = useRouter();
     const [from, setFrom] = useState("");
     const [to, setTo] = useState(pages[0]?.path ?? "/");
     const [busy, setBusy] = useState(false);
@@ -59,17 +61,18 @@ export function AddOldLinkSheet({
         }
         const res = await runAction(
             () =>
-                createSiteRedirect(siteId, {
-                    fromPath: oldLinkPath(from),
-                    toPath: to,
-                }),
+                createSiteRedirect(
+                    siteId,
+                    { fromPath: oldLinkPath(from), toPath: to },
+                    save.orgId,
+                ),
             { setBusy },
         );
         if (!res) return;
         if (!res.ok) return setError(res.error);
         showSuccess("Old link added. It forwards once you publish.");
         close();
-        router.refresh();
+        void save.saved();
     }
 
     return (

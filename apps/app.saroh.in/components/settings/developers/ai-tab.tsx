@@ -1,24 +1,26 @@
 import { mcpAddress } from "@/lib/ai-connections/mcp-address";
-import { listAiConnections } from "@/lib/ai-connections/service";
 import { DOCS_URL } from "@/lib/help/links";
 import {
     activeBusinessZone,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { AiApps } from "./ai-apps";
 
-/** The AI assistants tab, read on the server; the desk's default and the phone's `/ai`. */
+import { AiAppsContainer } from "./containers";
+
+/**
+ * The AI assistants tab's gate, the desk's default and the phone's `/ai`:
+ * who is looking and what they may do; the connections load in the
+ * browser (`/api/settings/developers/ai`).
+ */
 export async function AiTab() {
-    const [session, org, connections, zone] = await Promise.all([
+    const [session, org, zone] = await Promise.all([
         requireSession(),
         resolveActiveOrganization(),
-        listAiConnections(),
         activeBusinessZone(),
     ]);
     return (
-        <AiApps
-            connections={connections}
+        <AiAppsContainer
             business={org?.name ?? "your business"}
             selfId={session.user.id}
             owner={

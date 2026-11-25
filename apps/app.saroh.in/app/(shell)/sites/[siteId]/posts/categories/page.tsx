@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { postCategoriesHref } from "@/lib/content/categories-href";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 
 /**
  * Post categories used to be a page of their own, outside the Website tabs.
@@ -15,5 +16,5 @@ export default async function PostCategoriesPage({
     params: Promise<{ siteId: string }>;
 }) {
     const { siteId } = await params;
-    redirect(postCategoriesHref(siteId));
+    redirect(postCategoriesHref(siteId, await websiteAreaOn()));
 }

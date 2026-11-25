@@ -40,6 +40,7 @@ import {
     updateBillingProfileAction,
 } from "@/lib/saroh-billing/billing-actions";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
@@ -117,6 +118,7 @@ export function EditBillingProfileSheet({
     onSaved: () => void;
 }) {
     const id = `billing-profile-edit-${useId().replace(/:/g, "")}`;
+    const { orgId } = useSettingsSave();
     const form = useForm<Values>({ defaultValues: profileValues(profile) });
     const { isSubmitting } = form.formState;
     const says = editSays(profile.businesses);
@@ -139,7 +141,7 @@ export function EditBillingProfileSheet({
             return;
         }
         const res = await runAction(() =>
-            updateBillingProfileAction(profile.id, edit),
+            updateBillingProfileAction(profile.id, edit, ...asOrg(orgId)),
         );
         if (!res) return;
         if (!res.ok) {
@@ -199,6 +201,7 @@ export function ChangeBillingProfileSheet({
     const id = `billing-profile-change-${useId().replace(/:/g, "")}`;
     const titleId = `${id}-title`;
     const current = view.current?.mine ? view.current.id : "";
+    const { orgId } = useSettingsSave();
     const form = useForm<Values>({
         defaultValues: { ...NO_BILLING, billingChoice: current },
     });
@@ -226,8 +229,15 @@ export function ChangeBillingProfileSheet({
         const sent = billingSent(values);
         const res = await runAction(() =>
             "newBillingProfile" in sent
-                ? createBillingProfileAction(sent.newBillingProfile, true)
-                : chooseBillingProfileAction(sent.billingProfileId),
+                ? createBillingProfileAction(
+                      sent.newBillingProfile,
+                      true,
+                      ...asOrg(orgId),
+                  )
+                : chooseBillingProfileAction(
+                      sent.billingProfileId,
+                      ...asOrg(orgId),
+                  ),
         );
         if (!res) return;
         if (!res.ok) {

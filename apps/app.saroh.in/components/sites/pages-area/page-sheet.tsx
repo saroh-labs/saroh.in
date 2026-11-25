@@ -63,6 +63,8 @@ export interface PageSheetProps {
     onSaved: () => void;
     /** The page was deleted. */
     onDeleted: (page: SitePage) => void;
+    /** The tab's business, on a React Query screen (DEC-259). */
+    orgId?: string;
 }
 
 /**
@@ -100,6 +102,7 @@ function OpenPageSheet({
     onClose,
     onSaved,
     onDeleted,
+    orgId,
 }: PageSheetProps & { page: SitePage }) {
     const id = useId();
     const readOnly = !canUpdate;
@@ -127,7 +130,7 @@ function OpenPageSheet({
         setFailed(null);
         setRefusal(null);
         const res = await runAction(
-            () => updatePage(siteId, page.id, changes),
+            () => updatePage(siteId, page.id, changes, orgId),
             // Said in the sheet, beside Try again, not in a toast.
             { setBusy, quiet: true, onUnreached: setFailed },
         );
@@ -150,7 +153,7 @@ function OpenPageSheet({
     }
 
     async function remove() {
-        const res = await deletePage(siteId, page.id);
+        const res = await deletePage(siteId, page.id, orgId);
         if (!res.ok) return { ok: false, error: res.error };
         guard.release();
         showSuccess("Page deleted.");

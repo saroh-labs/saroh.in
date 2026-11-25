@@ -4,9 +4,9 @@ import { Refusal } from "@/components/shared/states/refusal";
 import { runAction } from "@/lib/api/run-action";
 import { updateRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Permissions } from "./permissions";
 import { RoleNameField } from "./role-name-field";
@@ -29,7 +29,7 @@ export function RoleSheet({
     holds: (action: string) => boolean;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const settings = useSettingsSave();
     const [pending, setPending] = useState(false);
     const [label, setLabel] = useState(role.label);
     const [tried, setTried] = useState(false);
@@ -58,10 +58,16 @@ export function RoleSheet({
         setRefusal(null);
         const res = await runAction(
             () =>
-                updateRole(role.key, {
-                    ...(labelChanged ? { label: label.trim() } : {}),
-                    ...(actionsChanged ? { actions: Array.from(granted) } : {}),
-                }),
+                updateRole(
+                    role.key,
+                    {
+                        ...(labelChanged ? { label: label.trim() } : {}),
+                        ...(actionsChanged
+                            ? { actions: Array.from(granted) }
+                            : {}),
+                    },
+                    ...asOrg(settings.orgId),
+                ),
             // Said in the sheet, beside what was typed.
             { setBusy: setPending, quiet: true, onUnreached: setRefusal },
         );
@@ -76,7 +82,7 @@ export function RoleSheet({
         }
         showSuccess("Role saved.");
         onClose();
-        router.refresh();
+        settings.saved({ organizations: true });
     }
 
     return (

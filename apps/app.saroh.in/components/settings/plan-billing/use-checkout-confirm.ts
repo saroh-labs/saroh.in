@@ -2,12 +2,12 @@
 
 import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
 import { afterSettingsSave } from "@/lib/query/invalidate";
 import { confirmCheckoutAction } from "@/lib/saroh-billing/billing-actions";
 import type { ConfirmResult } from "@/lib/saroh-billing/plan-view";
+import { useServerRefresh } from "@/lib/settings/use-settings";
 
 /** How a confirm is going: asking, still waiting for Razorpay, or settled. */
 export type ConfirmPhase = "idle" | "checking" | "waiting" | "settled";
@@ -21,7 +21,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * last try is said on the page, never as a reason to pay again.
  */
 export function useCheckoutConfirm(planName: string) {
-    const router = useRouter();
+    const refresh = useServerRefresh();
     const [phase, setPhase] = useState<ConfirmPhase>("idle");
     const busy = useRef(false);
 
@@ -55,7 +55,8 @@ export function useCheckoutConfirm(planName: string) {
                                 "Choose the plan again to try once more.",
                             );
                         }
-                        router.refresh();
+                        // Change plan draws on the server; a tab read again above.
+                        refresh();
                         return state;
                     }
                     if (i < tries - 1) await wait(gapMs);
@@ -66,7 +67,7 @@ export function useCheckoutConfirm(planName: string) {
                 busy.current = false;
             }
         },
-        [planName, router],
+        [planName, refresh],
     );
 
     return { phase, confirm };

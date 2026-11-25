@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { Download } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -16,6 +15,7 @@ import {
     DATA_EXPORT_KEPT,
     DATA_EXPORT_STARTED,
 } from "@/lib/data-export/words";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { EmptyState } from "@saroh/ui/data-state";
 
 /**
@@ -29,18 +29,23 @@ import { EmptyState } from "@saroh/ui/data-state";
 export function DataExportPanel({
     lines,
     inProgress,
+    check,
 }: {
     lines: DataExportLine[];
     inProgress: boolean;
+    /** Reads the downloads again ("Check again"); never throws. */
+    check: () => Promise<unknown>;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [starting, startStarting] = useTransition();
     const [checking, startChecking] = useTransition();
     const [opening, setOpening] = useState<string | null>(null);
 
     const start = () =>
         startStarting(async () => {
-            const result = await runAction(() => startDataExport());
+            const result = await runAction(() =>
+                startDataExport(...asOrg(save.orgId)),
+            );
             if (!result) return;
             if (!result.ok) {
                 showError("Your data couldn't be prepared.", result.error);
@@ -48,16 +53,16 @@ export function DataExportPanel({
             }
             if (result.data.already) showInfo(DATA_EXPORT_ALREADY);
             else showSuccess("Export started.", DATA_EXPORT_STARTED);
-            router.refresh();
+            save.saved();
         });
 
     const download = async (id: string) => {
         setOpening(id);
         try {
-            const result = await getDataExportLink(id);
+            const result = await getDataExportLink(id, ...asOrg(save.orgId));
             if (!result.ok) {
                 showError("The download couldn't start.", result.error);
-                router.refresh();
+                save.saved();
                 return;
             }
             window.location.assign(result.data.url);
@@ -113,7 +118,9 @@ export function DataExportPanel({
                                 variant="outline"
                                 size="sm"
                                 onClick={() =>
-                                    startChecking(() => router.refresh())
+                                    startChecking(async () => {
+                                        await check().catch(() => undefined);
+                                    })
                                 }
                                 busy={checking}
                                 busyLabel="Checking…"

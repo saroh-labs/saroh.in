@@ -22,10 +22,11 @@ import { productRead, productsKeys, productsListRead } from "./queries";
  * A page of the catalogue for the open business (DEC-259). A new filter
  * keeps the last rows on screen (greyed by the container) until it lands.
  */
-export function useProductsList(ask: CatalogueAsk) {
+export function useProductsList(ask: CatalogueAsk, enabled = true) {
     return useQuery({
         ...productsListRead.options(useOrgId(), ask),
         placeholderData: keepPreviousData,
+        enabled,
     });
 }
 

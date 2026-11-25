@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import type { QrPanelRead, QrSavedLink } from "./panel";
 import { panelCodeInput } from "./panel";
 import { readQrPanel } from "./panel-read";
@@ -14,22 +16,38 @@ import type { QrCodeChange, QrCodeInput } from "./types";
  * Server Actions for a site's QR codes. Thin: the API resolves the caller
  * from the session, checks `site:update`, the target, the colour and the
  * plan, and its refusal comes back as the result for the screen to word.
+ *
+ * Settings › Share on React Query (DEC-259) passes the tab's business last
+ * (`writeAsOrg`); a QR button's panel elsewhere calls without it.
  */
 
-export async function createQrCode(siteId: string, input: QrCodeInput) {
-    return createQrCodeApi(siteId, input);
+// A moved tab's refusal is `{ ok: false, error }`, a refusal the maker already words.
+const as = <R>(orgId: string | undefined, write: () => Promise<R>) =>
+    orgId ? (writeAsOrg(orgId, write) as Promise<R>) : write();
+
+export async function createQrCode(
+    siteId: string,
+    input: QrCodeInput,
+    orgId?: string,
+) {
+    return as(orgId, () => createQrCodeApi(siteId, input));
 }
 
 export async function updateQrCode(
     siteId: string,
     qrCodeId: string,
     change: QrCodeChange,
+    orgId?: string,
 ) {
-    return updateQrCodeApi(siteId, qrCodeId, change);
+    return as(orgId, () => updateQrCodeApi(siteId, qrCodeId, change));
 }
 
-export async function retireQrCode(siteId: string, qrCodeId: string) {
-    return retireQrCodeApi(siteId, qrCodeId);
+export async function retireQrCode(
+    siteId: string,
+    qrCodeId: string,
+    orgId?: string,
+) {
+    return as(orgId, () => retireQrCodeApi(siteId, qrCodeId));
 }
 
 /**

@@ -53,8 +53,9 @@ describe("leads and pipelines a role can't reach", () => {
     ])("%s the role reaches still read as before", async (_, read) => {
         http.apiFetch.mockResolvedValue(status(200, [{ id: "x" }]));
         expect(await read()).toEqual([{ id: "x" }]);
+        // A failed read is not an empty read (DEC-259): it throws.
         http.apiFetch.mockResolvedValue(status(500));
-        expect(await read()).toEqual([]);
+        await expect(read()).rejects.toThrow(/500/);
         expect(nav.forbidden).not.toHaveBeenCalled();
     });
 });

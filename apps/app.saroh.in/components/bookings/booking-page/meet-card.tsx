@@ -7,11 +7,10 @@ import { Field } from "@saroh/ui/field";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { DoorOpen, RefreshCw, Video } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { MeetAccessChoice } from "@/components/shared/google-meet/meet-access-choice";
-import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { saveBookingMeeting } from "@/lib/google-calendar/actions";
 import type { BookingMeeting, MeetAccess } from "@/lib/google-calendar/types";
 import {
@@ -176,13 +175,13 @@ export function MeetCard({
 }
 
 function useSave(bookingId: string, onDone: () => void) {
-    const router = useRouter();
+    const { save: bookingSave, saved } = useBookingSave();
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     async function save(input: Parameters<typeof saveBookingMeeting>[1]) {
         setError(null);
-        const res = await runAction(
-            () => saveBookingMeeting(bookingId, input),
+        const res = await bookingSave(
+            (...orgId) => saveBookingMeeting(bookingId, input, ...orgId),
             {
                 setBusy: setPending,
                 onUnreached: setError,
@@ -192,7 +191,7 @@ function useSave(bookingId: string, onDone: () => void) {
         if (!res) return;
         if (!res.ok) return setError(res.error);
         onDone();
-        router.refresh();
+        saved();
     }
     return { pending, error, save };
 }

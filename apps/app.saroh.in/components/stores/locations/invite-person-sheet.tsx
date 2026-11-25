@@ -11,12 +11,12 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { inviteMember } from "@/lib/members/actions";
 import { LOCATION_ROLES, roleLabel, roleLine } from "@/lib/stores/people";
+import { useLocationSave } from "@/lib/stores/use-stores";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -70,7 +70,7 @@ export function InvitePersonSheet({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
-    const router = useRouter();
+    const located = useLocationSave();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: { email: "", role: "VIEWER" },
@@ -95,6 +95,7 @@ export function InvitePersonSheet({
                     storeId,
                     values.email,
                     values.role,
+                    located.orgId,
                 );
                 if (res.ok) return { ok: true };
                 if (res.field === "email") onEmail = res.error;
@@ -109,7 +110,8 @@ export function InvitePersonSheet({
                 "When they accept, they're also added to your team, as Location team.",
             onSent: () => {
                 form.reset();
-                router.refresh();
+                // The invitation shows once the roster is read again.
+                void located.reread(storeId);
             },
             onBack: () => {
                 onOpenChange(true);

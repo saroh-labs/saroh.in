@@ -426,7 +426,11 @@ describe("StorefrontsScreen as a location's own page", () => {
     });
 
     it("a location that couldn't be read keeps its name and offers Try again", () => {
-        const html = screen({ selected: null, chosenId: hill.id });
+        const html = screen({
+            selected: null,
+            chosenId: hill.id,
+            onRetry: () => undefined,
+        });
         expect(h1(html)).toBe("Hill Road");
         expect(text(html)).toContain("Couldn't load this location");
         expect(text(html)).toContain("Try again");

@@ -10,6 +10,7 @@ import type {
     AutopayTimingSettings,
 } from "@/lib/subscriptions/autopay-timing";
 import { TIMING_LABEL } from "@/lib/subscriptions/plan-settings";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { AutopayTimingSetting } from "./autopay-timing-setting";
@@ -42,11 +43,15 @@ export function AutopayTimingSheet({
 }) {
     const [choice, setChoice] = useState(saved);
     const [pending, setPending] = useState(false);
+    const { orgId } = useSubscriptionSave();
 
     async function save() {
-        const res = await runAction(() => setAutopayChargeTiming(choice), {
-            setBusy: setPending,
-        });
+        const res = await runAction(
+            () => setAutopayChargeTiming(choice, orgId),
+            {
+                setBusy: setPending,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);

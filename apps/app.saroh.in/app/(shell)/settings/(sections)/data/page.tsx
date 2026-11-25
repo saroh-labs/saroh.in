@@ -1,14 +1,12 @@
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { DataExportPanel } from "@/components/settings/data/data-export-panel";
 import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/page/settings-panel";
+import { SettingsTabScreen } from "@/components/settings/settings-tab-screen";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
-import { listDataExports } from "@/lib/data-export/service";
-import { dataExportLine } from "@/lib/data-export/words";
-import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -19,21 +17,27 @@ import { requireSession } from "@/lib/session";
  * The owner's alone, by role, as the API has it: the tab is offered only to
  * an owner (`SETTINGS_PAGES`), and anyone else who types the address is
  * told who can, before anything is read.
+ *
+ * On React Query (DEC-259): the downloads load in the browser
+ * (`/api/settings/data`), drawn by `SettingsTabScreen`, which switches to
+ * the other Settings tabs in place.
  */
 export const metadata = { title: "Your data · Settings" };
 
 export default async function DataPage() {
     await requireSession();
-    const org = await resolveActiveOrganization();
-    const header = (
-        <SettingsPanelHeader
-            title="Your data"
-            description="Everything this business keeps in Saroh is yours to take away, whenever you like."
-        />
-    );
+    const org = await activeOrganizationOnce();
     if (org && org.role !== "OWNER") {
         return (
-            <SettingsPanel header={header}>
+            <SettingsPanel
+                header={
+                    <SettingsPanelHeader
+                        holdsData={false}
+                        title="Your data"
+                        description="Everything this business keeps in Saroh is yours to take away, whenever you like."
+                    />
+                }
+            >
                 <PermissionDeniedState
                     {...whoCanChange({
                         thing: "the business's data",
@@ -43,16 +47,5 @@ export default async function DataPage() {
             </SettingsPanel>
         );
     }
-    const read = await listDataExports();
-    const now = new Date();
-    return (
-        <SettingsPanel header={header}>
-            <DataExportPanel
-                lines={(read?.exports ?? []).map((view) =>
-                    dataExportLine(view, now),
-                )}
-                inProgress={read?.inProgress ?? false}
-            />
-        </SettingsPanel>
-    );
+    return <SettingsTabScreen tab="/settings/data" kind={org?.kind ?? null} />;
 }

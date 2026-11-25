@@ -7,7 +7,6 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { showSuccess } from "@saroh/ui/toast";
 import { Unplug } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import {
@@ -43,6 +42,7 @@ import type {
     StripeCheckoutStyle,
 } from "@/lib/providers/service";
 import { isTestKey, webhookFor } from "@/lib/providers/webhook";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { RadioCards } from "@saroh/ui/choice-group";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
@@ -235,7 +235,7 @@ function PaymentsForm({
     setSaving: (saving: boolean) => void;
     onDone: () => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     // The edition's providers only: India never offers Stripe, Global only it.
     const options = PAYMENT_PROVIDERS.filter((p) =>
         connectablePayments().includes(p.value),
@@ -289,9 +289,12 @@ function PaymentsForm({
         const before = checkoutStyle;
         setCheckoutStyle(next);
         if (!current) return;
-        const res = await runAction(() => setStripeCheckoutStyle(next), {
-            setBusy: setSavingStyle,
-        });
+        const res = await runAction(
+            () => setStripeCheckoutStyle(next, ...asOrg(save.orgId)),
+            {
+                setBusy: setSavingStyle,
+            },
+        );
         if (!res?.ok) {
             setCheckoutStyle(before);
             if (res) reportFailure(res);
@@ -302,7 +305,8 @@ function PaymentsForm({
                 ? "Customers now pay on your page."
                 : "Customers now pay on Stripe's page.",
         );
-        router.refresh();
+        // Only this tab draws it.
+        save.saved();
     }
     const stripeErrors = stripe ? stripeKeyProblems(stripeKeys, tried) : {};
     const stripeError = (field: keyof StripeKeys) =>
@@ -368,6 +372,7 @@ function PaymentsForm({
                                       ? { webhookSecret: webhookSecret.trim() }
                                       : {}),
                               },
+                        ...asOrg(save.orgId),
                     ),
                 ),
             { setBusy: setSaving },
@@ -385,15 +390,15 @@ function PaymentsForm({
         }
         showSuccess(`${labelOfPayment(provider)} connected.`);
         onDone();
-        router.refresh();
+        save.saved({ shell: true });
     }
 
     async function disconnect(p: PaymentProviderName): Promise<ConfirmResult> {
-        const res = await disconnectPaymentProvider(p);
+        const res = await disconnectPaymentProvider(p, ...asOrg(save.orgId));
         if (!res.ok) return refusedResult(res);
         showSuccess(`${labelOfPayment(p)} disconnected.`);
         onDone();
-        router.refresh();
+        save.saved({ shell: true });
     }
 
     return (
@@ -614,7 +619,7 @@ function MessagingForm({
     setSaving: (saving: boolean) => void;
     onDone: () => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [channel, setChannel] = useState<CommsChannel>(initialChannel);
     const spec = CHANNELS[channel];
     const offered = sendable(channel);
@@ -657,14 +662,17 @@ function MessagingForm({
         }
         const res = await runAction(
             () =>
-                connectCommsProvider({
-                    channel,
-                    provider,
-                    credentials,
-                    ...(fromAddress.trim()
-                        ? { fromAddress: fromAddress.trim() }
-                        : {}),
-                }),
+                connectCommsProvider(
+                    {
+                        channel,
+                        provider,
+                        credentials,
+                        ...(fromAddress.trim()
+                            ? { fromAddress: fromAddress.trim() }
+                            : {}),
+                    },
+                    ...asOrg(save.orgId),
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -674,15 +682,15 @@ function MessagingForm({
             `${spec.label} is sent through it.`,
         );
         onDone();
-        router.refresh();
+        save.saved({ shell: true });
     }
 
     async function disconnect(c: CommsChannel): Promise<ConfirmResult> {
-        const res = await disconnectCommsProvider(c);
+        const res = await disconnectCommsProvider(c, ...asOrg(save.orgId));
         if (!res.ok) return refusedResult(res);
         showSuccess(`${CHANNELS[c].label} disconnected.`);
         onDone();
-        router.refresh();
+        save.saved({ shell: true });
     }
 
     return (

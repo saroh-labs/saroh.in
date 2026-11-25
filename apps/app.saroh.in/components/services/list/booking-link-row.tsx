@@ -7,7 +7,6 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
@@ -15,6 +14,7 @@ import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
 import { noteShared } from "@/components/shared/share-link/note-shared";
 import { runAction } from "@/lib/api/run-action";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import type { BookingLinkView } from "@/lib/services/booking-link";
 import {
     BOOKING_LINK_LABEL,
@@ -29,6 +29,7 @@ import {
     makeBookingPage,
     publishBookingPage,
 } from "@/lib/services/booking-link-actions";
+import { useServiceSave } from "@/lib/services/use-services";
 import type { ShareSetup } from "@/lib/share-item/share";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Row } from "@saroh/ui/settings-rows";
@@ -54,7 +55,7 @@ export function BookingLinkRow({
     shareSetup?: ShareSetup | null;
     className?: string;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useServiceSave();
     // What the last write answered, until the page is read again: kept
     // against the read it answered over, so a fresh read always wins.
     const [answer, setAnswer] = useState<{
@@ -72,7 +73,7 @@ export function BookingLinkRow({
 
     const make = async () => {
         setMakeError(null);
-        const res = await runAction(makeBookingPage, {
+        const res = await runAction(() => makeBookingPage(orgId), {
             setBusy: setMaking,
             quiet: true,
             onUnreached: setMakeError,
@@ -84,7 +85,8 @@ export function BookingLinkRow({
         }
         setAnswered(res.data);
         showSuccess("Your booking page is made. Publish it when you're ready.");
-        router.refresh();
+        // A new site: the shell's sites and this list are settings reads.
+        afterSettingsSave();
     };
 
     const action =
@@ -198,9 +200,10 @@ export function BookingLinkRow({
                     published={row.kind === "live"}
                     onPublished={(next) => {
                         setAnswered(next);
-                        router.refresh();
+                        void saved();
                     }}
                     onClose={() => setOpen(false)}
+                    orgId={orgId}
                 />
             ) : null}
         </Card>
@@ -218,6 +221,7 @@ function PublishSheet({
     published = false,
     onPublished,
     onClose,
+    orgId,
 }: {
     open: boolean;
     view: BookingLinkView;
@@ -225,6 +229,8 @@ function PublishSheet({
     published?: boolean;
     onPublished: (view: BookingLinkView) => void;
     onClose: () => void;
+    /** The tab's business, passed last to the write (`writeAsOrg`). */
+    orgId: string;
 }) {
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -276,7 +282,7 @@ function PublishSheet({
             onClose={onClose}
             onSubmit={async () => {
                 setError(null);
-                const res = await runAction(publishBookingPage, {
+                const res = await runAction(() => publishBookingPage(orgId), {
                     setBusy: setPending,
                     quiet: true,
                     onUnreached: setError,

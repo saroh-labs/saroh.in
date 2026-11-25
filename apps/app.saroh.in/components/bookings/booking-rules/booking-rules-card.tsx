@@ -5,12 +5,12 @@ import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { ChevronRight } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ROW as CHOICE_ROW } from "@/components/bookings/availability/whose-hours";
 
 import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import type { RuleKey, RuleRow } from "@/lib/services/availability-rules";
 import {
     payWayBlocked,
@@ -44,7 +44,7 @@ export function ruleSaved(row: RuleRow, value: string): string {
  * says nothing has changed and the rule stays as it was.
  */
 export function useBookingRules(rules: BookingRules | null) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const [shown, setShown] = useState(rules);
     const [seen, setSeen] = useState(rules);
     if (rules !== seen) {
@@ -62,19 +62,19 @@ export function useBookingRules(rules: BookingRules | null) {
         done: string,
         failed: string,
     ): Promise<boolean> {
-        const res = await runAction(() => updateBookingRules(patch));
+        const res = await runAction(() => updateBookingRules(patch, ...org));
         if (!res) return false;
         if (!res.ok) {
             showError(failed, res.error);
             return false;
         }
         setShown(res.data);
-        router.refresh();
+        refresh();
         showUndo(done, async () => {
-            const undone = await updateBookingRules(back);
+            const undone = await updateBookingRules(back, ...org);
             if (!undone.ok) return undone;
             setShown(undone.data);
-            router.refresh();
+            refresh();
             return { ok: true };
         });
         return true;

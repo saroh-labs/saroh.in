@@ -4,6 +4,8 @@ import {
     lockedNavHrefs,
     planLockedModuleKeys,
 } from "@/components/shared/navigation/nav-locks";
+import { ApiError } from "@/lib/api/errors";
+import { apiFetch, orgBase } from "@/lib/api/http";
 import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { getAskAiState } from "@/lib/ask-ai/service";
 import { getHomeRail } from "@/lib/home/rail";
@@ -95,13 +97,41 @@ export async function readShellSettings(): Promise<ShellSettings> {
 }
 
 /**
- * The bell and the rail's badges. Only OVERDUE work with a count becomes a
- * badge: advice ("Add a product") is not a queue, and badging it would
- * train merchants to ignore the badges. Non-fatal: a rail without badges is
- * a working rail. Whether the person may see the bell is the shell's to
- * decide from the role it already holds.
+ * The bell and the rail's badges, in one call (owner, 25 Nov 2026):
+ * `GET /home/badges` counts them in the API, the rail's own rules by count
+ * alone, so a live tick or a save no longer pays for the rail's actions
+ * and the business's row besides. The API refuses a non-member or a paused
+ * seat (403). An API without it yet (404/405: the app ships first) answers
+ * from the rail, as before it.
  */
 export async function readShellLive(): Promise<ShellLive> {
+    const base = await orgBase();
+    if (!base) throw new ApiError(401, "GET home/badges");
+    const res = await apiFetch(`${base}/home/badges`);
+    if (res.status === 404 || res.status === 405)
+        return readShellLiveFromRail();
+    if (!res.ok) throw new ApiError(res.status, "GET home/badges");
+    const read = (await res.json()) as Partial<ShellLive> | null;
+    return {
+        unread: typeof read?.unread === "number" ? read.unread : 0,
+        counts: Object.fromEntries(
+            Object.entries(read?.counts ?? {}).filter(
+                ([, n]) => typeof n === "number" && n > 0,
+            ),
+        ),
+    };
+}
+
+/**
+ * Before `/home/badges`: the unread count and the rail's OVERDUE work with
+ * a count, behind the membership the route asks of everyone else. Only
+ * OVERDUE work becomes a badge: advice ("Add a product") is not a queue.
+ * Non-fatal: a rail without badges is a working rail.
+ */
+async function readShellLiveFromRail(): Promise<ShellLive> {
+    if (!(await activeOrganizationOnce())) {
+        throw new ApiError(403, "GET home/badges");
+    }
     const [unread, rail] = await Promise.all([
         unreadNotificationCount().catch(() => 0),
         getHomeRail().catch(() => null),

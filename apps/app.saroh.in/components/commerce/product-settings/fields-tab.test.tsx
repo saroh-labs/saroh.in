@@ -26,6 +26,16 @@ vi.mock("@/lib/products/settings-actions", () => ({
     restoreField: (...a: unknown[]) => actions.restoreField(...a) as unknown,
 }));
 const refresh = vi.fn();
+// A save reads Product settings again (`productSettingsSaved`, DEC-259).
+vi.mock("@/lib/products/use-product-settings", () => ({
+    useProductSettingsSave: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
 }));
@@ -167,7 +177,7 @@ describe("the list", () => {
         render();
         s.press("Delete Skin type");
         await s.settle();
-        expect(actions.removeField).toHaveBeenCalledWith("f1");
+        expect(actions.removeField).toHaveBeenCalledWith("f1", "org_1");
         expect(showUndo.mock.calls[0][0]).toBe(
             "Skin type deleted. Values already typed on products are kept for 30 days.",
         );
@@ -197,7 +207,11 @@ describe("Add field", () => {
         s.type(open(), " Finish ");
         act(() => radio("Number")?.click());
         await s.submit(s.sheet());
-        expect(actions.addField).toHaveBeenCalledWith("Finish", "NUMBER");
+        expect(actions.addField).toHaveBeenCalledWith(
+            "Finish",
+            "NUMBER",
+            "org_1",
+        );
         expect(actions.updateField).not.toHaveBeenCalled();
         expect(s.sheet()).toBe(null);
         expect(showUndo.mock.calls[0][0]).toBe("Finish added.");
@@ -219,10 +233,14 @@ describe("Add field", () => {
         act(() => radio("On the shop")?.click());
         act(() => pressed("Dresses")?.click());
         await s.submit(s.sheet());
-        expect(actions.updateField).toHaveBeenCalledWith("f3", {
-            onShop: true,
-            categoryIds: ["c2"],
-        });
+        expect(actions.updateField).toHaveBeenCalledWith(
+            "f3",
+            {
+                onShop: true,
+                categoryIds: ["c2"],
+            },
+            "org_1",
+        );
         expect(s.sheet()).toBe(null);
     });
 
@@ -292,9 +310,13 @@ describe("Edit", () => {
         expect(actions.updateField).not.toHaveBeenCalled();
         await s.submit(s.sheet());
         expect(actions.updateField).toHaveBeenCalledTimes(1);
-        expect(actions.updateField).toHaveBeenCalledWith("f1", {
-            categoryIds: ["c1", "c2"],
-        });
+        expect(actions.updateField).toHaveBeenCalledWith(
+            "f1",
+            {
+                categoryIds: ["c1", "c2"],
+            },
+            "org_1",
+        );
         expect(s.sheet()).toBe(null);
         expect(showUndo.mock.calls[0][0]).toBe("Skin type saved.");
     });
@@ -304,9 +326,13 @@ describe("Edit", () => {
         open();
         act(() => radio("On the shop")?.click());
         await s.submit(s.sheet());
-        expect(actions.updateField).toHaveBeenCalledWith("f1", {
-            onShop: true,
-        });
+        expect(actions.updateField).toHaveBeenCalledWith(
+            "f1",
+            {
+                onShop: true,
+            },
+            "org_1",
+        );
         expect(showUndo.mock.calls[0][0]).toBe(
             "Skin type now shows on the shop.",
         );

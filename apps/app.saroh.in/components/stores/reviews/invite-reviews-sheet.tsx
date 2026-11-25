@@ -1,7 +1,6 @@
 "use client";
 
 import { showWarning } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EmailNoteText } from "@/components/communications/email-note";
@@ -13,6 +12,7 @@ import type {
     InvitableOrder,
     InviteResult,
 } from "@/lib/product-reviews/service";
+import { useReviewSave } from "@/lib/product-reviews/use-product-reviews";
 import { CheckRow } from "@saroh/ui/check-row";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
@@ -42,7 +42,7 @@ export function InviteReviewsSheet({
     /** Why invitations can't go; null when they can. */
     emailNote: ReviewEmailNote | null;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useReviewSave();
     const [picked, setPicked] = useState<Set<string>>(
         () => new Set(orders.slice(0, BATCH).map((o) => o.id)),
     );
@@ -73,11 +73,11 @@ export function InviteReviewsSheet({
                     ? "1 customer is asked for a review."
                     : `${ids.length} customers are asked for a review.`,
             run: async () => {
-                const res = await inviteReviews(ids);
+                const res = await inviteReviews(ids, orgId);
                 if (!res.ok) return res;
                 sent = res.data.filter((r) => r.status === "queued").length;
-                // rq-refresh-ok: Reviews on Products is server-drawn until U24.
-                router.refresh();
+                // The orders asked about leave the list.
+                await saved({ invited: true });
                 if (res.data.length - sent > 0) {
                     // What was skipped, and why, is listed in the sheet.
                     setResults(res.data);

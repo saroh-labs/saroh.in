@@ -1,12 +1,12 @@
 "use client";
 
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { moveLead } from "@/lib/leads/actions";
 import type { LeadStage } from "@/lib/leads/service";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
@@ -29,21 +29,24 @@ export function MoveStageControl({
     label?: string;
     compact?: boolean;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const [busy, setBusy] = useState(false);
 
     async function onChange(stageId: string) {
         if (stageId === currentStageId) return;
-        const res = await runAction(() => moveLead(leadId, stageId), {
-            setBusy,
-        });
+        const res = await runAction(
+            () => moveLead(leadId, stageId, save.orgId),
+            {
+                setBusy,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
         showSuccess("Lead moved.");
-        router.refresh();
+        void save.saved();
     }
 
     return (

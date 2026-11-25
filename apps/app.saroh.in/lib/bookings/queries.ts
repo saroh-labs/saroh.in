@@ -1,18 +1,30 @@
 import { z } from "zod";
 
-import type { CalendarBusy } from "@/lib/google-calendar/types";
+import type { BookingMeeting, CalendarBusy } from "@/lib/google-calendar/types";
 import type { MomentView } from "@/lib/moments/keys";
 import { defineRead } from "@/lib/query/define-read";
 import type { DomainKey } from "@/lib/query/keys";
 import { domainKey } from "@/lib/query/keys";
+import type { KeptBooking } from "@/lib/services/availability-rules";
 import type {
     BookingsCalendar,
     DiaryBooking,
 } from "@/lib/services/booking-calendar";
+import type { PageBooking } from "@/lib/services/booking-page";
+import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import type { LocalDate, ServiceHours } from "@/lib/services/diary";
 import { addDays, monthDays, weekStartOf } from "@/lib/services/diary";
+import type { PeekPerson } from "@/lib/services/peek";
 import type { ShareLink } from "@/lib/sites/share-links";
-import type { StaffView } from "@/lib/staff/types";
+import type {
+    BookingRules,
+    Closure,
+    OnlineBlocker,
+    PersonRulesView,
+    RuleRequest,
+    StaffView,
+    WeeklyRange,
+} from "@/lib/staff/types";
 import type { DateRange } from "@/lib/views/date-range";
 import { dateRangeAsk } from "@/lib/views/date-range";
 
@@ -124,3 +136,88 @@ export interface DiaryAsk {
     to: LocalDate;
     week: LocalDate;
 }
+
+/**
+ * Hours and time off (`/bookings/availability`, U25): everyone's week,
+ * time off and extra hours, the business's closures and rules, and the
+ * next three weeks' bookings only as far as the screen says which fall
+ * outside the hours or on a day with extra hours. Under `bookings`, so a
+ * save on the diary or the list marks it stale, and its own saves mark
+ * the diary's free times stale with one invalidation.
+ */
+export interface AvailabilityView {
+    staff: StaffView[];
+    closures: Closure[];
+    /** When the business is open, or null with no hours saved. */
+    openingHours: WeeklyRange[] | null;
+    timezone: string;
+    today: LocalDate;
+    /** The business's rules, or null when they couldn't be read. */
+    rules: BookingRules | null;
+    /** With nobody on the diary: the services' own hours together. */
+    serviceHours: WeeklyRange[] | null;
+    /** The services the booking page offers, for "What customers see". */
+    services: { id: string; name: string }[];
+    onlineBlocker: OnlineBlocker | null;
+    /** This week's live bookings by person; null when unread. */
+    kept: KeptBooking[] | null;
+    /** Live bookings per `${staffId}|${date}`, three weeks; null when unread. */
+    bookedOn: Record<string, number> | null;
+    /** The rule requests waiting (owner or admin); null otherwise or unread. */
+    requests: RuleRequest[] | null;
+    /** A Member's own diary's rules and request; null otherwise. */
+    mine: PersonRulesView | null;
+}
+
+/**
+ * Records, not settings: time off and the bookings it counts change from
+ * the diary and from customers; its own saves read it again at once.
+ */
+export const availabilityRead = defineRead<AvailabilityView>()({
+    key: (orgId) => domainKey("bookings", orgId, "availability"),
+    route: { path: "/api/bookings/availability", params: {} },
+    tier: "records",
+});
+
+/** What a booking's page is asked: the booking, by its id in the path. */
+export interface BookingAsk {
+    bookingId: string;
+}
+
+/**
+ * One booking as its page draws it (U26): the booking, and beside it what
+ * the page shows from other reads, each failing on its own. A field left
+ * out is a panel not drawn; `null` is a read that failed or wasn't asked.
+ */
+export interface BookingView {
+    booking: PageBooking;
+    /** The server's now at the read: past or to come, and the outcome ask. */
+    now: number;
+    /** Class packs (ADR-007): left out for a role that can't read packs. */
+    packs?: {
+        paidWith: { name: string } | null;
+        usable: { id: string; label: string }[];
+        canWrite: boolean;
+    };
+    /** A class still to come's waitlist (A12); null: the read failed. */
+    waitlist?: ClassWaitlistRow[] | null;
+    /** Their phone, Needs attention and reach (`contact:read`); else null. */
+    person: PeekPerson | null;
+    /** Who is on the diary, for New booking and Change who (`booking:write`). */
+    staff: StaffView[] | null;
+    /** Its Meet and Google event (DEC-233); null draws Join online. */
+    meeting: BookingMeeting | null;
+    /** Google Calendar is on here: New booking offers a Meet (`booking:write`). */
+    meet?: boolean;
+}
+
+/** One booking's read: changes from outside (a reschedule, a payment). */
+export const bookingRead = defineRead<BookingView>()({
+    key: (orgId, { bookingId }) =>
+        domainKey("bookings", orgId, "booking", bookingId),
+    route: {
+        path: "/api/bookings/[bookingId]",
+        params: { bookingId: z.string().regex(/^[\w-]{1,64}$/) },
+    },
+    tier: "live",
+});

@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { LocationDetails } from "@/lib/stores/location-details";
@@ -21,6 +20,7 @@ import {
     PLACE_ROW_ID,
     placeEditId,
 } from "@/lib/stores/place-rows";
+import { useLocationSave } from "@/lib/stores/use-stores";
 import { Absent, Row, Section as Rows } from "@saroh/ui/settings-rows";
 
 import type {
@@ -81,7 +81,7 @@ export function PlaceSection({
     /** May add an image to the library (`media:write`). */
     canUploadLogo?: boolean;
 }) {
-    const router = useRouter();
+    const located = useLocationSave();
     // What the description and logo's sheet last saved, until the page has
     // read them again.
     const [savedDetails, setSavedDetails] = useState<LocationDetails | null>(
@@ -337,7 +337,7 @@ export function PlaceSection({
                     onClose={sheets.close}
                     onSaved={(next) => {
                         setSavedDetails(next);
-                        router.refresh();
+                        void located.reread(store.id);
                     }}
                 />
             ) : null}

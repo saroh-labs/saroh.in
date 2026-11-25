@@ -275,9 +275,12 @@ describe("adding a category", () => {
         const input = startAdding();
         typeInto(input, " News ");
         await submit(input.form);
-        expect(createPostCategory).toHaveBeenCalledWith("site_1", {
-            name: "News",
-        });
+        // Outside a React Query screen (the post editor) no business is sent.
+        expect(createPostCategory).toHaveBeenCalledWith(
+            "site_1",
+            { name: "News" },
+            undefined,
+        );
         expect(showError).toHaveBeenCalledWith(
             "A category with that name already exists.",
         );
@@ -344,10 +347,12 @@ describe("renaming a category", () => {
         typeInto(input, "Recipes");
         await submit(input.form);
         // The slug is kept, so links to the category keep working.
-        expect(updatePostCategory).toHaveBeenCalledWith("site_1", "c1", {
-            name: "Recipes",
-            slug: "news",
-        });
+        expect(updatePostCategory).toHaveBeenCalledWith(
+            "site_1",
+            "c1",
+            { name: "Recipes", slug: "news" },
+            undefined,
+        );
         expect(showError).toHaveBeenCalledWith(
             "A category with that name already exists.",
         );

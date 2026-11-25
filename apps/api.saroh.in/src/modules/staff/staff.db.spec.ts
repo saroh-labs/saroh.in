@@ -356,6 +356,103 @@ describe("staff and their hours (real database)", () => {
     });
 });
 
+describe("a deleted service and who takes it (real database)", () => {
+    it("takes the service off everyone on delete, and keeps its bookings", async () => {
+        const trimId = await makeService("Beard trim", 1, false);
+        const asha = await person("Asha", [ptId, trimId]);
+        const c = await contact();
+        const made = await bookings.bookByHand(org, trimId, {
+            startAt: at(7, 9).toISOString(),
+            contactId: c.id,
+            staffId: asha.id,
+        });
+
+        await bookings.removeService(org, trimId);
+
+        const links = await prisma.staffService.findMany({
+            where: { staffId: asha.id },
+            select: { serviceId: true },
+        });
+        expect(links.map((l) => l.serviceId)).toEqual([ptId]);
+        // The booking still says who and what.
+        await expect(
+            prisma.booking.findUniqueOrThrow({
+                where: { id: made.id },
+                select: { staffId: true, serviceId: true },
+            }),
+        ).resolves.toEqual({ staffId: asha.id, serviceId: trimId });
+        // And saving the person's services afterwards just works.
+        const saved = await staff.setServices(org, asha.id, [ptId, massageId]);
+        expect([...saved.serviceIds].sort()).toEqual([ptId, massageId].sort());
+    });
+
+    it("drops a deleted service a person still holds from before, on their next save", async () => {
+        const goneId = await makeService("Old facial", 1, false);
+        const asha = await person("Asha", [ptId]);
+        // Data from before deleting cleared the links.
+        await prisma.service.update({
+            where: { id: goneId },
+            data: { deletedAt: new Date(), status: "ARCHIVED" },
+        });
+        await prisma.staffService.create({
+            data: {
+                organizationId: org.organizationId,
+                staffId: asha.id,
+                serviceId: goneId,
+            },
+        });
+
+        const saved = await staff.setServices(org, asha.id, [
+            ptId,
+            goneId,
+            massageId,
+        ]);
+        expect([...saved.serviceIds].sort()).toEqual([ptId, massageId].sort());
+        await expect(
+            prisma.staffService.count({ where: { serviceId: goneId } }),
+        ).resolves.toBe(0);
+    });
+
+    it("still refuses another business's service, and a deleted one not held", async () => {
+        const other = await prisma.organization.create({
+            data: { name: "Other Org", slug: `staff-other-${process.pid}` },
+        });
+        const theirs = await prisma.service.create({
+            data: {
+                organizationId: other.id,
+                name: "Their PT",
+                durationMinutes: 60,
+                capacity: 1,
+                timezone: "UTC",
+                status: "ACTIVE",
+            },
+        });
+        const goneId = await makeService("Old wax", 1, false);
+        await bookings.removeService(org, goneId);
+        const asha = await person("Asha", [ptId]);
+
+        for (const ids of [
+            [ptId, theirs.id],
+            [ptId, goneId],
+            [ptId, "svc_never"],
+        ]) {
+            await expect(
+                staff.setServices(org, asha.id, ids),
+            ).rejects.toMatchObject({
+                response: {
+                    message: "One of those services was not found",
+                    field: "serviceIds",
+                },
+            });
+        }
+        const links = await prisma.staffService.findMany({
+            where: { staffId: asha.id },
+            select: { serviceId: true },
+        });
+        expect(links.map((l) => l.serviceId)).toEqual([ptId]);
+    });
+});
+
 describe("class places and the free-cancellation window (real database)", () => {
     async function soldPack(contactId: string) {
         const pack = await packs.createPack(org, {

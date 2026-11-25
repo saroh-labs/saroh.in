@@ -33,6 +33,14 @@ import type { Plan } from "@/lib/subscriptions/service";
 import { MissingRatesNotice } from "./missing-rates-notice";
 
 const saveGstRates = vi.fn();
+// The tab's business and Class packs' invalidation (DEC-259).
+const packSave = vi.hoisted(() => ({
+    saved: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+}));
+vi.mock("@/lib/class-packs/use-class-packs", () => ({
+    useClassPackSave: () => ({ orgId: "org_1", saved: packSave.saved }),
+}));
+
 vi.mock("@/lib/gst-rates/actions", () => ({
     saveGstRates: (...args: unknown[]) => saveGstRates(...args) as unknown,
 }));
@@ -454,6 +462,7 @@ describe("selling a pack", () => {
             "pk_ten",
             "c_asha",
             "UPI",
+            "org_1",
         );
         expect(toast.showSuccess).toHaveBeenCalled();
     });

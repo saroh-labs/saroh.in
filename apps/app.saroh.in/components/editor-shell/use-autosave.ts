@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -59,26 +60,41 @@ export function useAutosave<V>({
     );
     // The latest of each, for the save closure the controller holds.
     const recordRef = useRef(initial);
-    const live = useRef({ adapter, ready, hrefFor });
+    const router = useRouter();
+    const live = useRef({ adapter, ready, hrefFor, router });
     useEffect(() => {
-        live.current = { adapter, ready, hrefFor };
+        live.current = { adapter, ready, hrefFor, router };
     });
 
     /** A new record's edit page, until the address may move to it. */
     const pendingHref = useRef<string | null>(null);
-    const moveAddress = useCallback(() => {
+    /**
+     * The moved address, until a save lands with nothing newer to send:
+     * then Next mounts the edit route there, reading the record with all
+     * that was typed. A save's revalidation did that before DEC-259; now
+     * nothing draws a page again after a save, so the editor asks for it.
+     */
+    const mountAt = useRef<string | null>(null);
+    const moveAddress = useCallback((mount = true) => {
         const href = pendingHref.current;
         if (!href) return;
         pendingHref.current = null;
-        // Next mounts the edit route at the new address: leave it this
-        // page's place to take up (`lib/editor-shell/address.ts`).
+        window.history.replaceState(null, "", href);
+        if (mount) mountAt.current = href;
+    }, []);
+    const mountEditPage = useCallback(() => {
+        const href = mountAt.current;
+        if (!href) return;
+        mountAt.current = null;
+        // Leave the page mounted there this one's place to take up
+        // (`lib/editor-shell/address.ts`).
         const focused = document.activeElement;
         leavePlace(
             href,
             window.scrollY,
             focused instanceof HTMLElement && focused.id ? focused.id : null,
         );
-        window.history.replaceState(null, "", href);
+        live.current.router.replace(href, { scroll: false });
     }, []);
 
     // Mounted at an address a new record just moved to: carry on from
@@ -136,10 +152,12 @@ export function useAutosave<V>({
                     pendingHref.current = live.current.hrefFor(next.id);
                     if (!isTypingIn(document.activeElement)) moveAddress();
                 }
+                const { edits, savedSeq } = ctrl.snapshot;
+                if (edits <= savedSeq) mountEditPage();
             },
         });
         return () => ctrl.dispose();
-    }, [ctrl, moveAddress]);
+    }, [ctrl, moveAddress, mountEditPage]);
 
     // Focus leaving every text field moves the address, once.
     useEffect(() => {
@@ -181,8 +199,10 @@ export function useAutosave<V>({
     const publish = useCallback(async (): Promise<EditorResult<
         EditorRecord<V>
     > | null> => {
+        // Stays mounted: a page drawn mid-publish could show a draft.
+        mountAt.current = null;
         if (!(await ctrl.flush())) return null;
-        moveAddress();
+        moveAddress(false);
         const r = recordRef.current;
         if (!r) return null;
         const res = await live.current.adapter.publish(r.id, revision());

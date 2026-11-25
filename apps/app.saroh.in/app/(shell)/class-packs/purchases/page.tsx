@@ -1,46 +1,42 @@
-import { PurchasesScreen } from "@/components/class-packs/purchases/purchases-screen";
+import { PackEditorState } from "@/components/class-packs/pack-editor/editor-states";
+import { PurchasesContainer } from "@/components/class-packs/purchases/purchases-screen";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { canSellPacks } from "@/lib/class-packs/access";
-import {
-    getSellingTerms,
-    listPacks,
-    listPurchases,
-} from "@/lib/class-packs/service";
-import { contactPickerOptions } from "@/lib/invoices/contacts";
+import { canReadPacks, canSellPacks } from "@/lib/class-packs/access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Class pack holders" };
 
-/** Class packs → who holds one, with classes left and when it runs out. */
+/**
+ * Class packs → who holds one, with classes left and when it runs out.
+ * On React Query (DEC-259): the gates are the page's; the purchases and
+ * the sell dialog's reads are `PurchasesContainer`'s query
+ * (`/api/class-packs/purchases`), drawn into the screen's frame.
+ */
 export default async function PackPurchasesPage({
     searchParams,
 }: {
     searchParams: Promise<{ view?: string }>;
 }) {
     await requireSession();
-    const [purchases, packs, organization, params] = await Promise.all([
-        listPurchases(),
-        listPacks(),
+    const [organization, params] = await Promise.all([
         resolveActiveOrganization(),
         searchParams,
     ]);
-    // The only write here is selling one (E26: `pack:sell`).
-    const canWrite = canSellPacks(organization);
-    const [contacts, terms] = await Promise.all([
-        canWrite ? contactPickerOptions() : Promise.resolve([]),
-        getSellingTerms(),
-    ]);
+    if (!canReadPacks(organization)) {
+        return (
+            <PackEditorState
+                state="forbidden"
+                retryHref="/class-packs/purchases"
+            />
+        );
+    }
 
     return (
         <PageContainer width="full">
-            <PurchasesScreen
-                purchases={purchases}
-                packs={packs}
-                contacts={contacts}
-                canWrite={canWrite}
-                invoicesOnSale={terms.invoicesOnSale}
-                gst={terms.gst}
+            <PurchasesContainer
+                // The only write here is selling one (E26: `pack:sell`).
+                canWrite={canSellPacks(organization)}
                 initialFilterId={params.view}
             />
         </PageContainer>

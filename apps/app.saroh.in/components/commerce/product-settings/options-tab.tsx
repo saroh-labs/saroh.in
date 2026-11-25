@@ -4,11 +4,11 @@ import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import type { CatalogueView } from "@/lib/products/settings";
 import { addOption, removeOption } from "@/lib/products/settings-actions";
+import { useProductSettingsSave } from "@/lib/products/use-product-settings";
 
 import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
@@ -29,7 +29,7 @@ export function optionProductsHref(optionId: string): string {
  * products choosing by it; Delete is offered only once none do.
  */
 export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
-    const router = useRouter();
+    const { orgId, saved } = useProductSettingsSave();
     const { options, canWrite } = catalogue;
     const [pending, start] = useTransition();
 
@@ -40,20 +40,21 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                 return true;
             });
             if (!reached) return;
-            router.refresh();
+            void saved();
         });
     }
 
     /** Not in use, so it asks nothing: gone at once, with Undo. */
     function remove(o: (typeof options)[number]) {
         run(async () => {
-            const res = await removeOption(o.id);
+            const res = await removeOption(o.id, orgId);
             if (!res.ok) return showError(res.error);
             showUndo(`${o.name} deleted.`, () =>
                 run(async () => {
                     const undo = await addOption(
                         res.data.name,
                         res.data.values,
+                        orgId,
                     );
                     if (!undo.ok) showError(undo.error);
                 }),

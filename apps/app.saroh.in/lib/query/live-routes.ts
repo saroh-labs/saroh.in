@@ -11,10 +11,12 @@ export const LIVE_QUERY_ROUTES: Readonly<Record<string, readonly string[]>> = {
     "/": ["home"],
     "/bookings": ["bookings"],
     "/bookings/all": ["bookings"],
+    "/bookings/[bookingId]": ["bookings"],
     "/commerce/products": ["products"],
     "/commerce/orders": ["orders"],
     "/commerce/orders/[orderId]": ["orders"],
     "/commerce/orders/tickets": ["orders"],
+    "/notifications": ["notifications"],
 };
 
 /** Whether `pathname` is the route `glob` names. */

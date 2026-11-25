@@ -20,8 +20,11 @@ import type {
 
 const push = vi.fn();
 const refresh = vi.fn();
+const replace = vi.fn();
+// The editor's domain reads again after Publish, Discard and Delete draft.
+const saved = vi.fn<() => Promise<void>>(() => Promise.resolve());
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push, refresh, replace: vi.fn() }),
+    useRouter: () => ({ push, refresh, replace }),
     usePathname: () => "/billing/plans/new",
 }));
 
@@ -87,6 +90,8 @@ beforeEach(() => {
     adapter = adapterMock();
     push.mockReset();
     refresh.mockReset();
+    replace.mockReset();
+    saved.mockClear();
     toast.showSuccess.mockReset();
     toast.showError.mockReset();
     window.history.replaceState(null, "", "/billing/plans/new");
@@ -102,6 +107,7 @@ afterEach(() => {
 function render(initial: EditorRecord<Plan> | null) {
     const props: EditorShellProps<Plan> = {
         adapter,
+        saved,
         copy: {
             noun: "plan",
             liveLabel: "Open",
@@ -115,7 +121,7 @@ function render(initial: EditorRecord<Plan> | null) {
         initial,
         emptyValues: EMPTY,
         canEdit: true,
-        breadcrumb: [
+        breadcrumb: () => [
             // A plain link: the guard catches any <a>, Next's or not.
             // eslint-disable-next-line @next/next/no-html-link-for-pages
             <a key="plans" href="/billing/subscriptions?tab=plans">
@@ -267,6 +273,10 @@ describe("the editor shell", () => {
             "Saved as a draft. Nobody can join it yet. Delete draft if you change your mind.",
         );
         expect(window.location.pathname).toBe("/billing/plans/pl-1/edit");
+        // Saved with nothing newer: Next mounts the edit page there.
+        expect(replace).toHaveBeenCalledWith("/billing/plans/pl-1/edit", {
+            scroll: false,
+        });
         // Draft: Publish (off, the price is missing) and Delete draft.
         expect(button("Publish").disabled).toBe(true);
         expect(buttons("Delete draft").length).toBeGreaterThan(0);
@@ -295,6 +305,12 @@ describe("the editor shell", () => {
         act(() => field("Price").blur());
         await wait(0);
         expect(window.location.pathname).toBe("/billing/plans/pl-1/edit");
+        // The edit page mounts once the next save lands, with what it carries.
+        expect(replace).not.toHaveBeenCalled();
+        adapter.saveDraft.mockResolvedValue(ok(rec({ revision: 2 })));
+        type(field("Price"), "1200");
+        await wait(800);
+        expect(replace).toHaveBeenCalledTimes(1);
     });
 
     it("says why a nameless draft can't save, and sends nothing", async () => {
@@ -479,7 +495,8 @@ describe("the editor shell", () => {
         await wait();
         expect(adapter.publish).toHaveBeenCalledWith("pl-1", 5);
         expect(toast.showSuccess).toHaveBeenCalledWith("Changes published.");
-        expect(refresh).toHaveBeenCalled();
+        expect(saved).toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
         expect(status()).toBe("Open to new sign-ups · no changes");
         expect(host.textContent).not.toContain("When you publish");
     });
@@ -551,6 +568,7 @@ describe("the editor shell", () => {
             root.render(
                 <EditorShell<Plan>
                     adapter={adapter}
+                    saved={saved}
                     copy={{
                         noun: "plan",
                         liveLabel: "Open",

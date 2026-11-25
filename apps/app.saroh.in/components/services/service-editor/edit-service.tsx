@@ -58,6 +58,7 @@ import { hoursFromRules } from "@/lib/services/service-hours-draft";
 import type { PanelKey } from "@/lib/services/service-panels";
 import { editCards } from "@/lib/services/service-panels";
 import { zoneShortName } from "@/lib/services/time-picker";
+import { useServiceSave } from "@/lib/services/use-services";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
@@ -67,7 +68,7 @@ import type { EditorProps } from "./editor-props";
 import { BackToServices, SERVICES_HREF } from "./editor-props";
 import { Section } from "./fields";
 import { DESK, EditCards, PHONE } from "./service-rows";
-import { useServiceSave } from "./use-service-save";
+import { useServiceEditorSave } from "./use-service-save";
 import { WhoCanBookCard } from "./who-can-book";
 
 /** Where a service's bookings are listed. */
@@ -107,6 +108,7 @@ export function EditService(props: EditorProps & { service: Service }) {
         share = null,
     } = props;
     const router = useRouter();
+    const write = useServiceSave();
     const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
     const hasStaff = people.length > 0;
     const [initial] = useState(() =>
@@ -117,7 +119,7 @@ export function EditService(props: EditorProps & { service: Service }) {
             hoursFromRules(rules ?? []),
         ),
     );
-    const store = useServiceSave({
+    const store = useServiceEditorSave({
         serviceId: service.id,
         initial,
         people,
@@ -207,12 +209,15 @@ export function EditService(props: EditorProps & { service: Service }) {
     }
 
     async function remove(): Promise<ConfirmResult> {
-        const res = await runAction(() => archiveService(service.id), {
-            quiet: true,
-        });
+        const res = await runAction(
+            () => archiveService(service.id, write.orgId),
+            { quiet: true },
+        );
         if (!res?.ok) return { ok: false, error: res ? res.error : UNREACHED };
         showSuccess("Service deleted.");
         router.push(SERVICES_HREF);
+        // Left behind: Services is marked stale, and the list reads it on arrival.
+        void write.saved({ read: false });
     }
 
     const cards = editCards({

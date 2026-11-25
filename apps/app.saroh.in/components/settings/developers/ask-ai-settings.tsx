@@ -21,6 +21,7 @@ import { runAction } from "@/lib/api/run-action";
 import { MARKETING_URL } from "@/lib/help/links";
 import { afterSettingsSave } from "@/lib/query/invalidate";
 import { saveAskAiOn } from "@/lib/settings/ask-ai-actions";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 /** Team › Roles, where "Use Ask AI" is given. */
 export const ROLES_HREF = "/settings/people?tab=roles";
@@ -266,6 +267,7 @@ function WhoAsked({ people }: { people: AskAiPersonUsage[] }) {
  * save is refused, as Help improve Saroh's switch does.
  */
 function BusinessSwitch({ business, on }: { business: string; on: boolean }) {
+    const { orgId } = useSettingsSave();
     const [pending, startTransition] = useTransition();
     const [shown, setShown] = useOptimistic(on);
     const flip = () => {
@@ -273,7 +275,9 @@ function BusinessSwitch({ business, on }: { business: string; on: boolean }) {
         const next = !shown;
         startTransition(async () => {
             setShown(next);
-            const result = await runAction(() => saveAskAiOn(next));
+            const result = await runAction(() =>
+                saveAskAiOn(next, ...asOrg(orgId)),
+            );
             if (!result) return;
             if (!result.ok) {
                 showError(result.error, "Ask AI is as it was.");

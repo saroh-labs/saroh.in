@@ -1,5 +1,6 @@
 "use client";
 
+import { PartialRead } from "@saroh/ui/failed-read";
 import { pagesOf } from "@saroh/ui/lib/paging";
 import { PageContainer } from "@saroh/ui/page-container";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,7 +8,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useTransition } from "react";
 
+import { CollectionsPanel } from "@/components/commerce/collections/collections-panel";
 import { QuickEditsContext } from "@/components/commerce/quick-edits/quick-edits";
+import { useCollections } from "@/lib/collections/use-collections";
+import { useProductReviews } from "@/lib/product-reviews/use-product-reviews";
+import { choicesFrom } from "@/lib/products/filter-choices";
 import {
     catalogueFilter,
     listHref,
@@ -15,6 +20,7 @@ import {
 } from "@/lib/products/list-query";
 import type { CatalogueAsk } from "@/lib/products/queries";
 import { productsListKeys, productsListRead } from "@/lib/products/queries";
+import { useCategories } from "@/lib/products/use-product-settings";
 import {
     useProductsList,
     useQuickEditsHost,
@@ -36,20 +42,34 @@ type Screen = ComponentProps<typeof CatalogueScreen>;
  * 25 Nov). A filter, a sort or a search changes the address in place (no
  * server render) and the key; the last rows stay, greyed, until the new
  * ones land, and Back draws a seen page from the cache. A quick edit
- * writes the cache first (`useQuickEditsHost`). Collections and Reviews
- * are drawn by the server: moving to or from them is a server navigation.
+ * writes the cache first (`useQuickEditsHost`). The side reads are their
+ * own queries: the reviews (the tab's count, the rows' stars), the
+ * categories and collections (the Filter's choices, the Collections
+ * cards); one that fails leaves its part out, said, never the list.
+ * Moving to or from Collections or Reviews is a server navigation (the
+ * page's gates choose the view).
  */
 export function CatalogueContainer({
     defaultSize,
-    reviewsCount,
     showInventory,
     showReviews,
+    notice,
     ...screen
-}: Omit<Screen, "query" | "page" | "tabs" | "adapter"> & {
+}: Omit<
+    Screen,
+    | "query"
+    | "page"
+    | "tabs"
+    | "adapter"
+    | "ratings"
+    | "choices"
+    | "collectionCount"
+    | "collectionsPanel"
+> & {
     /** Rows per page when the address names none (the remembered size). */
     defaultSize: number;
-    reviewsCount: number | null;
     showInventory: boolean;
+    /** A role that may read reviews: their tab, count and stars. */
     showReviews: boolean;
 }) {
     const router = useRouter();
@@ -72,6 +92,23 @@ export function CatalogueContainer({
     const list = useProductsList(catalogueFilter(query));
     const quick = useQuickEditsHost();
     const page = list.data;
+    const reviews = useProductReviews(showReviews);
+    const categories = useCategories(query.option ? { options: "1" } : {});
+    const collections = useCollections();
+    // Unread, a section is left out of the Filter (null); on its way, empty.
+    const sideRows = <T,>(rows: T[] | undefined, isError: boolean) =>
+        rows ?? (isError ? null : []);
+    const choices = choicesFrom(
+        sideRows(categories.data?.categories, categories.isError),
+        sideRows(collections.data, collections.isError),
+        query.option
+            ? sideRows(
+                  categories.data?.options ?? undefined,
+                  categories.isError || categories.data?.options === null,
+              )
+            : undefined,
+    );
+    const openNew = search.get("new") === "collection";
 
     // The page's last rows have gone (deleted, or out of this view): the
     // last page that still holds some, in place.
@@ -120,7 +157,11 @@ export function CatalogueContainer({
                 all: page?.counts.all,
                 collections: page?.counts.collections,
                 inventory: page?.counts.inventory,
-                reviews: reviewsCount,
+                reviews: reviews.data
+                    ? reviews.data.reviews.length
+                    : reviews.isError
+                      ? null
+                      : undefined,
             }}
             hrefs={{
                 all: listHref(query, { view: "all" }),
@@ -138,6 +179,47 @@ export function CatalogueContainer({
             <QuickEditsContext.Provider value={quick}>
                 <CatalogueScreen
                     {...screen}
+                    notice={
+                        <>
+                            {reviews.isError ? (
+                                <PartialRead
+                                    things="reviews"
+                                    so="Their count can't be shown. It is not zero."
+                                />
+                            ) : null}
+                            {notice}
+                        </>
+                    }
+                    ratings={reviews.data?.ratings ?? []}
+                    choices={choices}
+                    collectionCount={
+                        collections.data
+                            ? collections.data.length
+                            : collections.isError
+                              ? null
+                              : undefined
+                    }
+                    collectionsPanel={
+                        active === "collections" && !collections.isPending ? (
+                            <CollectionsPanel
+                                collections={collections.data ?? null}
+                                categories={categories.data?.categories ?? []}
+                                canWrite={screen.canWrite}
+                                activeId={query.collection}
+                                hrefs={Object.fromEntries(
+                                    (collections.data ?? []).map((c) => [
+                                        c.id,
+                                        listHref(query, { collection: c.id }),
+                                    ]),
+                                )}
+                                clearHref={listHref(query, {
+                                    collection: null,
+                                })}
+                                openNew={openNew}
+                                closeNewHref={listHref(query)}
+                            />
+                        ) : null
+                    }
                     query={query}
                     page={page ?? null}
                     tabs={tabs}

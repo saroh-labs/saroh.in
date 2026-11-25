@@ -1,8 +1,9 @@
 /**
- * Hours and time off's page (U17): it waits with its own loading shape,
- * says plainly when everyone's hours couldn't be read (with Try again),
- * opens on the person in `?person=` with a Member's and Calendar only's
- * rights, and a Reviewer is locked out of Bookings before it is drawn.
+ * Hours and time off's page (U17; U25 on React Query): it waits with its
+ * own loading shape, hands the screen only its gates (the person in
+ * `?person=`, a Member's and Calendar only's rights), and a Reviewer is
+ * locked out of Bookings before it is drawn. What it reads is the route's
+ * (`app/api/bookings/availability/route.test.ts`).
  */
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -11,40 +12,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const reads = vi.hoisted(() => ({
     requireSession: vi.fn(),
     resolveActiveOrganization: vi.fn(),
-    listStaff: vi.fn(),
-    getBookingRules: vi.fn(),
-    readBookingPayment: vi.fn(),
-    readPersonRules: vi.fn(),
-    readRuleRequests: vi.fn(),
-    listServices: vi.fn(),
-    readBookingsCalendar: vi.fn(),
-    readNow: vi.fn(),
-    readServiceHours: vi.fn(),
     billingAccessOrNull: vi.fn(),
-    editor: vi.fn(),
+    container: vi.fn(),
 }));
 vi.mock("@/lib/session", () => ({ requireSession: reads.requireSession }));
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
-    usePathname: () => "/bookings/availability",
-}));
 vi.mock("@/lib/organizations/service", () => ({
     resolveActiveOrganization: reads.resolveActiveOrganization,
-}));
-vi.mock("@/lib/staff/service", () => ({
-    listStaff: reads.listStaff,
-    getBookingRules: reads.getBookingRules,
-    readBookingPayment: reads.readBookingPayment,
-    readPersonRules: reads.readPersonRules,
-    readRuleRequests: reads.readRuleRequests,
-}));
-vi.mock("@/lib/services/service", () => ({
-    listServices: reads.listServices,
-    readBookingsCalendar: reads.readBookingsCalendar,
-    readNow: reads.readNow,
-}));
-vi.mock("@/lib/services/service-hours-read", () => ({
-    readServiceHours: reads.readServiceHours,
 }));
 vi.mock("@/lib/saroh-billing/service", () => ({
     plansOpen: () => Promise.resolve(true),
@@ -53,10 +26,10 @@ vi.mock("@/lib/saroh-billing/service", () => ({
 vi.mock("@/components/billing/plan-limit-notice", () => ({
     PlanLimitNotice: () => null,
 }));
-// The screen itself is drawn in its own tests: here, what it is handed.
-vi.mock("./availability-editor", () => ({
-    AvailabilityEditor: (props: Record<string, unknown>) => {
-        reads.editor(props);
+// The screen reads its own data: here, what the page hands it.
+vi.mock("./availability-container", () => ({
+    AvailabilityContainer: (props: Record<string, unknown>) => {
+        reads.container(props);
         return null;
     },
 }));
@@ -67,8 +40,6 @@ vi.mock("@/components/modules/gate/module-gate", () => ({
 import Loading from "@/app/(shell)/bookings/availability/loading";
 import AvailabilityPage from "@/app/(shell)/bookings/availability/page";
 import Layout from "@/app/(shell)/bookings/layout";
-
-import { MEERA } from "./hours.test-kit";
 
 const OWNER = {
     id: "org_kaya",
@@ -82,22 +53,8 @@ beforeEach(() => {
     reads.requireSession.mockResolvedValue({
         user: { id: "u_mohit", name: "Mohit Mehta" },
     });
-    reads.readPersonRules.mockResolvedValue(null);
-    reads.readRuleRequests.mockResolvedValue(null);
     reads.resolveActiveOrganization.mockResolvedValue(OWNER);
-    reads.getBookingRules.mockResolvedValue(null);
-    reads.readBookingPayment.mockResolvedValue(null);
-    reads.listServices.mockResolvedValue([]);
-    reads.readBookingsCalendar.mockResolvedValue(null);
-    reads.readNow.mockReturnValue("2026-10-19T04:30:00.000Z");
-    reads.readServiceHours.mockResolvedValue(null);
     reads.billingAccessOrNull.mockResolvedValue(null);
-    reads.listStaff.mockResolvedValue({
-        timezone: "Asia/Kolkata",
-        staff: [MEERA],
-        closures: [],
-        openingHours: null,
-    });
 });
 
 const page = async (search: Record<string, string> = {}) =>
@@ -113,22 +70,14 @@ describe("Hours and time off's page", () => {
         expect(html).toContain('aria-busy="true"');
     });
 
-    it("says when everyone's hours couldn't be read, and offers Try again", async () => {
-        reads.listStaff.mockRejectedValue(new Error("down"));
-        const html = await page();
-        expect(html).toContain("Couldn&#x27;t load everyone&#x27;s hours");
-        expect(html).toContain("Try again");
-        expect(html).toContain('href="/bookings/availability"');
-        expect(reads.editor).not.toHaveBeenCalled();
-    });
-
     it("opens on the person in ?person=, with an owner's rights", async () => {
         await page({ person: "st_meera" });
-        expect(reads.editor).toHaveBeenCalledWith(
+        expect(reads.container).toHaveBeenCalledWith(
             expect.objectContaining({
                 person: "st_meera",
                 me: "Mohit Mehta",
                 business: "Kaya Physio",
+                meId: "u_mohit",
                 canEdit: true,
                 canManage: true,
             }),
@@ -142,7 +91,7 @@ describe("Hours and time off's page", () => {
             actions: ["booking:read", "booking:write", "hours:write"],
         });
         await page();
-        expect(reads.editor).toHaveBeenCalledWith(
+        expect(reads.container).toHaveBeenCalledWith(
             expect.objectContaining({ canEdit: true, canManage: false }),
         );
     });
@@ -154,55 +103,8 @@ describe("Hours and time off's page", () => {
             actions: ["booking:read", "booking:write", "service:read"],
         });
         await page();
-        expect(reads.editor).toHaveBeenCalledWith(
+        expect(reads.container).toHaveBeenCalledWith(
             expect.objectContaining({ canEdit: false, canManage: false }),
-        );
-    });
-
-    it("reads the requests waiting for an owner, and no one diary's (#1038)", async () => {
-        const waiting = [{ id: "rq_1", staffId: "st_meera" }];
-        reads.readRuleRequests.mockResolvedValue(waiting);
-        await page();
-        expect(reads.readRuleRequests).toHaveBeenCalled();
-        expect(reads.readPersonRules).not.toHaveBeenCalled();
-        expect(reads.editor).toHaveBeenCalledWith(
-            expect.objectContaining({
-                personRules: { meId: "u_mohit", requests: waiting, mine: null },
-            }),
-        );
-    });
-
-    it("reads a Member's own diary's rules and request, not everyone's (#1038)", async () => {
-        reads.resolveActiveOrganization.mockResolvedValue({
-            ...OWNER,
-            role: "MEMBER",
-            actions: ["booking:read", "service:read", "hours:write"],
-        });
-        reads.listStaff.mockResolvedValue({
-            timezone: "Asia/Kolkata",
-            staff: [
-                {
-                    ...MEERA,
-                    membership: {
-                        id: "m_1",
-                        userId: "u_mohit",
-                        name: "Mohit Mehta",
-                        email: "mohit@example.com",
-                    },
-                },
-            ],
-            closures: [],
-            openingHours: null,
-        });
-        const mine = { staffId: "st_meera", request: null };
-        reads.readPersonRules.mockResolvedValue(mine);
-        await page();
-        expect(reads.readPersonRules).toHaveBeenCalledWith("st_meera");
-        expect(reads.readRuleRequests).not.toHaveBeenCalled();
-        expect(reads.editor).toHaveBeenCalledWith(
-            expect.objectContaining({
-                personRules: { meId: "u_mohit", requests: null, mine },
-            }),
         );
     });
 

@@ -2,19 +2,28 @@
 
 import { revalidatePath } from "next/cache";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import * as detail from "./pack-detail-data";
 import type { DeskPaidBy } from "./sell-words";
 import type { PackInput, PackPurchase } from "./service";
 import * as api from "./service";
 
-/** Thin: the API decides who may, and what a pack may pay for. */
+/**
+ * Thin: the API decides who may, and what a pack may pay for. A write from
+ * a React Query screen takes the tab's business last (`writeAsOrg`),
+ * refusing a tab whose business has since changed, and revalidates
+ * nothing: the screen reads its queries again (`useClassPackSave`).
+ */
 
 function refresh() {
-    // "layout": the list and every pack's own page (E16) under it.
+    // rq-revalidate-ok: only the booking page's pack writes (server-rendered) reach here.
     revalidatePath("/class-packs", "layout");
+    // rq-revalidate-ok: as above.
     revalidatePath("/class-packs/purchases");
-    // Selling may issue an invoice; spending one changes a booking.
+    // rq-revalidate-ok: as above; spending one changes a booking.
     revalidatePath("/billing/invoices");
+    // rq-revalidate-ok: as above.
     revalidatePath("/bookings");
 }
 
@@ -24,21 +33,34 @@ async function then<T extends { ok: boolean }>(res: Promise<T>): Promise<T> {
     return r;
 }
 
+/** With the tab's business: checked, nothing revalidated; without, as before. */
+function asOrg<T extends { ok: boolean }>(
+    orgId: string | undefined,
+    write: () => Promise<T>,
+) {
+    return orgId ? writeAsOrg(orgId, write) : then(write());
+}
+
 export async function createPack(input: PackInput) {
     return then(api.createPack(input));
 }
 export async function updatePack(id: string, input: PackInput) {
     return then(api.updatePack(id, input));
 }
-export async function setPackArchived(id: string, archived: boolean) {
-    return then(api.setPackArchived(id, archived));
+export async function setPackArchived(
+    id: string,
+    archived: boolean,
+    orgId?: string,
+) {
+    return asOrg(orgId, () => api.setPackArchived(id, archived));
 }
 export async function sellPack(
     id: string,
     contactId: string,
     paidBy?: DeskPaidBy,
+    orgId?: string,
 ) {
-    return then(api.sellPack(id, contactId, paidBy));
+    return asOrg(orgId, () => api.sellPack(id, contactId, paidBy));
 }
 
 /**
@@ -53,11 +75,23 @@ export async function packsFor(
     return api.readPurchasesFor(contactId, serviceId);
 }
 
+/**
+ * From a booking's page on React Query (U26) the tab's business comes
+ * last: the write is refused when it isn't the open one, and nothing is
+ * revalidated (the page reads its own query again).
+ */
 export async function payBookingWithPack(
     bookingId: string,
     packPurchaseId: string,
+    orgId?: string,
 ) {
+    if (orgId) {
+        return writeAsOrg(orgId, () =>
+            api.payBookingWithPack(bookingId, packPurchaseId),
+        );
+    }
     const res = await then(api.payBookingWithPack(bookingId, packPurchaseId));
+    // rq-revalidate-ok: the booking's page is server-rendered.
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);
     return res;
 }
@@ -69,8 +103,9 @@ export async function extendHolder(
     purchaseId: string,
     days: number,
     reason: string,
+    orgId?: string,
 ) {
-    return then(detail.extendPurchase(purchaseId, days, reason));
+    return asOrg(orgId, () => detail.extendPurchase(purchaseId, days, reason));
 }
 
 /** Older activity for Pack Detail (E17): the page after `cursor`. A read. */
@@ -78,8 +113,10 @@ export async function olderPackEvents(packId: string, cursor: string) {
     return detail.readPackEvents(packId, cursor);
 }
 
-export async function takePackOffBooking(bookingId: string) {
+export async function takePackOffBooking(bookingId: string, orgId?: string) {
+    if (orgId) return writeAsOrg(orgId, () => api.removeFromBooking(bookingId));
     const res = await then(api.removeFromBooking(bookingId));
+    // rq-revalidate-ok: the booking's page is server-rendered.
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);
     return res;
 }

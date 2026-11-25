@@ -5,11 +5,11 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import type { AllergenView } from "@/lib/products/settings";
 import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
+import { useProductSettingsSave } from "@/lib/products/use-product-settings";
 
 import { NameDialog } from "@/components/shared/forms/name-dialog";
 import { listTable } from "@/components/shared/lists/list-toolbar";
@@ -68,7 +68,7 @@ function AllergenList({
     allergens: AllergenView[];
     canWrite: boolean;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useProductSettingsSave();
     const [pending, start] = useTransition();
 
     function run(work: () => Promise<void>) {
@@ -78,23 +78,23 @@ function AllergenList({
                 return true;
             });
             if (!reached) return;
-            router.refresh();
+            void saved();
         });
     }
 
     /** Resolves true when they were added. */
     async function add(names: string[], said: string) {
         const before = new Set(allergens.map((a) => a.id));
-        const res = await addAllergens(names);
+        const res = await addAllergens(names, orgId);
         if (!res.ok) {
             showError(res.error);
             return false;
         }
-        router.refresh();
+        void saved();
         const added = res.data.filter((a) => !before.has(a.id));
         showUndo(said, () =>
             run(async () => {
-                for (const a of added) await removeAllergen(a.id);
+                for (const a of added) await removeAllergen(a.id, orgId);
             }),
         );
         return true;
@@ -227,6 +227,7 @@ function AllergenList({
                                                     const res =
                                                         await removeAllergen(
                                                             a.id,
+                                                            orgId,
                                                         );
                                                     if (!res.ok)
                                                         return showError(
@@ -241,6 +242,7 @@ function AllergenList({
                                                                         [
                                                                             a.name,
                                                                         ],
+                                                                        orgId,
                                                                     );
                                                                 if (!undo.ok)
                                                                     showError(

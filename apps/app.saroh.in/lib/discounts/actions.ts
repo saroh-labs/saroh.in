@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 
 import { reachOf, ruleOf } from "./describe";
 import type { DiscountInput } from "./service";
@@ -10,18 +10,23 @@ import {
     updateDiscount as updateDiscountApi,
 } from "./service";
 
-/** Thin: the API decides who may change a code and what a code may be. */
+/**
+ * Thin: the API decides who may change a code and what a code may be.
+ * Each takes the tab's business last (DEC-259): refused when another one
+ * was opened since (`writeAsOrg`); nothing is revalidated, the screens
+ * read their queries again (`useDiscountsSave`).
+ */
 
-export async function createDiscount(input: DiscountInput) {
-    const res = await createDiscountApi(input);
-    if (res.ok) revalidatePath("/commerce/discounts");
-    return res;
+export async function createDiscount(input: DiscountInput, orgId: string) {
+    return writeAsOrg(orgId, () => createDiscountApi(input));
 }
 
-export async function updateDiscount(id: string, input: DiscountInput) {
-    const res = await updateDiscountApi(id, input);
-    if (res.ok) revalidatePath("/commerce/discounts");
-    return res;
+export async function updateDiscount(
+    id: string,
+    input: DiscountInput,
+    orgId: string,
+) {
+    return writeAsOrg(orgId, () => updateDiscountApi(id, input));
 }
 
 /**

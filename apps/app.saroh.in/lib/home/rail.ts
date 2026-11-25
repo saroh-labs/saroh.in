@@ -6,9 +6,9 @@ import type { HomeAction, HomeUnavailable } from "./service";
 
 /**
  * The rail's badges (review #16): the ranked actions alone, which is all
- * the shell counts. The shell reads this on every page, hard load and
- * refresh, so it asks `GET /home?parts=rail`, which skips everything only
- * Home's page draws, rather than the whole of Home. Once per request.
+ * the shell counts, from `GET /home?parts=rail`. The shell now reads
+ * `GET /home/badges` (owner, 25 Nov 2026); this is its answer only while an
+ * API without that is deployed (`readShellLive`). Once per request.
  */
 export interface HomeRail {
     actions: HomeAction[];

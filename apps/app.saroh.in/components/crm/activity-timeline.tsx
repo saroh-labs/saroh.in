@@ -4,12 +4,12 @@ import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { completeTask } from "@/lib/leads/actions";
 import type { LeadActivity } from "@/lib/leads/service";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { EmptyState } from "@saroh/ui/data-state";
 
 /** A friendly label for an activity type. */
@@ -60,20 +60,23 @@ function CompleteTaskButton({
     leadId: string;
     activityId: string;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const [busy, setBusy] = useState(false);
 
     async function onClick() {
-        const res = await runAction(() => completeTask(leadId, activityId), {
-            setBusy,
-        });
+        const res = await runAction(
+            () => completeTask(leadId, activityId, save.orgId),
+            {
+                setBusy,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
         showSuccess("Task completed.");
-        router.refresh();
+        void save.saved();
     }
 
     return (

@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import {
     chooseAccountCalendars,
     disconnectGoogleAccount,
@@ -10,6 +11,7 @@ import {
     setBusinessMeetAccess,
     startGoogleConnect,
 } from "./service";
+
 import type { MeetAccess } from "./types";
 
 /**
@@ -36,8 +38,11 @@ export async function disconnectAccount(accountId: string) {
     return disconnectGoogleAccount(accountId);
 }
 
-export async function disconnectMember(membershipId: string) {
-    return disconnectGoogleMember(membershipId);
+/** From Team on React Query, with the tab's business last (`writeAsOrg`). */
+export async function disconnectMember(membershipId: string, orgId?: string) {
+    return orgId
+        ? writeAsOrg(orgId, () => disconnectGoogleMember(membershipId))
+        : disconnectGoogleMember(membershipId);
 }
 
 export async function moveMyBookings() {
@@ -55,6 +60,9 @@ export async function saveBookingMeeting(
         meetingUrl?: string;
         meetAccess?: MeetAccess | null;
     },
+    orgId?: string,
 ) {
+    if (orgId)
+        return writeAsOrg(orgId, () => setBookingMeeting(bookingId, input));
     return setBookingMeeting(bookingId, input);
 }

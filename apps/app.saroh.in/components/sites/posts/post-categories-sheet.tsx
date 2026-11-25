@@ -36,14 +36,29 @@ export function PostCategoriesSheet({
     siteId,
     categories,
     trigger = <Button variant="outline">Categories</Button>,
+    save,
+    onRetry,
 }: {
     siteId: string;
     /** `null`: the list could not be read, which is not "none yet". */
     categories: PostCategory[] | null;
     /** The button that opens it; the post editor's left panel has its own. */
     trigger?: React.ReactElement;
+    /**
+     * On a React Query screen (the Website area): each write takes the
+     * tab's business last, and the list is read again; elsewhere (the post
+     * editor) the page is refreshed.
+     */
+    save?: { orgId: string; saved: () => Promise<void> };
+    onRetry?: () => void;
 }) {
     const router = useRouter();
+    const orgId = save?.orgId;
+    const after = () =>
+        save
+            ? void save.saved()
+            : // rq-refresh-ok: only the post editor (not on React Query) passes no `save`.
+              router.refresh();
     const arriving = useSearchParams().get(CATEGORIES_PARAM) === "1";
     const [open, setOpen] = useState(arriving);
     const [wasArriving, setWasArriving] = useState(arriving);
@@ -62,38 +77,40 @@ export function PostCategoriesSheet({
     }
 
     async function onAdd(name: string) {
-        const res = await createPostCategory(siteId, { name });
+        const res = await createPostCategory(siteId, { name }, orgId);
         // A refusal keeps the dialog open with what was typed.
         if (!res.ok) {
             showError(res.error);
             return false;
         }
         showSuccess("Category added.");
-        router.refresh();
+        after();
         return true;
     }
 
     async function onRename(c: PostCategory, next: string) {
         // The slug is kept: renaming changes what people read, not the
         // address links already point at.
-        const res = await updatePostCategory(siteId, c.id, {
-            name: next,
-            slug: c.slug,
-        });
+        const res = await updatePostCategory(
+            siteId,
+            c.id,
+            { name: next, slug: c.slug },
+            orgId,
+        );
         if (!res.ok) {
             showError(res.error);
             return false;
         }
         showSuccess("Category saved.");
-        router.refresh();
+        after();
         return true;
     }
 
     async function onDelete(c: PostCategory): Promise<ConfirmResult> {
-        const res = await deletePostCategory(siteId, c.id);
+        const res = await deletePostCategory(siteId, c.id, orgId);
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Category deleted.");
-        router.refresh();
+        after();
     }
 
     return (
@@ -131,7 +148,11 @@ export function PostCategoriesSheet({
                 <FailedState
                     size="panel"
                     title={couldntLoad("categories")}
-                    onRetry={() => router.refresh()}
+                    onRetry={
+                        onRetry ??
+                        // rq-refresh-ok: only the post editor (not on React Query) passes no `onRetry`.
+                        (() => router.refresh())
+                    }
                 />
             ) : categories.length === 0 ? (
                 <EmptyState

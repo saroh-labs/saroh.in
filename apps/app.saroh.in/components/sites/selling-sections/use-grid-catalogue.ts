@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-
 import { listGridCatalogue } from "@/lib/sites/actions";
 import type {
+    GridCatalogueRead,
     GridCollectionOption,
     GridProductOption,
 } from "@/lib/sites/grid-catalogue";
+import { usePickerRead } from "@/lib/sites/use-picker";
 
 /**
  * Where the Product grid panel's read of the catalogue stands (G12). A
@@ -20,33 +20,16 @@ export type GridCatalogueLoad =
       }
     | { status: "failed"; forbidden: boolean; retry: () => void };
 
-/** The business's products and collections, read on mount and on retry. */
+/**
+ * The business's products and collections: one cached read every picker
+ * shares (U33), under Products' own key, so a product saved on the
+ * Products screen marks it stale; read again on retry.
+ */
 export function useGridCatalogue(): GridCatalogueLoad {
-    const [read, setRead] = useState<
-        | "loading"
-        | {
-              ok: true;
-              products: GridProductOption[];
-              collections: GridCollectionOption[];
-          }
-        | { ok: false; forbidden: boolean }
-    >("loading");
-    const [attempt, setAttempt] = useState(0);
-
-    useEffect(() => {
-        let active = true;
-        listGridCatalogue()
-            .then((next) => {
-                if (active) setRead(next);
-            })
-            .catch(() => {
-                if (active) setRead({ ok: false, forbidden: false });
-            });
-        return () => {
-            active = false;
-        };
-    }, [attempt]);
-
+    const { read, retry } = usePickerRead<GridCatalogueRead>(
+        "products",
+        listGridCatalogue,
+    );
     if (read === "loading") return { status: "loading" };
     if (read.ok) {
         return {
@@ -55,12 +38,5 @@ export function useGridCatalogue(): GridCatalogueLoad {
             collections: read.collections,
         };
     }
-    return {
-        status: "failed",
-        forbidden: read.forbidden,
-        retry: () => {
-            setRead("loading");
-            setAttempt((n) => n + 1);
-        },
-    };
+    return { status: "failed", forbidden: read.forbidden, retry };
 }

@@ -75,6 +75,9 @@ const push = vi.fn();
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh }),
+    // A server-drawn page (a module's gate): a module on draws it again.
+    // A module's gate page, still drawn on the server: Turn on refreshes it.
+    usePathname: () => "/analytics",
 }));
 
 const showSuccess = vi.fn();

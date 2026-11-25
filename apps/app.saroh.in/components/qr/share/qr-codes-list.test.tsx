@@ -28,6 +28,13 @@ vi.mock("@/lib/qr/actions", () => ({
     retireQrCode: (...args: unknown[]) => retireQrCode(...args) as unknown,
 }));
 const refresh = vi.fn();
+// Settings › Share is on React Query (DEC-259): a save reads Settings
+// again (`useSettingsSave().saved`), never the page.
+const { saved } = vi.hoisted(() => ({ saved: vi.fn() }));
+vi.mock("@/lib/settings/use-settings", () => ({
+    useSettingsSave: () => ({ orgId: undefined, saved }),
+    asOrg: () => [],
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
 }));
@@ -389,7 +396,7 @@ describe("QrShare", () => {
         expect(retireQrCode).toHaveBeenCalledWith("site_1", "qr_aaa");
         expect(host.querySelector('[data-qr-row="aaa"]')).toBeNull();
         expect(host.querySelector('[data-qr-retired="aaa"]')).toBeTruthy();
-        expect(refresh).toHaveBeenCalled();
+        expect(saved).toHaveBeenCalled();
         expect(showSuccess).toHaveBeenCalledWith(
             "Code retired.",
             "A printed copy now opens your home page.",

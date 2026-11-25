@@ -4,7 +4,6 @@ import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { NameDialog } from "@/components/shared/forms/name-dialog";
@@ -16,6 +15,7 @@ import {
     renameCategory,
     restoreCategory,
 } from "@/lib/products/settings-actions";
+import { useProductSettingsSave } from "@/lib/products/use-product-settings";
 
 import { listTable } from "@/components/shared/lists/list-toolbar";
 import { cn } from "@saroh/ui/lib/utils";
@@ -40,7 +40,7 @@ type Category = CatalogueView["categories"][number];
  * Delete asks nothing: it goes at once, with Undo for ten seconds.
  */
 export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
-    const router = useRouter();
+    const { orgId, saved } = useProductSettingsSave();
     const { categories, uncategorizedCount, canWrite } = catalogue;
     const [justAdded, setJustAdded] = useState<string | null>(null);
     const addedRow = useRef<HTMLLIElement>(null);
@@ -60,55 +60,57 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
     /** An Undo: the call, then the list as it now is. `showUndo` says how it went. */
     async function undone(work: Promise<{ ok: boolean; error?: string }>) {
         const res = await work;
-        router.refresh();
+        void saved();
         return res;
     }
 
     const undoRemoval = (removal: CategoryRemoval) =>
-        undone(restoreCategory(removal));
+        undone(restoreCategory(removal, orgId));
 
     async function add(name: string) {
-        const res = await addCategory(name);
+        const res = await addCategory(name, orgId);
         if (!res.ok) {
             showError(res.error);
             return false;
         }
         // It lands in alphabetical order: marked, and brought into view.
         setJustAdded(res.data.id);
-        router.refresh();
-        showUndo(`${name} added.`, () => undone(removeCategory(res.data.id)));
+        void saved();
+        showUndo(`${name} added.`, () =>
+            undone(removeCategory(res.data.id, orgId)),
+        );
         return true;
     }
 
     async function rename(c: Category, name: string) {
-        const res = await renameCategory(c.id, name);
+        const res = await renameCategory(c.id, name, orgId);
         if (!res.ok) {
             showError(res.error);
             return false;
         }
-        router.refresh();
+        void saved();
         showUndo(`${c.name} is now ${name}.`, () =>
-            undone(renameCategory(c.id, c.name)),
+            undone(renameCategory(c.id, c.name, orgId)),
         );
         return true;
     }
 
     async function merge(c: Category, intoId: string | null, into: string) {
-        const res = await mergeCategory(c.id, intoId);
+        const res = await mergeCategory(c.id, intoId, orgId);
         if (!res.ok) {
             showError(res.error);
             return false;
         }
-        router.refresh();
+        void saved();
         showUndo(`${c.name} merged into ${into}.`, () => undoRemoval(res.data));
         return true;
     }
 
     /** Reversible, so it asks nothing: gone at once, with Undo. */
     async function remove(c: Category) {
-        const res = await removeCategory(c.id);
+        const res = await removeCategory(c.id, orgId);
         if (!res.ok) return showError(res.error);
-        router.refresh();
+        void saved();
         showUndo(
             `${c.name} deleted.`,
             () => undoRemoval(res.data),

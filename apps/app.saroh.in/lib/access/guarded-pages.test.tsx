@@ -8,12 +8,16 @@
  * added with no guard. And each guarded page drawn for a role without the
  * permission, read as markup.
  */
+import { QueryClientProvider } from "@tanstack/react-query";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { discountRead } from "@/lib/discounts/queries";
 import type { Organization } from "@/lib/organizations/service";
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
 
 const resolveActiveOrganization = vi.fn();
 vi.mock("@/lib/organizations/service", () => ({
@@ -62,10 +66,6 @@ vi.mock("@/lib/saroh-billing/service", () => ({
     plansOpen: () => Promise.resolve(true),
     pausedOrNull: () => Promise.resolve(null),
     billingAccessOrNull: () => Promise.resolve(null),
-}));
-const getDiscount = vi.fn();
-vi.mock("@/lib/discounts/service", () => ({
-    getDiscount: (...args: unknown[]) => getDiscount(...args) as unknown,
 }));
 const loadReachOptions = vi.fn(() =>
     Promise.resolve({
@@ -132,7 +132,6 @@ beforeEach(() => {
     resolveActiveOrganization.mockReset();
     getSite.mockReset();
     getPost.mockReset();
-    getDiscount.mockReset();
     loadReachOptions.mockClear();
 });
 
@@ -340,29 +339,46 @@ describe("a discount code, for someone who reads discounts", () => {
         id: "disc_1",
         code: "MARKETDAY",
         description: "Saturday stall",
-        kind: "PERCENTAGE",
+        kind: "PERCENTAGE" as const,
         percent: "15",
         amount: null,
         currency: null,
-        appliesTo: "BUSINESS",
+        appliesTo: "BUSINESS" as const,
         targets: [],
         startsAt: null,
         endsAt: null,
         usageLimit: 100,
         used: 12,
-        state: "ACTIVE",
+        state: "ACTIVE" as const,
     };
 
-    it("reads, with no field and no Save, without discount:write", async () => {
-        getDiscount.mockResolvedValue(discount);
-        resolveActiveOrganization.mockResolvedValue(
-            org([...MEMBER, "discount:read"]),
-        );
+    /**
+     * The page drawn as the browser draws it once its read landed (DEC-259):
+     * the read carries the form's choices only for `discount:write`
+     * (`/api/discounts/[discountId]`, whose test proves it).
+     */
+    async function drawn(reach: unknown) {
+        const client = makeTestClient();
+        const ask = { discountId: "disc_1" };
+        client.setQueryData(discountRead.key("org_1", ask), {
+            discount,
+            reach,
+        });
         const { default: Page } =
             await import("@/app/(shell)/commerce/discounts/[discountId]/page");
-        const said = text(
-            await Page({ params: params({ discountId: "disc_1" }) }),
-        );
+        return renderToStaticMarkup(
+            <QueryClientProvider client={client}>
+                <OrgProvider orgId="org_1">
+                    {await Page({ params: params(ask) })}
+                </OrgProvider>
+            </QueryClientProvider>,
+        )
+            .replace(/&#x27;/g, "'")
+            .replace(/&amp;/g, "&");
+    }
+
+    it("reads, with no field and no Save, without discount:write", async () => {
+        const said = await drawn(null);
         expect(said).toContain(
             "Your role can read this code but not change it. An owner or admin can change this in Settings › Team.",
         );
@@ -371,19 +387,14 @@ describe("a discount code, for someone who reads discounts", () => {
         expect(said).toContain("12 of 100");
         expect(said).toContain("Live");
         expect(said).not.toMatch(/<input|<form|discount-form|>Save/);
-        // The form's options are never read for a page that has no form.
-        expect(loadReachOptions).not.toHaveBeenCalled();
     });
 
     it("is the form for someone who may change it", async () => {
-        getDiscount.mockResolvedValue(discount);
-        resolveActiveOrganization.mockResolvedValue(
-            org(["discount:read", "discount:write"]),
-        );
-        const { default: Page } =
-            await import("@/app/(shell)/commerce/discounts/[discountId]/page");
         expect(
-            text(await Page({ params: params({ discountId: "disc_1" }) })),
+            await drawn({
+                options: { STOREFRONT: [], COLLECTION: [], PRODUCT: [] },
+                defaultCurrency: "INR",
+            }),
         ).toContain("discount-form");
     });
 });

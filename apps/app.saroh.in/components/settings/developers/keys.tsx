@@ -23,7 +23,6 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronRight, ExternalLink, KeyRound, Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
@@ -45,6 +44,7 @@ import {
 import { runAction } from "@/lib/api/run-action";
 import { formatDate } from "@/lib/format/datetime";
 import { relativeWhen } from "@/lib/notifications/when";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { SecretOnce } from "./secret-once";
 
 const KIND_WORDS: Record<ApiKeyKind, { name: string; term: string }> = {
@@ -115,7 +115,7 @@ const draftFrom = (key: ApiKeyView | null, kind: ApiKeyKind): Draft =>
  */
 export function Keys(props: KeysProps) {
     const { keys, business, open, count, cap, docs, zone } = props;
-    const router = useRouter();
+    const save = useSettingsSave();
     const [openId, setOpenId] = useState<string | null>(null);
     const [making, setMaking] = useState<Draft | null>(null);
     const [shown, setShown] = useState<{ name: string; token: string } | null>(
@@ -310,7 +310,7 @@ export function Keys(props: KeysProps) {
                     showSuccess(
                         `${name} is saved. It changes on its next call.`,
                     );
-                    router.refresh();
+                    save.saved();
                 }}
             />
             <SecretOnce
@@ -325,7 +325,7 @@ export function Keys(props: KeysProps) {
                 thing="key"
                 onDone={() => {
                     setShown(null);
-                    router.refresh();
+                    save.saved();
                 }}
             />
         </div>
@@ -353,16 +353,19 @@ function KeySheet({
     onEdit: (k: ApiKeyView) => void;
     onReplaced: (name: string, token: string) => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [asking, setAsking] = useState(false);
     const [rolling, setRolling] = useState(false);
     const now = new Date();
 
     async function replace() {
         if (!k) return;
-        const res = await runAction(() => rollApiKey(k.id), {
-            setBusy: setRolling,
-        });
+        const res = await runAction(
+            () => rollApiKey(k.id, ...asOrg(save.orgId)),
+            {
+                setBusy: setRolling,
+            },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         onReplaced(k.name, res.data.token);
@@ -370,12 +373,14 @@ function KeySheet({
 
     async function revoke() {
         if (!k) return;
-        const res = await runAction(() => revokeApiKey(k.id));
+        const res = await runAction(() =>
+            revokeApiKey(k.id, ...asOrg(save.orgId)),
+        );
         if (!res) return false;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${k.name} is revoked.`);
         onClose();
-        router.refresh();
+        save.saved();
         return true;
     }
 
@@ -593,6 +598,7 @@ function NewKeyFields({
     onSaved: (name: string) => void;
 }) {
     const editId = start.editId;
+    const save = useSettingsSave();
     const [d, setD] = useState<Draft>(start);
     const [error, setError] = useState<string | null>(null);
     const may = (a: string) => actions.includes(a);
@@ -632,19 +638,26 @@ function NewKeyFields({
                 originsFrom(start.origins).join("\n");
             const saved = await runAction(
                 () =>
-                    updateApiKey(editId, {
-                        name,
-                        ...(levelsChanged ? { scope } : {}),
-                        ...(d.ai !== start.ai ? { aiEnabled } : {}),
-                        ...(originsChanged ? { allowedOrigins } : {}),
-                    }),
+                    updateApiKey(
+                        editId,
+                        {
+                            name,
+                            ...(levelsChanged ? { scope } : {}),
+                            ...(d.ai !== start.ai ? { aiEnabled } : {}),
+                            ...(originsChanged ? { allowedOrigins } : {}),
+                        },
+                        ...asOrg(save.orgId),
+                    ),
                 { setBusy },
             );
             if (!saved) return;
             if (!saved.ok) return setError(saved.error);
             return onSaved(saved.data.name);
         }
-        const res = await runAction(() => createApiKey(body), { setBusy });
+        const res = await runAction(
+            () => createApiKey(body, ...asOrg(save.orgId)),
+            { setBusy },
+        );
         if (!res) return;
         if (!res.ok) return setError(res.error);
         onMade(res.data.key.name, res.data.token);

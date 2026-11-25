@@ -3,7 +3,6 @@
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
@@ -17,6 +16,7 @@ import {
     removeField,
     updateField,
 } from "@/lib/products/settings-actions";
+import { useProductSettingsSave } from "@/lib/products/use-product-settings";
 
 import { Chip } from "@/components/shared/lists/chip";
 import { ChipGroup } from "@saroh/ui/choice-group";
@@ -62,7 +62,7 @@ export function FieldSheet({
     fields: FieldView[];
     categories: CatalogueView["categories"];
 }) {
-    const router = useRouter();
+    const { orgId, saved: settingsSaved } = useProductSettingsSave();
     const id = useId();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -103,7 +103,7 @@ export function FieldSheet({
     async function save() {
         let target = saved;
         if (!target) {
-            const res = await addField(nl, type);
+            const res = await addField(nl, type, orgId);
             if (!res.ok) return showError(res.error);
             target = res.data;
             setCreated(target);
@@ -117,19 +117,19 @@ export function FieldSheet({
                 : { categoryIds }),
         };
         if (Object.keys(patch).length > 0) {
-            const res = await updateField(before.id, patch);
+            const res = await updateField(before.id, patch, orgId);
             if (!res.ok) {
                 // A field just added shows in the list behind the sheet.
-                router.refresh();
+                void settingsSaved();
                 return showError(res.error);
             }
         }
         setOpen(false);
-        router.refresh();
+        void settingsSaved();
         if (!field) {
             showUndo(`${nl} added.`, async () => {
-                const back = await removeField(before.id);
-                router.refresh();
+                const back = await removeField(before.id, orgId);
+                void settingsSaved();
                 return back;
             });
             return;
@@ -143,12 +143,16 @@ export function FieldSheet({
                     : `${nl} is team only now.`
                 : `${nl} saved.`,
             async () => {
-                const back = await updateField(before.id, {
-                    name: before.name,
-                    onShop: before.onShop,
-                    categoryIds: before.categoryIds,
-                });
-                router.refresh();
+                const back = await updateField(
+                    before.id,
+                    {
+                        name: before.name,
+                        onShop: before.onShop,
+                        categoryIds: before.categoryIds,
+                    },
+                    orgId,
+                );
+                void settingsSaved();
                 return back;
             },
         );

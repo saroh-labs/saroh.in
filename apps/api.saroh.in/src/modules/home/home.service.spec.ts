@@ -1119,3 +1119,90 @@ describe("HomeService: Home A (DEC-171)", () => {
         expect(home.going).toBeUndefined();
     });
 });
+
+/**
+ * The shell's badges (owner, 25 Nov 2026): what the shell drew from the
+ * rail, by count alone. The same numbers on the same rail rows, so the
+ * badge and Home never disagree; a Reviewer reads nothing.
+ */
+describe("the shell's badges", () => {
+    const VIEWS: View[] = [
+        { key: "COMMERCE", label: "Sell", readiness: "ACTIVE" },
+        { key: "APPOINTMENTS", label: "Appointments", readiness: "ACTIVE" },
+        { key: "CRM", label: "CRM", readiness: "ACTIVE" },
+    ];
+    const fixture = {
+        activities: [OVERDUE_TASK],
+        activityCount: 4,
+        orders: [OPEN_ORDER],
+        orderCount: 2,
+    };
+    const RAIL_ROWS = ["/leads", "/commerce/orders", "/commerce/customers"];
+    // The shell's own rule over the rail (`readShellLive` before badges).
+    const fromRail = (
+        actions: { href: string; severity: string; count?: number }[],
+    ) =>
+        Object.fromEntries(
+            actions
+                .filter((a) => a.severity === "OVERDUE" && (a.count ?? 0) > 0)
+                .filter((a) => RAIL_ROWS.includes(a.href))
+                .map((a) => [a.href, a.count]),
+        );
+    const dbOf = (service: HomeService) =>
+        (
+            service as unknown as {
+                db: Record<string, Record<string, jest.Mock>>;
+            }
+        ).db;
+
+    it("counts what the rail badges, on the same rows", async () => {
+        const badges = await build(VIEWS, fixture).badges(INPUT);
+        const rail = await build(VIEWS, fixture).rail(INPUT);
+        expect(badges).toEqual({ "/leads": 4, "/commerce/orders": 2 });
+        expect(badges).toEqual(fromRail(rail.actions));
+    });
+
+    it("badges Customers for two or more booking-page notes, not one", async () => {
+        const service = build(VIEWS, fixture);
+        dbOf(service).contactAttention = {
+            count: jest.fn().mockResolvedValue(3),
+            findMany: jest.fn().mockResolvedValue([]),
+        };
+        expect((await service.badges(INPUT))["/commerce/customers"]).toBe(3);
+        dbOf(service).contactAttention.count.mockResolvedValue(1);
+        expect(await service.badges(INPUT)).not.toHaveProperty(
+            "/commerce/customers",
+        );
+    });
+
+    it("leaves out what the person can't read or a module that is off", async () => {
+        const service = build(
+            [
+                { key: "COMMERCE", label: "Sell", readiness: "SETUP_REQUIRED" },
+                { key: "CRM", label: "CRM", readiness: "ACTIVE" },
+            ],
+            fixture,
+        );
+        const badges = await service.badges({
+            ...INPUT,
+            organizationRole: "MEMBER",
+            organizationActions: new Set(),
+        });
+        expect(badges).toEqual({});
+        expect(dbOf(service).activity.count).not.toHaveBeenCalled();
+    });
+
+    it("drops only the badge whose count failed", async () => {
+        const service = build(VIEWS, fixture);
+        dbOf(service).activity.count.mockRejectedValue(new Error("down"));
+        expect(await service.badges(INPUT)).toEqual({ "/commerce/orders": 2 });
+    });
+
+    it("reads nothing for a Reviewer", async () => {
+        const service = build(VIEWS, fixture);
+        expect(
+            await service.badges({ ...INPUT, organizationRole: "REVIEWER" }),
+        ).toEqual({});
+        expect(dbOf(service).activity.count).not.toHaveBeenCalled();
+    });
+});

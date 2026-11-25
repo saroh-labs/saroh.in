@@ -38,11 +38,14 @@ export const MENU_ROW =
  */
 export function AddPagePanel({
     siteId,
+    orgId,
     offers,
     onAdded,
     onCancel,
 }: {
     siteId: string;
+    /** The tab's business, on a React Query screen (DEC-259). */
+    orgId?: string;
     offers: ModulePageOffer[];
     /** A page went in: open it. */
     onAdded: (page: SitePage) => void;
@@ -56,7 +59,7 @@ export function AddPagePanel({
 
     async function add(input: CreatePageInput, key: string) {
         setRefusal(null);
-        const res = await runAction(() => createPage(siteId, input), {
+        const res = await runAction(() => createPage(siteId, input, orgId), {
             setBusy: (on) => setBusy(on ? key : null),
         });
         if (!res) return;

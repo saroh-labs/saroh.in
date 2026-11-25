@@ -31,6 +31,8 @@ import {
     setCustomerEmail,
     setOverdueTiming,
 } from "@/lib/communications/customer-emails-actions";
+import { usePutCustomerEmails } from "@/lib/providers/use-providers";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { SwitchRow } from "@saroh/ui/check-row";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
@@ -76,6 +78,8 @@ export function CustomerEmailsSheet({
     const [pending, startTransition] = useTransition();
     const [shown, flipShown] = useOptimistic(state, shownWith);
     const { offer } = useSettingsUndo();
+    const { orgId } = useSettingsSave();
+    const put = usePutCustomerEmails();
     const note = customerEmailsNote(shown);
 
     const flip = (email: CustomerEmail, on: boolean) => {
@@ -83,18 +87,26 @@ export function CustomerEmailsSheet({
         const change = { kind: email.kind, on };
         startTransition(async () => {
             flipShown(change);
-            const res = await runAction(() => setCustomerEmail(change));
+            const res = await runAction(() =>
+                setCustomerEmail(change, ...asOrg(orgId)),
+            );
             if (!res) return;
             if (!res.ok) {
                 showError(res.error, "Nothing has changed.");
                 return;
             }
+            put(res.data);
             offer(customerEmailSaved(email.label, on), async () => {
                 const back = await runAction(
-                    () => setCustomerEmail({ kind: email.kind, on: !on }),
+                    () =>
+                        setCustomerEmail(
+                            { kind: email.kind, on: !on },
+                            ...asOrg(orgId),
+                        ),
                     { quiet: true },
                 );
                 if (!back) return { ok: false, error: UNREACHED };
+                if (back.ok) put(back.data);
                 return back.ok
                     ? { ok: true }
                     : { ok: false, error: back.error };
@@ -113,17 +125,22 @@ export function CustomerEmailsSheet({
         if (before[field] === timing[field]) return;
         startTransition(async () => {
             flipShown({ timing });
-            const res = await runAction(() => setOverdueTiming(timing));
+            const res = await runAction(() =>
+                setOverdueTiming(timing, ...asOrg(orgId)),
+            );
             if (!res) return;
             if (!res.ok) {
                 showError(res.error, "Nothing has changed.");
                 return;
             }
+            put(res.data);
             offer(OVERDUE_TIMING_SAVED, async () => {
-                const back = await runAction(() => setOverdueTiming(before), {
-                    quiet: true,
-                });
+                const back = await runAction(
+                    () => setOverdueTiming(before, ...asOrg(orgId)),
+                    { quiet: true },
+                );
                 if (!back) return { ok: false, error: UNREACHED };
+                if (back.ok) put(back.data);
                 return back.ok
                     ? { ok: true }
                     : { ok: false, error: back.error };

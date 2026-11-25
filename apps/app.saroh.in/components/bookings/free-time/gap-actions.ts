@@ -24,6 +24,8 @@ import type { GapTarget } from "./gap-types";
 interface After {
     onClose: () => void;
     refresh: () => void;
+    /** The tab's business, last on every write (`useBookingSave`). */
+    org: [] | [string];
 }
 
 /**
@@ -42,7 +44,7 @@ export async function blockGapTime(
         timezone: string;
         setBusy: (busy: boolean) => void;
     },
-    { onClose, refresh }: After,
+    { onClose, refresh, org }: After,
 ) {
     const { staff, date, free } = target;
     const to = Math.min(free[0] + minutes, 1440);
@@ -52,11 +54,15 @@ export async function blockGapTime(
     const known = new Set(staff.timeOff.map((t) => t.id));
     const res = await runAction(
         () =>
-            addTimeOff(staff.id, {
-                startAt,
-                endAt: zonedInstant(date, to, timezone).toISOString(),
-                reason: "Blocked from the calendar",
-            }),
+            addTimeOff(
+                staff.id,
+                {
+                    startAt,
+                    endAt: zonedInstant(date, to, timezone).toISOString(),
+                    reason: "Blocked from the calendar",
+                },
+                ...org,
+            ),
         { setBusy },
     );
     if (!res) return;
@@ -71,7 +77,7 @@ export async function blockGapTime(
         `Blocked ${formatClockRange(free[0], to)} for ${firstName(staff.name)}. Customers won’t be offered it.`,
         async () => {
             if (!added) return false;
-            const back = await removeTimeOff(staff.id, added.id);
+            const back = await removeTimeOff(staff.id, added.id, ...org);
             refresh();
             return back;
         },
@@ -89,10 +95,12 @@ export async function closeExtraHours(
         extra,
         today,
     }: { target: GapTarget; extra: ExtraHours; today: string },
-    { onClose, refresh }: After,
+    { onClose, refresh, org }: After,
 ) {
     const { staff, date } = target;
-    const res = await runAction(() => removeExtraHours(staff.id, extra.id));
+    const res = await runAction(() =>
+        removeExtraHours(staff.id, extra.id, ...org),
+    );
     if (!res) return;
     if (!res.ok) return showError(res.error);
     onClose();
@@ -100,11 +108,15 @@ export async function closeExtraHours(
     showUndo(
         `Closed ${firstName(staff.name)}’s extra hours ${gapDay(date, today)}, ${formatClockRange(extra.startMinute, extra.endMinute)}. Bookings already in them are kept.`,
         async () => {
-            const back = await addExtraHours(staff.id, {
-                date,
-                startMinute: extra.startMinute,
-                endMinute: extra.endMinute,
-            });
+            const back = await addExtraHours(
+                staff.id,
+                {
+                    date,
+                    startMinute: extra.startMinute,
+                    endMinute: extra.endMinute,
+                },
+                ...org,
+            );
             refresh();
             return back;
         },

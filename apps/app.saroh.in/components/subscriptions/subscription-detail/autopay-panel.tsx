@@ -6,7 +6,6 @@ import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { UNREACHED } from "@/lib/api/unreached";
@@ -22,6 +21,7 @@ import type {
     AutopayLink,
     AutopayMethod,
 } from "@/lib/subscriptions/service";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 import { RadioCards } from "@saroh/ui/choice-group";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
@@ -141,7 +141,7 @@ function SendLinkDialog({
     now: Date;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useSubscriptionSave();
     const emailId = useId();
     const [method, setMethod] = useState<AutopayMethod | null>(
         card.methods.length === 1 ? (card.methods[0] ?? null) : null,
@@ -160,18 +160,19 @@ function SendLinkDialog({
             subscriptionId,
             method,
             email && card.emailTo !== null,
+            orgId,
         ).catch((): { ok: false; error: string } => ({
             ok: false,
             error: UNREACHED,
         }));
-        setBusy(false);
         if (!res.ok) {
+            setBusy(false);
             showError(res.error);
-            router.refresh();
             return;
         }
         setMade(res.data);
-        router.refresh();
+        await saved();
+        setBusy(false);
     }
 
     if (made) {
@@ -307,23 +308,20 @@ function CancelAutopay({
     emailTo: string | null;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useSubscriptionSave();
     const at = provider ?? "your payment provider";
 
     async function go(): Promise<ConfirmResult> {
-        const res = await cancelAutopay(subscriptionId).catch(
+        const res = await cancelAutopay(subscriptionId, orgId).catch(
             (): { ok: false; error: string } => ({
                 ok: false,
                 error: UNREACHED,
             }),
         );
-        if (!res.ok) {
-            router.refresh();
-            return { ok: false, error: res.error };
-        }
+        if (!res.ok) return { ok: false, error: res.error };
+        await saved();
         const said = cancelledText(res.data, firstName);
         showSuccess(said.title, said.detail);
-        router.refresh();
     }
 
     return (

@@ -41,6 +41,8 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "class-packs/new": "full",
     // `BookingDetail` draws its own `PageContainer`.
     "bookings/[bookingId]": "default",
+    // `DiscountContainer` draws its own `PageContainer` once the code lands.
+    "commerce/discounts/[discountId]": "form",
     // Order Detail and the tickets draw their own <main> at the full width.
     "commerce/orders/[orderId]": "full",
     "commerce/orders/tickets": "full",
@@ -77,7 +79,26 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "billing/invoices/[invoiceId]": "full", // `InvoiceDetailContainer`
     "courses/[courseId]": "full", // `CourseDetailContainer`
     "commerce/stock": "full", // `StockContainer`
+    "commerce/locations": "full", // `LocationsContainer`
     "contacts/[contactId]": "full", // `CustomerDetailContainer`
+    // Team, Your profile and Business are drawn in place by one client
+    // screen (`SettingsTabScreen`), each in its `SettingsPanel`.
+    "settings/(sections)/people": "settings",
+    "settings/(sections)/profile": "settings",
+    "settings/(sections)/organization": "settings",
+    // Share's page keeps the module gate; `ShareContainer` draws its panel.
+    "settings/(sections)/share": "settings",
+    "settings/(sections)/modules": "settings",
+    "settings/(sections)/integrations": "settings",
+    "settings/(sections)/billing": "settings",
+    "leads/[leadId]": "default", // `LeadDetailContainer`
+    "billing/subscriptions/[subscriptionId]": "full", // `SubscriptionDetailContainer`
+    "billing/plans/[planId]": "full", // `PlanDetailContainer`
+    "billing/subscriptions": "full", // `SubscriptionsContainer`
+    "commerce/products": "full", // `CatalogueContainer`
+    "sites/[siteId]/versions": "default", // `SiteVersionsContainer`
+    // `PublishRequestContainer`
+    "sites/[siteId]/publish-requests/[requestId]": "default",
     // Ask AI's full page draws its list and conversation edge to edge.
     ask: "full",
     // The post editor owns its viewport.

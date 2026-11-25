@@ -5,11 +5,20 @@ import type {
     AskAiState,
 } from "@saroh/api-contract";
 import { act } from "react";
-import type { Root } from "react-dom/client";
-import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { toWire } from "@/lib/query/define-read";
+import { renderWithQuery } from "@/lib/query/test-utils";
+
 import { AskAiTab } from "./ask-ai-tab";
+
+vi.mock("@/lib/saroh-billing/global-free", () => ({
+    freeNoteShown: () => false,
+}));
+// The other tabs' writes, which the containers' module pulls in.
+vi.mock("@/lib/api-keys/actions", () => ({}));
+vi.mock("@/lib/webhooks/actions", () => ({}));
+vi.mock("@/lib/ai-connections/actions", () => ({}));
 
 const saveAskAiOn = vi.fn();
 vi.mock("@/lib/settings/ask-ai-actions", () => ({
@@ -24,6 +33,7 @@ vi.mock("@/lib/session", () => ({ requireSession: vi.fn() }));
 const org = vi.fn();
 vi.mock("@/lib/organizations/service", () => ({
     resolveActiveOrganization: () => org() as unknown,
+    activeOrganizationOnce: () => org() as unknown,
 }));
 const state = vi.fn();
 vi.mock("@/lib/ask-ai/service", () => ({
@@ -98,15 +108,26 @@ const team: AskAiPeopleUsage = {
 };
 
 let host: HTMLDivElement;
-let root: Root;
+let unmount: (() => void) | undefined;
 
 beforeEach(() => {
-    (
-        globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
-    host = document.createElement("div");
-    document.body.append(host);
-    root = createRoot(host);
+    // The tab's read route (`askAiSettingsServer`, its own test in
+    // app/api/settings/developers.test.ts): the settings' total stays while
+    // the switch is off.
+    vi.stubGlobal("fetch", async () => {
+        const [st, set, ppl] = (await Promise.all([
+            state(),
+            settings(),
+            people(),
+        ])) as [AskAiState | null, AskAiSettings | null, AskAiPeopleUsage];
+        return Response.json(
+            toWire({
+                state: st,
+                usage: set?.usage ?? st?.usage ?? null,
+                people: ppl,
+            }),
+        );
+    });
     saveAskAiOn.mockReset();
     state.mockReset();
     state.mockResolvedValue(ownerState());
@@ -117,14 +138,19 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    act(() => root.unmount());
-    host.remove();
+    unmount?.();
+    unmount = undefined;
+    vi.unstubAllGlobals();
 });
 
 async function draw(actions: string[]) {
     org.mockResolvedValue({ name: "Example Salon", actions });
     const tree = await AskAiTab();
-    act(() => root.render(tree));
+    ({ host, unmount } = renderWithQuery(tree, { orgId: "org_1" }));
+    // The read lands.
+    for (let i = 0; i < 5; i++) {
+        await act(() => new Promise((r) => setTimeout(r, 0)));
+    }
 }
 
 describe("Settings › Ask AI", () => {
@@ -195,7 +221,8 @@ describe("Settings › Ask AI", () => {
             host.querySelector<HTMLButtonElement>('[role="switch"]')?.click();
             await Promise.resolve();
         });
-        expect(saveAskAiOn).toHaveBeenCalledWith(false);
+        // The tab's business last: a moved tab is refused (writeAsOrg).
+        expect(saveAskAiOn).toHaveBeenCalledWith(false, "org_1");
     });
 
     it("doesn't open for a Member", async () => {

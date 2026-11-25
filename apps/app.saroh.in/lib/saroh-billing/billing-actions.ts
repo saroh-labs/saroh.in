@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import type { ApiFailure, ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, orgBase } from "@/lib/api/http";
@@ -219,7 +220,9 @@ function securePage(url: unknown): string | null {
  */
 export async function changePlanAction(
     input: unknown,
+    orgId?: string,
 ): Promise<{ ok: true; data: ChangeResult } | ChangeFailure> {
+    if (orgId) return writeAsOrg(orgId, () => changePlanAction(input));
     const c = clean(input);
     if (!c) return { ok: false, error: CHANGE_FAILED };
     if (c.coupon && !COUPON.test(c.coupon)) {
@@ -375,7 +378,11 @@ export async function checkCouponAction(
 export async function setAddonAction(
     addonId: unknown,
     quantity: unknown,
+    orgId?: string,
 ): Promise<ApiResult<AddonsView>> {
+    if (orgId) {
+        return writeAsOrg(orgId, () => setAddonAction(addonId, quantity));
+    }
     if (typeof addonId !== "string" || !ADDON_ID.test(addonId)) {
         return { ok: false, error: ADDON_FAILED };
     }
@@ -474,7 +481,13 @@ function chosen<T extends BillingProfileChosen>(
  */
 export async function chooseBillingProfileAction(
     billingProfileId: unknown,
+    orgId?: string,
 ): Promise<ApiResult<BillingProfileChosen>> {
+    if (orgId) {
+        return writeAsOrg(orgId, () =>
+            chooseBillingProfileAction(billingProfileId),
+        );
+    }
     if (
         typeof billingProfileId !== "string" ||
         !PROFILE_ID.test(billingProfileId)
@@ -497,11 +510,15 @@ export async function chooseBillingProfileAction(
 export async function createBillingProfileAction(
     input: unknown,
     use: unknown,
+    orgId?: string,
 ): Promise<
     ApiResult<
         BillingProfileChosen & { created: string; notMoved?: string | null }
     >
 > {
+    if (orgId) {
+        return writeAsOrg(orgId, () => createBillingProfileAction(input, use));
+    }
     const profile = cleanProfile(input);
     return chosen(
         await send<
@@ -527,7 +544,13 @@ export async function createBillingProfileAction(
 export async function updateBillingProfileAction(
     billingProfileId: unknown,
     input: unknown,
+    orgId?: string,
 ): Promise<ApiResult<{ profile: OwnBillingProfile; businesses: number }>> {
+    if (orgId) {
+        return writeAsOrg(orgId, () =>
+            updateBillingProfileAction(billingProfileId, input),
+        );
+    }
     if (
         typeof billingProfileId !== "string" ||
         !PROFILE_ID.test(billingProfileId)

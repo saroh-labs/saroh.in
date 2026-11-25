@@ -5,10 +5,13 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { dismissToasts, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
+import { PageContainer } from "@/components/shared/page/page-container";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { CappedList } from "@/lib/lists/capped";
 import { loadPlanEvents, setPlanArchived } from "@/lib/subscriptions/actions";
@@ -26,12 +29,18 @@ import {
     subscribersEmptyText,
 } from "@/lib/subscriptions/plan-detail";
 import { editHref } from "@/lib/subscriptions/plan-editor";
+import type { PlanAsk } from "@/lib/subscriptions/queries";
 import type {
     Optional,
     Plan,
     PlanEventsPage,
     Subscription,
 } from "@/lib/subscriptions/service";
+import {
+    usePlan,
+    useSubscriptionSave,
+    useSubscriptionSettings,
+} from "@/lib/subscriptions/use-subscriptions";
 import { payRows } from "@/lib/subscriptions/view";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
@@ -41,6 +50,55 @@ import { PlanHistory } from "./history";
 import { PlanOverview } from "./overview";
 import { PlanAutopayTiming } from "./plan-autopay-timing";
 import { PlanSubscribers } from "./subscribers";
+
+/**
+ * One plan's page on React Query (DEC-259): the plan, who is on it and its
+ * history (`/api/plans/[planId]`), with "When autopay charges" from the
+ * settings every plan shares (the Plans tab's read). The title, tabs and
+ * actions are the plan's, so the route's loader stands until both land;
+ * settings that can't be read only lose their card. A first read that
+ * fails is the page failing (`error.tsx`).
+ */
+export function PlanDetailContainer({
+    ask,
+    skeleton,
+    ...gates
+}: {
+    ask: PlanAsk;
+    /** The route's loader, until the plan is read. */
+    skeleton: ReactNode;
+    canWrite: boolean;
+    initialTab: DetailTab;
+}) {
+    const read = usePlan(ask);
+    const settings = useSubscriptionSettings();
+    const [nowIso] = useState(() => new Date().toISOString());
+    if (read.isError && !read.data) throw read.error;
+    if (!read.data || settings.isPending) return <>{skeleton}</>;
+    const { plan, subscriptions, events, withClasses } = read.data;
+    // Dates read in the zone its subscriptions renew in.
+    const timeZone =
+        (subscriptions.state === "ok"
+            ? subscriptions.data.rows[0]?.timezone
+            : undefined) ?? DEFAULT_BUSINESS_ZONE;
+    return (
+        <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
+            <PlanDetail
+                // Another plan starts on its own tab and history.
+                key={plan.id}
+                {...gates}
+                plan={plan}
+                subscriptions={subscriptions}
+                events={events}
+                withClasses={withClasses}
+                timeZone={timeZone}
+                nowIso={nowIso}
+                autopay={settings.data?.settings?.autopay ?? null}
+                onRetry={() => void read.refetch()}
+            />
+        </PageContainer>
+    );
+}
 
 /**
  * Payments → Plans → one plan (D4), after "Saroh Plan Detail": the header
@@ -62,7 +120,10 @@ export function PlanDetail({
     initialTab,
     nowIso,
     autopay = null,
+    onRetry,
 }: {
+    /** A tab's own read failed: read the plan's page again. */
+    onRetry: () => void;
     plan: Plan;
     subscriptions: Optional<CappedList<Subscription>>;
     events: Optional<PlanEventsPage>;
@@ -75,6 +136,7 @@ export function PlanDetail({
     autopay?: AutopayTimingSettings | null;
 }) {
     const router = useRouter();
+    const save = useSubscriptionSave();
     const now = new Date(nowIso);
     const [tab, setTab] = useState<DetailTab>(initialTab);
     const [busy, setBusy] = useState(false);
@@ -109,7 +171,9 @@ export function PlanDetail({
         const to = plan.status !== "ARCHIVED";
         setBusy(true);
         start(async () => {
-            const res = await runAction(() => setPlanArchived(plan.id, to));
+            const res = await runAction(() =>
+                setPlanArchived(plan.id, to, save.orgId),
+            );
             setBusy(false);
             if (!res) return;
             if (!res.ok) {
@@ -118,19 +182,19 @@ export function PlanDetail({
                 return;
             }
             setOlder([]);
-            router.refresh();
+            await save.saved();
             dismissToasts();
             showUndo(
                 archiveToast(plan, to),
                 () =>
                     start(async () => {
                         const back = await runAction(() =>
-                            setPlanArchived(plan.id, !to),
+                            setPlanArchived(plan.id, !to, save.orgId),
                         );
                         if (!back) return;
-                        if (!back.ok) reportFailure(back);
+                        if (!back.ok) return reportFailure(back);
                         setOlder([]);
-                        router.refresh();
+                        await save.saved();
                     }),
                 { duration: HOLD_UNDO_MS },
             );
@@ -156,7 +220,7 @@ export function PlanDetail({
 
     function retry() {
         setOlder([]);
-        router.refresh();
+        onRetry();
     }
 
     const subscribeTo = subscribeHref(plan);

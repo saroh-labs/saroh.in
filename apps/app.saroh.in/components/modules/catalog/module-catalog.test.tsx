@@ -176,9 +176,11 @@ describe("Settings › Modules (DEC-057)", () => {
             turnOff?.click();
             await Promise.resolve();
         });
+        // No options, and no business outside the shell.
         expect(setModuleStatusAction).toHaveBeenCalledWith(
             "COMMERCE",
             "DISABLED",
+            undefined,
         );
         expect(showError).toHaveBeenCalledWith(said);
         expect(showError.mock.calls.flat().join(" ")).not.toMatch(

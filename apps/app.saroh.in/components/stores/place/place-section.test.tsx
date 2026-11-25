@@ -21,9 +21,15 @@ import { StorefrontsScreen } from "@/components/stores/locations/storefronts-scr
 
 /** The address's query, as each test sets it. */
 const address = vi.hoisted(() => ({ query: "" }));
-const refresh = vi.fn();
+const located = vi.hoisted(() => ({
+    orgId: "org_1",
+    patch: vi.fn(),
+    listed: vi.fn(() => Promise.resolve()),
+    reread: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@/lib/stores/use-stores", () => ({ useLocationSave: () => located }));
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh, replace: vi.fn() }),
+    useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
     useSearchParams: () => new URLSearchParams(address.query),
 }));
 const update = vi.fn();
@@ -125,7 +131,8 @@ beforeEach(() => {
     uploading.busy = false;
     showError.mockReset();
     showSuccess.mockReset();
-    refresh.mockReset();
+    located.listed.mockClear();
+    located.reread.mockClear();
     address.query = "";
     window.history.replaceState(null, "", "/commerce/locations");
     // Every save is taken, and answers with what was sent.
@@ -303,12 +310,16 @@ describe("the Name sheet", () => {
         expect(update).not.toHaveBeenCalled();
         await press(item("Save"));
         expect(update).toHaveBeenCalledTimes(1);
-        expect(update).toHaveBeenCalledWith(hill.id, { name: "Linking Road" });
+        expect(update).toHaveBeenCalledWith(
+            hill.id,
+            { name: "Linking Road" },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Name saved.");
         expect(sheet()).toBeNull();
         expect(says("name")).toBe("Linking Road");
         // The title and the list show the name: the page reads again.
-        expect(refresh).toHaveBeenCalled();
+        expect(located.listed).toHaveBeenCalled();
     });
 
     it("Cancel saves nothing, returns to the row's Edit, and the next opening starts fresh", async () => {
@@ -410,7 +421,11 @@ describe("the Do customers come here? sheet", () => {
         await press(edit("Change whether customers come here"));
         await press(item("No, online only"));
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(hill.id, { kind: "ONLINE" });
+        expect(update).toHaveBeenCalledWith(
+            hill.id,
+            { kind: "ONLINE" },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "This location has no counter now",
         );
@@ -439,7 +454,7 @@ describe("the Do customers come here? sheet", () => {
         await press(edit("Change whether customers come here"));
         await press(item("Yes, they visit"));
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(hill.id, { kind: "SHOP" });
+        expect(update).toHaveBeenCalledWith(hill.id, { kind: "SHOP" }, "org_1");
         expect(sheet()).toBeNull();
         expect(says("address")).toBe("12 Hill Road, Bandra");
     });
@@ -459,9 +474,13 @@ describe("the Address sheet", () => {
         );
         type(box(), " 7 Linking Road\nKhar ");
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(hill.id, {
-            address: "7 Linking Road\nKhar",
-        });
+        expect(update).toHaveBeenCalledWith(
+            hill.id,
+            {
+                address: "7 Linking Road\nKhar",
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Location address saved.");
         expect(sheet()).toBeNull();
         expect(says("address")).toBe("7 Linking Road, Khar");
@@ -492,9 +511,13 @@ describe("the Address sheet", () => {
         });
         await press(item("Save"));
         // Only the link changed, sent as typed for the API to keep.
-        expect(update).toHaveBeenCalledWith(hill.id, {
-            mapUrl: "https://www.google.co.in/maps/place/Hill+Road",
-        });
+        expect(update).toHaveBeenCalledWith(
+            hill.id,
+            {
+                mapUrl: "https://www.google.co.in/maps/place/Hill+Road",
+            },
+            "org_1",
+        );
         expect(sheet()).toBeNull();
         expect(
             host.querySelector('[data-testid="location-map-link-summary"]')
@@ -521,7 +544,7 @@ describe("the Address sheet", () => {
         expect(link()?.value).toBe("g.page/hill-road");
         type(link(), "");
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(hill.id, { mapUrl: null });
+        expect(update).toHaveBeenCalledWith(hill.id, { mapUrl: null }, "org_1");
     });
 
     it("with none saved the row says so and offers Add address", async () => {
@@ -538,7 +561,11 @@ describe("the Address sheet", () => {
         await press(edit("Edit address"));
         type(box(), "  ");
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(hill.id, { address: null });
+        expect(update).toHaveBeenCalledWith(
+            hill.id,
+            { address: null },
+            "org_1",
+        );
         expect(says("address")).toBe("No address yet");
     });
 
@@ -589,11 +616,15 @@ describe("the Opening hours sheet", () => {
         await press(item("Mon to Fri"));
         expect(update).not.toHaveBeenCalled();
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(hill.id, {
-            openingHours: WEEK.map((d) =>
-                d.day === "SAT" ? { ...d, closed: true } : d,
-            ),
-        });
+        expect(update).toHaveBeenCalledWith(
+            hill.id,
+            {
+                openingHours: WEEK.map((d) =>
+                    d.day === "SAT" ? { ...d, closed: true } : d,
+                ),
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Opening hours saved.");
         expect(sheet()).toBeNull();
         expect(says("hours")).toBe("Mon to Fri · 9:00 am to 6:00 pm");
@@ -607,7 +638,11 @@ describe("the Opening hours sheet", () => {
             "Not saved yet: a starting week. Save it to show it on receipts.",
         );
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(hill.id, { openingHours: WEEK });
+        expect(update).toHaveBeenCalledWith(
+            hill.id,
+            { openingHours: WEEK },
+            "org_1",
+        );
         expect(says("hours")).toBe("Mon to Sat · 9:00 am to 6:00 pm");
     });
 
@@ -778,15 +813,19 @@ describe("the Description and logo sheet", () => {
 
         await press(item("Save"));
         expect(updateDetails).toHaveBeenCalledTimes(1);
-        expect(updateDetails).toHaveBeenCalledWith(hill.id, {
-            name: "Hill Road",
-            description: "Sourdough since 2019",
-            logoMediaId: OWN.mediaId,
-        });
+        expect(updateDetails).toHaveBeenCalledWith(
+            hill.id,
+            {
+                name: "Hill Road",
+                description: "Sourdough since 2019",
+                logoMediaId: OWN.mediaId,
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Details saved.");
         expect(sheet()).toBeNull();
         expect(says("details")).toBe("Description added · own logo");
-        expect(refresh).toHaveBeenCalled();
+        expect(located.reread).toHaveBeenCalled();
         // Not the location's own settings route.
         expect(update).not.toHaveBeenCalled();
     });
@@ -801,11 +840,15 @@ describe("the Description and logo sheet", () => {
         expect(updateDetails).not.toHaveBeenCalled();
 
         await press(item("Save"));
-        expect(updateDetails).toHaveBeenCalledWith(hill.id, {
-            name: "Hill Road",
-            description: null,
-            logoMediaId: null,
-        });
+        expect(updateDetails).toHaveBeenCalledWith(
+            hill.id,
+            {
+                name: "Hill Road",
+                description: null,
+                logoMediaId: null,
+            },
+            "org_1",
+        );
         expect(says("details")).toBe(
             "Using your business logo · no description yet",
         );
@@ -834,10 +877,14 @@ describe("the Description and logo sheet", () => {
         expect(picture()?.getAttribute("src")).toBe(typed.url);
         type(description(), "Sourdough since 2019");
         await press(item("Save"));
-        expect(updateDetails).toHaveBeenCalledWith(hill.id, {
-            name: "Hill Road",
-            description: "Sourdough since 2019",
-        });
+        expect(updateDetails).toHaveBeenCalledWith(
+            hill.id,
+            {
+                name: "Hill Road",
+                description: "Sourdough since 2019",
+            },
+            "org_1",
+        );
         expect(says("details")).toBe("Description added · own logo");
     });
 

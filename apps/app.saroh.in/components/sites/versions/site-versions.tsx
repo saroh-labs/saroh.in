@@ -9,7 +9,6 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { CalendarClock, History } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -23,6 +22,7 @@ import { releaseTitle, versionRowCopy } from "@/lib/sites/release-review";
 import type { SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import type { SiteSave } from "@/lib/sites/use-sites";
 import { restoreVersionAsDraft } from "@/lib/sites/version-restore-actions";
 import { FailedRead } from "@saroh/ui/failed-read";
 
@@ -62,6 +62,7 @@ export function SiteVersions({
     publications,
     canRestore,
     scheduled = null,
+    save,
 }: {
     siteId: string;
     publications: SitePublication[];
@@ -71,9 +72,11 @@ export function SiteVersions({
      */
     canRestore: boolean;
     scheduled?: ScheduledGoLives;
+    /** The restore takes the tab's business; the versions read again once it landed. */
+    save: SiteSave;
 }) {
     const zone = useBusinessZone();
-    const router = useRouter();
+    const { saved } = save;
     const [confirming, setConfirming] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const upcoming = <ScheduledList siteId={siteId} scheduled={scheduled} />;
@@ -94,7 +97,7 @@ export function SiteVersions({
     function onRestore(publicationId: string) {
         startTransition(async () => {
             const res = await runAction(() =>
-                restoreVersionAsDraft(siteId, publicationId),
+                restoreVersionAsDraft(siteId, publicationId, {}, save.orgId),
             );
             if (!res) return;
             if (!res.ok) {
@@ -102,7 +105,7 @@ export function SiteVersions({
                 return;
             }
             setConfirming(null);
-            router.refresh();
+            await saved();
             showSuccess(
                 "That version is your draft now. It goes live when you publish.",
             );

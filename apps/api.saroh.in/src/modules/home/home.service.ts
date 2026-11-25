@@ -18,7 +18,7 @@ import { StockChecksService } from "../stock/stock-checks.service";
 import { businessTracksStock } from "../stock/tracking";
 import { businessDetailsGap } from "./home-business-details";
 import { readHomeCheques } from "./home-cheques";
-import { overdueFollowUps } from "./home-crm-sources";
+import { overdueFollowUpCount, overdueFollowUps } from "./home-crm-sources";
 import { noEmailProvider } from "./home-email-setup";
 import { groupNeeds } from "./home-groups";
 import { HomeInlineService } from "./home-inline";
@@ -48,9 +48,10 @@ import {
 } from "./home-money-sources";
 import { flattenNeeds } from "./home-needs";
 import type { OpenOrders } from "./home-open-orders";
-import { readOpenOrders } from "./home-open-orders";
+import { countSoonOrders, readOpenOrders } from "./home-open-orders";
 import { pausesWaitingOnPayments } from "./home-pause-sources";
 import {
+    bookingPageNoteCount,
     bookingPageNotes,
     lowStarReviews,
     MESSAGE_WAIT_MS,
@@ -230,6 +231,80 @@ export class HomeService {
             return { actions: [], unavailable: [] };
         }
         return (await this.compose(input, "rail")).rail;
+    }
+
+    /**
+     * The shell's badges (owner, 25 Nov 2026): the counts the rail draws,
+     * keyed by the rail row they badge, without the rest of the rail. The
+     * same rule as the shell reading {@link rail}: an OVERDUE action with a
+     * count whose `href` is a rail row. Only four ever are: overdue
+     * follow-ups on Leads, orders due by tomorrow on Orders, and on
+     * Customers the booking-page notes or, over them as the rail's
+     * `Object.fromEntries` had it, the customers waiting on a reply, each
+     * only when there are two or more (one names the person's own page).
+     * Each source behind the same gates as {@link compose}, by count alone.
+     */
+    async badges(input: HomeInput): Promise<Record<string, number>> {
+        if (input.organizationRole === "REVIEWER") return {};
+        const [views, staffView] = await Promise.all([
+            this.availability.listViews(input),
+            isStaffView(input) ? readStaffNarrow(this.db, input) : null,
+        ]);
+        const active = new Set(
+            views.filter((v) => v.readiness === "ACTIVE").map((v) => v.key),
+        );
+        const available = new Set(
+            views.filter((v) => v.readiness !== "DISABLED").map((v) => v.key),
+        );
+        const now = new Date();
+        const org = input.organizationId;
+        const viewer = viewerOf(input);
+        const threads = this.threads;
+        const none: HomeUnavailable[] = [];
+        const count = (
+            moduleKey: string,
+            label: string,
+            read: () => Promise<number>,
+        ) => this.attempt({ moduleKey, label }, read, 0, none);
+        const [leads, orders, notes, messages] = await Promise.all([
+            active.has("CRM") && holds(input, "lead:read")
+                ? count("CRM", "Overdue follow-ups", () =>
+                      overdueFollowUpCount(this.db, org, now),
+                  )
+                : 0,
+            active.has("COMMERCE")
+                ? count("COMMERCE", "Open orders", async () =>
+                      countSoonOrders(this.db, org, {
+                          now,
+                          zone: await this.businessZone(input),
+                          storeIds: (staffView?.narrow ?? WHOLE_BUSINESS)
+                              .storeIds,
+                      }),
+                  )
+                : 0,
+            available.has("APPOINTMENTS") && holds(input, "contact:write")
+                ? count("APPOINTMENTS", "Booking-page notes", () =>
+                      bookingPageNoteCount(this.db, viewer),
+                  )
+                : 0,
+            accountAreaOn() && holds(input, "message:read") && threads
+                ? count("CRM", "Messages", async () => {
+                      const waiting = await threads.waitingOnTeam(viewer, {
+                          now,
+                          olderThanMs: MESSAGE_WAIT_MS,
+                          limit: 1,
+                      });
+                      return waiting.count;
+                  })
+                : 0,
+        ]);
+        const customers = messages > 1 ? messages : notes > 1 ? notes : 0;
+        const rows: [string, number][] = [
+            ["/leads", leads],
+            ["/commerce/orders", orders],
+            ["/commerce/customers", customers],
+        ];
+        return Object.fromEntries(rows.filter(([, n]) => n > 0));
     }
 
     /**

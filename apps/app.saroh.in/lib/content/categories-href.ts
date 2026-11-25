@@ -5,7 +5,11 @@
  */
 export const CATEGORIES_PARAM = "categories";
 
-/** The Posts tab with the categories sheet open. */
-export function postCategoriesHref(siteId: string): string {
-    return `/sites/${siteId}/posts?${CATEGORIES_PARAM}=1`;
+/**
+ * The Posts tab with the categories sheet open; in the Website area,
+ * Writing itself, so an old link lands in one hop, not two (each hop's
+ * page starts its reads before it moves on).
+ */
+export function postCategoriesHref(siteId: string, area = false): string {
+    return `/sites/${siteId}/${area ? "writing" : "posts"}?${CATEGORIES_PARAM}=1`;
 }

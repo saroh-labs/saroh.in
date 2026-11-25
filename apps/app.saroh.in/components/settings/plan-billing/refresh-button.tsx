@@ -1,19 +1,23 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-/** "Try again" on a card whose read failed: reads the page again, in place. */
+import { useSettingsRefresh } from "@/lib/settings/use-settings";
+
+/**
+ * "Try again" on a card whose read failed: reads the tab again, in place
+ * (on a server-drawn screen, the page).
+ */
 export function RefreshButton({ label = "Try again" }: { label?: string }) {
-    const router = useRouter();
+    const refresh = useSettingsRefresh();
     const [pending, start] = useTransition();
     return (
         <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => start(() => router.refresh())}
+            onClick={() => start(refresh)}
             busy={pending}
             busyLabel="Trying again…"
         >
