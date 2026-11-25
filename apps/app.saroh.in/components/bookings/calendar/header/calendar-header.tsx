@@ -588,13 +588,13 @@ export function CalendarHeader({
         </div>
     );
 
-    if (known === null) {
-        return (
-            <>
-                {phoneFrame(true, true)}
-                {deskFrame(false, true)}
-            </>
-        );
-    }
-    return known ? phoneFrame(true, false) : deskFrame(false, false);
+    // Each frame keeps its place, so the one in use is the same element
+    // before and after hydration: never remounted, a press never lost.
+    const both = known === null;
+    return (
+        <>
+            {known === false ? null : phoneFrame(true, both)}
+            {known === true ? null : deskFrame(false, both)}
+        </>
+    );
 }

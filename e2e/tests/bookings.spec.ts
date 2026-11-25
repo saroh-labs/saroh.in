@@ -298,6 +298,12 @@ test.describe("bookings calendar", () => {
             const wed = picked
                 ? strip.getByRole("link", { name: /^Thu / })
                 : wednesday;
+            // The strip is drawn before the diary is read: its label says the
+            // count (or Closed) once the read lands.
+            await expect(wed).toHaveAttribute(
+                "aria-label",
+                /, (closed|nothing booked|\d+ sessions? · )/,
+            );
             const label = (await wed.getAttribute("aria-label")) ?? "";
             await wed.click();
             await expect(wed).toHaveAttribute("aria-current", "date");
@@ -1383,7 +1389,15 @@ test.describe("All bookings (U11)", () => {
                 }),
             ).toBeVisible();
         }
-        await expect(page.getByText(/^Times in \w+$/)).toBeVisible();
+        // On a phone the zone is said in the "…" sheet (critique, 25 Nov;
+        // bookings-list-switch.spec.ts opens it), not in the header.
+        if (test.info().project.name.startsWith("phone")) {
+            await expect(
+                page.getByText(/^Times in \w+$/).filter({ visible: true }),
+            ).toHaveCount(0);
+        } else {
+            await expect(page.getByText(/^Times in \w+$/)).toBeVisible();
+        }
         // "23 in all" and "Back to the calendar" are gone.
         await expect(page.getByText(/\d+ in all$/)).toHaveCount(0);
         await expect(page.getByText("Back to the calendar")).toHaveCount(0);

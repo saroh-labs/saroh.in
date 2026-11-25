@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { northwind, phone, stamp } from "../fixtures/own-data";
 import { ownService } from "../fixtures/own-service";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 
 /**
@@ -48,8 +49,9 @@ test.describe("New booking, step by step (U8)", () => {
         let bookingId: string | null = null;
         try {
             await page.goto("/bookings");
-            await newBooking(page).click();
             const sheet = page.getByRole("dialog", { name: "New booking" });
+            // Pressed before hydration, the button does nothing.
+            await pressUntil(newBooking(page), sheet);
             await expect(sheet).toBeVisible();
             await expect(
                 sheet
@@ -183,8 +185,9 @@ test.describe("New booking, step by step (U8)", () => {
     test("closing with someone picked asks first", async ({ page }) => {
         await signIn(page);
         await page.goto("/bookings");
-        await newBooking(page).click();
         const sheet = page.getByRole("dialog", { name: "New booking" });
+        // Pressed before hydration, the button does nothing.
+        await pressUntil(newBooking(page), sheet);
         // Someone picked from the recent customers: work to lose.
         await sheet.getByRole("list").getByRole("button").first().click();
         await expect(

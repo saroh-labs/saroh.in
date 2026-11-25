@@ -63,13 +63,11 @@ export function ListPageHeader({
             }
         />
     );
-    if (both) {
-        return (
-            <>
-                {phoneFrame}
-                {deskFrame}
-            </>
-        );
-    }
-    return known ? phoneFrame : deskFrame;
+    // Each frame keeps its place, so the one in use is never remounted.
+    return (
+        <>
+            {known === false ? null : phoneFrame}
+            {known === true ? null : deskFrame}
+        </>
+    );
 }

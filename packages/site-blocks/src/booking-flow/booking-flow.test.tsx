@@ -218,6 +218,9 @@ function serve(handler: Handler) {
 
 const realFetch = globalThis.fetch;
 beforeEach(() => {
+    // Also before: the last test's unmount can still keep its choice after
+    // its afterEach cleared it, and the next one would open on it (CI, 25 Nov).
+    window.sessionStorage.clear();
     checkouts.opened = [];
     window.matchMedia = vi.fn(() => ({
         matches: false,
