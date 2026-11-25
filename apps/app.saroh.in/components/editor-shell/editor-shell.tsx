@@ -294,7 +294,8 @@ export function EditorShell<V extends Record<string, unknown>>(
         if (res?.ok) {
             showSuccess("Draft deleted.");
             router.push(afterDeleteHref);
-            await after();
+            // Leaving anyway: a failed re-read must not leave it busy.
+            await after().catch(() => undefined);
             return;
         }
         setBusy(false);
