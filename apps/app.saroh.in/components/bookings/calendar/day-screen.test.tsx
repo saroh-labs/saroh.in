@@ -401,7 +401,7 @@ describe("Everyone", () => {
         const heads = Array.from(
             host.querySelectorAll("[data-column-head]"),
         ).map((h) => h.textContent);
-        expect(heads[0]).toContain("1 booked");
+        expect(heads[0]).toContain("1 session · 1 person");
         expect(heads[1]).toContain("Sports therapist · 9 am to 5 pm");
     });
 

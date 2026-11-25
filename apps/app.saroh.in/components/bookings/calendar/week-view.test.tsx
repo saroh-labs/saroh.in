@@ -256,12 +256,12 @@ describe("the week on the desk", () => {
     it("heads each day with its count and how full it is", () => {
         draw();
         const mon = heading("Mon 19 Oct");
-        expect(mon.textContent).toContain("3 booked");
+        expect(mon.textContent).toContain("3 sessions");
         expect(mon.getAttribute("aria-label")).toMatch(
-            /^Mon 19 Oct, today, 3 booked, .+\. Open the day$/,
+            /^Mon 19 Oct, today, 3 sessions · 3 people, .+\. Open the day$/,
         );
-        expect(heading("Wed 21 Oct").textContent).toContain("1 booked");
-        expect(heading("Tue 20 Oct").textContent).toContain("0 booked");
+        expect(heading("Wed 21 Oct").textContent).toContain("1 session");
+        expect(heading("Tue 20 Oct").textContent).toContain("0 sessions");
         const full = (label: string) =>
             Number(
                 heading(label)
@@ -378,7 +378,7 @@ describe("the week on the desk", () => {
 
     it("without the hours, counts stay and nothing is guessed", () => {
         draw({ staff: null });
-        expect(heading("Mon 19 Oct").textContent).toContain("3 booked");
+        expect(heading("Mon 19 Oct").textContent).toContain("3 sessions");
         expect(desk().querySelector("[data-fullness]")).toBeNull();
         expect(desk().querySelector("[data-week-free]")).toBeNull();
         expect(desk().querySelector("[data-week-closed]")).toBeNull();
@@ -387,7 +387,7 @@ describe("the week on the desk", () => {
 
     it("an empty week: every day at nothing booked, free time to book", () => {
         draw({ calendar: calendarOf([]) });
-        expect(heading("Mon 19 Oct").textContent).toContain("0 booked");
+        expect(heading("Mon 19 Oct").textContent).toContain("0 sessions");
         expect(desk().querySelector("[data-diary-block]")).toBeNull();
         expect(
             desk().querySelectorAll("button[data-week-free]").length,
@@ -408,7 +408,7 @@ describe("the week on a phone", () => {
         const mon = dayCell("Mon 19 Oct");
         expect(mon.getAttribute("aria-checked")).toBe("true");
         expect(mon.getAttribute("aria-label")).toBe(
-            "Mon 19 Oct, today, 3 bookings",
+            "Mon 19 Oct, today, 3 sessions · 3 people",
         );
         expect(mon.textContent).toContain("Today");
         expect(dayCell("Sun 25 Oct").getAttribute("aria-label")).toBe(
@@ -431,7 +431,9 @@ describe("the week on a phone", () => {
             "Mon 19 Oct · today",
         );
         // Meera: free 9:45, 12:15 and 3 pm; Arjun: free from 11.
-        expect(phone().textContent).toContain("3 bookings · 4 free times");
+        expect(phone().textContent).toContain(
+            "3 sessions · 3 people · 4 free times",
+        );
         const rows = Array.from(phone().querySelectorAll("ul > li")).map(
             (li) => li.textContent,
         );
@@ -451,7 +453,7 @@ describe("the week on a phone", () => {
         );
         expect(phone().querySelector("h2")?.textContent).toBe("Wed 21 Oct");
         expect(wed.textContent).toMatch(/^1/);
-        expect(phone().textContent).toContain("1 booking · ");
+        expect(phone().textContent).toContain("1 session · 1 person · ");
         expect(push).toHaveBeenCalledWith(
             `/bookings?date=${WED}&layout=week&person=all`,
             { scroll: false },
@@ -485,7 +487,7 @@ describe("the week on a phone", () => {
 
     it("a day with no bookings but free time lists only free times", () => {
         draw({ date: "2026-10-20" });
-        expect(phone().textContent).toContain("0 bookings · 3 free times");
+        expect(phone().textContent).toContain("Nothing booked · 3 free times");
         const rows = phone().querySelectorAll("ul > li");
         expect(rows).toHaveLength(3);
         rows.forEach((r) =>
@@ -527,10 +529,12 @@ describe("the week on a phone", () => {
         expect(phone().querySelector("h2")?.textContent).toBe(
             "Mon 19 Oct · today · Arjun",
         );
-        expect(phone().textContent).toContain("1 booking · 1 free time");
+        expect(phone().textContent).toContain(
+            "1 session · 1 person · 1 free time",
+        );
         expect(phone().textContent).not.toContain("Ananya Desai");
         expect(dayCell("Mon 19 Oct").getAttribute("aria-label")).toBe(
-            "Mon 19 Oct, today, 1 booking",
+            "Mon 19 Oct, today, 1 session · 1 person",
         );
         // Opening hours on Sunday is for Arjun, who is picked.
         act(() => dayCell("Sun 25 Oct").click());
@@ -559,12 +563,12 @@ describe("the week on a phone", () => {
         for (const label of ["Mon 19 Oct", "Wed 21 Oct", "Sat 24 Oct"]) {
             expect(dayCell(label).textContent).toMatch(/^0/);
         }
-        expect(phone().textContent).toContain("0 bookings · 3 free times");
+        expect(phone().textContent).toContain("Nothing booked · 3 free times");
     });
 
     it("without the hours: counts and bookings, no free times, nothing closed", () => {
         draw({ staff: null, date: SUN });
-        expect(phone().textContent).toContain("0 bookings");
+        expect(phone().textContent).toContain("Nothing booked");
         expect(phone().textContent).not.toContain("free time");
         expect(phone().textContent).not.toContain("Closed on");
         expect(phone().textContent).toContain("Nothing booked on Sun 25 Oct.");

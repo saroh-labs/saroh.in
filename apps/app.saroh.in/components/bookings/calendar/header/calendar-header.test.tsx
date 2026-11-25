@@ -233,7 +233,7 @@ describe("Go to a day", () => {
         draw();
         click(button(/Change the day or the view$/));
         const thu = popover()?.querySelector(
-            '[role="group"][aria-label="Pick a day"] [aria-label="Thu 22 Oct, 3 bookings"]',
+            '[role="group"][aria-label="Pick a day"] [aria-label="Thu 22 Oct, 3 sessions · 3 people"]',
         );
         click(thu);
         expect(push).toHaveBeenCalledWith(
@@ -634,8 +634,9 @@ describe("the header on a phone", () => {
         expect(sheet()?.textContent).toContain("on this phone.");
         // The week strip's days are letters on a phone.
         expect(
-            sheet()?.querySelector('[aria-label="Tue 20 Oct, 1 booking"]')
-                ?.textContent,
+            sheet()?.querySelector(
+                '[aria-label="Tue 20 Oct, 1 session · 1 person"]',
+            )?.textContent,
         ).toContain("T");
     });
 

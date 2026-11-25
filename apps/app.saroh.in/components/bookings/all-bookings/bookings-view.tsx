@@ -35,7 +35,6 @@ import type {
 } from "@/lib/services/all-bookings";
 import {
     asksOutcome,
-    bookingsWord,
     defaultOrder,
     emptyView,
     foldsIn,
@@ -62,6 +61,11 @@ import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { BookingOutcome } from "@/lib/services/booking-state";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { localDateOf, whoFor } from "@/lib/services/diary";
+import {
+    countedWords,
+    countItems,
+    listItems,
+} from "@/lib/services/session-counts";
 import { zoneShortName } from "@/lib/services/time-picker";
 import type { ShareLink } from "@/lib/sites/share-links";
 import type { DateRange } from "@/lib/views/date-range";
@@ -71,6 +75,7 @@ import {
     writeDateRange,
 } from "@/lib/views/date-range";
 import { BookingRow, ROW_GRID } from "./booking-row";
+import { ClassRow } from "./class-row";
 import {
     FoldLine,
     NarrowPill,
@@ -566,12 +571,31 @@ export function BookingsView({
                                         ) : null}
                                         {g.rows.length > 0 ? (
                                             <span className="ml-auto text-[12.5px] font-normal normal-case tracking-normal text-muted-foreground">
-                                                {bookingsWord(g.rows.length)}
+                                                {countedWords(
+                                                    countItems(
+                                                        listItems(g.rows),
+                                                    ),
+                                                )}
                                             </span>
                                         ) : null}
                                     </h2>
                                     <ul className="max-[759px]:overflow-hidden max-[759px]:rounded-[12px] max-[759px]:border max-[759px]:border-border max-[759px]:bg-card">
-                                        {g.rows.map(renderRow)}
+                                        {listItems(g.rows).map((item) =>
+                                            item.kind === "one" ? (
+                                                renderRow(item.booking)
+                                            ) : (
+                                                <ClassRow
+                                                    key={item.key}
+                                                    bookings={item.bookings}
+                                                    zone={timezone}
+                                                    showMoney={can.money}
+                                                >
+                                                    {item.bookings.map(
+                                                        renderRow,
+                                                    )}
+                                                </ClassRow>
+                                            ),
+                                        )}
                                         {g.cancelled?.length ? (
                                             <>
                                                 {showCancelled ||

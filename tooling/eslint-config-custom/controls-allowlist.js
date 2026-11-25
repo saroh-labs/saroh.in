@@ -76,6 +76,11 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/list/list-free-times.tsx": ["button"],
     // button: each booked row of the List, one button
     "components/bookings/calendar/list/list-view.tsx": ["button"],
+    // button: one booking as a line (Agenda, the phone's Week), the whole
+    // row one button that opens the quick look
+    "components/bookings/calendar/booking-line.tsx": ["button"],
+    // button: a class start on the List, one row that opens its people
+    "components/bookings/all-bookings/class-row.tsx": ["button"],
     // button: the date title and the person chip of header C, and "…"
     "components/bookings/calendar/header/calendar-header.tsx": ["button"],
     // button: a calendar cell (the week strip and the month), a step

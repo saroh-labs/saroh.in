@@ -31,6 +31,7 @@ import {
     hoursAcross,
 } from "@/lib/services/diary-view";
 import type { Service } from "@/lib/services/service";
+import { countBlocks } from "@/lib/services/session-counts";
 import type { StaffView } from "@/lib/staff/types";
 
 import { columnsFor, dayFactsOf, personChoices } from "./header/header-facts";
@@ -220,7 +221,7 @@ export function useCalendarDays({
                   0,
               );
     const summary = summaryLine({
-        booked: live.length,
+        booked: countBlocks(live),
         free: freeCount,
         money:
             value !== null && currencyCode

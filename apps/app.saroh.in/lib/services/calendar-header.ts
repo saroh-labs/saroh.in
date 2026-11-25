@@ -5,6 +5,8 @@ import { count } from "@/lib/format/plural";
 import type { CalendarLayout } from "./calendar-href";
 import type { LocalDate } from "./diary";
 import { addDays, monthDays, weekStartOf } from "./diary";
+import type { Counted } from "./session-counts";
+import { countedWords } from "./session-counts";
 
 /**
  * The words of the calendar's header C (U2, #1018): the date title, the one
@@ -121,10 +123,10 @@ export function periodWord(
 }
 
 /**
- * The one summary line: "5 booked · 3 free times · ₹2,400 booked". The
- * free times only when the hours are known; the money only for someone who
- * may see it (the read leaves prices out otherwise); what is cancelled
- * only while it is drawn.
+ * The one summary line: "3 sessions · 9 people · 3 free times · ₹2,400
+ * booked" (DEC-260). The free times only when the hours are known; the
+ * money only for someone who may see it (the read leaves prices out
+ * otherwise); what is cancelled only while it is drawn.
  */
 export function summaryLine({
     booked,
@@ -132,7 +134,8 @@ export function summaryLine({
     money,
     cancelledShown,
 }: {
-    booked: number;
+    /** The live sessions and the people on them. */
+    booked: Counted;
     /** Free times on the view; null when the hours could not be read. */
     free: number | null;
     /** "₹2,400", or null without the money permission or nothing priced. */
@@ -140,11 +143,9 @@ export function summaryLine({
     /** How many cancelled bookings are drawn; 0 when they are hidden. */
     cancelledShown: number;
 }): string {
-    const parts = [
-        booked > 0 ? `${formatNumber(booked)} booked` : "Nothing booked",
-    ];
+    const parts = [countedWords(booked)];
     if (free !== null) parts.push(count(free, "free time"));
-    if (money && booked > 0) parts.push(`${money} booked`);
+    if (money && booked.sessions > 0) parts.push(`${money} booked`);
     if (cancelledShown > 0)
         parts.push(`${formatNumber(cancelledShown)} cancelled shown`);
     return parts.join(" · ");
@@ -184,8 +185,10 @@ export function addMonths(month: string, by: number): string {
 
 /** What a day of the date sheet knows about itself. */
 export interface DayFacts {
-    /** Live bookings that day, or null when it is outside what was read. */
+    /** Live sessions that day, or null when it is outside what was read. */
     count: number | null;
+    /** The people on them (DEC-260); null as `count` is. */
+    people?: number | null;
     /** Nobody works that day (and the hours are known). */
     closed: boolean;
 }
@@ -232,7 +235,7 @@ function cellOf(
             ? `${words}, closed`
             : f.count === null
               ? words
-              : `${words}, ${count(f.count, "booking")}`,
+              : `${words}, ${countedWords({ sessions: f.count, people: f.people ?? f.count }).toLowerCase()}`,
     };
 }
 

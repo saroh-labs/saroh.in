@@ -12,6 +12,7 @@ import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
 import { dayFullness } from "@/lib/services/diary-view";
 
 import { firstName } from "@/lib/names";
+import { countBlocks, countedWords } from "@/lib/services/session-counts";
 import { CLOSED_HATCH } from "./geometry";
 import { BookingRow, FreeRow } from "./week-day-rows";
 import type { WeekDay } from "./week-view";
@@ -135,7 +136,6 @@ export function WeekPhone({
             a.start - b.start ||
             (a.kind === b.kind ? 0 : a.kind === "free" ? -1 : 1),
     );
-    const n = liveCount(day);
     const freeTimes = rows.filter((r) => r.kind === "free").length;
     const hoursKnown = day.cols.some((c) => c.day !== null);
     const on = formatDay(day.date, { weekday: "short", year: "never" });
@@ -161,7 +161,7 @@ export function WeekPhone({
                             role="radio"
                             aria-checked={checked}
                             tabIndex={checked ? 0 : -1}
-                            aria-label={`${d.label}${d.today ? ", today" : ""}, ${d.closed ? "closed" : count(c, "booking")}`}
+                            aria-label={`${d.label}${d.today ? ", today" : ""}, ${d.closed ? "closed" : countedWords(countBlocks(d.blocks)).toLowerCase()}`}
                             onClick={() => choose(d.date)}
                             onKeyDown={(e) => onKey(e, i)}
                             className={cn(
@@ -215,8 +215,8 @@ export function WeekPhone({
                     {words
                         ? "Closed"
                         : hoursKnown
-                          ? `${count(n, "booking")} · ${count(freeTimes, "free time")}`
-                          : count(n, "booking")}
+                          ? `${countedWords(countBlocks(day.blocks))} · ${count(freeTimes, "free time")}`
+                          : countedWords(countBlocks(day.blocks))}
                 </div>
             </div>
 

@@ -356,7 +356,9 @@ export const ROW_STATUS: Record<
     didnt: { label: BOOKING_WORDS.didntCome, tone: "error" },
     cancelled: { label: "Cancelled", tone: "neutral" },
     unmarked: { label: BOOKING_WORDS.notMarked, tone: "neutral" },
-    atVisit: { label: BOOKING_WORDS.paysAtVisit, tone: "neutral" },
+    // Money still to take at the visit: the one payment word (DEC-257),
+    // as the calendar's block says it; the Money line says how.
+    atVisit: { label: BOOKING_WORDS.awaitingPayment, tone: "warning" },
 };
 
 /**
@@ -502,9 +504,15 @@ export function cancelledWord(n: number): string {
 
 /** "45 min", "1 hr", "1 hr 30 min": how long a booking runs. */
 export function lengthWord(startAt: string, endAt: string): string {
-    const mins = Math.round(
-        (new Date(endAt).getTime() - new Date(startAt).getTime()) / 60000,
+    return minutesWord(
+        Math.round(
+            (new Date(endAt).getTime() - new Date(startAt).getTime()) / 60000,
+        ),
     );
+}
+
+/** "45 min", "1 hr", "1 hr 30 min", from minutes. */
+export function minutesWord(mins: number): string {
     if (mins < 60) return `${mins} min`;
     const h = Math.floor(mins / 60);
     const m = mins % 60;

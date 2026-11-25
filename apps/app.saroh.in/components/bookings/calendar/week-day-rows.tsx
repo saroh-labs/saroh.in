@@ -4,18 +4,11 @@ import { formatClock } from "@/lib/format/datetime";
 import { cn } from "@saroh/ui/lib/utils";
 import { Plus } from "lucide-react";
 
-import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { Block, Column, Span } from "@/lib/services/diary";
-import {
-    blockLine,
-    blockTitle,
-    isLive,
-    STATE_LABEL,
-} from "@/lib/services/diary";
 
 import { firstName } from "@/lib/names";
-import { STATE_TONE } from "./parts";
+import { BlockLine } from "./booking-line";
 
 /**
  * The rows of a day's list on the phone's week (U5, BKMBookingsWeek): a
@@ -73,9 +66,9 @@ export function FreeRow({
     );
 }
 
-/** A booking: its times, a bar in the kind's colour, who and what, its state. */
+/** A booking: the one line every view draws (`BlockLine`). */
 export function BookingRow({
-    block: b,
+    block,
     selected,
     onOpen,
 }: {
@@ -83,55 +76,9 @@ export function BookingRow({
     selected: boolean;
     onOpen: () => void;
 }) {
-    const cancelled = !isLive(b);
     return (
-        <li>
-            <button
-                type="button"
-                onClick={onOpen}
-                className={cn(
-                    ROW,
-                    "min-h-[60px] items-stretch bg-card py-2.5 active:bg-muted",
-                    selected && "ring-2 ring-inset ring-foreground",
-                    cancelled && "text-muted-foreground",
-                )}
-            >
-                <span className="w-[76px] shrink-0 whitespace-nowrap tabular-nums">
-                    <span className="block text-[14px] font-bold">
-                        {formatClock(b.start)}
-                    </span>
-                    <span className="block text-[11.5px] text-muted-foreground">
-                        {formatClock(b.end)}
-                    </span>
-                </span>
-                <span
-                    aria-hidden
-                    className={cn(
-                        "w-1 shrink-0 rounded-sm",
-                        cancelled
-                            ? "bg-border-strong"
-                            : b.kind === "class"
-                              ? "bg-diary-class"
-                              : "bg-diary-one",
-                    )}
-                />
-                <span className="min-w-0 flex-1">
-                    <span
-                        className={cn(
-                            "block text-[14px] font-semibold",
-                            cancelled && "line-through",
-                        )}
-                    >
-                        {blockTitle(b)}
-                    </span>
-                    <span className="block text-[12.5px] text-muted-foreground">
-                        {blockLine(b)}
-                    </span>
-                </span>
-                <StatusBadge tone={STATE_TONE[b.state]} className="self-center">
-                    {STATE_LABEL[b.state]}
-                </StatusBadge>
-            </button>
+        <li className="border-b border-border/60 last:border-b-0">
+            <BlockLine block={block} selected={selected} onOpen={onOpen} />
         </li>
     );
 }

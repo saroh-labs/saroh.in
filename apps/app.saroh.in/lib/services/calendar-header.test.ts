@@ -52,38 +52,53 @@ describe("the summary line", () => {
     it("says what is booked, what is free and its worth", () => {
         expect(
             summaryLine({
-                booked: 5,
+                booked: { sessions: 3, people: 9 },
                 free: 3,
                 money: "₹2,400",
                 cancelledShown: 0,
             }),
-        ).toBe("5 booked · 3 free times · ₹2,400 booked");
+        ).toBe("3 sessions · 9 people · 3 free times · ₹2,400 booked");
     });
 
     it("leaves the money out for someone who may not see it", () => {
         expect(
-            summaryLine({ booked: 5, free: 1, money: null, cancelledShown: 0 }),
-        ).toBe("5 booked · 1 free time");
+            summaryLine({
+                booked: { sessions: 5, people: 5 },
+                free: 1,
+                money: null,
+                cancelledShown: 0,
+            }),
+        ).toBe("5 sessions · 5 people · 1 free time");
     });
 
     it("leaves free times out when the hours could not be read", () => {
         expect(
             summaryLine({
-                booked: 2,
+                booked: { sessions: 1, people: 1 },
                 free: null,
                 money: null,
                 cancelledShown: 0,
             }),
-        ).toBe("2 booked");
+        ).toBe("1 session · 1 person");
     });
 
     it("says nothing is booked, and what cancelled is shown", () => {
         expect(
-            summaryLine({ booked: 0, free: 7, money: "₹0", cancelledShown: 0 }),
+            summaryLine({
+                booked: { sessions: 0, people: 0 },
+                free: 7,
+                money: "₹0",
+                cancelledShown: 0,
+            }),
         ).toBe("Nothing booked · 7 free times");
         expect(
-            summaryLine({ booked: 3, free: 2, money: null, cancelledShown: 1 }),
-        ).toBe("3 booked · 2 free times · 1 cancelled shown");
+            summaryLine({
+                booked: { sessions: 3, people: 3 },
+                free: 2,
+                money: null,
+                cancelledShown: 1,
+            }),
+        ).toBe("3 sessions · 3 people · 2 free times · 1 cancelled shown");
     });
 });
 
@@ -119,7 +134,7 @@ describe("the date sheet", () => {
             picked: true,
             count: 3,
             dots: 2,
-            label: "Thu 22 Oct, 3 bookings",
+            label: "Thu 22 Oct, 3 sessions · 3 people",
         });
         expect(week[6]).toMatchObject({
             closed: true,

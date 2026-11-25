@@ -1,11 +1,12 @@
 import type { DiaryBooking } from "./booking-calendar";
 import { BOOKING_WORDS } from "./booking-words";
-import type { Block, Column, PersonDay, Span } from "./diary";
+import type { Block, Column, DiaryState, PersonDay, Span } from "./diary";
 import {
     isLive,
     liveSeats,
     mergeSpans,
     MIN_FREE_MINUTES,
+    STATE_LABEL,
     subtractSpans,
 } from "./diary";
 import type { Laned } from "./diary-lanes";
@@ -97,6 +98,71 @@ export function toPayText(block: Block): string | null {
         return toPay(block.booking) ? BOOKING_WORDS.awaitingPayment : null;
     const n = liveSeats(block.session).filter(toPay).length;
     return n > 0 ? `${n} ${BOOKING_WORDS.awaitingPayment.toLowerCase()}` : null;
+}
+
+/**
+ * How a block stands, in the one word every view says (Day, Week, Agenda
+ * and the quick look): a class is "Full" or "2 places left" ("2 left"
+ * where room is short), a one-to-one with money still to take "Awaiting
+ * payment" (DEC-257's one payment word), else its state's own word. The
+ * `state` picks the badge's tone.
+ */
+export function blockStatus(block: Block): {
+    label: string;
+    short: string;
+    state: DiaryState;
+} {
+    const word = (label: string, state: DiaryState, short = label) => ({
+        label,
+        short,
+        state,
+    });
+    if (!isLive(block)) return word(STATE_LABEL.cancelled, "cancelled");
+    if (block.kind === "class") {
+        const left = block.session.capacity - liveSeats(block.session).length;
+        if (left <= 0) return word(STATE_LABEL.full, "full");
+        return word(
+            `${left} ${left === 1 ? "place" : "places"} left`,
+            "open",
+            `${left} left`,
+        );
+    }
+    if (block.state === "booked" && toPay(block.booking)) {
+        return word(BOOKING_WORDS.awaitingPayment, "pending");
+    }
+    return word(STATE_LABEL[block.state], block.state);
+}
+
+/**
+ * Free time on a phone's Everyone day (BKVCalendarBPhone), drawn as one
+ * column: where anybody is free, each stretch booked with the first person
+ * (in column order) free all through it, so a tap books someone who is.
+ * Only the columns `bookable` lets through are offered.
+ */
+export function everyoneFree(
+    columns: readonly Column[],
+    bookable: (column: Column) => boolean,
+): { column: Column; free: Span }[] {
+    const offered = columns.filter((c) => bookable(c) && c.day);
+    const cuts = Array.from(
+        new Set(offered.flatMap((c) => (c.day?.free ?? []).flat())),
+    ).sort((a, b) => a - b);
+    const out: { column: Column; free: Span }[] = [];
+    for (let i = 0; i + 1 < cuts.length; i++) {
+        const a = cuts[i] ?? 0;
+        const b = cuts[i + 1] ?? 0;
+        const column = offered.find((c) =>
+            (c.day?.free ?? []).some(([x, y]) => x <= a && y >= b),
+        );
+        if (!column) continue;
+        const last = out.at(-1);
+        if (last?.column === column && last.free[1] === a) {
+            last.free = [last.free[0], b];
+        } else {
+            out.push({ column, free: [a, b] });
+        }
+    }
+    return out.filter(({ free: [a, b] }) => b - a >= MIN_FREE_MINUTES);
 }
 
 // ── What is drawn ───────────────────────────────────────────────────────────

@@ -3331,6 +3331,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A logo whose host won't let it be read is picked from the device instead. It is read there and never uploaded.
 - The colour picked is a brand colour like a typed one: the palette is still made on the server and held to 4.5:1 (DEC-241).
 
+## DEC-260 Bookings counts in sessions and people, in every view
+
+**Status: Accepted — 2026-11-25** · owner (25 Nov 2026, after the Bookings phone critique) · follows DEC-257
+
+- Context: a class counted 1 on the Calendar and as its people on the List, so the same day read "3" in one view and "10" in the other.
+- **Both units, everywhere.** A one-to-one is one session and one person; a class start is one session and as many people as hold a place. The Calendar's summary says "3 sessions · 9 people · 2 free times"; a day of the week strip and Go to a day count sessions and say both to a screen reader; a person's column, Week's day heading and Agenda's Booked heading say both.
+- **The List groups a class start into one row**, "Yoga flow · 7 of 15", with its teacher and places left; pressing it opens its people under it, each the List's own row (menu, Came / Didn't come). A day's band counts in both units. The Showing picker's view counts stay per booking: each is something to act on per person (marking, taking payment).
+- One counting function (`lib/services/session-counts.ts`) for every view.
+
 ## DEC-250 Video and Instagram embeds in posts are left out
 
 **Status: Accepted — 2026-11-22** · owner (22 Nov 2026, round-2 brief, W2, Y1 and Q6)

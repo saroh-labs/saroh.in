@@ -207,7 +207,9 @@ describe("cancelled bookings", () => {
         expect(blocks("one")).toHaveLength(1);
         expect(blocks("cancelled")).toHaveLength(0);
         // 9 to 10 and 11 to 5 are free; 3 to 4 is free again once cancelled.
-        expect(summaryText()).toBe("1 booked · 2 free times · ₹500 booked");
+        expect(summaryText()).toBe(
+            "1 session · 1 person · 2 free times · ₹500 booked",
+        );
         openOptions();
         const sw = cancelledSwitch();
         expect(sw?.getAttribute("aria-checked")).toBe("false");
@@ -457,13 +459,13 @@ describe("whose bookings", () => {
                 .querySelector('button[aria-label^="Whose bookings"]')
                 ?.getAttribute("aria-label"),
         ).toBe("Whose bookings: Everyone. Change");
-        expect(summaryText()).toMatch(/^3 booked/);
+        expect(summaryText()).toMatch(/^3 sessions · 3 people/);
     });
 
     it("one person draws their column, and the count matches theirs", () => {
         draw(two, { staff: [asha, arjun], person: "arjun" });
         expect(heads()).toEqual(["arjun"]);
-        expect(summaryText()).toMatch(/^2 booked/);
+        expect(summaryText()).toMatch(/^2 sessions · 2 people/);
         expect(
             host
                 .querySelector('button[aria-label^="Whose bookings"]')

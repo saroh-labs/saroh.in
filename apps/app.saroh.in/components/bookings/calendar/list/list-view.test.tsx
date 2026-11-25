@@ -339,8 +339,7 @@ describe("the booked rows", () => {
     it("say who takes each one and how it stands", () => {
         draw(today);
         const [cls, ananya, , priya] = rows();
-        expect(cls.textContent).toContain("Neha Kapoor · 6 of 8 places");
-        expect(cls.textContent).toContain("2 left");
+        expect(cls.textContent).toContain("6 of 8 · Neha");
         expect(cls.textContent).toContain("2 places left");
         expect(ananya.textContent).toContain("Physio assessment · Meera");
         expect(ananya.textContent).toContain("Came");
@@ -352,7 +351,7 @@ describe("the booked rows", () => {
         const head = q(
             'section[aria-label="Booked"] .max-\\[759px\\]\\:hidden',
         );
-        expect(head?.textContent).toBe("Booked4 bookings");
+        expect(head?.textContent).toBe("Booked4 sessions · 9 people");
         const label = q('section[aria-label="Booked"] > .label');
         expect(label?.className).toContain("min-[760px]:hidden");
     });

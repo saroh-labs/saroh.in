@@ -4,7 +4,8 @@ import type { BookingsCalendar } from "@/lib/services/booking-calendar";
 import { EVERYONE } from "@/lib/services/bookings-opens";
 import type { DayFacts } from "@/lib/services/calendar-header";
 import type { Column, LocalDate, ServiceHours } from "@/lib/services/diary";
-import { dayColumns, isLive } from "@/lib/services/diary";
+import { dayColumns } from "@/lib/services/diary";
+import { countBlocks } from "@/lib/services/session-counts";
 import type { StaffView } from "@/lib/staff/types";
 
 import type { PersonChoice } from "./people-sheet";
@@ -68,10 +69,12 @@ export function dayFactsOf({
             person,
         );
         const withHours = cols.filter((c) => c.day !== null);
+        const booked = inRead
+            ? countBlocks(cols.flatMap((c) => c.blocks))
+            : null;
         const facts: DayFacts = {
-            count: inRead
-                ? cols.reduce((n, c) => n + c.blocks.filter(isLive).length, 0)
-                : null,
+            count: booked?.sessions ?? null,
+            people: booked?.people ?? null,
             closed:
                 staff !== null &&
                 withHours.length > 0 &&
