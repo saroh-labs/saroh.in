@@ -37,6 +37,16 @@ vi.mock("@/lib/products/settings-actions", () => ({
         actions.reorderOptionValues(...a) as unknown,
 }));
 const refresh = vi.fn();
+// A save reads Product settings again (`productSettingsSaved`, DEC-259).
+vi.mock("@/lib/products/use-product-settings", () => ({
+    useProductSettingsSave: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
 }));
@@ -157,7 +167,7 @@ describe("the list", () => {
         render();
         s.press("Delete Shade");
         await s.settle();
-        expect(actions.removeOption).toHaveBeenCalledWith("o2");
+        expect(actions.removeOption).toHaveBeenCalledWith("o2", "org_1");
         expect(showUndo.mock.calls[0][0]).toBe("Shade deleted.");
     });
 });
@@ -188,10 +198,11 @@ describe("New option", () => {
         s.type(newValue(), "Espresso");
         expect(actions.addOption).not.toHaveBeenCalled();
         await s.submit(s.sheet());
-        expect(actions.addOption).toHaveBeenCalledWith("Grind", [
-            "Whole bean",
-            "Espresso",
-        ]);
+        expect(actions.addOption).toHaveBeenCalledWith(
+            "Grind",
+            ["Whole bean", "Espresso"],
+            "org_1",
+        );
         expect(s.sheet()).toBe(null);
         expect(showUndo.mock.calls[0][0]).toBe("Grind added.");
         render([
@@ -276,9 +287,21 @@ describe("Edit", () => {
         for (const m of Object.values(actions))
             expect(m).not.toHaveBeenCalled();
         await s.submit(s.sheet());
-        expect(actions.renameOption).toHaveBeenCalledWith("o1", "Weight");
-        expect(actions.removeOptionValue).toHaveBeenCalledWith("o1", "v2");
-        expect(actions.addOptionValue).toHaveBeenCalledWith("o1", "1kg");
+        expect(actions.renameOption).toHaveBeenCalledWith(
+            "o1",
+            "Weight",
+            "org_1",
+        );
+        expect(actions.removeOptionValue).toHaveBeenCalledWith(
+            "o1",
+            "v2",
+            "org_1",
+        );
+        expect(actions.addOptionValue).toHaveBeenCalledWith(
+            "o1",
+            "1kg",
+            "org_1",
+        );
         expect(s.sheet()).toBe(null);
         expect(showUndo.mock.calls[0][0]).toBe(
             "Size is now Weight. Customers see the new name.",
@@ -368,6 +391,7 @@ describe("Rename and order values", () => {
             "o1",
             "v1",
             "250 g",
+            "org_1",
         );
         expect(actions.reorderOptionValues).not.toHaveBeenCalled();
         expect(showUndo.mock.calls[0][0]).toBe(
@@ -383,6 +407,7 @@ describe("Rename and order values", () => {
             "o1",
             "v1",
             "250g",
+            "org_1",
         );
     });
 
@@ -413,11 +438,11 @@ describe("Rename and order values", () => {
         s.press("Sort A to Z", s.sheet());
         expect(values()).toEqual(["1 L", "50 ml", "250 ml"]);
         await s.submit(s.sheet());
-        expect(actions.reorderOptionValues).toHaveBeenCalledWith("o1", [
-            "a",
-            "c",
-            "b",
-        ]);
+        expect(actions.reorderOptionValues).toHaveBeenCalledWith(
+            "o1",
+            ["a", "c", "b"],
+            "org_1",
+        );
     });
 
     it("moves a value with the arrow keys on its handle", () => {

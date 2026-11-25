@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import type { ApiResult } from "@/lib/api/failure";
 import { listCataloguePage } from "@/lib/products/service";
 
@@ -17,8 +18,13 @@ import {
  * Server Actions for the collections screens (#524). Thin wrappers over
  * `service.ts`; the API decides who may (`store:write`) and says why it
  * refuses. A refusal that names a field keeps it, so the sheet can put it
- * there.
+ * there. Each write takes the tab's business last (`writeAsOrg`), refusing
+ * a tab whose business has since changed; the screens read themselves
+ * again (`collectionsSaved`), so nothing is revalidated.
  */
+
+const asOrg = <R>(orgId: string | undefined, write: () => Promise<R>) =>
+    orgId ? writeAsOrg(orgId, write) : write();
 
 /** A product the sheet can pick, as the catalogue search finds it. */
 export interface PickableProduct {
@@ -78,8 +84,11 @@ export async function findProducts(
     }
 }
 
-export async function saveNewCollection(input: CollectionInput) {
-    return createCollection(input);
+export async function saveNewCollection(
+    input: CollectionInput,
+    orgId?: string,
+) {
+    return asOrg(orgId, () => createCollection(input));
 }
 
 /**
@@ -87,6 +96,15 @@ export async function saveNewCollection(input: CollectionInput) {
  * its whole list. When the list is refused after the rest saved, it says so.
  */
 export async function saveCollection(
+    collectionId: string,
+    patch: { name?: string; description?: string | null; categoryId?: string },
+    products: string[] | null,
+    orgId?: string,
+): Promise<ApiResult<CollectionDetail | null> & { partly?: boolean }> {
+    return asOrg(orgId, () => saveBoth(collectionId, patch, products));
+}
+
+async function saveBoth(
     collectionId: string,
     patch: { name?: string; description?: string | null; categoryId?: string },
     products: string[] | null,
@@ -105,14 +123,15 @@ export async function saveCollection(
     return { ok: true, data: saved };
 }
 
-export async function removeCollection(collectionId: string) {
-    return deleteCollection(collectionId);
+export async function removeCollection(collectionId: string, orgId?: string) {
+    return asOrg(orgId, () => deleteCollection(collectionId));
 }
 
 /** Put a product in exactly these hand-picked collections. */
 export async function saveProductCollections(
     productId: string,
     collectionIds: string[],
+    orgId?: string,
 ) {
-    return setProductCollections(productId, collectionIds);
+    return asOrg(orgId, () => setProductCollections(productId, collectionIds));
 }

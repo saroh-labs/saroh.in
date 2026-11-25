@@ -65,6 +65,13 @@ beforeEach(() => {
         "fetch",
         vi.fn(async (url: string) => {
             reads.push(url);
+            // The side reads answer at once; the list's page waits.
+            if (url.startsWith("/api/products/categories")) {
+                return new Response(JSON.stringify({ categories: [] }));
+            }
+            if (url.startsWith("/api/collections")) {
+                return new Response(JSON.stringify([]));
+            }
             await gate;
             return new Response(JSON.stringify(PAGE), { status: 200 });
         }),
@@ -78,11 +85,9 @@ function open() {
     return renderWithQuery(
         <CatalogueContainer
             defaultSize={50}
-            reviewsCount={null}
             showInventory
             showReviews={false}
             stores={[{ id: "s1", name: "Hill Road" }]}
-            choices={{ categories: [], collections: [] }}
             canWrite
             canStock
         />,
