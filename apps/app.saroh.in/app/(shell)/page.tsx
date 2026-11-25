@@ -16,8 +16,6 @@ import {
 } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
-import Loading from "./loading";
-
 /** It had none: Home's tab read the bare "Saroh" (12 Oct 2026). */
 export const metadata = { title: "Home" };
 
@@ -31,7 +29,7 @@ export const metadata = { title: "Home" };
  * the gates (signed in, a business, chosen, not paused) and what this
  * person may be offered (New, Finish setup, Insights); Home itself, which
  * Home it is and what it says, is `HomeContainer`'s read (`/api/home`),
- * behind the shell's loader until it lands.
+ * into a header drawn at once (New working) above Home's loader shapes.
  */
 export default async function Home() {
     const session = await requireSession();
@@ -81,7 +79,6 @@ export default async function Home() {
     // title (F6): who, when, and the last 24 hours, then the work.
     return (
         <HomeContainer
-            skeleton={<Loading />}
             name={session.user.name}
             businessName={business.name}
             kind={kindOf(business.kind)}

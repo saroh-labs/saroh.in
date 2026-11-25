@@ -1,5 +1,9 @@
 "use client";
 
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { count, plural } from "@/lib/format/plural";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
@@ -67,6 +71,10 @@ import { QuickLook } from "./quick-look";
  * box ready, even when it isn't on the page on screen: the task finishes
  * here. A search or filter on a dropped connection keeps the list and says
  * so, rather than losing the page to the browser's offline screen.
+ *
+ * Before the first page is read (`page` null) the whole frame is drawn and
+ * works, a search or filter keying the read; the rows are the list
+ * loader's skeleton and the count a bar until it lands (owner, 25 Nov).
  */
 const OFFLINE = "Couldn't search. Check your connection and try again.";
 const OFFLINE_HOW = "Check your connection and try again.";
@@ -84,6 +92,8 @@ export interface ListAdapter {
     /** The list is on its way and the old rows are held. */
     fetching: boolean;
 }
+
+const NO_NEEDS: CataloguePage["needs"] = [];
 
 /** How many of `rows` match, for a bulk label: "Archive 2". */
 function countOf(
@@ -113,8 +123,8 @@ export function CatalogueScreen({
     adapter,
 }: {
     query: ListQuery;
-    /** The page the address asks for, from the list's query. */
-    page: CataloguePage;
+    /** The page the address asks for; null until the first is read. */
+    page: CataloguePage | null;
     adapter: ListAdapter;
     stores: { id: string; name: string }[];
     /** All · Collections · Inventory · Reviews, under Needs you. */
@@ -163,8 +173,8 @@ export function CatalogueScreen({
     );
 
     const rows = useMemo(
-        () => catalogueRows(data.items, pausedCut),
-        [data.items, pausedCut],
+        () => catalogueRows(data?.items ?? [], pausedCut),
+        [data?.items, pausedCut],
     );
     const ratingById = useMemo(
         () => new Map(ratings.map((r) => [r.productId, r])),
@@ -174,7 +184,7 @@ export function CatalogueScreen({
     const many = stores.length > 1;
     const first = stores.at(0);
 
-    const needs = data.needs as NeedDetail[];
+    const needs = (data?.needs ?? NO_NEEDS) as NeedDetail[];
     const needById = useMemo(
         () => new Map(needs.map((n) => [n.productId, n])),
         [needs],
@@ -432,8 +442,9 @@ export function CatalogueScreen({
         store?.name ?? (many ? null : first.name),
         collectionCount,
     );
+    const total = data?.total ?? 0;
     const countLabel =
-        count(data.total, "product") +
+        count(total, "product") +
         (store
             ? ` sold at ${store.name}`
             : many
@@ -448,7 +459,13 @@ export function CatalogueScreen({
                 canWrite={canWrite}
                 meter={meter}
                 bannerShown={limitBannerShown}
-                count={data.total > 0 ? countLabel : undefined}
+                count={
+                    !data ? (
+                        <FigureLoading />
+                    ) : total > 0 ? (
+                        countLabel
+                    ) : undefined
+                }
             />
             <NeedsYou
                 needs={needs}
@@ -501,7 +518,8 @@ export function CatalogueScreen({
                             <CatalogueFilters
                                 query={query}
                                 go={go}
-                                storefronts={data.storefronts}
+                                storefronts={data?.storefronts ?? null}
+                                stores={stores}
                                 choices={choices}
                             />
                         </span>
@@ -521,7 +539,8 @@ export function CatalogueScreen({
                                     <CatalogueFilters
                                         query={query}
                                         go={go}
-                                        storefronts={data.storefronts}
+                                        storefronts={data?.storefronts ?? null}
+                                        stores={stores}
                                         choices={choices}
                                     />
                                     <CatalogueSortSelect
@@ -555,6 +574,15 @@ export function CatalogueScreen({
                                       storefront: null,
                                   })
                             : undefined
+                    }
+                    isLoading={!data}
+                    loading={
+                        <PageLoading
+                            bare
+                            width="full"
+                            shape="rows"
+                            label="Loading products"
+                        />
                     }
                     onRowClick={(r) => openRow(r.id)}
                     selectable={canWrite}
@@ -624,7 +652,7 @@ export function CatalogueScreen({
                     // is given and its footer from the catalogue's numbers.
                     paging={{
                         page: query.page,
-                        total: data.total,
+                        total,
                         size: query.size,
                         to: (n) => ({ href: pageHref(query, n) }),
                         onSize: (size) => {
@@ -643,7 +671,7 @@ export function CatalogueScreen({
                         ? openIndex
                         : (query.page - 1) * query.size + openIndex
                 }
-                total={data.total}
+                total={total}
                 storeId={query.storefront}
                 canWrite={canWrite}
                 canStock={canStock}

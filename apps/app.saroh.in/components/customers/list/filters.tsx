@@ -12,9 +12,17 @@ import type {
     CustomersPage,
     ListQuery,
 } from "@/lib/customers/list";
-import { chipsFor, SORT_LABEL, sortsFor } from "@/lib/customers/list";
+import {
+    CHIP_LABEL,
+    chipsAllowed,
+    chipsFor,
+    SORT_LABEL,
+    sortsAllowed,
+    sortsFor,
+} from "@/lib/customers/list";
 
 const ALL_STORES = "all";
+const ALL = () => true;
 
 /**
  * The Customers list's controls (Saroh Customers.dc.html), in the one list
@@ -29,26 +37,45 @@ export function Filters({
     go,
     count = null,
     searching = false,
+    may = ALL,
+    stores = [],
 }: {
+    /**
+     * Before the first page (`page` null): what this viewer may ask, so the
+     * chips and sorts are offered at once, their counts left out.
+     */
+    may?: (action: string) => boolean;
+    /** Before the first page: the storefronts for "Bought at". */
+    stores?: { id: string; name: string }[];
     /** "Showing 1 to 50 of 120", while the list runs past a page. */
     count?: string | null;
     /** The list is being read again. */
     searching?: boolean;
     query: ListQuery;
-    page: CustomersPage;
+    page: CustomersPage | null;
     /** Replace the address with `patch` applied. */
     go: (patch: Partial<ListQuery>) => void;
 }) {
-    const storefronts = page.storefronts ?? [];
-    const sorts = sortsFor(page);
-    const chips = chipsFor(page);
+    const storefronts = page
+        ? (page.storefronts ?? [])
+        : may("order:read")
+          ? stores
+          : [];
+    const sorts = page ? sortsFor(page) : sortsAllowed(may);
+    const chips: { key: CustomerChip; label: string; count?: number }[] = page
+        ? chipsFor(page)
+        : chipsAllowed(may).map((key) => ({ key, label: CHIP_LABEL[key] }));
+    const chip = page?.chip ?? query.chip;
+    // The API's own default: the last order, for whoever reads orders.
+    const sort =
+        query.sort ?? page?.sort ?? (sorts.includes("last") ? "last" : "name");
 
     return (
         <ListToolbar
             className="mb-3.5"
             count={count}
             onClear={
-                query.q || page.chip !== "all" || query.store
+                query.q || chip !== "all" || query.store
                     ? () => go({ q: "", chip: "all", store: null })
                     : undefined
             }
@@ -67,7 +94,7 @@ export function Filters({
                 <>
                     <ListFilter<CustomerChip>
                         label="Show"
-                        value={page.chip}
+                        value={chip}
                         onValueChange={(chip) => go({ chip })}
                         options={chips.map((c) => ({
                             value: c.key,
@@ -99,7 +126,7 @@ export function Filters({
                     // A sort narrows nothing.
                     narrowed={false}
                     label="Sort"
-                    value={query.sort ?? page.sort}
+                    value={sort}
                     onValueChange={(sort) => go({ sort })}
                     options={sorts.map((s) => ({
                         value: s,

@@ -2,7 +2,7 @@
 
 import { PageContainer } from "@saroh/ui/page-container";
 import { useSearchParams } from "next/navigation";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { useMemo } from "react";
 
 import { listQueryFrom } from "@/lib/invoices/list-view";
@@ -25,13 +25,13 @@ type Screen = ComponentProps<typeof InvoicesScreen>;
  * source filter the rows on hand, so picking one reads nothing. A new ask
  * keeps the last rows, greyed, until it lands. The money strip is its own
  * read, so a payment reads both again (`useInvoiceSave`). Both are read in
- * the browser; the route's loader (`skeleton`) stands until both answer,
- * so the strip never says "couldn't be read" while it is on its way.
+ * the browser into the frame, drawn at once; the rows and the strip are
+ * skeletons each until its own read answers, so the strip never says
+ * "couldn't be read" while it is on its way (owner, 25 Nov).
  */
 export function InvoicesContainer({
-    skeleton,
     ...screen
-}: { skeleton: ReactNode } & Omit<
+}: Omit<
     Screen,
     | "invoices"
     | "truncated"
@@ -54,22 +54,21 @@ export function InvoicesContainer({
 
     // A failed read is the page failing (`error.tsx`), never an empty list.
     if (list.isError && !view) throw list.error;
-    if (!view || summary.isPending) return skeleton;
 
     return (
         <PageContainer width="full">
             <InvoicesScreen
                 {...screen}
-                invoices={view.invoices}
-                truncated={view.truncated}
+                invoices={view?.invoices ?? null}
+                truncated={view?.truncated}
                 query={query}
                 initialChip={chipFromQuery(params.source)}
-                scope={view.scope}
+                scope={view?.scope}
                 // From Home's "Last 24 hours" (F6): the invoices paid since.
                 paidSince={sinceParam({ since: ask.since })}
-                paidSinceInvoices={view.paid}
+                paidSinceInvoices={view?.paid}
                 // Null: the strip says it couldn't be read; the list still shows.
-                summary={summary.data ?? null}
+                summary={summary.isPending ? undefined : (summary.data ?? null)}
                 pending={list.isPlaceholderData}
             />
         </PageContainer>

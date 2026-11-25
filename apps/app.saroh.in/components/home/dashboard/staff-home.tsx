@@ -1,10 +1,8 @@
 import type { HomeNew } from "@/components/shared/navigation/quick-actions";
 import type { HomeModel } from "@/lib/home/service";
-import { storesOnly } from "@/lib/home/staff";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { MomentView } from "@/lib/moments/keys";
 
-import { HomeHeader } from "@/components/home/header/home-header";
 import { NewSpace } from "@/components/home/header/new-sheet";
 import { Moment } from "@/components/shared/notices/moment";
 import { HomeDashboard } from "./home-dashboard";
@@ -25,11 +23,14 @@ import { HomeDashboard } from "./home-dashboard";
  *
  * No "Get ready to take money": its steps are for someone who may change
  * the business (`org:update`), which a staff member isn't.
+ *
+ * Below the header: `HomeContainer` draws the header (with "Hill Road
+ * only") in the same place in every state, so New stays open across Home's
+ * read.
  */
 export function StaffHome({
     home,
     modules,
-    name,
     businessName,
     newMenu = null,
     moment = null,
@@ -37,8 +38,6 @@ export function StaffHome({
     home: HomeModel;
     /** Read only for a business with nothing on — the first-run state. */
     modules: ModuleView[] | null;
-    /** The viewer's own name, from their session. */
-    name: string | null | undefined;
     businessName: string;
     /** What New offers them (`homeNewFor`); a staff member may book. */
     newMenu?: HomeNew | null;
@@ -47,15 +46,6 @@ export function StaffHome({
 }) {
     return (
         <>
-            <HomeHeader
-                lastDay={home.lastDay}
-                name={name}
-                businessName={businessName}
-                only={storesOnly(home.staff)}
-                newMenu={newMenu}
-                // The phone Home says it in the day sheet (U17).
-                sinceOnPhone={!home.hasAnyModule}
-            />
             {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
                 <HomeDashboard

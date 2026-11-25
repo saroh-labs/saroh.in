@@ -59,6 +59,7 @@ export function DataView<TRow>({
     filterLabel = "Show",
     initialFilterId,
     isLoading = false,
+    loading,
     error = null,
     noun,
     showTotal = true,
@@ -831,6 +832,8 @@ export function DataView<TRow>({
                 >
                     {error}
                 </p>
+            ) : isLoading && loading ? (
+                <>{loading}</>
             ) : isLoading ? (
                 <div className="space-y-2" aria-busy="true">
                     {/* The shared Skeleton, not a local animate-pulse block:

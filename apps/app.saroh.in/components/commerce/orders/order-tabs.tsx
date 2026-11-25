@@ -19,7 +19,8 @@ export function OrderStatusFilter({
     go,
 }: {
     query: OrdersQuery;
-    counts: OrderListPage["counts"];
+    /** Null while the page is on its way: the counts are left out. */
+    counts: OrderListPage["counts"] | null;
     go: (patch: Partial<OrdersQuery>) => void;
 }) {
     return (
@@ -30,7 +31,7 @@ export function OrderStatusFilter({
             options={ORDERS_TABS.map((tab) => ({
                 value: tab.id,
                 label: tab.id === "all" ? "All orders" : tab.label,
-                count: counts[tab.id],
+                count: counts?.[tab.id],
             }))}
         />
     );

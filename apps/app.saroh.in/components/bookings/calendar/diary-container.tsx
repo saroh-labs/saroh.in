@@ -44,7 +44,10 @@ const NEW_BOOKING =
  * `inPlace`); a day in the week already read draws at once, another week
  * keeps the last one on screen, greyed, until it lands. Every write on it
  * (the quick look, a free gap, closed time, New booking) goes through the
- * bookings saves: the diary is read once, the list marked stale.
+ * bookings saves: the diary is read once, the list marked stale. The first
+ * read is the browser's: the header and its controls (the day, the view,
+ * the person, "…", New booking) are drawn at once and work, the diary is
+ * its skeleton until the read lands (owner, 25 Nov).
  */
 export function DiaryContainer({
     zone,
@@ -107,22 +110,29 @@ export function DiaryContainer({
     };
     const layout = openingLayout(chosen);
 
-    if (!data) {
-        return query.isError ? (
+    // A diary with nothing in it would be a lie: a failed first read says so.
+    if (!data && query.isError) {
+        return (
             <FailedState
                 title={couldntLoad("the calendar")}
                 retryHref={calendarHref(layout, date)}
             />
-        ) : null;
+        );
     }
 
-    const timezone = data.calendar.timezone || data.zone;
-    const active = (data.staff ?? []).filter((p) => p.status === "ACTIVE");
+    const timezone = data ? data.calendar.timezone || data.zone : zone;
+    const active = (data?.staff ?? []).filter((p) => p.status === "ACTIVE");
     const mine = active.find((p) => p.membership?.userId === userId);
     const person = openingPerson({
         asked: params.person,
         opens,
-        people: active.map((p) => p.id),
+        // Before the read nobody is known: the asked or last person is
+        // trusted, so a step taken meanwhile keeps whose diary it is.
+        people: data
+            ? active.map((p) => p.id)
+            : [params.person, opens.lastPerson].filter(
+                  (id): id is string => typeof id === "string",
+              ),
         me: mine?.id ?? null,
     });
 
@@ -132,20 +142,20 @@ export function DiaryContainer({
                 layout={layout}
                 date={date}
                 today={today}
-                now={data.now}
+                now={data?.now ?? clock}
                 timezone={timezone}
-                calendar={data.calendar}
-                staff={data.staff}
+                calendar={data?.calendar ?? null}
+                staff={data?.staff ?? null}
                 services={services}
                 rules={rules}
                 notices={notices}
                 limitNotice={limitNotice}
                 calendarLine={calendarLine}
-                serviceHours={data.serviceHours}
+                serviceHours={data?.serviceHours ?? null}
                 // Cancelled bookings stay off the diary unless the address
                 // asks for them, so a reload keeps the choice.
                 showCancelled={params.cancelled === "1"}
-                googleBusy={data.googleBusy}
+                googleBusy={data?.googleBusy ?? null}
                 googleShow={
                     params.google === "0"
                         ? "off"
@@ -183,9 +193,10 @@ export function DiaryContainer({
                 <NewBookingHost
                     setup={{
                         ...setup,
-                        staff: flowStaff(data.staff),
+                        // Until the read: anyone, and no prices shown.
+                        staff: flowStaff(data?.staff ?? null),
                         timezone,
-                        showMoney: data.calendar.money,
+                        showMoney: data?.calendar.money ?? false,
                     }}
                     arrival={arrival}
                 >

@@ -19,7 +19,7 @@ export function ListHeading({
     count,
     actions,
 }: {
-    count: string | null;
+    count: ReactNode;
     actions?: ReactNode;
 }) {
     return (

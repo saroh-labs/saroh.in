@@ -46,6 +46,11 @@ type Tab = "levels" | "log" | "checks";
  * filters and pages are addresses; the count is this screen's own state
  * until saved, so what was typed on one page of Levels is still there on
  * the next.
+ *
+ * Before the first read (`levels` and `checks` null) the header, its
+ * buttons, the tabs and each list's toolbar are drawn and work; the rows
+ * are skeletons and the tabs' counts wait, and Count stock waits for the
+ * rows it counts (owner, 25 Nov).
  */
 export function StockScreen({
     business,
@@ -67,10 +72,12 @@ export function StockScreen({
     tab: Tab;
     show: string;
     q: string;
-    levels: StockLevels;
-    needsYou: number;
+    /** Null until the first read lands. */
+    levels: StockLevels | null;
+    /** Null until the levels are read. */
+    needsYou: number | null;
     storefronts: { id: string; name: string }[];
-    checks: StockChecks | "failed";
+    checks: StockChecks | "failed" | null;
     log: StockLog | "failed" | null;
     logFilter: { kind: LogKindId; store: string; product: string } & DateRange;
     products: { id: string; name: string }[];
@@ -181,9 +188,11 @@ export function StockScreen({
     };
 
     const checkCount =
-        checks === "failed"
-            ? null
-            : Object.values(checks.counts).reduce((a, b) => a + b, 0);
+        checks === null
+            ? undefined
+            : checks === "failed"
+              ? null
+              : Object.values(checks.counts).reduce((a, b) => a + b, 0);
     // Both counts mean "this needs you now", so both wear the one
     // attention tone (Ink) and say so in their name: how many lines are
     // running low, how many checks are open. Checks that couldn't be read
@@ -198,20 +207,22 @@ export function StockScreen({
         {
             id: "levels",
             label: "Levels",
-            count: needsYou > 0 ? needsYou : undefined,
+            count: needsYou && needsYou > 0 ? needsYou : undefined,
             tone: "strong",
-            says: plural(needsYou, "needs you", "need you"),
+            says: plural(needsYou ?? 0, "needs you", "need you"),
         },
         { id: "log", label: "Log" },
         {
             id: "checks",
             label: "Checks",
             count:
-                checkCount === null
-                    ? null
-                    : checkCount > 0
-                      ? checkCount
-                      : undefined,
+                checkCount === undefined
+                    ? undefined
+                    : checkCount === null
+                      ? null
+                      : checkCount > 0
+                        ? checkCount
+                        : undefined,
             tone: "strong",
             says: plural(checkCount ?? 0, "check needs you", "checks need you"),
         },
@@ -248,7 +259,8 @@ export function StockScreen({
                             ) : null}
                             <Button
                                 type="button"
-                                disabled={counting}
+                                // Counting is typed into the rows.
+                                disabled={counting || !levels}
                                 onClick={startCount}
                             >
                                 Count stock
@@ -310,7 +322,7 @@ export function StockScreen({
                         />
                     </>
                 ) : null}
-                {tab === "log" && log ? (
+                {tab === "log" ? (
                     <LogList
                         log={log}
                         filter={logFilter}

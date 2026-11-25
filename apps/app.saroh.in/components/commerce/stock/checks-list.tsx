@@ -12,6 +12,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import { ListPaging } from "@/components/shared/lists/list-toolbar";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { productHref } from "@/lib/products/links";
 import type { StockHref, StockListPage } from "@/lib/stock/list-query";
 import { STOCK_LISTS, STOCK_PAGES_LABEL } from "@/lib/stock/list-query";
@@ -41,7 +42,8 @@ export function ChecksList({
     paging,
     onRetry,
 }: {
-    checks: StockChecks | "failed";
+    /** Null while the first read is on its way: skeleton rows. */
+    checks: StockChecks | "failed" | null;
     /** The screen's address with these changed. */
     href: StockHref;
     /** The page on screen and its rows per page. */
@@ -65,6 +67,19 @@ export function ChecksList({
         </p>
     );
 
+    if (!checks) {
+        return (
+            <div>
+                {intro}
+                <PageLoading
+                    bare
+                    width="full"
+                    shape="rows"
+                    label="Loading stock checks"
+                />
+            </div>
+        );
+    }
     if (checks === "failed") {
         return (
             <div>

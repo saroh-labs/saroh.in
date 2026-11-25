@@ -9,8 +9,6 @@ import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
-import Loading from "./loading";
-
 export const metadata = { title: "Invoices" };
 
 /**
@@ -32,8 +30,8 @@ export const metadata = { title: "Invoices" };
  * On React Query (DEC-259): the gate and the business's facts (GST standing,
  * zone, rates missing, Payments on) are the page's; the list as the address
  * asks (`/api/invoices`) and the strip (`/api/invoices/summary`) are
- * `InvoicesContainer`'s queries, read from the browser behind the route's
- * loader, and every later one in place.
+ * `InvoicesContainer`'s queries, read from the browser into the frame drawn
+ * at once (its data regions skeletons), and every later one in place.
  */
 export default async function InvoicesPage() {
     await requireSession();
@@ -54,7 +52,6 @@ export default async function InvoicesPage() {
 
     return (
         <InvoicesContainer
-            skeleton={<Loading />}
             canWrite={canWrite}
             tax={
                 business

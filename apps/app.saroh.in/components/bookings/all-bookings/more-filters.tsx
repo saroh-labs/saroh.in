@@ -114,7 +114,8 @@ export function BookingFilters({
     /** The viewer on the diary, for "Just me"; null when they aren't on it. */
     me: { id: string; name: string } | null;
     /** How many bookings show with these filters, for "Show 2 bookings". */
-    showing: number;
+    /** Null while the list is on its way. */
+    showing: number | null;
     /** Filters on, for the button's count (a date counts as one). */
     narrowedBy: number;
     /** "Upcoming": the view these narrow, said under the title. */
@@ -192,7 +193,9 @@ export function BookingFilters({
                     </Button>
                     <span className="flex-1 max-[759px]:hidden" />
                     <Button type="button" onClick={() => setOpen(false)}>
-                        Show {showing} {showing === 1 ? "booking" : "bookings"}
+                        {showing === null
+                            ? "Show bookings"
+                            : `Show ${showing} ${showing === 1 ? "booking" : "bookings"}`}
                     </Button>
                 </div>
             }

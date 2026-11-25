@@ -13,7 +13,8 @@ export function SinceNotice({
     verb,
     clearHref,
 }: {
-    count: number;
+    /** Null while the list is on its way: the narrowing is said, unnumbered. */
+    count: number | null;
     noun: { one: string; other: string };
     /** "placed", "made", "left", "paid". */
     verb: string;
@@ -25,9 +26,11 @@ export function SinceNotice({
             icon={false}
             action={<TextLink href={clearHref}>Show all {noun.other}</TextLink>}
         >
-            {count === 0
-                ? `No ${noun.other} ${verb} in the last 24 hours.`
-                : `Only the ${count === 1 ? noun.one : `${count} ${noun.other}`} ${verb} in the last 24 hours.`}
+            {count === null
+                ? `Only the ${noun.other} ${verb} in the last 24 hours.`
+                : count === 0
+                  ? `No ${noun.other} ${verb} in the last 24 hours.`
+                  : `Only the ${count === 1 ? noun.one : `${count} ${noun.other}`} ${verb} in the last 24 hours.`}
         </Notice>
     );
 }

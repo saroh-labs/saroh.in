@@ -67,12 +67,16 @@ export function CatalogueFilters({
     query,
     go,
     storefronts,
+    stores,
     choices,
 }: ToolbarProps & {
-    storefronts: CataloguePage["storefronts"];
+    /** Null while the page is on its way: the locations, uncounted. */
+    storefronts: CataloguePage["storefronts"] | null;
+    stores: { id: string; name: string }[];
     choices: FilterChoices;
 }) {
-    const many = storefronts.byStorefront.length > 1;
+    const list = storefronts?.byStorefront ?? stores;
+    const many = list.length > 1;
     return (
         <>
             <ListFilter<ProductStatus | typeof ANY>
@@ -98,12 +102,14 @@ export function CatalogueFilters({
             />
             {many ? (
                 <StorefrontFilter
-                    stores={storefronts.byStorefront}
+                    stores={list}
                     countFor={(id) =>
-                        storefronts.byStorefront.find((s) => s.id === id)
-                            ?.count ?? 0
+                        storefronts
+                            ? (storefronts.byStorefront.find((s) => s.id === id)
+                                  ?.count ?? 0)
+                            : null
                     }
-                    total={storefronts.everywhere}
+                    total={storefronts?.everywhere ?? null}
                     value={query.storefront}
                     onChange={(storefront) => go({ storefront })}
                     noun={{ one: "product", other: "products" }}

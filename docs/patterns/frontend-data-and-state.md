@@ -54,11 +54,24 @@ There is no global client store. React Query holds server state only, in
   module guards, redirects, `notFound`/`forbidden`, and facts that decide what
   is offered (payments on, the business's zone, money shown). It renders the
   container and **prefetches no display read**: no `prefetchRead`, no
-  `HydrationBoundary`. The container returns the route's own loader (the
-  page passes `skeleton={<Loading />}` from its `loading.tsx`; the container
-  then owns the `PageContainer`, so nothing nests or jumps) until its first
-  `useQuery` lands, and its existing failed state on error (`throw` to
-  `error.tsx`, or the screen's own). A screen that draws several queries
+  `HydrationBoundary`.
+- **The real screen at once, skeletons only where data goes** (owner,
+  25 Nov 2026). Before its first `useQuery` lands the container draws the
+  screen's real frame from the page's gate props: heading, header actions
+  (New, Add, Export), tabs, filters, search, date and view switchers. They
+  work at once: a search or filter typed before the data keys the read as
+  usual. Only the data regions are skeletons, drawn with the route loader's
+  own pieces (`PageLoading bare` with a region shape: `rows`, `figures`,
+  `panels`, `home`, `calendar`, `diary`), so `loading.tsx` and the container
+  share one source of shapes and nothing moves when the rows replace them.
+  A control that depends on the data (a count, Export, Count stock, a
+  bulk select) is a `FigureLoading` bar, disabled or left out until then,
+  never a wrong number or a 0; a figure bar is a span (a div inside a `<p>`
+  breaks hydration). The failed state stays what it was (`throw` to
+  `error.tsx`, or the screen's own in its region). A record's page whose
+  title, tabs and actions all come from the record keeps its loader
+  (`skeleton`) until the record lands. Check it on a throttled build: the
+  first row's region at the same y before and after the data. A screen that draws several queries
   waits for the ones that would otherwise say "couldn't be read" while still
   on their way. A record's page may keep a `notFound` only when it shares the
   tab title's `cache()`d read (`readOrderOnce`, `readInvoiceOnce`). What a

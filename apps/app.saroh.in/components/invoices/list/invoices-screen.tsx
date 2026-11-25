@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
@@ -15,6 +16,10 @@ import {
     ListToolbar,
 } from "@/components/shared/lists/list-toolbar";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import { formatDay } from "@/lib/format/datetime";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import { invoicesHref } from "@/lib/invoices/links";
@@ -55,6 +60,7 @@ import { invoiceZone } from "@/lib/invoices/zone";
 import type { DateRange } from "@/lib/views/date-range";
 import { NO_DATE_RANGE } from "@/lib/views/date-range";
 import { withoutSince } from "@/lib/views/since";
+
 import { ChequesLine } from "./cheques-line";
 import type { InvoiceBusinessTax } from "./gst-status-line";
 import { GstStatusLine } from "./gst-status-line";
@@ -100,10 +106,13 @@ export type { InvoiceBusinessTax } from "./gst-status-line";
  *
  * On React Query (DEC-259, `invoices-container.tsx`): a filter changes the
  * address in place and the container reads what it asks, the last rows
- * greyed (`pending`) until it lands.
+ * greyed (`pending`) until it lands. Before the first read (`invoices`
+ * null) the frame is here and works (New invoice, search, status, Issued);
+ * the count, the GST line, the strip and the rows are skeletons in the
+ * loader's shapes (owner, 25 Nov).
  */
 export function InvoicesScreen({
-    invoices,
+    invoices: read,
     truncated = false,
     canWrite,
     tax,
@@ -136,7 +145,8 @@ export function InvoicesScreen({
      * (#836), as on the paper the customer gets. Absent, the viewer's.
      */
     timeZone?: string;
-    invoices: Invoice[];
+    /** Null until the first read lands. */
+    invoices: Invoice[] | null;
     /** The newest read hit its cap: older paid and void ones are not here. */
     truncated?: boolean;
     canWrite: boolean;
@@ -162,9 +172,14 @@ export function InvoicesScreen({
      * hand is filtered instead.
      */
     paidSinceInvoices?: Invoice[] | null;
-    /** The money strip's read; null when it couldn't be read. */
-    summary: InvoiceSummary | null;
+    /**
+     * The money strip's read; null when it couldn't be read, undefined
+     * while it is on its way.
+     */
+    summary: InvoiceSummary | null | undefined;
 }) {
+    const loading = read === null;
+    const invoices = read ?? NO_INVOICES;
     const pathname = usePathname();
     const params = useSearchParams();
     const busy = pending;
@@ -318,29 +333,30 @@ export function InvoicesScreen({
     const day = (key: string) => formatDay(key);
     const somethingNarrows = narrowed(shownQuery) || (!scope && chip !== "all");
 
-    const empty: ListEmpty | null =
-        invoices.length === 0 && !scope && !onServer
-            ? { kind: "first-run" }
-            : rows.length > 0
-              ? null
-              : shownQuery.q
-                ? {
-                      kind: "no-results",
-                      cause: "search",
-                      query: shownQuery.q,
-                      onClear: () => search(""),
-                  }
-                : {
-                      kind: "no-results",
-                      cause: "view",
-                      title: (
-                          figureEmptyLine(shownQuery, day) ??
-                          (scope && mine.length === 0
-                              ? scopeEmptyLine(scope)
-                              : chipEmptyLine(tabLabel, scope ? "all" : chip))
-                      ).replace(/\.$/, ""),
-                      onClear: somethingNarrows ? clearAll : undefined,
-                  };
+    const empty: ListEmpty | null = loading
+        ? null
+        : invoices.length === 0 && !scope && !onServer
+          ? { kind: "first-run" }
+          : rows.length > 0
+            ? null
+            : shownQuery.q
+              ? {
+                    kind: "no-results",
+                    cause: "search",
+                    query: shownQuery.q,
+                    onClear: () => search(""),
+                }
+              : {
+                    kind: "no-results",
+                    cause: "view",
+                    title: (
+                        figureEmptyLine(shownQuery, day) ??
+                        (scope && mine.length === 0
+                            ? scopeEmptyLine(scope)
+                            : chipEmptyLine(tabLabel, scope ? "all" : chip))
+                    ).replace(/\.$/, ""),
+                    onClear: somethingNarrows ? clearAll : undefined,
+                };
 
     // Every issued paper a bill of supply (D15): the line says so, rather
     // than "GST tax invoices".
@@ -379,12 +395,14 @@ export function InvoicesScreen({
                 // How many are on hand, until a search or a figure asks
                 // the API: then the rows are the answer, not the business.
                 count={
-                    onServer
-                        ? undefined
-                        : countLabel(mine.length, {
-                              one: "invoice",
-                              other: "invoices",
-                          })
+                    loading ? (
+                        <FigureLoading />
+                    ) : onServer ? undefined : (
+                        countLabel(mine.length, {
+                            one: "invoice",
+                            other: "invoices",
+                        })
+                    )
                 }
                 className="mb-1"
                 actions={
@@ -403,25 +421,46 @@ export function InvoicesScreen({
                     ) : undefined
                 }
             />
-            <GstStatusLine
-                tax={tax}
-                exempt={exempt}
-                missing={missingRates}
-                className="mb-3.5 text-[12.5px] leading-relaxed text-muted-foreground max-sm:mb-3"
-            />
+            {loading ? (
+                // The line says whether every paper is a bill of supply,
+                // which the invoices tell: the loader's bar meanwhile.
+                <div className="mb-3.5 flex h-5 items-center max-sm:mb-3">
+                    <Skeleton aria-hidden className="h-3 w-72 max-w-full" />
+                </div>
+            ) : (
+                <GstStatusLine
+                    tax={tax}
+                    exempt={exempt}
+                    missing={missingRates}
+                    className="mb-3.5 text-[12.5px] leading-relaxed text-muted-foreground max-sm:mb-3"
+                />
+            )}
 
-            <MoneyStrip
-                summary={summary}
-                query={shownQuery}
-                onPick={pickFigure}
-                className="mb-2.5"
-            />
-            <ChequesLine
-                summary={summary}
-                on={chequesOn}
-                onPick={pickFigure}
-                className="mb-2.5"
-            />
+            {summary === undefined ? (
+                <div className="mb-2.5">
+                    <PageLoading
+                        bare
+                        width="full"
+                        shape="figures"
+                        label="Loading what is owed"
+                    />
+                </div>
+            ) : (
+                <>
+                    <MoneyStrip
+                        summary={summary}
+                        query={shownQuery}
+                        onPick={pickFigure}
+                        className="mb-2.5"
+                    />
+                    <ChequesLine
+                        summary={summary}
+                        on={chequesOn}
+                        onPick={pickFigure}
+                        className="mb-2.5"
+                    />
+                </>
+            )}
 
             {/* The one list toolbar, in one row: the search, then an
                 invoice's standing, the day it was issued and what it was
@@ -463,8 +502,9 @@ export function InvoicesScreen({
                                 value: t.id,
                                 label:
                                     t.id === "all" ? "All invoices" : t.label,
-                                count: mine.filter((i) => inTab(i, t.id))
-                                    .length,
+                                count: loading
+                                    ? undefined
+                                    : mine.filter((i) => inTab(i, t.id)).length,
                             }))}
                         />
                         <DateRangeFilter
@@ -488,66 +528,11 @@ export function InvoicesScreen({
                 }
             />
 
-            <InvoiceListBody
-                rows={rows}
-                empty={empty}
-                resetOn={view}
-                selectedId={openId}
-                onOpen={openInvoice}
-                timeZone={timeZone}
-                truncated={truncated && !onServer}
-                canWrite={canWrite}
-                busy={busy}
-                rowBefore={
-                    selecting
-                        ? (i) =>
-                              remindable(i) ? (
-                                  <Checkbox
-                                      checked={tickedIds.has(i.id)}
-                                      onCheckedChange={() => tick(i.id)}
-                                      aria-label={`Pick ${i.number ?? "this invoice"} to remind`}
-                                      className="relative z-[1] size-[17px] rounded-[5px]"
-                                  />
-                              ) : (
-                                  <span aria-hidden className="size-[17px]" />
-                              )
-                        : undefined
-                }
-                rowAfter={
-                    onOverdue && canWrite
-                        ? (i) => (
-                              <div className="flex w-[96px] justify-end max-md:hidden">
-                                  {reminded[i.id] ? (
-                                      <span
-                                          data-reminded={reminded[i.id]}
-                                          className="text-right text-[11.5px] leading-tight text-muted-foreground"
-                                      >
-                                          {remindedWords(
-                                              reminded[i.id] ?? "email",
-                                          )}
-                                      </span>
-                                  ) : remindable(i) ? (
-                                      <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          disabled={rowShare.loading === i.id}
-                                          aria-label={`Remind ${i.number ?? "this invoice"}`}
-                                          onClick={() =>
-                                              rowShare.open(i.id, "REMINDER")
-                                          }
-                                      >
-                                          Remind
-                                      </Button>
-                                  ) : null}
-                              </div>
-                          )
-                        : undefined
-                }
-                notice={
-                    paidSince ? (
+            {loading ? (
+                <div className="mt-3.5 space-y-3.5">
+                    {paidSince ? (
                         <SinceNotice
-                            count={rows.length}
+                            count={null}
                             noun={{ one: "invoice", other: "invoices" }}
                             verb="paid"
                             clearHref={withoutSince(
@@ -555,9 +540,94 @@ export function InvoicesScreen({
                                 Object.fromEntries(params.entries()),
                             )}
                         />
-                    ) : null
-                }
-            />
+                    ) : null}
+                    <PageLoading
+                        bare
+                        width="full"
+                        shape="rows"
+                        label="Loading invoices"
+                    />
+                </div>
+            ) : (
+                <InvoiceListBody
+                    rows={rows}
+                    empty={empty}
+                    resetOn={view}
+                    selectedId={openId}
+                    onOpen={openInvoice}
+                    timeZone={timeZone}
+                    truncated={truncated && !onServer}
+                    canWrite={canWrite}
+                    busy={busy}
+                    rowBefore={
+                        selecting
+                            ? (i) =>
+                                  remindable(i) ? (
+                                      <Checkbox
+                                          checked={tickedIds.has(i.id)}
+                                          onCheckedChange={() => tick(i.id)}
+                                          aria-label={`Pick ${i.number ?? "this invoice"} to remind`}
+                                          className="relative z-[1] size-[17px] rounded-[5px]"
+                                      />
+                                  ) : (
+                                      <span
+                                          aria-hidden
+                                          className="size-[17px]"
+                                      />
+                                  )
+                            : undefined
+                    }
+                    rowAfter={
+                        onOverdue && canWrite
+                            ? (i) => (
+                                  <div className="flex w-[96px] justify-end max-md:hidden">
+                                      {reminded[i.id] ? (
+                                          <span
+                                              data-reminded={reminded[i.id]}
+                                              className="text-right text-[11.5px] leading-tight text-muted-foreground"
+                                          >
+                                              {remindedWords(
+                                                  reminded[i.id] ?? "email",
+                                              )}
+                                          </span>
+                                      ) : remindable(i) ? (
+                                          <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              disabled={
+                                                  rowShare.loading === i.id
+                                              }
+                                              aria-label={`Remind ${i.number ?? "this invoice"}`}
+                                              onClick={() =>
+                                                  rowShare.open(
+                                                      i.id,
+                                                      "REMINDER",
+                                                  )
+                                              }
+                                          >
+                                              Remind
+                                          </Button>
+                                      ) : null}
+                                  </div>
+                              )
+                            : undefined
+                    }
+                    notice={
+                        paidSince ? (
+                            <SinceNotice
+                                count={rows.length}
+                                noun={{ one: "invoice", other: "invoices" }}
+                                verb="paid"
+                                clearHref={withoutSince(
+                                    pathname,
+                                    Object.fromEntries(params.entries()),
+                                )}
+                            />
+                        ) : null
+                    }
+                />
+            )}
 
             {tickedRows.length > 0 ? (
                 <RemindBar
@@ -603,3 +673,5 @@ export function InvoicesScreen({
         </div>
     );
 }
+
+const NO_INVOICES: Invoice[] = [];
