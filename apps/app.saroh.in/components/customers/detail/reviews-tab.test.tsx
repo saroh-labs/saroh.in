@@ -5,8 +5,8 @@ import type { Review } from "@/lib/product-reviews/service";
 
 import { ReviewsTab } from "./reviews-tab";
 
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh: vi.fn() }),
+vi.mock("@/lib/product-reviews/use-product-reviews", () => ({
+    useReviewSave: () => ({ orgId: "org_1", saved: vi.fn() }),
 }));
 vi.mock("@/lib/product-reviews/actions", () => ({
     replyToReview: vi.fn(),

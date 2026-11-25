@@ -4,11 +4,11 @@ import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import type { CatalogueView, FieldView } from "@/lib/products/settings";
 import { removeField, restoreField } from "@/lib/products/settings-actions";
+import { useProductSettingsSave } from "@/lib/products/use-product-settings";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { runAction } from "@/lib/api/run-action";
@@ -55,7 +55,7 @@ function FieldsList({
     catalogue: CatalogueView;
     fields: FieldView[];
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useProductSettingsSave();
     const { canWrite, categories } = catalogue;
     const [pending, start] = useTransition();
 
@@ -66,7 +66,7 @@ function FieldsList({
                 return true;
             });
             if (!reached) return;
-            router.refresh();
+            void saved();
         });
     }
 
@@ -162,6 +162,7 @@ function FieldsList({
                                                         const res =
                                                             await removeField(
                                                                 f.id,
+                                                                orgId,
                                                             );
                                                         if (!res.ok)
                                                             return showError(
@@ -175,6 +176,7 @@ function FieldsList({
                                                                         const undo =
                                                                             await restoreField(
                                                                                 f.id,
+                                                                                orgId,
                                                                             );
                                                                         if (
                                                                             !undo.ok

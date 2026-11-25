@@ -5,7 +5,6 @@ import { ProductContainer } from "@/components/commerce/product-page/product-con
 import { AccessDenied } from "@/components/shared/states/access-denied";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { activeCut, pausedByCut } from "@/lib/billing/paused";
-import { listCollections } from "@/lib/collections/service";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
@@ -14,7 +13,6 @@ import { readOverview } from "@/lib/products/access";
 import { productTabOf } from "@/lib/products/links";
 import { shopProductUrl } from "@/lib/products/overview-words";
 import { productAsk } from "@/lib/products/queries";
-import { listCategories } from "@/lib/products/service";
 import { listAllergens } from "@/lib/products/settings";
 import { countsStock } from "@/lib/products/tracking";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
@@ -147,26 +145,8 @@ export default async function ProductPage({
         business?.tracked ?? null,
     );
     const onStock = view === "team" && tab === "stock" && counts;
-    const onCollections = view === "team" && tab === "collections";
     const onOverview = view === "team" && tab === "overview";
-    const [
-        categories,
-        collections,
-        priceHistory,
-        allergens,
-        waiting,
-        shareSetup,
-    ] = await Promise.all([
-        // The details sheet picks a category; only a writer opens it. The
-        // Collections tab says which category put it in an automatic one.
-        overview.canWrite || onCollections
-            ? listCategories().catch(() => [])
-            : Promise.resolve([]),
-        // The Collections tab's sizes and its Edit sheet (#524) — optional:
-        // without them the cards leave the count out and Edit waits.
-        onCollections
-            ? listCollections().catch(() => null)
-            : Promise.resolve(null),
+    const [priceHistory, allergens, waiting, shareSetup] = await Promise.all([
         // What it and its options have cost (12 Oct 2026), under the
         // Overview. Optional: a read that fails is said in its place.
         onOverview
@@ -204,8 +184,6 @@ export default async function ProductPage({
             webShop={web ? (web.links.shop ?? null) : undefined}
             share={shareSetup}
             canReplyReviews={may("product-review:write")}
-            categories={categories}
-            collections={collections}
             priceHistory={priceHistory}
             sellsFood={(allergens?.length ?? 0) > 0}
             waiting={waiting}

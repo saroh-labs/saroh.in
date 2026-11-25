@@ -6,7 +6,6 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { GripVertical, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useRef, useState } from "react";
 
@@ -21,6 +20,7 @@ import {
     renameOptionValue,
     reorderOptionValues,
 } from "@/lib/products/settings-actions";
+import { useProductSettingsSave } from "@/lib/products/use-product-settings";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 import { PROBLEM } from "./product-settings";
@@ -94,7 +94,7 @@ export function OptionSheet({
     /** Every option, for "already exists". */
     options: Option[];
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useProductSettingsSave();
     const id = useId();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -178,13 +178,14 @@ export function OptionSheet({
         const res = await addOption(
             nd,
             draft.map((r) => r.value.trim()),
+            orgId,
         );
         if (!res.ok) return showError(res.error);
         setOpen(false);
-        router.refresh();
+        void saved();
         showUndo(`${nd} added.`, async () => {
-            const back = await removeOption(res.data.id);
-            router.refresh();
+            const back = await removeOption(res.data.id, orgId);
+            void saved();
             return back;
         });
     }
@@ -194,7 +195,7 @@ export function OptionSheet({
         const undo: (() => Promise<{ ok: boolean }>)[] = [];
         const refused = (message: string) => {
             // What did save shows in the list behind the sheet.
-            router.refresh();
+            void saved();
             showError(message);
         };
         // Read against what is saved now, so Save after a refusal sends
@@ -202,25 +203,30 @@ export function OptionSheet({
         const server = o.values;
         const renamed = nd !== o.name;
         if (renamed) {
-            const res = await renameOption(o.id, nd);
+            const res = await renameOption(o.id, nd, orgId);
             if (!res.ok) return refused(res.error);
-            undo.push(() => renameOption(o.id, o.name));
+            undo.push(() => renameOption(o.id, o.name, orgId));
         }
         for (const r of removed) {
             if (!r.id || !server.some((v) => v.id === r.id)) continue;
-            const res = await removeOptionValue(o.id, r.id);
+            const res = await removeOptionValue(o.id, r.id, orgId);
             if (!res.ok) return refused(res.error);
-            undo.push(() => addOptionValue(o.id, r.value));
+            undo.push(() => addOptionValue(o.id, r.value, orgId));
         }
         let variantsRenamed = 0;
         for (const r of draft) {
             const now = r.id ? server.find((v) => v.id === r.id) : undefined;
             if (!r.id || !now || now.value === r.value.trim()) continue;
-            const res = await renameOptionValue(o.id, r.id, r.value.trim());
+            const res = await renameOptionValue(
+                o.id,
+                r.id,
+                r.value.trim(),
+                orgId,
+            );
             if (!res.ok) return refused(res.error);
             variantsRenamed += res.data.variantCount;
             const rid = r.id;
-            undo.push(() => renameOptionValue(o.id, rid, now.value));
+            undo.push(() => renameOptionValue(o.id, rid, now.value, orgId));
         }
         const ids: string[] = [];
         for (const r of draft) {
@@ -233,10 +239,10 @@ export function OptionSheet({
                 ids.push(saved.id);
                 continue;
             }
-            const res = await addOptionValue(o.id, r.value.trim());
+            const res = await addOptionValue(o.id, r.value.trim(), orgId);
             if (!res.ok) return refused(res.error);
             ids.push(res.data.id);
-            undo.push(() => removeOptionValue(o.id, res.data.id));
+            undo.push(() => removeOptionValue(o.id, res.data.id, orgId));
         }
         // The order the server holds now: kept ones as they were, then new.
         const kept = server
@@ -244,13 +250,13 @@ export function OptionSheet({
             .filter((x) => !removed.some((r) => r.id === x));
         const before = [...kept, ...ids.filter((x) => !kept.includes(x))];
         if (before.join() !== ids.join()) {
-            const res = await reorderOptionValues(o.id, ids);
+            const res = await reorderOptionValues(o.id, ids, orgId);
             if (!res.ok) return refused(res.error);
-            undo.push(() => reorderOptionValues(o.id, before));
+            undo.push(() => reorderOptionValues(o.id, before, orgId));
         }
         setOpen(false);
         if (undo.length === 0) return;
-        router.refresh();
+        void saved();
         showUndo(
             renamed
                 ? `${o.name} is now ${nd}. Customers see the new name.`
@@ -266,7 +272,7 @@ export function OptionSheet({
                         break;
                     }
                 }
-                router.refresh();
+                void saved();
                 return undone
                     ? true
                     : {

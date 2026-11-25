@@ -1,12 +1,12 @@
 "use client";
 
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
+import { useReviewSave } from "@/lib/product-reviews/use-product-reviews";
 
 /** The longest reply the API takes. */
 export const REPLY_MAX = 1000;
@@ -16,10 +16,12 @@ export const REPLY_MAX = 1000;
  * Reviews and Customer Detail's (C6): reply once (shown under the review on
  * the shop), and hide or show. Hiding takes an Undo rather than a confirm —
  * it is reversible, and the review stays listed, marked. Both lists call the
- * same endpoints, so what is done in one shows in the other.
+ * same endpoints, so what is done in one shows in the other: a save reads
+ * the reviews, the product's page and the customer's tab again where shown
+ * (`reviewsSaved`, DEC-259).
  */
 export function useReviewActions() {
-    const router = useRouter();
+    const { orgId, saved } = useReviewSave();
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const [pending, startTransition] = useTransition();
@@ -38,7 +40,7 @@ export function useReviewActions() {
         const text = draft.trim();
         if (!text) return;
         startTransition(async () => {
-            const res = await runAction(() => replyToReview(id, text));
+            const res = await runAction(() => replyToReview(id, text, orgId));
             if (!res) return;
             if (!res.ok) {
                 showError("Your reply wasn't posted. Try again.");
@@ -46,15 +48,14 @@ export function useReviewActions() {
             }
             showSuccess("Reply posted.");
             setReplyingTo(null);
-            // rq-refresh-ok: a product's Reviews tab moves in U24.
-            router.refresh();
+            await saved();
         });
     }
 
     function toggleHidden(id: string, status: "PUBLISHED" | "HIDDEN") {
         const hide = status !== "HIDDEN";
         startTransition(async () => {
-            const res = await runAction(() => setReviewHidden(id, hide));
+            const res = await runAction(() => setReviewHidden(id, hide, orgId));
             if (!res) return;
             if (!res.ok) {
                 showError(
@@ -64,19 +65,17 @@ export function useReviewActions() {
                 );
                 return;
             }
-            // rq-refresh-ok: a product's Reviews tab moves in U24.
-            router.refresh();
+            await saved();
             if (hide) {
                 showUndo(
                     "Review hidden from the shop.",
                     async () => {
                         const back = await runAction(
-                            () => setReviewHidden(id, false),
+                            () => setReviewHidden(id, false, orgId),
                             { quiet: true },
                         );
                         if (!back) return { ok: false, error: UNREACHED };
-                        // rq-refresh-ok: a product's Reviews tab moves in U24.
-                        router.refresh();
+                        if (back.ok) await saved();
                         return back;
                     },
                     { description: "It stays here, marked." },
