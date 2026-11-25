@@ -6,6 +6,7 @@ import { hostname } from "node:os";
 
 import { reportJobError } from "../../common/observability/report-error";
 import { env } from "../../env";
+import { forgetModuleLists } from "../capabilities/module-lists-cache";
 import { JobHandlerRegistry } from "./job-handler.registry";
 import type { JobLane, JobQueue } from "./job-queue.port";
 import { JOB_LANES, JOB_QUEUE } from "./job-queue.port";
@@ -115,6 +116,9 @@ export class JobWorkerService implements OnModuleInit, OnModuleDestroy {
         }
         try {
             await handler(job);
+            // A business's job (a renewal, a plan move) may change what its
+            // modules read; its cached list goes.
+            if (job.organizationId) forgetModuleLists(job.organizationId);
             if (!(await this.queue.complete(job.id, this.workerId))) {
                 this.lostLease(job, "succeeded");
             }

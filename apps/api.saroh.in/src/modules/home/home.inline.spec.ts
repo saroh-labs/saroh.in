@@ -117,19 +117,23 @@ function setup(opts: {
             findMany: jest.fn().mockResolvedValue(opts.attempts ?? []),
         },
     };
-    const readFor = jest.fn(async (_org: string, id: string) => ({
-        send:
-            typeof opts.send === "function"
-                ? opts.send(id)
-                : {
-                      channels: ["email"],
-                      emailTo: "farah@example.com",
-                      nextReminderAt: null,
-                      ...opts.send,
-                  },
-        sent: [],
-    }));
-    const sending = { readFor } as unknown as InvoiceSendService;
+    const sendFlagsFor = jest.fn(
+        async (_org: string, ids: readonly string[]) =>
+            new Map(
+                ids.map((id) => [
+                    id,
+                    typeof opts.send === "function"
+                        ? opts.send(id)
+                        : {
+                              channels: ["email"],
+                              emailTo: "farah@example.com",
+                              nextReminderAt: null,
+                              ...opts.send,
+                          },
+                ]),
+            ),
+    );
+    const sending = { sendFlagsFor } as unknown as InvoiceSendService;
     const ports: InlinePorts = {
         orderReach: opts.reach ?? jest.fn().mockResolvedValue("EMAIL"),
         signsIn: jest.fn().mockResolvedValue(opts.signsIn ?? true),
@@ -156,7 +160,7 @@ function setup(opts: {
         db as never,
         ports,
     );
-    return { service, db, readFor, ports };
+    return { service, db, sendFlagsFor, ports };
 }
 
 describe("the words", () => {
@@ -620,10 +624,10 @@ describe("HomeInlineService.decorate", () => {
     });
 
     it("offers Send reminder from D17's send flag, in its words", async () => {
-        const { service, readFor } = setup({});
+        const { service, sendFlagsFor } = setup({});
         const actions = [action("PAYMENTS_OVERDUE_INVOICES", [ev("inv_1")])];
         await service.decorate(actions, OWNER, NOW);
-        expect(readFor).toHaveBeenCalledWith(ORG, "inv_1", NOW);
+        expect(sendFlagsFor).toHaveBeenCalledWith(ORG, ["inv_1"], NOW);
         expect(actions[0].evidence?.[0].inline).toMatchObject({
             kind: "SEND_REMINDER",
             target: "inv_1",
@@ -650,11 +654,11 @@ describe("HomeInlineService.decorate", () => {
     });
 
     it("offers Send reminder only with invoice:write", async () => {
-        const { service, readFor } = setup({});
+        const { service, sendFlagsFor } = setup({});
         const actions = [action("PAYMENTS_OVERDUE_INVOICES", [ev("inv_1")])];
         await service.decorate(actions, holding("invoice:read"), NOW);
         expect(actions[0].evidence?.[0].inline).toBeUndefined();
-        expect(readFor).not.toHaveBeenCalled();
+        expect(sendFlagsFor).not.toHaveBeenCalled();
     });
 
     it("offers Reply only while the account area is on, and to message:write", async () => {

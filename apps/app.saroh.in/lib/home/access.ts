@@ -108,11 +108,15 @@ async function loadInvoicing(
  * checklist is then left off Home, never Home itself.
  */
 export async function readHomeSetup(): Promise<HomeSetup> {
-    const settings = await getOrganizationSettings();
-    if (!settings) throw new Error("Home setup: settings unread");
+    const settingsRead = getOrganizationSettings().then((settings) => {
+        if (!settings) throw new Error("Home setup: settings unread");
+        return settings;
+    });
     // The 4 first steps lead until done (#1194); the money card then.
-    const [list, seen, modules] = await Promise.all([
-        loadReadyChecklist(settings),
+    // Only the checklist waits for the settings; the rest start with them.
+    const [settings, list, seen, modules] = await Promise.all([
+        settingsRead,
+        settingsRead.then(loadReadyChecklist),
         getSeenMoments(),
         homeModules(),
     ]);

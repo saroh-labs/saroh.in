@@ -1,7 +1,10 @@
+import { correlationStorage } from "../../common/logging/request-context";
 import type { OrgRole } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { ModuleAvailabilityService } from "./module-availability.service";
+import { forgetModuleLists } from "./module-lists-cache";
+import { forgetFor } from "./modules-cache.middleware";
 import type { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
 function build(opts: {
@@ -57,7 +60,7 @@ function build(opts: {
         readiness,
         db as never,
     );
-    return { service, flags, entitlements, readiness };
+    return { service, flags, entitlements, readiness, db };
 }
 
 const base = {
@@ -225,5 +228,66 @@ describe("ModuleAvailabilityService — an invented role", () => {
         });
         // The shipped map: MEMBER holds site:read.
         expect(r.authorized).toBe(true);
+    });
+
+    describe("the module list, kept per business inside a request", () => {
+        const inGet = <T>(fn: () => Promise<T>) =>
+            correlationStorage.run({ correlationId: "c", method: "GET" }, fn);
+        const owner = {
+            organizationId: "org_cache",
+            organizationRole: "OWNER" as OrgRole,
+        };
+        beforeEach(() => forgetModuleLists());
+
+        it("answers again from the kept list, a copy each time", async () => {
+            const { service, db } = build({});
+            const first = await inGet(() => service.listViews(owner));
+            first[0].label = "changed by a caller";
+            const second = await inGet(() => service.listViews(owner));
+            expect(db.organizationModule.findMany).toHaveBeenCalledTimes(1);
+            expect(second[0].label).not.toBe("changed by a caller");
+            // Another role, another list.
+            await inGet(() =>
+                service.listViews({ ...owner, organizationRole: "MEMBER" }),
+            );
+            expect(db.organizationModule.findMany).toHaveBeenCalledTimes(2);
+        });
+
+        it("reads afresh outside a request (a job, a spec)", async () => {
+            const { service, db } = build({});
+            await service.listViews(owner);
+            await service.listViews(owner);
+            expect(db.organizationModule.findMany).toHaveBeenCalledTimes(2);
+        });
+
+        it("forgets it on a module switched, a plan changed, and any staff or billing write", async () => {
+            const { service, db } = build({});
+            const read = () => inGet(() => service.listViews(owner));
+            const calls = () =>
+                db.organizationModule.findMany.mock.calls.length;
+            await read();
+            for (const write of [
+                "/organizations/org_cache/modules/CRM", // the switch
+                "/organizations/org_cache/billing/checkout", // a plan change
+                "/admin/organizations/org_cache/overrides", // staff
+                "/public/billing/webhooks/razorpay", // the provider's word
+            ]) {
+                const before = calls();
+                forgetFor(write);
+                await read();
+                expect([write, calls()]).toEqual([write, before + 1]);
+            }
+            // Another business's write, or a customer's on a site: kept.
+            for (const write of [
+                "/organizations/org_other/products",
+                "/public/sites/northwind/orders",
+                "/api/auth/sign-in/email",
+            ]) {
+                const before = calls();
+                forgetFor(write);
+                await read();
+                expect([write, calls()]).toEqual([write, before]);
+            }
+        });
     });
 });

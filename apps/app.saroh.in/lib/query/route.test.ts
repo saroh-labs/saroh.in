@@ -137,13 +137,62 @@ describe("readRoute", () => {
         expect(service).not.toHaveBeenCalled();
     });
 
-    it("the page's gate says no: 403, before the service", async () => {
+    it("the page's gate says no: 403, and the service's rows are dropped", async () => {
         access.mockResolvedValue(false);
         const res = await ask();
         expect(res.status).toBe(403);
         await expectLockedDown(res);
-        expect(await res.json()).toEqual({ code: "ROLE_DENIED" });
-        expect(service).not.toHaveBeenCalled();
+        const body = await res.text();
+        expect(JSON.parse(body)).toEqual({ code: "ROLE_DENIED" });
+        expect(body).not.toContain("r1");
+    });
+
+    it("the gate and the service run at the same time; the answer waits for the gate", async () => {
+        let allow!: (ok: boolean) => void;
+        access.mockReturnValue(new Promise((r) => (allow = r)));
+        let rowsReady!: (v: Row[]) => void;
+        service.mockReturnValue(new Promise((r) => (rowsReady = r)));
+        let settled = false;
+        const pending = ask().then((res) => {
+            settled = true;
+            return res;
+        });
+        await vi.waitFor(() => expect(service).toHaveBeenCalled());
+        expect(access).toHaveBeenCalled();
+        // The rows are in, but the gate hasn't answered: nothing is sent.
+        rowsReady([{ id: "r9", at: new Date("2026-11-24T10:00:00Z") }]);
+        await new Promise((r) => setTimeout(r, 0));
+        expect(settled).toBe(false);
+        allow(true);
+        const res = await pending;
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual([
+            { id: "r9", at: "2026-11-24T10:00:00.000Z" },
+        ]);
+    });
+
+    it("a refused gate wins over the service's failure, whichever ends first", async () => {
+        for (const gateFirst of [true, false]) {
+            let allow!: (ok: boolean) => void;
+            access.mockReturnValueOnce(new Promise((r) => (allow = r)));
+            service.mockRejectedValueOnce(new ApiError(500, "GET /x"));
+            const pending = ask();
+            await vi.waitFor(() => expect(service).toHaveBeenCalled());
+            if (gateFirst) allow(false);
+            await new Promise((r) => setTimeout(r, 0));
+            if (!gateFirst) allow(false);
+            const res = await pending;
+            expect(res.status).toBe(403);
+            expect(await res.json()).toEqual({ code: "ROLE_DENIED" });
+            service.mockClear();
+        }
+    });
+
+    it("a gate that fails answers its own status, not the service's", async () => {
+        access.mockRejectedValueOnce(new ApiError(401, "GET /me"));
+        service.mockRejectedValueOnce(new ApiError(404, "GET /x"));
+        const res = await ask();
+        expect(res.status).toBe(401);
     });
 
     it("missing or another business's record: 404", async () => {

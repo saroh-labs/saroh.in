@@ -23,6 +23,7 @@ import {
     withLiveAdditions,
 } from "@saroh/pricing-catalog";
 import { editionOf } from "../../common/app-url";
+import { requestMemo } from "../../common/logging/request-context";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -263,6 +264,22 @@ export class CatalogueAccessService {
     async resolve(
         organizationId: string,
         now: Date = new Date(),
+        whatIf?: WhatIf,
+    ): Promise<BusinessAccess> {
+        // Asked once per module by GET /modules and per card by Home: read
+        // once per request. Only for "now" (a caller's own default); a date
+        // in the future or a what-if is always read afresh.
+        if (!whatIf && Math.abs(now.getTime() - Date.now()) < 1000) {
+            return requestMemo(`catalogue-access:${organizationId}`, () =>
+                this.read(organizationId, now),
+            );
+        }
+        return this.read(organizationId, now, whatIf);
+    }
+
+    private async read(
+        organizationId: string,
+        now: Date,
         whatIf?: WhatIf,
     ): Promise<BusinessAccess> {
         const [subscription, rows] = await Promise.all([

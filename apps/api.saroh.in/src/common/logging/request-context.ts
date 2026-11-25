@@ -24,6 +24,8 @@ export interface RequestContext {
     userAgent?: string;
     /** The signed-in session, set by `BetterAuthGuard`. */
     sessionId?: string;
+    /** `requestMemo`'s answers, made on first use. */
+    memo?: Map<string, Promise<unknown>>;
 }
 
 /**
@@ -41,4 +43,26 @@ export function getCorrelationId(): string | undefined {
 /** The in-flight request's id, method and path, or undefined outside one. */
 export function getRequestContext(): RequestContext | undefined {
     return correlationStorage.getStore();
+}
+
+/**
+ * One answer per key for the in-flight GET: a read that several parts of
+ * one request ask for (the business's plan, asked per module) is read once.
+ * Outside a request, or in any other method — a write may change what it
+ * read before reading again — `load` runs every time. A failure isn't kept.
+ */
+export function requestMemo<T>(
+    key: string,
+    load: () => Promise<T>,
+): Promise<T> {
+    const store = correlationStorage.getStore();
+    if (store?.method !== "GET") return load();
+    store.memo ??= new Map();
+    let answer = store.memo.get(key) as Promise<T> | undefined;
+    if (!answer) {
+        answer = load();
+        store.memo.set(key, answer);
+        answer.catch(() => store.memo?.delete(key));
+    }
+    return answer;
 }
