@@ -1,3 +1,9 @@
+import type { ActivityEntry } from "@/components/settings/activity/activity-list";
+import type {
+    AskAiPeopleUsage,
+    AskAiState,
+    AskAiUsage,
+} from "@saroh/api-contract";
 import type { LimitNotice } from "@saroh/pricing-catalog";
 
 import type { PausedTeam } from "@/lib/billing/paused";
@@ -119,9 +125,48 @@ export const IN_PLACE_TABS = [
     "/settings/modules",
     "/settings/integrations",
     "/settings/billing",
+    "/settings/data",
+    "/settings/activity",
 ] as const;
 export type InPlaceTab = (typeof IN_PLACE_TABS)[number];
 
 export function inPlaceTab(pathname: string | null): InPlaceTab | null {
     return IN_PLACE_TABS.find((t) => t === pathname) ?? null;
 }
+
+/**
+ * Settings › Activity on React Query (DEC-259): the last changes, each as
+ * its line and its sheet draw it (worded on the server, in the business's
+ * zone), never the audit row itself. `records`: the team adds to it.
+ */
+/** The tab's line under its title, on the loader and the screen alike. */
+export const ACTIVITY_SAYS =
+    "The last changes to this business's settings, team and customer records, newest first.";
+
+export interface ActivityScreen {
+    entries: ActivityEntry[];
+}
+
+export const activityRead = defineRead<ActivityScreen>()({
+    key: (orgId) => domainKey("settings", orgId, "activity"),
+    route: { path: "/api/settings/activity", params: {} },
+    tier: "records",
+});
+
+/**
+ * Settings › API and AI apps › Ask AI on React Query (DEC-259): the
+ * business's switch, this period's total and who asked. Counts only,
+ * never what anyone asked.
+ */
+export interface AskAiScreen {
+    state: AskAiState | null;
+    /** The period's total, kept while the switch is off. */
+    usage: AskAiUsage | null;
+    people: AskAiPeopleUsage | null;
+}
+
+export const askAiSettingsRead = defineRead<AskAiScreen>()({
+    key: (orgId) => domainKey("settings", orgId, "ask-ai"),
+    route: { path: "/api/settings/developers/ask-ai", params: {} },
+    tier: "settings",
+});

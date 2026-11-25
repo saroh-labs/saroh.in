@@ -328,6 +328,7 @@ describe("the registries", () => {
             "/commerce/orders": ["orders"],
             "/commerce/orders/[orderId]": ["orders"],
             "/commerce/orders/tickets": ["orders"],
+            "/notifications": ["notifications"],
         });
         expect(CHROME_REFRESH_ROUTES.length).toBeLessThanOrEqual(
             CHROME_REFRESH_CAP,

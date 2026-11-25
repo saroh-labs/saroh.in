@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
+import { WebhooksContainer } from "@/components/settings/developers/containers";
 import { DevelopersLocked } from "@/components/settings/developers/locked";
-import { Webhooks } from "@/components/settings/developers/webhooks";
 import { readApiUsage } from "@/lib/api-keys/service";
 import { upgradeHref } from "@/lib/billing/access";
 import { DOCS_URL } from "@/lib/help/links";
@@ -14,12 +14,14 @@ import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import { eventsFor } from "@/lib/webhooks/events";
-import { listWebhooks } from "@/lib/webhooks/service";
 
 /**
  * Settings › API and AI apps › Notifications to your systems (webhooks):
  * `webhook:manage` (Owners, and whoever they give it). Where the bell's
  * "an address was turned off" notice lands (`notifications/href.ts`).
+ *
+ * On React Query (DEC-259): the switch, permission and plan are the gate;
+ * the addresses load in the browser (`/api/settings/developers/webhooks`).
  */
 export const metadata = {
     title: "Notifications to your systems · API and AI apps · Settings",
@@ -47,19 +49,13 @@ export default async function WebhooksPage() {
             />
         );
     }
-    const [endpoints, zone] = await Promise.all([
-        listWebhooks(),
-        activeBusinessZone(),
-    ]);
     const actions = org?.actions ?? [];
     return (
-        <Webhooks
-            endpoints={endpoints}
+        <WebhooksContainer
             events={eventsFor((a) => actions.includes(a))}
-            count={usage.webhooks.count}
             cap={usage.webhooks.cap}
             docs={DOCS_URL}
-            zone={zone}
+            zone={await activeBusinessZone()}
         />
     );
 }

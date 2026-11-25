@@ -13,9 +13,18 @@ import type { ServerRead } from "@/lib/query/route";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { canReadBookings } from "@/lib/services/access";
 import { withoutAmounts } from "@/lib/services/all-bookings";
+import type { KeptBooking } from "@/lib/services/availability-rules";
 import { canTakeDeskPayments } from "@/lib/services/booking-money";
 import { readBookingsByDay } from "@/lib/services/bookings-by-day";
-import { addDays, dayBounds } from "@/lib/services/diary";
+import { calendarHref } from "@/lib/services/calendar-href";
+import {
+    addDays,
+    dayBounds,
+    localDateOf,
+    localMinuteOf,
+    weekdayOf,
+    whoFor,
+} from "@/lib/services/diary";
 import {
     flattenCalendar,
     listServices,
@@ -24,19 +33,28 @@ import {
     readNow,
 } from "@/lib/services/service";
 import { readServiceHours } from "@/lib/services/service-hours-read";
+import { requireSession } from "@/lib/session";
 import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import type { StaffList } from "@/lib/staff/service";
-import { listStaff } from "@/lib/staff/service";
+import {
+    getBookingRules,
+    listStaff,
+    readBookingPayment,
+    readPersonRules,
+    readRuleRequests,
+} from "@/lib/staff/service";
+import { tidyWeek } from "@/lib/staff/starting-week";
 import { withClosures } from "@/lib/staff/time-off";
 
 import type {
+    AvailabilityView,
     BookingsAsk,
     BookingsDiary,
     BookingsList,
     DiaryAsk,
 } from "./queries";
-import { bookingsRead, diaryRead } from "./queries";
+import { availabilityRead, bookingsRead, diaryRead } from "./queries";
 
 /**
  * Who reads what on the bookings list (DEC-259), asked by the page and by
@@ -189,4 +207,134 @@ export async function readBookingsDiary(
 export const diaryServer: ServerRead<DiaryAsk, BookingsDiary> = {
     read: diaryRead,
     service: readBookingsDiary,
+};
+
+/**
+ * Hours and time off's read (U25): what the page read before DEC-259, as
+ * one answer. The staff failing throws (the screen says it couldn't load
+ * everyone's hours); the bookings failing leaves `kept` and `bookedOn`
+ * null (the hours still work, and say they couldn't check); the rules,
+ * payment and requests failing each leave their part null.
+ */
+export async function readAvailability(): Promise<AvailabilityView> {
+    const [organization, staffList, rules, services, payment] =
+        await Promise.all([
+            activeOrganizationOnce(),
+            listStaff(),
+            getBookingRules().catch(() => null),
+            listServices(),
+            readBookingPayment(),
+        ]);
+    if (!staffList) throw new Error("Hours: the staff couldn't be read");
+    // An owner or admin reads the requests waiting; a Member their own
+    // diary's rules (the session says which diary is theirs).
+    // As the page asks it: by permission, by role on an older answer.
+    const decides = organization?.actions
+        ? organization.actions.includes("service:write")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const userId = decides ? null : (await requireSession()).user.id;
+    const myDiary = userId
+        ? staffList.staff.find(
+              (p) => p.status === "ACTIVE" && p.membership?.userId === userId,
+          )
+        : undefined;
+    const timezone = staffList.timezone;
+    const today = localDateOf(new Date(readNow()), timezone);
+    const [calendar, serviceHours, requests, mine] = await Promise.all([
+        readBookingsCalendar(
+            dayBounds(today, timezone).from.toISOString(),
+            dayBounds(addDays(today, 21), timezone).to.toISOString(),
+        ),
+        // Only read while nobody is on the diary; null otherwise.
+        readServiceHours(services, staffList),
+        decides ? readRuleRequests() : null,
+        myDiary ? readPersonRules(myDiary.id) : null,
+    ]);
+    return {
+        // A teammate's sign-in email is never shown here: never sent.
+        staff: staffList.staff.map((p) =>
+            p.membership
+                ? { ...p, membership: { ...p.membership, email: "" } }
+                : p,
+        ),
+        closures: staffList.closures,
+        openingHours: staffList.openingHours ?? null,
+        timezone,
+        today,
+        rules,
+        serviceHours: serviceHours ? tidyWeek(serviceHours.hours) : null,
+        services: services
+            .filter((s) => s.status === "ACTIVE" && s.showOnBookingPage)
+            .map((s) => ({ id: s.id, name: s.name })),
+        onlineBlocker: payment?.onlineBlocker ?? null,
+        ...keptOf(calendar, timezone, today),
+        requests,
+        mine,
+    };
+}
+
+/**
+ * The live bookings with a person: this week's for "outside these hours",
+ * and a count per person per day for extra hours. Null both when the
+ * bookings couldn't be read.
+ */
+function keptOf(
+    calendar: Awaited<ReturnType<typeof readBookingsCalendar>>,
+    timezone: string,
+    today: string,
+): { kept: KeptBooking[] | null; bookedOn: Record<string, number> | null } {
+    if (!calendar) return { kept: null, bookedOn: null };
+    const weekEnd = addDays(today, 7);
+    const kept: KeptBooking[] = [];
+    const bookedOn: Record<string, number> = {};
+    const count = (staffId: string, date: string) => {
+        const key = `${staffId}|${date}`;
+        bookedOn[key] = (bookedOn[key] ?? 0) + 1;
+    };
+    for (const diary of calendar.diaries) {
+        if (!diary.person) continue;
+        const staffId = diary.person.id;
+        for (const b of diary.bookings) {
+            if (b.status === "CANCELLED") continue;
+            const date = localDateOf(b.startAt, timezone);
+            count(staffId, date);
+            if (date < weekEnd) {
+                kept.push({
+                    id: b.id,
+                    staffId,
+                    weekday: weekdayOf(date),
+                    start: localMinuteOf(b.startAt, timezone),
+                    who: whoFor(b),
+                    date,
+                    href: `/bookings/${b.id}`,
+                });
+            }
+        }
+        // A class is one thing on the day, however many are on it.
+        for (const s of diary.classes) {
+            if (s.bookings.every((b) => b.status === "CANCELLED")) continue;
+            const date = localDateOf(s.startAt, timezone);
+            count(staffId, date);
+            if (date < weekEnd) {
+                kept.push({
+                    id: s.key,
+                    staffId,
+                    weekday: weekdayOf(date),
+                    start: localMinuteOf(s.startAt, timezone),
+                    who: s.service.name,
+                    date,
+                    href: calendarHref("day", date, { person: staffId }),
+                });
+            }
+        }
+    }
+    return { kept, bookedOn };
+}
+
+export const availabilityServer: ServerRead<
+    Record<string, never>,
+    AvailabilityView
+> = {
+    read: availabilityRead,
+    service: () => readAvailability(),
 };

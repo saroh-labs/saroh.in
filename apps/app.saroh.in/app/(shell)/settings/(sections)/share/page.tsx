@@ -1,16 +1,5 @@
-import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
-import { IntentLink } from "@saroh/ui/intent-link";
-import { QrCode } from "lucide-react";
-
 import { ModuleGate } from "@/components/modules/gate/module-gate";
-import { QrShare } from "@/components/qr/share/qr-share";
-import {
-    SettingsPanel,
-    SettingsPanelHeader,
-} from "@/components/settings/page/settings-panel";
-import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { readQrScreen } from "@/lib/qr/screen";
+import { ShareContainer } from "@/components/settings/tabs/share-tab";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -22,6 +11,9 @@ import { requireSession } from "@/lib/session";
  * gate: off, it says so and that nothing was deleted; out of a role's
  * reach, it says that. Anyone with `site:read` sees the codes; making and
  * changing one is `site:update`, which the API judges again on every save.
+ *
+ * On React Query (DEC-259): the gate is the page's; the codes load in the
+ * browser from `/api/settings/share` (`ShareContainer`).
  */
 export const metadata = { title: "Share · Settings" };
 
@@ -29,48 +21,7 @@ export default async function ShareSettingsPage() {
     await requireSession();
     return (
         <ModuleGate moduleKey="WEBSITE">
-            <Share />
+            <ShareContainer />
         </ModuleGate>
-    );
-}
-
-async function Share() {
-    const org = await resolveActiveOrganization();
-    const screen = await readQrScreen(org);
-    const readOnly = screen.state === "ready" && !screen.canChange;
-
-    return (
-        <SettingsPanel
-            width="full"
-            header={
-                <SettingsPanelHeader
-                    title="Share"
-                    description="Ways to put your pages in front of customers, in your shop and on paper."
-                    readOnlyNote={
-                        readOnly
-                            ? "You can see and download these codes. An owner or admin makes and changes them."
-                            : undefined
-                    }
-                />
-            }
-        >
-            {screen.state === "no-site" ? (
-                <EmptyState
-                    className="max-w-[760px]"
-                    icon={<QrCode />}
-                    title="No website yet"
-                    description="A QR code opens a page on your website, so it needs one first. Once your site is there, its codes are made here."
-                    action={
-                        <Button asChild>
-                            <IntentLink href="/sites">Go to Website</IntentLink>
-                        </Button>
-                    }
-                />
-            ) : (
-                <div className="max-w-[1232px]">
-                    <QrShare screen={screen} />
-                </div>
-            )}
-        </SettingsPanel>
     );
 }

@@ -25,32 +25,30 @@ import {
  */
 
 /**
- * Opening a row is reading it. The bell's count is drawn by the shell, so
- * the shell is read again: the count is right on the page the row opens.
+ * Opening a row is reading it. Each takes the tab's business last
+ * (DEC-259): refused when another one was opened since (`writeAsOrg`);
+ * nothing is revalidated, the inbox reads its query and the shell's live
+ * read (the bell's count) again itself (`useNotificationsSave`).
  */
 export async function markNotificationRead(
     id: string,
+    orgId: string,
 ): Promise<NotificationsResult<{ id: string }>> {
-    const result = await markReadApi(id);
-    if (result.ok) revalidatePath("/", "layout");
-    return result;
+    return writeAsOrg(orgId, () => markReadApi(id));
 }
 
-export async function markAllNotificationsRead(): Promise<
-    NotificationsResult<{ updated: number; readAt: string | null }>
-> {
-    const result = await markAllApi();
-    if (result.ok) revalidatePath("/", "layout");
-    return result;
+export async function markAllNotificationsRead(
+    orgId: string,
+): Promise<NotificationsResult<{ updated: number; readAt: string | null }>> {
+    return writeAsOrg(orgId, () => markAllApi());
 }
 
 /** Undo of "Mark all as read", for the instant that press answered with. */
 export async function undoMarkAllNotificationsRead(
     readAt: string,
+    orgId: string,
 ): Promise<NotificationsResult<{ updated: number }>> {
-    const result = await undoReadAllApi(readAt);
-    if (result.ok) revalidatePath("/", "layout");
-    return result;
+    return writeAsOrg(orgId, () => undoReadAllApi(readAt));
 }
 
 /**
@@ -66,6 +64,7 @@ export async function saveAlert(
 ): Promise<CrmResult<AlertPreferences>> {
     if (orgId) return writeAsOrg(orgId, () => updateAlert(change));
     const result = await updateAlert(change);
+    // rq-revalidate-ok: Your profile (Settings) is server-rendered, not on React Query.
     if (result.ok) revalidatePath("/", "layout");
     return result;
 }

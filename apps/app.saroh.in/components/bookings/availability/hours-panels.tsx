@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 
 import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { firstName } from "@/lib/names";
 import type { RuleKey } from "@/lib/services/availability-rules";
 import { ruleRows } from "@/lib/services/availability-rules";
@@ -113,7 +113,7 @@ export function HoursPanels({
     onPickWho: (id: string) => void;
     onAddPerson: () => void;
 }) {
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const whoShort = shown ? firstName(shown.name) : "Everyone";
     const shownWeek = shown ? (weeks[shown.id] ?? shown.hours) : [];
     const dayPerson =
@@ -127,8 +127,8 @@ export function HoursPanels({
         const res = await runAction(
             async (): Promise<{ ok: true } | { ok: false; error: string }> => {
                 const r = staffId
-                    ? await removeTimeOffMany(staffId, line.ids)
-                    : await removeClosures(line.ids);
+                    ? await removeTimeOffMany(staffId, line.ids, ...org)
+                    : await removeClosures(line.ids, ...org);
                 return r.ok ? { ok: true } : r;
             },
         );
@@ -140,16 +140,16 @@ export function HoursPanels({
             );
             return;
         }
-        router.refresh();
+        refresh();
         showUndo("Time off removed.", async () => {
             const back = staffId
-                ? await addTimeOff(staffId, rangeOfLine(line))
-                : await addClosure({
-                      ...rangeOfLine(line),
-                      fromDate: line.fromDate,
-                  });
+                ? await addTimeOff(staffId, rangeOfLine(line), ...org)
+                : await addClosure(
+                      { ...rangeOfLine(line), fromDate: line.fromDate },
+                      ...org,
+                  );
             if (!back.ok) return back;
-            router.refresh();
+            refresh();
             return { ok: true };
         });
     }

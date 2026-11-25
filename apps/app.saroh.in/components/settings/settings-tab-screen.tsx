@@ -35,7 +35,9 @@ import {
     useSettingsStale,
 } from "@/lib/settings/use-settings";
 import { shellLiveRead } from "@/lib/shell/queries";
+import { ActivityContainer } from "./tabs/activity-tab";
 import { BillingContainer } from "./tabs/billing-tab";
+import { DataContainer } from "./tabs/data-tab";
 import { Drawn } from "./tabs/drawn";
 import { ModulesContainer } from "./tabs/modules-tab";
 import { ProvidersContainer } from "./tabs/providers-tab";
@@ -62,6 +64,8 @@ export function SettingsTabScreen({
     if (tab === "/settings/modules") return <ModulesContainer />;
     if (tab === "/settings/integrations") return <ProvidersContainer />;
     if (tab === "/settings/billing") return <BillingContainer />;
+    if (tab === "/settings/data") return <DataContainer />;
+    if (tab === "/settings/activity") return <ActivityContainer />;
     return <OrganizationContainer kind={kind} />;
 }
 

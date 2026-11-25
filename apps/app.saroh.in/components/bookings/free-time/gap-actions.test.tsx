@@ -84,11 +84,15 @@ describe("Block this time", () => {
                 timezone: IST,
                 setBusy: () => undefined,
             },
-            { onClose: () => undefined, refresh: () => undefined },
+            {
+                onClose: () => undefined,
+                refresh: () => undefined,
+                org: ["org_a"],
+            },
         );
         const undo = showUndo.mock.calls[0]?.[1] as () => Promise<unknown>;
         await undo();
-        expect(removeTimeOff).toHaveBeenCalledWith("asha", "new");
+        expect(removeTimeOff).toHaveBeenCalledWith("asha", "new", "org_a");
     });
 });
 

@@ -201,10 +201,9 @@ describe.each([
             "Add someone who takes bookings",
         );
         await press(radio("Everyone"));
-        expect(router.replace).toHaveBeenCalledWith(
-            "/bookings/availability?person=all",
-            { scroll: false },
-        );
+        // The address alone, no server render (U25).
+        expect(window.location.search).toBe("?person=all");
+        expect(router.replace).not.toHaveBeenCalled();
         expect(said(host)).toContain("Everyone · the whole team");
         expect(said(host)).toContain("3 people");
         // Everyone's week: from the first in to the last out, and who works.

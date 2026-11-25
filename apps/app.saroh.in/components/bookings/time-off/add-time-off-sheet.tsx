@@ -10,10 +10,10 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import { Segmented } from "@saroh/ui/segmented";
 import { TextLink } from "@saroh/ui/text-link";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { calendarHref } from "@/lib/services/calendar-href";
 import type { LocalDate } from "@/lib/services/diary";
 import { addDays } from "@/lib/services/diary";
@@ -89,7 +89,7 @@ export function AddTimeOffSheet({
     closures: Closure[];
 }) {
     const id = useId();
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const [kind, setKind] = useState<"person" | "business">("person");
     const [staffId, setStaffId] = useState(
         people.some((p) => p.id === startWho)
@@ -169,10 +169,10 @@ export function AddTimeOffSheet({
                 | { ok: false; error: string }
             > => {
                 if (closed) {
-                    const r = await addClosure({
-                        ...range,
-                        reason: why.trim() || "Closed",
-                    });
+                    const r = await addClosure(
+                        { ...range, reason: why.trim() || "Closed" },
+                        ...org,
+                    );
                     return r.ok
                         ? {
                               ok: true,
@@ -181,7 +181,7 @@ export function AddTimeOffSheet({
                           }
                         : r;
                 }
-                const r = await addTimeOff(staffId, range);
+                const r = await addTimeOff(staffId, range, ...org);
                 return r.ok
                     ? {
                           ok: true,
@@ -199,14 +199,14 @@ export function AddTimeOffSheet({
         }
         const added = res.rows.map((r) => r.id).filter((x) => !known.has(x));
         onClose();
-        router.refresh();
+        refresh();
         showUndo(offAdded(res.affected), async () => {
             if (!added.length) return { ok: true };
             const back = closed
-                ? await removeClosures(added)
-                : await removeTimeOffMany(staffId, added);
+                ? await removeClosures(added, ...org)
+                : await removeTimeOffMany(staffId, added, ...org);
             if (!back.ok) return back;
-            router.refresh();
+            refresh();
             return { ok: true };
         });
     }

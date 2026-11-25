@@ -24,6 +24,7 @@ vi.mock("next/navigation", () => ({
     usePathname: () => h.pathname,
     useSearchParams: () => new URLSearchParams(),
 }));
+vi.mock("@/lib/data-export/actions", () => ({}));
 vi.mock("@/lib/notifications/actions", () => ({
     saveAlert: (...a: unknown[]) => h.saveAlert(...a) as unknown,
     undoAlert: vi.fn(),

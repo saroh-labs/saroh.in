@@ -1,20 +1,19 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+
+import { useUsageScreen } from "@/lib/api-keys/use-api-keys";
 
 /** Reads Usage again: this minute's counts move on their own. */
 export function RefreshButton() {
-    const router = useRouter();
-    const [pending, start] = useTransition();
+    const { refetch, isFetching } = useUsageScreen();
     return (
         <Button
             variant="outline"
             size="sm"
-            busy={pending}
+            busy={isFetching}
             busyLabel="Refreshing…"
-            onClick={() => start(() => router.refresh())}
+            onClick={() => void refetch()}
         >
             Refresh
         </Button>

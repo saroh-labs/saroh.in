@@ -5,6 +5,7 @@ import type { MomentView } from "@/lib/moments/keys";
 import { defineRead } from "@/lib/query/define-read";
 import type { DomainKey } from "@/lib/query/keys";
 import { domainKey } from "@/lib/query/keys";
+import type { KeptBooking } from "@/lib/services/availability-rules";
 import type {
     BookingsCalendar,
     DiaryBooking,
@@ -12,7 +13,15 @@ import type {
 import type { LocalDate, ServiceHours } from "@/lib/services/diary";
 import { addDays, monthDays, weekStartOf } from "@/lib/services/diary";
 import type { ShareLink } from "@/lib/sites/share-links";
-import type { StaffView } from "@/lib/staff/types";
+import type {
+    BookingRules,
+    Closure,
+    OnlineBlocker,
+    PersonRulesView,
+    RuleRequest,
+    StaffView,
+    WeeklyRange,
+} from "@/lib/staff/types";
 import type { DateRange } from "@/lib/views/date-range";
 import { dateRangeAsk } from "@/lib/views/date-range";
 
@@ -124,3 +133,45 @@ export interface DiaryAsk {
     to: LocalDate;
     week: LocalDate;
 }
+
+/**
+ * Hours and time off (`/bookings/availability`, U25): everyone's week,
+ * time off and extra hours, the business's closures and rules, and the
+ * next three weeks' bookings only as far as the screen says which fall
+ * outside the hours or on a day with extra hours. Under `bookings`, so a
+ * save on the diary or the list marks it stale, and its own saves mark
+ * the diary's free times stale with one invalidation.
+ */
+export interface AvailabilityView {
+    staff: StaffView[];
+    closures: Closure[];
+    /** When the business is open, or null with no hours saved. */
+    openingHours: WeeklyRange[] | null;
+    timezone: string;
+    today: LocalDate;
+    /** The business's rules, or null when they couldn't be read. */
+    rules: BookingRules | null;
+    /** With nobody on the diary: the services' own hours together. */
+    serviceHours: WeeklyRange[] | null;
+    /** The services the booking page offers, for "What customers see". */
+    services: { id: string; name: string }[];
+    onlineBlocker: OnlineBlocker | null;
+    /** This week's live bookings by person; null when unread. */
+    kept: KeptBooking[] | null;
+    /** Live bookings per `${staffId}|${date}`, three weeks; null when unread. */
+    bookedOn: Record<string, number> | null;
+    /** The rule requests waiting (owner or admin); null otherwise or unread. */
+    requests: RuleRequest[] | null;
+    /** A Member's own diary's rules and request; null otherwise. */
+    mine: PersonRulesView | null;
+}
+
+/**
+ * Records, not settings: time off and the bookings it counts change from
+ * the diary and from customers; its own saves read it again at once.
+ */
+export const availabilityRead = defineRead<AvailabilityView>()({
+    key: (orgId) => domainKey("bookings", orgId, "availability"),
+    route: { path: "/api/bookings/availability", params: {} },
+    tier: "records",
+});

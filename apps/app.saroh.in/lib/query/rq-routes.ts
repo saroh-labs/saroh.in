@@ -20,6 +20,7 @@ export const RQ_ROUTES: readonly string[] = [
     "/calendar",
     "/bookings",
     "/bookings/all",
+    "/bookings/availability",
     "/commerce/products",
     "/commerce/products/[productId]",
     "/commerce/orders",
@@ -38,6 +39,18 @@ export const RQ_ROUTES: readonly string[] = [
     "/settings/modules",
     "/settings/integrations",
     "/settings/billing",
+    "/settings/share",
+    "/settings/data",
+    "/settings/activity",
+    "/settings/developers",
+    "/settings/developers/ai",
+    "/settings/developers/ask-ai",
+    "/settings/developers/keys",
+    "/settings/developers/webhooks",
+    "/settings/developers/usage",
+    "/notifications",
+    "/commerce/discounts",
+    "/commerce/discounts/[discountId]",
     "/social",
 ];
 
@@ -51,9 +64,16 @@ export const RQ_DOMAINS: readonly string[] = [
     "customers",
     "stock",
     "settings",
+    "notifications",
+    "discounts",
     "social",
     "modules",
     "providers",
+    "api-keys",
+    "ai-connections",
+    "data-export",
+    "webhooks",
+    "qr",
 ];
 
 /** Whether `pathname` is one of {@link RQ_ROUTES}. */

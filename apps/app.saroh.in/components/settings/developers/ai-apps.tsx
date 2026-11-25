@@ -15,7 +15,6 @@ import { listTable, ListTable, ListTableHead } from "@saroh/ui/list-table";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, ChevronRight, ExternalLink, Lock, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
@@ -30,6 +29,7 @@ import { runAction } from "@/lib/api/run-action";
 import { formatDateTime } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { relativeWhen } from "@/lib/notifications/when";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 const CAN = [
     "Build and edit pages as a draft, and show you a preview",
@@ -552,7 +552,7 @@ function ConnectionSheet({
     zone: string;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [asking, setAsking] = useState(false);
     const c = connection;
     const mine = c?.person.id === selfId;
@@ -562,12 +562,14 @@ function ConnectionSheet({
 
     async function disconnect() {
         if (!c) return;
-        const res = await runAction(() => disconnectAiConnection(c.id));
+        const res = await runAction(() =>
+            disconnectAiConnection(c.id, ...asOrg(save.orgId)),
+        );
         if (!res) return false;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${app} is disconnected from ${business}.`);
         onClose();
-        router.refresh();
+        save.saved();
         return true;
     }
 
@@ -698,7 +700,7 @@ function Changes({
     canEditSite: boolean;
     zone: string;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [page, setPage] = useState<AiConnectionActivity | null | "loading">(
         "loading",
     );
@@ -745,7 +747,7 @@ function Changes({
     async function rollBack() {
         if (!rolling) return;
         const res = await runAction(() =>
-            rollBackAiSiteDraft(c.id, rolling.siteId),
+            rollBackAiSiteDraft(c.id, rolling.siteId, ...asOrg(save.orgId)),
         );
         if (!res) return false;
         if (!res.ok) return { ok: false, error: res.error };
@@ -753,7 +755,7 @@ function Changes({
             `${rolling.siteName}'s draft is back to how it was. Your live site hasn't changed.`,
         );
         await load();
-        router.refresh();
+        save.saved();
         return true;
     }
 

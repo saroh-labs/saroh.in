@@ -18,7 +18,12 @@ import { calendarKeys } from "@/lib/calendar/queries";
 import { homeKeys } from "@/lib/home/queries";
 import type { BookingsAsk, DiaryAsk } from "./queries";
 
-import { bookingsKeys, bookingsRead, diaryRead } from "./queries";
+import {
+    availabilityRead,
+    bookingsKeys,
+    bookingsRead,
+    diaryRead,
+} from "./queries";
 
 /**
  * The bookings list for the open business (DEC-259). A new date filter
@@ -40,6 +45,11 @@ export function useBookingsDiary(ask: DiaryAsk) {
         ...diaryRead.options(useOrgId(), ask),
         placeholderData: keepPreviousData,
     });
+}
+
+/** Hours and time off (U25): read again by its own saves. */
+export function useAvailability() {
+    return useQuery(availabilityRead.options(useOrgId(), {}));
 }
 
 /** A booking write, given the open business's id when on React Query. */
@@ -81,7 +91,7 @@ export function useBookingSave(): BookingSave {
     return (
         useContext(BookingSaveContext) ?? {
             save: (write, run) => runAction(() => write(), run),
-            // rq-refresh-ok: a booking's page and Hours are server-rendered until U25/U26.
+            // rq-refresh-ok: a booking's page is server-rendered until U26.
             saved: () => router.refresh(),
             // rq-refresh-ok: as above.
             refresh: () => router.refresh(),
@@ -94,7 +104,8 @@ type Write = (orgId: string) => Promise<unknown>;
 const pass = (write: Write, orgId: string) => write(orgId);
 
 /**
- * The bookings screens' saves (DEC-259), the list's and the diary's:
+ * The bookings screens' saves (DEC-259), the list's, the diary's and
+ * Hours and time off's (whose read is under `bookings` too):
  * through `useActionMutation`, so the action gets the tab's business (and
  * refuses a moved tab), then what is on screen is read once (the other
  * bookings read marked stale), and Home and the Business calendar are marked stale (not mounted
