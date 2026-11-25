@@ -2,10 +2,9 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
-import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import { setPackArchived } from "@/lib/class-packs/actions";
 import { usedEmptyText, usedRows } from "@/lib/class-packs/pack-activity";
 import { packKind, unitWord } from "@/lib/class-packs/pack-cards";
@@ -43,11 +42,10 @@ import {
     saleRow,
     salesByMonth,
 } from "@/lib/class-packs/pack-sales";
-import type { HeldPack } from "@/lib/class-packs/sell-words";
-import type { GstAsk } from "@/lib/gst/item-words";
+import type { SellContext } from "@/lib/class-packs/queries";
+import { useClassPackSave, usePack } from "@/lib/class-packs/use-class-packs";
 import { invoicesHref } from "@/lib/invoices/links";
 
-import type { SellablePack } from "@/components/class-packs/list/sell-pack-dialog";
 import { SellPackDialog } from "@/components/class-packs/list/sell-pack-dialog";
 import { TabStrip } from "@saroh/ui/tabs";
 import { ActivityTab } from "./activity-tab";
@@ -63,16 +61,38 @@ import { PackOverviewTab } from "./overview";
 import { SalesTab } from "./sales-tab";
 import { UsedTab } from "./used-tab";
 
-/** An Undo toast lasts ten seconds (round-2 default 136). */
+export type { SellContext };
 
-/** What the sell dialog needs, read only for someone who may sell. */
-export interface SellContext {
-    contacts: ContactOption[];
-    held: HeldPack[];
-    packs: SellablePack[];
-    invoicesOnSale: boolean;
-    /** The business's GST standing, for the dialog's amount to pay. */
-    gst?: GstAsk | null;
+/**
+ * One pack's page on React Query (DEC-259): its one read
+ * (`/api/class-packs/[packId]`), behind the route's loader until it lands,
+ * since the title, tabs and actions are the pack's. Failing fails the page.
+ */
+export function PackDetailContainer({
+    packId,
+    skeleton,
+    ...gates
+}: {
+    packId: string;
+    skeleton: ReactNode;
+    canWrite: boolean;
+    canSell: boolean;
+    initialTab: PackDetailTab;
+}) {
+    const read = usePack({ packId });
+    const [nowIso] = useState(() => new Date().toISOString());
+    if (read.isError && !read.data) throw read.error;
+    if (!read.data) return <>{skeleton}</>;
+    return (
+        <PackDetailScreen
+            // Another pack starts on its own tab and lens.
+            key={read.data.pack.id}
+            {...read.data}
+            {...gates}
+            nowIso={nowIso}
+            onRetry={() => void read.refetch()}
+        />
+    );
 }
 
 /**
@@ -102,7 +122,10 @@ export function PackDetailScreen({
     canSell,
     sell,
     initialTab,
+    onRetry,
 }: {
+    /** A tab's own read failed: read the pack's page again. */
+    onRetry: () => void;
     pack: Pack;
     holders: PartRead<PackHolder[]>;
     used: PartRead<PackUsedPage>;
@@ -121,7 +144,7 @@ export function PackDetailScreen({
     sell: SellContext | null;
     initialTab: PackDetailTab;
 }) {
-    const router = useRouter();
+    const save = useClassPackSave();
     const now = new Date(nowIso);
     const [tab, setTab] = useState<PackDetailTab>(initialTab);
     const [lens, setLens] = useState<Lens>("team");
@@ -172,23 +195,25 @@ export function PackDetailScreen({
     function restore() {
         setBusy(true);
         start(async () => {
-            const res = await runAction(() => setPackArchived(pack.id, false));
+            const res = await runAction(() =>
+                setPackArchived(pack.id, false, save.orgId),
+            );
             setBusy(false);
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
-            router.refresh();
+            await save.saved();
             dismissToasts();
             showUndo(archiveToast(pack, false), () =>
                 start(async () => {
                     const back = await runAction(() =>
-                        setPackArchived(pack.id, true),
+                        setPackArchived(pack.id, true, save.orgId),
                     );
                     if (!back) return;
-                    if (!back.ok) showError(back.error);
-                    router.refresh();
+                    if (!back.ok) return showError(back.error);
+                    await save.saved();
                 }),
             );
         });
@@ -265,7 +290,7 @@ export function PackDetailScreen({
                                 sellable={sellable}
                                 onSell={() => setSelling(true)}
                                 onExtend={extend}
-                                onRetry={() => router.refresh()}
+                                onRetry={onRetry}
                             />
                         ) : tab === "used" ? (
                             <UsedTab
@@ -277,7 +302,7 @@ export function PackDetailScreen({
                                 denied={used.state === "denied"}
                                 chips={coverLines(pack, dropIns)}
                                 emptyText={usedEmptyText(kind)}
-                                onRetry={() => router.refresh()}
+                                onRetry={onRetry}
                             />
                         ) : tab === "sales" ? (
                             <SalesTab
@@ -298,7 +323,7 @@ export function PackDetailScreen({
                                         ? invoicesHref({ pack: pack.id })
                                         : null
                                 }
-                                onRetry={() => router.refresh()}
+                                onRetry={onRetry}
                             />
                         ) : tab === "activity" ? (
                             <ActivityTab
@@ -310,7 +335,7 @@ export function PackDetailScreen({
                                 pack={pack}
                                 kind={kind}
                                 timeZone={timeZone}
-                                onRetry={() => router.refresh()}
+                                onRetry={onRetry}
                             />
                         ) : (
                             <PackOverviewTab

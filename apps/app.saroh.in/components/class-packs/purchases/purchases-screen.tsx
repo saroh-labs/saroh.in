@@ -7,7 +7,6 @@ import { Button } from "@saroh/ui/button";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { Ticket } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { DataView } from "@/components/shared/data-view/data-view";
@@ -16,12 +15,13 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import type { PackStanding } from "@/lib/class-packs/balance";
+import type { PurchasesView } from "@/lib/class-packs/queries";
 import { paidByLabel } from "@/lib/class-packs/sell-words";
-import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
+import type { PackPurchase } from "@/lib/class-packs/service";
+import { usePackPurchases } from "@/lib/class-packs/use-class-packs";
 import { personHref } from "@/lib/contacts/person-href";
-import type { GstAsk } from "@/lib/gst/item-words";
 
 import { ClassPacksTabs } from "@/components/class-packs/list/class-packs-tabs";
 import { SellPackDialog } from "@/components/class-packs/list/sell-pack-dialog";
@@ -44,31 +44,32 @@ const FILTERS: DataFilter<PackPurchase>[] = (
     predicate: (p: PackPurchase) => p.standing === s,
 }));
 
+/** Who holds a pack, read in the browser (DEC-259); failing fails the page. */
+export function PurchasesContainer(
+    props: Omit<Parameters<typeof PurchasesScreen>[0], "data">,
+) {
+    const read = usePackPurchases();
+    if (read.isError && !read.data) throw read.error;
+    return <PurchasesScreen {...props} data={read.data ?? null} />;
+}
+
 /**
  * Who holds which pack: classes left, when it runs out, and the invoice it
  * was sold with. The balance is the API's — classes sold less the ones spent
  * and not given back — so this list and a booking never disagree.
  */
 export function PurchasesScreen({
-    purchases,
-    packs,
-    contacts,
+    data,
     canWrite,
-    invoicesOnSale,
     initialFilterId,
-    gst = null,
 }: {
-    /** The business's GST standing, for the sell dialog's amount to pay. */
-    gst?: GstAsk | null;
-    purchases: PackPurchase[];
-    packs: ClassPack[];
-    contacts: ContactOption[];
+    /** The purchases read; null while on its way (the rows are skeletons). */
+    data: PurchasesView | null;
     canWrite: boolean;
-    invoicesOnSale: boolean;
     initialFilterId?: string;
 }) {
-    const router = useRouter();
     const [selling, setSelling] = useState(false);
+    const purchases = data?.purchases ?? [];
 
     const columns: DataColumn<PackPurchase>[] = [
         {
@@ -183,58 +184,72 @@ export function PurchasesScreen({
                     "Class packs",
                 ]}
                 title="Class packs"
-                count={countLabel(purchases.length, {
-                    one: "pack sold",
-                    other: "packs sold",
-                })}
+                count={
+                    data
+                        ? countLabel(purchases.length, {
+                              one: "pack sold",
+                              other: "packs sold",
+                          })
+                        : undefined
+                }
                 className="mb-0"
                 actions={
                     canWrite ? (
-                        <Button onClick={() => setSelling(true)}>
+                        <Button
+                            disabled={!data}
+                            onClick={() => setSelling(true)}
+                        >
                             Sell a pack
                         </Button>
                     ) : undefined
                 }
             />
             <ClassPacksTabs current="holders" />
-            <DataView
-                viewId="class-pack-purchases"
-                rows={purchases}
-                columns={columns}
-                rowKey={(p) => p.id}
-                rowHref={(p) => personHref(p.contact.id)}
-                modes={["table", "list"]}
-                hideModeToggle
-                filters={FILTERS}
-                initialFilterId={initialFilterId}
-                noun={{ one: "pack sold", other: "packs sold" }}
-                showTotal={false}
-                searchPlaceholder="Search people or packs"
-                searchableColumnIds={["who", "pack"]}
-                emptyState={{
-                    icon: <Ticket />,
-                    title: "No packs sold yet",
-                    note: "Sell someone a pack and it shows here with the classes they have left and when it runs out.",
-                    action: canWrite ? (
-                        <Button onClick={() => setSelling(true)}>
-                            Sell a pack
-                        </Button>
-                    ) : undefined,
-                }}
-            />
-            {canWrite && selling ? (
+            {!data ? (
+                <PageLoading
+                    bare
+                    shape="list"
+                    width="full"
+                    label="Loading who holds a pack"
+                />
+            ) : (
+                <DataView
+                    viewId="class-pack-purchases"
+                    rows={purchases}
+                    columns={columns}
+                    rowKey={(p) => p.id}
+                    rowHref={(p) => personHref(p.contact.id)}
+                    modes={["table", "list"]}
+                    hideModeToggle
+                    filters={FILTERS}
+                    initialFilterId={initialFilterId}
+                    noun={{ one: "pack sold", other: "packs sold" }}
+                    showTotal={false}
+                    searchPlaceholder="Search people or packs"
+                    searchableColumnIds={["who", "pack"]}
+                    emptyState={{
+                        icon: <Ticket />,
+                        title: "No packs sold yet",
+                        note: "Sell someone a pack and it shows here with the classes they have left and when it runs out.",
+                        action: canWrite ? (
+                            <Button onClick={() => setSelling(true)}>
+                                Sell a pack
+                            </Button>
+                        ) : undefined,
+                    }}
+                />
+            )}
+            {canWrite && selling && data ? (
                 <SellPackDialog
                     open
                     onOpenChange={(o) => {
-                        if (!o) {
-                            setSelling(false);
-                            router.refresh();
-                        }
+                        // A sale reads the list again itself.
+                        if (!o) setSelling(false);
                     }}
-                    contacts={contacts}
-                    packs={packs}
-                    invoicesOnSale={invoicesOnSale}
-                    gst={gst}
+                    contacts={data.contacts}
+                    packs={data.packs}
+                    invoicesOnSale={data.invoicesOnSale}
+                    gst={data.gst}
                     held={purchases.map((p) => ({
                         contactId: p.contact.id,
                         packId: p.pack.id,

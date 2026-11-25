@@ -96,6 +96,12 @@ export interface EditorShellProps<V extends Record<string, unknown>> {
     afterDeleteHref: string;
     /** The toast after Publish ("Monthly is open for sign-ups."). */
     publishedMessage: (record: EditorRecord<V>, wasLive: boolean) => string;
+    /**
+     * After Publish, Discard or Delete draft landed: a React Query screen's
+     * invalidation (the Pack Editor's `useClassPackSave`). Left out, the
+     * server-rendered pages are rendered again (`router.refresh()`).
+     */
+    saved?: () => Promise<void>;
     /** The side column (At a glance). */
     aside?: (fields: EditorFields<V>) => ReactNode;
     /** The record's sections. */
@@ -136,11 +142,19 @@ export function EditorShell<V extends Record<string, unknown>>(
         viewable,
         afterDeleteHref,
         publishedMessage,
+        saved,
         aside,
         children,
         autosaveDelayMs,
     } = props;
     const router = useRouter();
+    const after =
+        saved ??
+        (() => {
+            // rq-refresh-ok: only the Plan Editor (server-rendered) leaves `saved` out.
+            router.refresh();
+            return Promise.resolve();
+        });
     const editor = useAutosave<V>({
         adapter,
         initial,
@@ -249,7 +263,7 @@ export function EditorShell<V extends Record<string, unknown>>(
                 return;
             }
             showSuccess(publishedMessage(res.data, wasLive));
-            router.refresh();
+            await after();
         } finally {
             setBusy(false);
         }
@@ -267,7 +281,7 @@ export function EditorShell<V extends Record<string, unknown>>(
             }
             setRefused(null);
             showSuccess("Changes discarded.");
-            router.refresh();
+            await after();
         } finally {
             setBusy(false);
         }
@@ -280,7 +294,7 @@ export function EditorShell<V extends Record<string, unknown>>(
         if (res?.ok) {
             showSuccess("Draft deleted.");
             router.push(afterDeleteHref);
-            router.refresh();
+            await after();
             return;
         }
         setBusy(false);
