@@ -42,5 +42,6 @@ export const aiActivityRead = defineRead<AiActivityScreen>()({
             cursor: z.string().max(64).optional(),
         },
     },
-    tier: "settings",
+    // Live: deliveries and AI app calls happen from outside, any time.
+    tier: "live",
 });

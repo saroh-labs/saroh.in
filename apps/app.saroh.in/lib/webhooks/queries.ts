@@ -52,5 +52,6 @@ export const webhookDeliveriesRead = defineRead<WebhookDeliveriesScreen>()({
         path: "/api/settings/developers/webhooks/deliveries",
         params: { endpoint: z.string().regex(/^[\w-]{1,64}$/) },
     },
-    tier: "settings",
+    // Live: deliveries and AI app calls happen from outside, any time.
+    tier: "live",
 });
