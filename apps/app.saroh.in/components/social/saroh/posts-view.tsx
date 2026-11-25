@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
+import { useScreenLink } from "@/components/shared/page/screen-pending";
 import { formatTime } from "@/lib/format/datetime";
 import { joinFacts } from "@/lib/format/join";
 import { count } from "@/lib/format/plural";
@@ -64,6 +65,7 @@ export function PostsView({
     narrow: boolean;
 }) {
     const zone = useBusinessZone();
+    const screenLink = useScreenLink();
     const [chip, setChip] = useState<PostChip>("all");
     const rows = posts.ok ? posts.data : [];
     const none =
@@ -117,6 +119,7 @@ export function PostsView({
                     action={
                         <IntentLink
                             href="/social?tab=channels"
+                            onNavigate={screenLink("/social?tab=channels")}
                             className="font-semibold underline underline-offset-4"
                         >
                             {SOCIAL_WORDS.reconnect}
@@ -191,6 +194,9 @@ export function PostsView({
                                             <IntentLink
                                                 key={p.id}
                                                 href={postHref(p.id)}
+                                                onNavigate={screenLink(
+                                                    postHref(p.id),
+                                                )}
                                                 scroll={false}
                                                 data-week-post={p.id}
                                                 className={cn(
@@ -328,6 +334,9 @@ export function PostsView({
                                     >
                                         <IntentLink
                                             href={postHref(p.id)}
+                                            onNavigate={screenLink(
+                                                postHref(p.id),
+                                            )}
                                             scroll={false}
                                             className="relative flex justify-center rounded-2xl bg-muted p-3.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                         >

@@ -7,6 +7,7 @@
  * the Page picker; the posts page's empty, chip and failed states; and
  * the composer's channels, Threads warning, story size and limit.
  */
+import { QueryClientProvider } from "@tanstack/react-query";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -21,6 +22,8 @@ import {
     vi,
 } from "vitest";
 
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
 import type {
     SocialAccess,
     SocialChannel,
@@ -31,12 +34,16 @@ import type { SocialCompose } from "@/lib/social/use-social-post";
 import { useSocialPost } from "@/lib/social/use-social-post";
 
 import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
+import { SocialHome } from "../home/social-home";
 import { ChannelsView } from "./channels/channels-view";
 import { SocialPostPanel } from "./composer/social-post-panel";
 import { PostSheet } from "./post-sheet";
 import { PostsView } from "./posts-view";
 import { SocialLocked } from "./social-locked";
+import { SarohSocialPage } from "./social-page";
 
+const go = vi.fn<(href: string) => void>();
+const onRetry = vi.fn();
 const router = vi.hoisted(() => ({
     push: vi.fn(),
     replace: vi.fn(),
@@ -78,6 +85,7 @@ const actions = vi.hoisted(() => ({
     deletePost: vi.fn(),
 }));
 vi.mock("@/lib/social/saroh-social-actions", () => actions);
+vi.mock("@/lib/social/actions", () => ({ removeOwnPost: vi.fn() }));
 
 const ON: SocialAccess = {
     state: "on",
@@ -138,6 +146,8 @@ beforeEach(() => {
     root = createRoot(host);
     for (const fn of Object.values(actions)) fn.mockReset();
     router.push.mockReset();
+    router.refresh.mockReset();
+    onRetry.mockReset();
 });
 
 afterEach(() => {
@@ -146,7 +156,14 @@ afterEach(() => {
     document.body.innerHTML = "";
 });
 
-const draw = (node: ReactNode) => act(() => root.render(node));
+/** Inside React Query and a business, as the shell draws it. */
+const withQuery = (node: ReactNode, client = makeTestClient()) => (
+    <QueryClientProvider client={client}>
+        <OrgProvider orgId="org_1">{node}</OrgProvider>
+    </QueryClientProvider>
+);
+
+const draw = (node: ReactNode) => act(() => root.render(withQuery(node)));
 const text = () => document.body.textContent;
 const q = (sel: string) => document.body.querySelector(sel);
 
@@ -207,6 +224,8 @@ describe("Channels (S2)", () => {
     it("draws three fixed rows, each with its state and one action", () => {
         draw(
             <ChannelsView
+                go={go}
+                onRetry={onRetry}
                 channels={{ ok: true, data: rows }}
                 canPost
                 params={PARAMS}
@@ -235,6 +254,8 @@ describe("Channels (S2)", () => {
     it("offers nothing to press to someone who may only read", () => {
         draw(
             <ChannelsView
+                go={go}
+                onRetry={onRetry}
                 channels={{ ok: true, data: rows }}
                 canPost={false}
                 params={PARAMS}
@@ -248,6 +269,8 @@ describe("Channels (S2)", () => {
     it("says once how a connect came back", () => {
         draw(
             <ChannelsView
+                go={go}
+                onRetry={onRetry}
                 channels={{ ok: true, data: rows }}
                 canPost
                 params={{
@@ -266,6 +289,8 @@ describe("Channels (S2)", () => {
     it("says it couldn't read the channels, never that none are connected", () => {
         draw(
             <ChannelsView
+                go={go}
+                onRetry={onRetry}
                 channels={{ ok: false }}
                 canPost
                 params={PARAMS}
@@ -279,6 +304,8 @@ describe("Channels (S2)", () => {
     it("asks which Page when the sign-in manages several", () => {
         draw(
             <ChannelsView
+                go={go}
+                onRetry={onRetry}
                 channels={{ ok: true, data: rows }}
                 canPost
                 params={{
@@ -307,6 +334,8 @@ describe("Channels (S2)", () => {
     it("asks which Instagram account when the Pages have several linked", () => {
         draw(
             <ChannelsView
+                go={go}
+                onRetry={onRetry}
                 channels={{ ok: true, data: rows }}
                 canPost
                 params={{
@@ -577,14 +606,16 @@ describe("a post's sheet (S5, S6)", () => {
         await act(async () => {
             await Promise.resolve();
             root.render(
-                <PostSheet
-                    post={partly}
-                    access={ON}
-                    channels={[channel("INSTAGRAM", "CONNECTED")]}
-                    canPost
-                    narrow={false}
-                    onClose={() => undefined}
-                />,
+                withQuery(
+                    <PostSheet
+                        post={partly}
+                        access={ON}
+                        channels={[channel("INSTAGRAM", "CONNECTED")]}
+                        canPost
+                        narrow={false}
+                        onClose={() => undefined}
+                    />,
+                ),
             );
         });
         expect(q("[data-post-partly]")?.textContent).toBe(
@@ -634,20 +665,26 @@ describe("a post's sheet (S5, S6)", () => {
         await act(async () => {
             await Promise.resolve();
             root.render(
-                <PostSheet
-                    post={{
-                        ...post("x2", "SCHEDULED", "2026-11-24T14:10:00.000Z"),
-                        channels: [
-                            { kind: "INSTAGRAM", ...waiting },
-                            { kind: "FACEBOOK", ...waiting },
-                        ],
-                    }}
-                    access={ON}
-                    channels={[channel("INSTAGRAM", "CONNECTED")]}
-                    canPost
-                    narrow={false}
-                    onClose={() => undefined}
-                />,
+                withQuery(
+                    <PostSheet
+                        post={{
+                            ...post(
+                                "x2",
+                                "SCHEDULED",
+                                "2026-11-24T14:10:00.000Z",
+                            ),
+                            channels: [
+                                { kind: "INSTAGRAM", ...waiting },
+                                { kind: "FACEBOOK", ...waiting },
+                            ],
+                        }}
+                        access={ON}
+                        channels={[channel("INSTAGRAM", "CONNECTED")]}
+                        canPost
+                        narrow={false}
+                        onClose={() => undefined}
+                    />,
+                ),
             );
         });
         const line = q("[data-held-by-saroh]")?.textContent ?? "";
@@ -664,17 +701,157 @@ describe("a post's sheet (S5, S6)", () => {
         await act(async () => {
             await Promise.resolve();
             root.render(
-                <PostSheet
-                    post={partly}
-                    access={ON}
-                    channels={[]}
-                    canPost={false}
-                    narrow={false}
-                    onClose={() => undefined}
-                />,
+                withQuery(
+                    <PostSheet
+                        post={partly}
+                        access={ON}
+                        channels={[]}
+                        canPost={false}
+                        narrow={false}
+                        onClose={() => undefined}
+                    />,
+                ),
             );
         });
         expect(q("[data-post-results] [role=alert]")).not.toBeNull();
         expect(q("[data-post-action]")).toBeNull();
+    });
+});
+
+describe("Social's saves on React Query (DEC-259, U16)", () => {
+    const spy = () => {
+        const client = makeTestClient();
+        const invalidate = vi.spyOn(client, "invalidateQueries");
+        return { client, invalidate };
+    };
+    const socialRead = (invalidate: ReturnType<typeof spy>["invalidate"]) =>
+        invalidate.mock.calls.filter(
+            ([f]) =>
+                f?.queryKey?.[0] === "social" &&
+                f.queryKey[1] === "org_1" &&
+                f.refetchType !== "none",
+        ).length;
+
+    it("Post now writes as the tab's business and reads Social once, never a page refresh", async () => {
+        const { client, invalidate } = spy();
+        actions.savePost.mockResolvedValue({
+            ok: true,
+            data: post("x3", "PUBLISHING", null),
+        });
+        act(() => {
+            root.render(
+                withQuery(
+                    <PostSheet
+                        post={post("x3", "DRAFT", null)}
+                        access={ON}
+                        channels={[channel("INSTAGRAM", "CONNECTED")]}
+                        canPost
+                        narrow={false}
+                        onClose={() => undefined}
+                    />,
+                    client,
+                ),
+            );
+        });
+        await act(async () => {
+            (q("[data-post-action=now]") as HTMLButtonElement).click();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(actions.savePost).toHaveBeenCalledWith(
+            "x3",
+            { action: "now" },
+            "org_1",
+        );
+        expect(socialRead(invalidate)).toBe(1);
+        // Home names posts in Needs you: marked stale, not read now.
+        expect(invalidate).toHaveBeenCalledWith({
+            queryKey: ["home", "org_1"],
+            refetchType: "none",
+        });
+        expect(router.refresh).not.toHaveBeenCalled();
+    });
+
+    it("a refused write reads nothing", async () => {
+        const { client, invalidate } = spy();
+        actions.savePost.mockResolvedValue({ ok: false, error: "No." });
+        act(() => {
+            root.render(
+                withQuery(
+                    <PostSheet
+                        post={post("x4", "DRAFT", null)}
+                        access={ON}
+                        channels={[]}
+                        canPost
+                        narrow={false}
+                        onClose={() => undefined}
+                    />,
+                    client,
+                ),
+            );
+        });
+        await act(async () => {
+            (q("[data-post-action=now]") as HTMLButtonElement).click();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+        expect(socialRead(invalidate)).toBe(0);
+    });
+
+    it("Channels' Try again reads the channels again, never a page refresh", () => {
+        draw(
+            <ChannelsView
+                go={go}
+                onRetry={onRetry}
+                channels={{ ok: false }}
+                canPost
+                params={PARAMS}
+                pages={null}
+            />,
+        );
+        const retry = Array.from(document.querySelectorAll("button")).find(
+            (b) => b.textContent.includes("Try again"),
+        );
+        act(() => retry?.click());
+        expect(onRetry).toHaveBeenCalledOnce();
+        expect(router.refresh).not.toHaveBeenCalled();
+    });
+});
+
+describe("Social's first paint (DEC-259, #1480)", () => {
+    it("draws the real frame from the gate, the lists as skeletons, no rows", () => {
+        draw(
+            <SarohSocialPage
+                access={ON}
+                channels={null}
+                posts={null}
+                opened={null}
+                pages={null}
+                params={{ ...PARAMS, tab: "posts" }}
+                reload={() => undefined}
+            />,
+        );
+        expect(q("h1")?.textContent).toBe(SOCIAL_WORDS.social);
+        expect(q("[data-new-post]")).not.toBeNull();
+        expect(q("[data-channels-link]")).not.toBeNull();
+        expect(q("[data-slot=page-loading]")).not.toBeNull();
+        expect(q("[data-week-post]")).toBeNull();
+        // Never "no posts" or "none connected" while on their way.
+        expect(text()).not.toContain(SOCIAL_WORDS.channelsFailed);
+    });
+
+    it("the free Share's frame too: its header at once, a skeleton for the lists", () => {
+        draw(
+            <SocialHome
+                rows={null}
+                posts={null}
+                setup={
+                    { siteId: "site_1", schedule: { tier: "free" } } as never
+                }
+                canPost
+                failed={[]}
+            />,
+        );
+        expect(q("h1")?.textContent).toBe("Social");
+        expect(q("[data-slot=page-loading]")).not.toBeNull();
+        expect(q("[data-own-post]")).toBeNull();
     });
 });
