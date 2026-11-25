@@ -3,21 +3,21 @@
 import { Button } from "@saroh/ui/button";
 import { useTransition } from "react";
 
-import { useSettingsRefresh } from "@/lib/settings/use-settings";
+import { useSettingsSave } from "@/lib/settings/use-settings";
 
 /**
  * "Try again" on a card whose read failed: reads the tab again, in place
- * (on a server-drawn screen, the page).
+ * (Plan and billing and Change plan are both on React Query).
  */
 export function RefreshButton({ label = "Try again" }: { label?: string }) {
-    const refresh = useSettingsRefresh();
+    const save = useSettingsSave();
     const [pending, start] = useTransition();
     return (
         <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => start(refresh)}
+            onClick={() => start(() => save.saved())}
             busy={pending}
             busyLabel="Trying again…"
         >

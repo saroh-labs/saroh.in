@@ -118,7 +118,21 @@ async function plansPage(org: unknown): Promise<string> {
     resolveActiveOrganization.mockResolvedValue(org);
     const { default: ChangePlanPage } =
         await import("@/app/(shell)/settings/(sections)/billing/plans/page");
-    return renderToStaticMarkup(await ChangePlanPage());
+    const { ChangePlanScreen, ChangePlanView } =
+        await import("./change-plan-screen");
+    const page = await ChangePlanPage();
+    // Refused by the page itself, in its own words.
+    if (page.type !== ChangePlanScreen) return renderToStaticMarkup(page);
+    // Otherwise the browser draws the route's answer, as the wire carries it.
+    const { mayReadPlans, plansServer } =
+        await import("@/lib/saroh-billing/screen-service");
+    if (!(await mayReadPlans())) return "REFUSED";
+    const screen = toWire(await plansServer.service({}));
+    if (!screen) throw new Error("No answer");
+    const { canChange } = page.props as { canChange: boolean };
+    return renderToStaticMarkup(
+        <ChangePlanView screen={screen} canChange={canChange} />,
+    );
 }
 
 const PLANS = 'href="/settings/billing/plans"';

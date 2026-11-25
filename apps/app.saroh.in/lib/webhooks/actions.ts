@@ -55,8 +55,3 @@ export async function resendDelivery(
 ) {
     return as(orgId, () => webhooks.resendDelivery(id, deliveryId));
 }
-
-/** A read: the address's latest messages, when its sheet opens. */
-export async function readDeliveries(id: string) {
-    return webhooks.listDeliveries(id);
-}

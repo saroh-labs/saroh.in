@@ -1,7 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 
 import { dataExportLink, requestDataExport } from "./service";
@@ -13,11 +11,9 @@ import { dataExportLink, requestDataExport } from "./service";
  * the tab reads its own query again.
  */
 export async function startDataExport(orgId?: string) {
-    if (orgId) return writeAsOrg(orgId, () => requestDataExport());
-    const result = await requestDataExport();
-    // rq-revalidate-ok: only when called without the tab's business (outside React Query).
-    if (result.ok) revalidatePath("/settings/data");
-    return result;
+    return orgId
+        ? writeAsOrg(orgId, () => requestDataExport())
+        : requestDataExport();
 }
 
 /**

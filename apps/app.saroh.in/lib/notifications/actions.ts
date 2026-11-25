@@ -1,7 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 import type { CrmResult } from "@/lib/api/http";
 
@@ -54,19 +52,17 @@ export async function undoMarkAllNotificationsRead(
 /**
  * Flip one of your own alerts (F14). The API decides what you may choose
  * and which channels can deliver; this never does. The bell's count in the
- * header follows what you hear about, so the shell is refreshed. Your
- * profile on React Query passes the tab's business last (`writeAsOrg`,
- * nothing revalidated); the tab keeps the answer and reads the bell again.
+ * header follows what you hear about. Your profile (on React Query) passes
+ * the tab's business last (`writeAsOrg`, nothing revalidated); the tab
+ * keeps the answer and reads the bell again.
  */
 export async function saveAlert(
     change: AlertChange,
     orgId?: string,
 ): Promise<CrmResult<AlertPreferences>> {
-    if (orgId) return writeAsOrg(orgId, () => updateAlert(change));
-    const result = await updateAlert(change);
-    // rq-revalidate-ok: Your profile (Settings) is server-rendered, not on React Query.
-    if (result.ok) revalidatePath("/", "layout");
-    return result;
+    return orgId
+        ? writeAsOrg(orgId, () => updateAlert(change))
+        : updateAlert(change);
 }
 
 /**
