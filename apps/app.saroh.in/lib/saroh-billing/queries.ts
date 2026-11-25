@@ -4,6 +4,8 @@ import { defineRead } from "@/lib/query/define-read";
 import { domainKey } from "@/lib/query/keys";
 import type {
     AddonRow,
+    Cycle,
+    PendingCheckout,
     PickerRow,
     PlanNote,
     SarohInvoice,
@@ -44,5 +46,31 @@ export type BillingScreen =
 export const billingRead = defineRead<BillingScreen>()({
     key: (orgId) => domainKey("settings", orgId, "billing"),
     route: { path: "/api/settings/billing", params: {} },
+    tier: "settings",
+});
+
+/**
+ * Settings › Plan and billing › Change plan (DEC-259): every plan as its
+ * card draws it, the cycle, and a payment still waiting (the owner's
+ * alone). Nothing else of the price list or the subscription crosses.
+ */
+export type PlansScreen =
+    /** The API refused the plan to this person. */
+    | { kind: "denied" }
+    | {
+          kind: "plans";
+          /** Per cycle; null when Saroh's price list couldn't be read. */
+          rows: Record<Cycle, PickerRow[]> | null;
+          yearly:
+              { on: false } | { on: true; freeMonths: number; label: string };
+          cycle: Cycle;
+          currentPlan: string;
+          /** A plan change waiting for its payment: only to whoever may change the plan. */
+          pending: PendingCheckout | null;
+      };
+
+export const plansRead = defineRead<PlansScreen>()({
+    key: (orgId) => domainKey("settings", orgId, "plans"),
+    route: { path: "/api/settings/billing/plans", params: {} },
     tier: "settings",
 });

@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { CheckRow } from "@saroh/ui/check-row";
 import { FormSheet } from "@saroh/ui/form-sheet";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -17,6 +16,7 @@ import type {
 } from "@/lib/google-calendar/types";
 import type { OutcomeMessage } from "@/lib/google-calendar/words";
 import { GC_WORDS } from "@/lib/google-calendar/words";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 import { DisconnectDialog } from "./disconnect-dialog";
 import { useAccountCalendars } from "./use-calendars";
@@ -55,7 +55,7 @@ function OpenAccountSheet({
     onClose: () => void;
     onSaid: (message: OutcomeMessage) => void;
 }) {
-    const router = useRouter();
+    const settings = useSettingsSave();
     const open = true;
     const { options } = useAccountCalendars(account, open);
     const [busy, setBusy] = useState<string[]>(() =>
@@ -82,20 +82,29 @@ function OpenAccountSheet({
         setError(null);
         const res = await runAction(
             () =>
-                saveAccountCalendars(account.id, {
-                    checkBusy: busy,
-                    ...(putHere && writable ? { writeTo: writable.id } : {}),
-                }),
+                saveAccountCalendars(
+                    account.id,
+                    {
+                        checkBusy: busy,
+                        ...(putHere && writable
+                            ? { writeTo: writable.id }
+                            : {}),
+                    },
+                    ...asOrg(settings.orgId),
+                ),
             { setBusy: setPending, onUnreached: setError, quiet: true },
         );
         if (!res) return;
         if (!res.ok) return setError(res.error);
         onClose();
-        router.refresh();
+        settings.saved();
     }
 
     async function disconnect() {
-        const res = await disconnectAccount(account.id);
+        const res = await disconnectAccount(
+            account.id,
+            ...asOrg(settings.orgId),
+        );
         if (!res.ok) return { ok: false, error: res.error };
         onClose();
         onSaid({
@@ -103,7 +112,7 @@ function OpenAccountSheet({
             title: "Disconnected",
             body: res.data.kept.message,
         });
-        router.refresh();
+        settings.saved();
         return { ok: true };
     }
 

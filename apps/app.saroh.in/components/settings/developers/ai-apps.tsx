@@ -1,6 +1,5 @@
 "use client";
 
-import type { AiConnectionActivity } from "@saroh/api-contract";
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
@@ -14,21 +13,25 @@ import { cn } from "@saroh/ui/lib/utils";
 import { listTable, ListTable, ListTableHead } from "@saroh/ui/list-table";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronRight, ExternalLink, Lock, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
     disconnectAiConnection,
-    readAiActivity,
     rollBackAiSiteDraft,
 } from "@/lib/ai-connections/actions";
 import { CONNECT_IN, liveAiApps } from "@/lib/ai-connections/mcp-address";
+import type { AiActivityScreen } from "@/lib/ai-connections/queries";
+import { aiActivityRead } from "@/lib/ai-connections/queries";
 import type { AiConnection } from "@/lib/ai-connections/types";
+import { useAiActivity } from "@/lib/ai-connections/use-ai-connections";
 import { runAction } from "@/lib/api/run-action";
 import { formatDateTime } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { relativeWhen } from "@/lib/notifications/when";
+import { useOrgId } from "@/lib/query/org";
 import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 const CAN = [
@@ -701,9 +704,26 @@ function Changes({
     zone: string;
 }) {
     const save = useSettingsSave();
-    const [page, setPage] = useState<AiConnectionActivity | null | "loading">(
-        "loading",
-    );
+    const orgId = useOrgId();
+    const qc = useQueryClient();
+    // The first page is read when the sheet opens on this connection and
+    // held for the visit; pages after it are this sheet's own.
+    const first = useAiActivity(c.id);
+    const [later, setLater] = useState<{
+        id: string;
+        data: AiActivityScreen["data"];
+        nextCursor: string | null;
+    } | null>(null);
+    const after = later?.id === c.id ? later : null;
+    const page: AiActivityScreen | null | "loading" = first.data
+        ? {
+              ...first.data,
+              data: [...first.data.data, ...(after?.data ?? [])],
+              nextCursor: after ? after.nextCursor : first.data.nextCursor,
+          }
+        : first.isError
+          ? null
+          : "loading";
     const [more, setMore] = useState(false);
     const [rolling, setRolling] = useState<{
         siteId: string;
@@ -713,33 +733,26 @@ function Changes({
     const now = new Date();
 
     async function load() {
-        setPage("loading");
-        setPage(await readAiActivity(c.id).catch(() => null));
+        setLater(null);
+        await first.refetch();
     }
-    // Read once, when the sheet opens on this connection.
-    useEffect(() => {
-        let live = true;
-        void readAiActivity(c.id)
-            .catch(() => null)
-            .then((read) => {
-                if (live) setPage(read);
-            });
-        return () => {
-            live = false;
-        };
-    }, [c.id]);
 
     async function loadMore() {
         if (page === "loading" || !page?.nextCursor) return;
         setMore(true);
-        const next = await readAiActivity(c.id, page.nextCursor).catch(
-            () => null,
-        );
+        const next = await qc
+            .fetchQuery(
+                aiActivityRead.options(orgId, {
+                    connection: c.id,
+                    cursor: page.nextCursor,
+                }),
+            )
+            .catch(() => null);
         setMore(false);
         if (!next) return showError("We couldn't load more. Try again.");
-        setPage({
-            ...page,
-            data: [...page.data, ...next.data],
+        setLater({
+            id: c.id,
+            data: [...(after?.data ?? []), ...next.data],
             nextCursor: next.nextCursor,
         });
     }
@@ -754,7 +767,8 @@ function Changes({
         showSuccess(
             `${rolling.siteName}'s draft is back to how it was. Your live site hasn't changed.`,
         );
-        await load();
+        // Reads this sheet's first page again with the other tabs.
+        setLater(null);
         save.saved();
         return true;
     }

@@ -91,6 +91,8 @@ export const RQ_ROUTES: readonly string[] = [
     "/sites/[siteId]/versions/[publicationId]",
     "/sites/[siteId]/releases/[releaseId]",
     "/sites/[siteId]/publish-requests/[requestId]",
+    "/settings/billing/plans",
+    "/settings/integrations/google-calendar",
 ];
 
 export const RQ_DOMAINS: readonly string[] = [

@@ -4,7 +4,6 @@ import { writeAsOrg } from "@/lib/api/assert-active-org";
 
 import {
     disconnectAiConnection as disconnect,
-    readAiActivity as read,
     rollBackAiSiteDraft as rollBack,
 } from "./service";
 
@@ -15,11 +14,6 @@ const as = <R>(orgId: string | undefined, write: () => Promise<R>) =>
 /** Disconnect: the API lets anyone end their own, and the Owner anyone's. */
 export async function disconnectAiConnection(id: string, orgId?: string) {
     return as(orgId, () => disconnect(id));
-}
-
-/** A read: what the connection changed, when its sheet opens or for more. */
-export async function readAiActivity(id: string, cursor?: string) {
-    return read(id, cursor);
 }
 
 /** Draft only; refused when the draft changed outside the connection since. */

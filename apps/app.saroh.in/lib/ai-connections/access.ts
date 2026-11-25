@@ -5,9 +5,9 @@ import type { ServerRead } from "@/lib/query/route";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import type { NoAsk } from "@/lib/settings/queries";
 
-import type { AiAppsScreen } from "./queries";
-import { aiConnectionsRead } from "./queries";
-import { listAiConnections } from "./service";
+import type { AiActivityScreen, AiAppsScreen } from "./queries";
+import { aiActivityRead, aiConnectionsRead } from "./queries";
+import { listAiConnections, readAiActivity } from "./service";
 import type { AiConnection } from "./types";
 
 /** AI assistants: everyone in the business sees their own (the Owner everyone's). */
@@ -33,4 +33,29 @@ export const aiAppsServer: ServerRead<NoAsk, AiAppsScreen> = {
     service: async () => ({
         connections: (await listAiConnections()).map(connectionFacts),
     }),
+};
+
+export const aiActivityServer: ServerRead<
+    Parameters<typeof aiActivityRead.options>[1],
+    AiActivityScreen
+> = {
+    read: aiActivityRead,
+    // The API lets the person who connected it, or `apikey:manage`, read it.
+    service: async ({ connection, cursor }) => {
+        const page = await readAiActivity(connection, cursor);
+        if (!page) return null;
+        return {
+            data: page.data.map((c) => ({
+                id: c.id,
+                summary: c.summary,
+                at: c.at,
+            })),
+            nextCursor: page.nextCursor,
+            siteDrafts: page.siteDrafts.map((d) => ({
+                siteId: d.siteId,
+                siteName: d.siteName,
+                since: d.since,
+            })),
+        };
+    },
 };
