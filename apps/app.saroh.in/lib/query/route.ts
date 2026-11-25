@@ -173,12 +173,19 @@ export function readRoute<P, T>(
             if (!orgId) return refuse(401);
             if (claimed !== orgId) return refuse(409);
             setScopedOrg(orgId);
+            // The service starts beside the gate, not after it: the API
+            // checks role and membership on every call, and its answer is
+            // only sent once the gate says yes. A refused gate's answer wins
+            // over anything the service did (its reads are dropped; a GET
+            // lost with the response costs nothing).
+            const pending = (async () => def.service(parsed.data as P))();
+            pending.catch(() => undefined);
             // The gate reads this request's membership, so its no is the
             // role's: the browser doesn't take it for a stale business list.
             if (access && !(await access(orgId))) {
                 return answer(403, { code: ROLE_DENIED });
             }
-            const data = await def.service(parsed.data as P);
+            const data = await pending;
             if (data === null) return refuse(404);
             return answer(200, toWire(data));
         } catch (error) {

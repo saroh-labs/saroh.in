@@ -198,6 +198,26 @@ describe("Home's inline actions (real database)", () => {
         expect(await offered("PAYMENTS_OVERDUE_INVOICES", id)).toBeUndefined();
     });
 
+    it("reads each row's send flag in a batch exactly as the invoice's own read does", async () => {
+        const ids = [await overdueInvoice(), await overdueInvoice()];
+        await sending.remind(owner, ids[0]);
+        const now = new Date();
+        const flags = await sending.sendFlagsFor(
+            owner.organizationId,
+            [...ids, "inv_missing"],
+            now,
+        );
+        for (const id of ids) {
+            const { send } = await sending.readFor(
+                owner.organizationId,
+                id,
+                now,
+            );
+            expect(flags.get(id)).toEqual(send);
+        }
+        expect(flags.has("inv_missing")).toBe(false);
+    });
+
     it("offers nothing on an invoice that has been paid", async () => {
         const id = await overdueInvoice();
         await prisma.invoice.update({

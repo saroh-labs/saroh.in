@@ -21,12 +21,15 @@ import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { catalogueModulesFor } from "@saroh/pricing-catalog";
 
+import { getRequestContext } from "../../common/logging/request-context";
+
 import type { OrgRole } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import type { OrgAction } from "../organizations/organization-actions";
 import { can } from "../organizations/organization-policy";
+import { moduleLists } from "./module-lists-cache";
 import type {
     ModuleKey,
     ModuleLifecycle,
@@ -280,6 +283,27 @@ export class ModuleAvailabilityService {
      * registry label and the persisted lifecycle.
      */
     async listViews(
+        input: Omit<AvailabilityInput, "moduleKey">,
+    ): Promise<ModuleView[]> {
+        // Only inside a request, where a write forgets it; a job or a spec
+        // building the service by hand reads afresh.
+        if (!getRequestContext()) return this.readViews(input);
+        const who = input.organizationActions
+            ? [...input.organizationActions].sort().join(",")
+            : `role:${input.organizationRole}`;
+        // The project comes from the query: encoded, so it can't hold `|`.
+        const key = [
+            input.organizationId,
+            encodeURIComponent(input.projectId ?? ""),
+            input.organizationRole,
+            who,
+        ].join("|");
+        // A copy each: a caller can't change the kept list.
+        const views = await moduleLists.get(key, () => this.readViews(input));
+        return structuredClone(views as ModuleView[]);
+    }
+
+    private async readViews(
         input: Omit<AvailabilityInput, "moduleKey">,
     ): Promise<ModuleView[]> {
         const [availabilities, installations] = await Promise.all([

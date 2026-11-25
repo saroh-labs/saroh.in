@@ -516,9 +516,17 @@ export class ModuleReadinessRegistry {
             // that has sold has something to see before its site is visited.
             evaluate: async ({ organizationId }) => {
                 const where = { organizationId };
+                // Whether there is any, not how many: a busy site's count
+                // walks every event it has, on every module read.
                 const [events, aggregates, order, invoice] = await Promise.all([
-                    this.db.analyticsEvent.count({ where }),
-                    this.db.analyticsDailyAggregate.count({ where }),
+                    this.db.analyticsEvent.findFirst({
+                        where,
+                        select: { id: true },
+                    }),
+                    this.db.analyticsDailyAggregate.findFirst({
+                        where,
+                        select: { id: true },
+                    }),
                     this.db.order.findFirst({
                         where: { organizationId, paymentStatus: "PAID" },
                         select: { id: true },
@@ -528,7 +536,7 @@ export class ModuleReadinessRegistry {
                         select: { id: true },
                     }),
                 ]);
-                if (events > 0 || aggregates > 0 || order || invoice) {
+                if (events || aggregates || order || invoice) {
                     return active();
                 }
                 return setup(

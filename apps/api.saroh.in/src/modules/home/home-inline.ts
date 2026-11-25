@@ -375,26 +375,26 @@ export class HomeInlineService {
         const sending = this.sending;
         if (!sending || evidence.length === 0) return;
         if (!holds(input, "invoice:write")) return;
-        await Promise.all(
-            evidence.map(async (ev) => {
-                const { send } = await sending.readFor(
-                    input.organizationId,
-                    ev.id,
-                    now,
-                );
-                if (send.channels.length === 0) return;
-                if (send.nextReminderAt && new Date(send.nextReminderAt) > now)
-                    return;
-                const person = firstNameOf(ev.subtitle);
-                ev.inline = {
-                    kind: "SEND_REMINDER",
-                    ...reminderWords(person, send.channels, send.emailTo),
-                    undoable: true,
-                    target: ev.id,
-                    person,
-                };
-            }),
+        // Every row's flag in one batch, not each invoice's whole send read.
+        const flags = await sending.sendFlagsFor(
+            input.organizationId,
+            evidence.map((ev) => ev.id),
+            now,
         );
+        for (const ev of evidence) {
+            const send = flags.get(ev.id);
+            if (!send || send.channels.length === 0) continue;
+            if (send.nextReminderAt && new Date(send.nextReminderAt) > now)
+                continue;
+            const person = firstNameOf(ev.subtitle);
+            ev.inline = {
+                kind: "SEND_REMINDER",
+                ...reminderWords(person, send.channels, send.emailTo),
+                undoable: true,
+                target: ev.id,
+                person,
+            };
+        }
     }
 
     /**
