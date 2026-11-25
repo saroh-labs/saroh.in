@@ -286,27 +286,22 @@ test.describe("bookings calendar", () => {
         await signIn(page);
         await page.goto("/bookings?layout=week");
         if (test.info().project.name.startsWith("phone")) {
-            const strip = page.getByRole("radiogroup", {
-                name: "Pick a day of the week",
-            });
-            await expect(strip.getByRole("radio")).toHaveCount(7);
-            // Wednesday (Thursday when today is Wednesday, which is picked
-            // already and so never goes into the address): picked at once,
-            // kept in the address, and the list's count is the strip's.
-            const wednesday = strip.getByRole("radio", { name: /^Wed / });
-            const isToday =
-                (await wednesday.getAttribute("aria-checked")) === "true";
-            const wed = isToday
-                ? strip.getByRole("radio", { name: /^Thu / })
+            // The header's week strip, the one Day has (critique, 25 Nov).
+            const strip = page.getByRole("navigation", { name: "This week" });
+            await expect(strip.getByRole("link")).toHaveCount(7);
+            // Wednesday (Thursday when Wednesday is the day shown): it goes
+            // there in the week, kept in the address, and the list's count
+            // is the strip's.
+            const wednesday = strip.getByRole("link", { name: /^Wed / });
+            const picked =
+                (await wednesday.getAttribute("aria-current")) === "date";
+            const wed = picked
+                ? strip.getByRole("link", { name: /^Thu / })
                 : wednesday;
-            // Pressed before hydration, a day does nothing: press until picked.
-            await pressUntil(
-                wed,
-                async () => (await wed.getAttribute("aria-checked")) === "true",
-            );
-            await expect(wed).toHaveAttribute("aria-checked", "true");
-            await expect(page).toHaveURL(/layout=week/);
             const label = (await wed.getAttribute("aria-label")) ?? "";
+            await wed.click();
+            await expect(wed).toHaveAttribute("aria-current", "date");
+            await expect(page).toHaveURL(/layout=week/);
             const date = label.split(",")[0] ?? "";
             await expect(page).toHaveURL(
                 new RegExp(
@@ -319,14 +314,21 @@ test.describe("bookings calendar", () => {
                     name: new RegExp(`^${date}`),
                 }),
             ).toBeVisible();
-            const n = /(\d+) booking/.exec(label)?.[1];
-            if (n !== undefined) {
+            const words = /, (\d+ sessions? · \d+ (?:person|people))$/.exec(
+                label,
+            )?.[1];
+            if (words !== undefined) {
                 await expect(
-                    page.getByText(new RegExp(`^${n} bookings?( · |$)`)),
+                    page
+                        .locator('[data-week-view="phone"]')
+                        .getByText(new RegExp(`^${words}( · |$)`)),
                 ).toBeVisible();
             } else {
                 await expect(
-                    page.getByText("Closed", { exact: true }),
+                    page
+                        .getByText(/^(Closed|Nothing booked)/)
+                        .filter({ visible: true })
+                        .first(),
                 ).toBeVisible();
             }
             // The 880px grid never draws on a phone, and nothing hides
@@ -343,7 +345,7 @@ test.describe("bookings calendar", () => {
                 .filter({ visible: true });
             await expect(headings).toHaveCount(7);
             await expect(headings.first()).toHaveAccessibleName(
-                /^Mon \d+ \w+(, today)?, (closed|\d+ booked)/,
+                /^Mon \d+ \w+(, today)?, (closed|nothing booked|\d+ sessions?)/,
             );
             await expect(
                 page.getByText(/The bar under each day shows how full it is\./),
