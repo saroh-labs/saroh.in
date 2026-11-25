@@ -33,6 +33,7 @@ export const RQ_ROUTES: readonly string[] = [
     "/settings/people",
     "/settings/profile",
     "/settings/organization",
+    "/social",
 ];
 
 export const RQ_DOMAINS: readonly string[] = [
@@ -45,4 +46,5 @@ export const RQ_DOMAINS: readonly string[] = [
     "customers",
     "stock",
     "settings",
+    "social",
 ];

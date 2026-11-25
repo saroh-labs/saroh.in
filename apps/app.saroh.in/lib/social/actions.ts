@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import type { OwnPostInput } from "./own-posts";
 import { createOwnPost, deleteOwnPost, updateOwnPost } from "./own-posts";
 
@@ -11,7 +13,12 @@ export async function saveOwnPost(id: string | null, input: OwnPostInput) {
     return id ? updateOwnPost(id, input) : createOwnPost(input);
 }
 
-/** Delete an own post (Your posts, "Delete this draft"). */
-export async function removeOwnPost(id: string) {
-    return deleteOwnPost(id);
+/**
+ * Delete an own post (Your posts, "Delete this draft"). Social's Your
+ * posts passes the tab's business last (`writeAsOrg`).
+ */
+export async function removeOwnPost(id: string, orgId?: string) {
+    return orgId
+        ? writeAsOrg(orgId, () => deleteOwnPost(id))
+        : deleteOwnPost(id);
 }
