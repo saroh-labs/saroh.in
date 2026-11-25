@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+
 import type { ModuleImpact, ModuleLifecycle } from "./schema";
 import type { ModuleMutationResult } from "./service";
 import {
@@ -24,7 +26,15 @@ export async function setModuleStatusAction(
     moduleKey: string,
     status: ModuleLifecycle,
     options?: { reason?: string; acknowledgedBlockerCodes?: string[] },
+    orgId?: string,
 ): Promise<ModuleMutationResult> {
+    // From Modules on React Query: the tab's business, nothing revalidated
+    // (`afterSettingsSave()` reads the tab and the shell again).
+    if (orgId) {
+        return writeAsOrg(orgId, () =>
+            setStatusApi(moduleKey, status, options),
+        );
+    }
     const result = await setStatusApi(moduleKey, status, options);
     if (result.ok) revalidatePath(MODULES_PATH);
     return result;

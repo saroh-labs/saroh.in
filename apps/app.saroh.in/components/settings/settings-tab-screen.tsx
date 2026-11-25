@@ -2,10 +2,8 @@
 
 import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
-import type { UseQueryResult } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { OrganizationSettingsForm } from "@/components/organizations/business-settings/organization-settings-form";
@@ -16,7 +14,6 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/page/settings-panel";
-import { SettingsSectionError } from "@/components/settings/page/settings-section-error";
 import { YourProfile } from "@/components/settings/profile/your-profile";
 import {
     ReadyChecklist,
@@ -24,13 +21,13 @@ import {
 } from "@/components/settings/ready/ready-checklist";
 import { ShowSetupOnHome } from "@/components/settings/ready/show-setup-on-home";
 import { SettingsColumns } from "@/components/shared/page/settings-columns";
+
 import type { AlertPreferences } from "@/lib/notifications/preferences";
 import { kindWords } from "@/lib/organizations/kind";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/time-zones";
 import { useOrgId } from "@/lib/query/org";
 import type { InPlaceTab, ProfileScreen } from "@/lib/settings/queries";
 import { inPlaceTab, profileRead } from "@/lib/settings/queries";
-import type { SettingsSection } from "@/lib/settings/section-failure";
 import {
     useOrganizationScreen,
     usePeopleScreen,
@@ -38,9 +35,14 @@ import {
     useSettingsStale,
 } from "@/lib/settings/use-settings";
 import { shellLiveRead } from "@/lib/shell/queries";
+import { BillingContainer } from "./tabs/billing-tab";
+import { Drawn } from "./tabs/drawn";
+import { ModulesContainer } from "./tabs/modules-tab";
+import { ProvidersContainer } from "./tabs/providers-tab";
 
 /**
- * Team, Your profile and Business on React Query (DEC-259). Each tab's
+ * Team, Your profile, Business, Modules, Integrations and Plan and billing
+ * on React Query (DEC-259). Each tab's
  * page checks its gate and the read loads here; between these three the side list changes the
  * address in place (`SettingsTabs`), and this draws the tab the address
  * names from the cache: a tab seen a moment ago costs no read, a new one
@@ -57,32 +59,10 @@ export function SettingsTabScreen({
     const tab = inPlaceTab(usePathname()) ?? served;
     if (tab === "/settings/people") return <PeopleContainer />;
     if (tab === "/settings/profile") return <ProfileContainer />;
+    if (tab === "/settings/modules") return <ModulesContainer />;
+    if (tab === "/settings/integrations") return <ProvidersContainer />;
+    if (tab === "/settings/billing") return <BillingContainer />;
     return <OrganizationContainer kind={kind} />;
-}
-
-/** The tab's loading or failed state, or its view once read. */
-function Drawn<T>({
-    query,
-    section,
-    loading,
-    children,
-}: {
-    query: UseQueryResult<T>;
-    section: SettingsSection;
-    loading: ReactNode;
-    children: (data: T) => ReactNode;
-}) {
-    if (query.data !== undefined) return children(query.data);
-    if (query.isError) {
-        return (
-            <SettingsSectionError
-                section={section}
-                error={query.error}
-                retry={() => void query.refetch()}
-            />
-        );
-    }
-    return loading;
 }
 
 function PeopleContainer() {

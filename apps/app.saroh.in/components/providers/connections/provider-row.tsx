@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { showSuccess } from "@saroh/ui/toast";
 import { ExternalLink, Unplug } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import {
@@ -22,6 +21,7 @@ import type {
     ConnectedPaymentProvider,
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
@@ -96,7 +96,7 @@ export function ProviderRowView({
     /** Each payment provider's webhook, for setup; `null` when unread. */
     webhooks: PaymentWebhookSetup[] | null;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [open, setOpen] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const detailsId = useId();
@@ -135,11 +135,17 @@ export function ProviderRowView({
         if (!target) return;
         const res =
             target.kind === "payments"
-                ? await disconnectPaymentProvider(target.provider)
-                : await disconnectCommsProvider(target.channel);
+                ? await disconnectPaymentProvider(
+                      target.provider,
+                      ...asOrg(save.orgId),
+                  )
+                : await disconnectCommsProvider(
+                      target.channel,
+                      ...asOrg(save.orgId),
+                  );
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${entry.name} disconnected.`);
-        router.refresh();
+        save.saved({ shell: true });
     }
 
     return (

@@ -82,6 +82,9 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "settings/(sections)/people": "settings",
     "settings/(sections)/profile": "settings",
     "settings/(sections)/organization": "settings",
+    "settings/(sections)/modules": "settings",
+    "settings/(sections)/integrations": "settings",
+    "settings/(sections)/billing": "settings",
     // Ask AI's full page draws its list and conversation edge to edge.
     ask: "full",
     // The post editor owns its viewport.

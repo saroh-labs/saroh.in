@@ -1,3 +1,5 @@
+import { matchRoute } from "@/lib/query/live-routes";
+
 /**
  * The workspace's routes on React Query (DEC-259), registered by route glob
  * in the unit that moves them: an exact path, `[param]` for one segment
@@ -33,6 +35,9 @@ export const RQ_ROUTES: readonly string[] = [
     "/settings/people",
     "/settings/profile",
     "/settings/organization",
+    "/settings/modules",
+    "/settings/integrations",
+    "/settings/billing",
     "/social",
 ];
 
@@ -47,4 +52,11 @@ export const RQ_DOMAINS: readonly string[] = [
     "stock",
     "settings",
     "social",
+    "modules",
+    "providers",
 ];
+
+/** Whether `pathname` is one of {@link RQ_ROUTES}. */
+export function isRqRoute(pathname: string | null | undefined): boolean {
+    return !!pathname && RQ_ROUTES.some((glob) => matchRoute(glob, pathname));
+}

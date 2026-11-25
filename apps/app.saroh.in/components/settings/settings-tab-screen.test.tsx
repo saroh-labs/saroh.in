@@ -52,6 +52,16 @@ vi.mock("@/components/settings/profile/your-profile", async () => {
         ),
     };
 });
+// Modules, Integrations and Plan and billing are tested in `tabs/`.
+vi.mock("./tabs/modules-tab", () => ({
+    ModulesContainer: () => <p data-tab="modules" />,
+}));
+vi.mock("./tabs/providers-tab", () => ({
+    ProvidersContainer: () => <p data-tab="integrations" />,
+}));
+vi.mock("./tabs/billing-tab", () => ({
+    BillingContainer: () => <p data-tab="billing" />,
+}));
 vi.mock("@/components/settings/page/settings-panel", () => ({
     SettingsPanel: ({ children }: { children: React.ReactNode }) => (
         <div>{children}</div>

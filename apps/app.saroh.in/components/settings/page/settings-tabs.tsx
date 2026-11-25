@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 import { SETTINGS_PAGES } from "@/components/shared/navigation/nav-items";
+import { useHeldIntegrationsNote } from "@/lib/providers/use-providers";
 import { IN_PLACE_TABS, inPlaceTab } from "@/lib/settings/queries";
 import { settingsPageLabel } from "@/lib/settings/search";
 import { SectionList } from "@saroh/ui/section-list";
@@ -45,6 +46,13 @@ export function SettingsTabs({
     kind?: string;
 }) {
     const pathname = usePathname();
+    // Integrations' own read knows its line better than the server's
+    // render once a connect there has changed it.
+    const held = useHeldIntegrationsNote();
+    const noteOf = (href: string) =>
+        href === "/settings/integrations" && held !== undefined
+            ? (held ?? undefined)
+            : notes?.[href];
     const pages = SETTINGS_PAGES.filter((page) => hrefs.includes(page.href));
     // In place there is no server render to write the title: it follows
     // the address here, Back and Forward included. The unread count in
@@ -90,7 +98,7 @@ export function SettingsTabs({
                 href: page.href,
                 icon: page.icon,
                 description: page.description,
-                note: notes?.[page.href],
+                note: noteOf(page.href),
             }))}
         />
     );

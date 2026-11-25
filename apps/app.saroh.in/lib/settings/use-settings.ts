@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClientContext, useQuery } from "@tanstack/react-query";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useContext, useMemo } from "react";
 
 import {
@@ -8,6 +9,7 @@ import {
     invalidateOrganizations,
 } from "@/lib/query/invalidate";
 import { useOrgId, useOrgIdOrNull } from "@/lib/query/org";
+import { isRqRoute } from "@/lib/query/rq-routes";
 
 import {
     organizationRead,
@@ -92,4 +94,35 @@ export function useSettingsSave(): SettingsSave {
 /** The trailing `orgId` argument, or none: an action called outside a business keeps its old call. */
 export function asOrg(orgId: string | undefined): [] | [string] {
     return orgId ? [orgId] : [];
+}
+
+/**
+ * After a save from a part shared with a screen still drawn on the server
+ * (Plan and billing's parts on Change plan, Try again on Developers): on a
+ * React Query tab the Settings tabs read again; elsewhere the server draws
+ * the page again, as before.
+ */
+export function useSettingsRefresh(): () => void {
+    const server = useServerRefresh();
+    const pathname = usePathname();
+    const save = useSettingsSave();
+    return useCallback(() => {
+        if (isRqRoute(pathname)) save.saved();
+        else server();
+    }, [pathname, save, server]);
+}
+
+/**
+ * The server's half of a save already told to the queries
+ * (`afterSettingsSave()`): a screen still drawn on the server (Change
+ * plan) is drawn again; a React Query route is left alone.
+ */
+export function useServerRefresh(): () => void {
+    const router = useRouter();
+    const pathname = usePathname();
+    return useCallback(() => {
+        if (isRqRoute(pathname)) return;
+        // rq-refresh-ok: only off React Query routes (Change plan, Developers draw on the server).
+        router.refresh();
+    }, [pathname, router]);
 }

@@ -116,6 +116,9 @@ export const IN_PLACE_TABS = [
     "/settings/people",
     "/settings/profile",
     "/settings/organization",
+    "/settings/modules",
+    "/settings/integrations",
+    "/settings/billing",
 ] as const;
 export type InPlaceTab = (typeof IN_PLACE_TABS)[number];
 
