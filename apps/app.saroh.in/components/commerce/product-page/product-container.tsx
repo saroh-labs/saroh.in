@@ -23,6 +23,7 @@ import {
 } from "@/components/commerce/quick-edits/quick-edits";
 import type { PausedCut } from "@/lib/billing/paused";
 import { pausedByCut, pausedWords } from "@/lib/billing/paused";
+import { useCollections } from "@/lib/collections/use-collections";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { ProductTab } from "@/lib/products/links";
 import { productHref } from "@/lib/products/links";
@@ -30,6 +31,7 @@ import { priceLabel, stockBadge } from "@/lib/products/overview-rules";
 import { accessLine, shopProductUrl } from "@/lib/products/overview-words";
 import type { ProductAsk } from "@/lib/products/queries";
 import { countsStock, trackingControl } from "@/lib/products/tracking";
+import { useCategories } from "@/lib/products/use-product-settings";
 import {
     useProduct,
     useProductsSaved,
@@ -48,9 +50,10 @@ type OverviewTab = ComponentProps<typeof ProductOverviewTab>;
  * shelves where shown), so a quick edit (archive, publish, add stock,
  * price) shows at once everywhere on the page and a sheet's save reads it
  * again, never the whole page. The Stock tab's log and checks are Stock's
- * queries, read again with the product after a stock change there. What
- * only the server reads for a tab (price history, collections) comes in as
- * props.
+ * queries, read again with the product after a stock change there. The
+ * categories (for a writer's sheets and the Collections tab) and the
+ * collections (that tab's counts and sheets) are their own queries; what
+ * only the server reads for a tab (price history) comes in as props.
  */
 export function ProductContainer({
     ask,
@@ -63,8 +66,6 @@ export function ProductContainer({
     webShop,
     share: shareSetup,
     canReplyReviews,
-    categories,
-    collections,
     priceHistory,
     sellsFood,
     waiting,
@@ -85,8 +86,6 @@ export function ProductContainer({
     webShop: string | null | undefined;
     share: ShareSetup | null;
     canReplyReviews: boolean;
-    categories: ComponentProps<typeof ProductCollectionsTab>["categories"];
-    collections: ComponentProps<typeof ProductCollectionsTab>["collections"];
     priceHistory: OverviewTab["priceHistory"];
     sellsFood: boolean;
     waiting: StockTab["waiting"];
@@ -112,11 +111,25 @@ export function ProductContainer({
             : stockShown);
     const logRead = useStockLog(productLogAsk(ask.productId), onStock);
     const checksRead = useStockChecks(ALL_CHECKS, onStock);
+    const onCollections = tab === "collections" && view === "team";
+    // A writer's sheets pick a category; the Collections tab says which put
+    // it in an automatic one. Unread, none is offered (as before).
+    const categoriesRead = useCategories(
+        {},
+        onCollections || data?.overview.canWrite === true,
+    );
+    const collectionsRead = useCollections(onCollections);
+    const categories = categoriesRead.data?.categories ?? [];
     // A first read that failed is the page failing (`error.tsx`); a read
     // again that fails keeps the last answer (react-query keeps it). The
     // Stock tab waits for its log and checks too, never said unread first.
     if (productRead.isError && !data) throw productRead.error;
-    if (!data || (onStock && (logRead.isPending || checksRead.isPending))) {
+    if (
+        !data ||
+        (onStock && (logRead.isPending || checksRead.isPending)) ||
+        // Never "no collections" while they are on their way.
+        (onCollections && collectionsRead.isPending)
+    ) {
         return skeleton;
     }
 
@@ -308,7 +321,9 @@ export function ProductContainer({
                                 {tab === "collections" ? (
                                     <ProductCollectionsTab
                                         overview={overview}
-                                        collections={collections}
+                                        collections={
+                                            collectionsRead.data ?? null
+                                        }
                                         categories={categories}
                                         retryHref={href("collections")}
                                         onShop={shopUrl !== null}

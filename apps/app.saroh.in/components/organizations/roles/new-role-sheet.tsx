@@ -5,10 +5,10 @@ import { Refusal } from "@/components/shared/states/refusal";
 import { runAction } from "@/lib/api/run-action";
 import { createRole } from "@/lib/organizations/role-actions";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { RadioCards } from "@saroh/ui/choice-group";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { RoleNameField } from "./role-name-field";
 import { ROLE_LABEL, ROLE_PLAIN } from "./role-words";
@@ -44,7 +44,7 @@ export function NewRoleSheet({
     holds: (action: string) => boolean;
     onCreated: (key: string) => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [pending, setPending] = useState(false);
     const [label, setLabel] = useState("");
     const [from, setFrom] = useState<string>("");
@@ -81,7 +81,11 @@ export function NewRoleSheet({
         if (label.trim().length === 0) return;
         setError(null);
         const res = await runAction(
-            () => createRole({ label: label.trim(), actions }),
+            () =>
+                createRole(
+                    { label: label.trim(), actions },
+                    ...asOrg(save.orgId),
+                ),
             // Said in the sheet, beside what was typed.
             { setBusy: setPending, quiet: true, onUnreached: setError },
         );
@@ -104,7 +108,7 @@ export function NewRoleSheet({
         showSuccess("Role created.");
         onCreated(res.data.key);
         close();
-        router.refresh();
+        save.saved({ organizations: true });
     }
 
     return (

@@ -2,7 +2,7 @@
 
 import { plural } from "@/lib/format/plural";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useStartingCurrency } from "@/components/shared/fields/business-country";
@@ -42,6 +42,8 @@ import type { EnableResult } from "@/lib/modules/turn-on-service";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
 import { connectLockFor } from "@/lib/providers/connect-lock";
 import { afterSettingsSave } from "@/lib/query/invalidate";
+import { isRqRoute } from "@/lib/query/rq-routes";
+import { useServerRefresh, useSettingsSave } from "@/lib/settings/use-settings";
 import type { SuggestionBasis } from "@/lib/sites/template-picker";
 import { moduleStatesWith } from "@/lib/sites/template-picker";
 import { templateChoiceOn } from "@/lib/sites/templates-switch";
@@ -69,6 +71,12 @@ export function useTurnOn({
     nothingRequired?: boolean;
 }) {
     const router = useRouter();
+    // A module on changes a server-drawn page's gates (a module guard), so
+    // that page is drawn again; a React Query route reads its settings.
+    const serverRefresh = useServerRefresh();
+    const pathname = usePathname();
+    const { orgId } = useSettingsSave();
+    const asTab = isRqRoute(pathname) ? orgId : undefined;
     const currency = useStartingCurrency();
     const trade = useBusinessTrade();
     const tradeOther = useBusinessTradeOther();
@@ -229,6 +237,7 @@ export function useTurnOn({
             const res: EnableResult = await enableModuleAction(
                 key,
                 setupFor(key, sent),
+                asTab,
             ).catch(() => ({
                 ok: false as const,
                 error: UNREACHED,
@@ -277,8 +286,7 @@ export function useTurnOn({
                 // What did turn on shows behind the sheet.
                 if (onAlready.length > 0) {
                     afterSettingsSave();
-                    // rq-refresh-ok: a module on changes the page's server gates.
-                    router.refresh();
+                    serverRefresh();
                 }
                 return;
             }
@@ -306,8 +314,7 @@ export function useTurnOn({
             firstRun ? { siteId: siteId.current } : undefined,
         );
         if (href) router.push(href);
-        // rq-refresh-ok: a module on changes the page's server gates.
-        else router.refresh();
+        else serverRefresh();
     };
 
     // The template a new website starts from (DEC-070, K15), when said.

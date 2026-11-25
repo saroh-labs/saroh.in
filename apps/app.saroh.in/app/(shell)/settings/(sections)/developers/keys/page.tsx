@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 
-import { Keys } from "@/components/settings/developers/keys";
+import { KeysContainer } from "@/components/settings/developers/containers";
 import { DevelopersLocked } from "@/components/settings/developers/locked";
-import { listApiKeys, readApiUsage } from "@/lib/api-keys/service";
+import { readApiUsage } from "@/lib/api-keys/service";
 import { upgradeHref } from "@/lib/billing/access";
 import { DOCS_URL } from "@/lib/help/links";
 import {
@@ -19,6 +19,9 @@ import { apiAreaOn } from "@/lib/settings/api-area-switch";
  * (`apikey:manage`). Off by its switches, the address is not found; off
  * by the plan, the tab stays and says which plan has it (on an edition
  * before its paid plans, "Coming with paid plans").
+ *
+ * On React Query (DEC-259): those are the gate; the keys load in the
+ * browser (`/api/settings/developers/keys`), each masked to its start.
  */
 export const metadata = { title: "Connections · API and AI apps · Settings" };
 
@@ -45,21 +48,15 @@ export default async function KeysPage() {
             />
         );
     }
-    const [keys, zone] = await Promise.all([
-        listApiKeys(),
-        activeBusinessZone(),
-    ]);
     return (
-        <Keys
-            keys={keys}
+        <KeysContainer
             selfId={session.user.id}
             business={business}
             actions={org?.actions ?? []}
             open={usage.keys.open}
-            count={usage.keys.count}
             cap={usage.keys.cap}
             docs={DOCS_URL}
-            zone={zone}
+            zone={await activeBusinessZone()}
         />
     );
 }

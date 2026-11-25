@@ -65,8 +65,13 @@ export interface EditorShellProps<V extends Record<string, unknown>> {
     canEdit: boolean;
     /** The read-only note's first sentence, when `canEdit` is false. */
     readOnlyText?: string;
-    /** Where the record sits: "Payments › Plans › Monthly", links and all. */
-    breadcrumb?: ReactNode[];
+    /**
+     * Where the record sits: "Payments › Plans › Monthly", links and all,
+     * from what the server last answered (null before the first save), so
+     * a new record's crumb follows its first save without the page drawn
+     * again.
+     */
+    breadcrumb?: (record: EditorRecord<V> | null) => ReactNode[];
     /** The header's title: the name typed so far, or "New plan". */
     titleOf: (values: V, record: EditorRecord<V> | null) => string;
     /**
@@ -96,6 +101,11 @@ export interface EditorShellProps<V extends Record<string, unknown>> {
     afterDeleteHref: string;
     /** The toast after Publish ("Monthly is open for sign-ups."). */
     publishedMessage: (record: EditorRecord<V>, wasLive: boolean) => string;
+    /**
+     * After Publish, Discard or Delete draft landed: the editor's domain
+     * reads again what changed (`useClassPackSave`, `useSubscriptionSave`).
+     */
+    saved: () => Promise<void>;
     /** The side column (At a glance). */
     aside?: (fields: EditorFields<V>) => ReactNode;
     /** The record's sections. */
@@ -136,6 +146,7 @@ export function EditorShell<V extends Record<string, unknown>>(
         viewable,
         afterDeleteHref,
         publishedMessage,
+        saved,
         aside,
         children,
         autosaveDelayMs,
@@ -249,7 +260,7 @@ export function EditorShell<V extends Record<string, unknown>>(
                 return;
             }
             showSuccess(publishedMessage(res.data, wasLive));
-            router.refresh();
+            await saved();
         } finally {
             setBusy(false);
         }
@@ -267,7 +278,7 @@ export function EditorShell<V extends Record<string, unknown>>(
             }
             setRefused(null);
             showSuccess("Changes discarded.");
-            router.refresh();
+            await saved();
         } finally {
             setBusy(false);
         }
@@ -280,7 +291,8 @@ export function EditorShell<V extends Record<string, unknown>>(
         if (res?.ok) {
             showSuccess("Draft deleted.");
             router.push(afterDeleteHref);
-            router.refresh();
+            // Leaving anyway: a failed re-read must not leave it busy.
+            await saved().catch(() => undefined);
             return;
         }
         setBusy(false);
@@ -321,7 +333,7 @@ export function EditorShell<V extends Record<string, unknown>>(
     return (
         <main className="w-full pb-8">
             <PublishBanner
-                breadcrumb={breadcrumb}
+                breadcrumb={breadcrumb?.(record)}
                 title={title}
                 pill={pill}
                 line={line}

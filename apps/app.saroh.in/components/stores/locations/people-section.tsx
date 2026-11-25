@@ -8,7 +8,6 @@ import {
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useHold } from "@/components/shared/undo/use-hold";
@@ -29,6 +28,7 @@ import {
     roleLabel,
     shownInvitations,
 } from "@/lib/stores/people";
+import { useLocationSave } from "@/lib/stores/use-stores";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
@@ -69,7 +69,9 @@ export function PeopleSection({
     /** `null` when the roster couldn't be read. */
     people: LocationPeople | null;
 }) {
-    const router = useRouter();
+    // Each change reads the location (its roster) again once (DEC-259).
+    const located = useLocationSave();
+    const reread = () => located.reread(store.id);
     const [inviting, setInviting] = useState(false);
     // Removing someone cannot be undone from here (bringing them back means
     // a new invitation they have to accept), so it asks first.
@@ -97,7 +99,7 @@ export function PeopleSection({
             <FailedState
                 size="panel"
                 title={couldntLoad("the people here")}
-                onRetry={() => router.refresh()}
+                onRetry={() => void reread()}
             />,
         );
     }
@@ -122,7 +124,7 @@ export function PeopleSection({
 
     async function onChangeRole(userId: string, next: MemberRole) {
         const res = await runAction(
-            () => updateMemberRole(store.id, userId, next),
+            () => updateMemberRole(store.id, userId, next, located.orgId),
             { setBusy: (on) => setBusy(on ? userId : null) },
         );
         if (!res) return;
@@ -131,17 +133,18 @@ export function PeopleSection({
             return;
         }
         showSuccess("Role saved.");
-        router.refresh();
+        await reread();
     }
 
     async function onRemove(userId: string): Promise<ConfirmResult> {
-        const res = await runAction(() => removeMember(store.id, userId), {
-            setBusy: (on) => setBusy(on ? userId : null),
-        });
+        const res = await runAction(
+            () => removeMember(store.id, userId, located.orgId),
+            { setBusy: (on) => setBusy(on ? userId : null) },
+        );
         if (!res) return;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Person removed.");
-        router.refresh();
+        await reread();
     }
 
     /**
@@ -156,12 +159,16 @@ export function PeopleSection({
             `invitation:${invitationId}`,
             "Invitation cancelled.",
             async () => {
-                const res = await revokeInvitation(store.id, invitationId);
+                const res = await revokeInvitation(
+                    store.id,
+                    invitationId,
+                    located.orgId,
+                );
                 if (!res.ok) {
                     showError("The invitation wasn't cancelled.", res.error);
                     back();
                 }
-                router.refresh();
+                await reread();
             },
             back,
         );

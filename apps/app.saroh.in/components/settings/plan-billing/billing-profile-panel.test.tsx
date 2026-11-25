@@ -10,9 +10,14 @@
  * the row says the move is pending, with a way to cancel it. Made-up
  * profiles. Hidden for an Admin: `plan-owner-only.test.tsx`.
  */
+import type { QueryClient } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
+
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -117,8 +122,28 @@ afterEach(() => {
     document.body.innerHTML = "";
 });
 
+/** Plan and billing on React Query (DEC-259): a save reads the Settings tabs again. */
+let client: QueryClient;
+let invalidate: ReturnType<typeof vi.spyOn>;
 function draw(view: BusinessBillingProfile | null) {
-    act(() => root.render(<BillingProfilePanel view={view} />));
+    client = makeTestClient();
+    invalidate = vi.spyOn(client, "invalidateQueries");
+    act(() =>
+        root.render(
+            <QueryClientProvider client={client}>
+                <OrgProvider orgId="org_1">
+                    <BillingProfilePanel view={view} />
+                </OrgProvider>
+            </QueryClientProvider>,
+        ),
+    );
+}
+/** Saved: the tab is read again, with no server render. */
+function readAgain() {
+    expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ["settings", "org_1"],
+    });
+    expect(refresh).not.toHaveBeenCalled();
 }
 
 const sheet = () => document.body.querySelector<HTMLElement>("[role=dialog]");
@@ -228,10 +253,12 @@ describe("Edit: a profile used by several businesses", () => {
         });
         type(field("Billing address"), "4 Lake View");
         await press(button("Save for 3 businesses", sheet()));
-        expect(updateBillingProfileAction).toHaveBeenCalledWith("bprof_ka", {
-            addressLine1: "4 Lake View",
-        });
-        expect(refresh).toHaveBeenCalled();
+        expect(updateBillingProfileAction).toHaveBeenCalledWith(
+            "bprof_ka",
+            { addressLine1: "4 Lake View" },
+            "org_1",
+        );
+        readAgain();
         expect(sheet()).toBeNull();
     });
 
@@ -264,8 +291,11 @@ describe("Change: who Saroh bills", () => {
         await press(button("Change", host));
         await press(choice("Asha Fitness"));
         await submit();
-        expect(chooseBillingProfileAction).toHaveBeenCalledWith("bprof_mh");
-        expect(refresh).toHaveBeenCalled();
+        expect(chooseBillingProfileAction).toHaveBeenCalledWith(
+            "bprof_mh",
+            "org_1",
+        );
+        readAgain();
     });
 
     it("says a payment waiting under the choices, the sheet open", async () => {
@@ -318,6 +348,7 @@ describe("Change: who Saroh bills", () => {
                 billingEmail: "fitness@example.com",
             },
             true,
+            "org_1",
         );
         const email = field("Billing email");
         expect(email.getAttribute("aria-invalid")).toBe("true");
@@ -366,11 +397,14 @@ describe("a paid plan moving at its renewal (U6)", () => {
         await press(button("Change", host));
         await press(choice("Asha Fitness"));
         await submit();
-        expect(chooseBillingProfileAction).toHaveBeenCalledWith("bprof_mh");
+        expect(chooseBillingProfileAction).toHaveBeenCalledWith(
+            "bprof_mh",
+            "org_1",
+        );
         expect(sheet()?.textContent).toContain(
             `From ${on()}, Saroh bills Asha Fitness. Authorise the payment to finish.`,
         );
-        expect(refresh).toHaveBeenCalled();
+        readAgain();
 
         openRazorpayWindow.mockResolvedValue("paid");
         confirmCheckoutAction.mockResolvedValue({
@@ -425,11 +459,14 @@ describe("a paid plan moving at its renewal (U6)", () => {
             "Choose Asha Foods LLP to cancel the move to Asha Fitness.",
         );
         await submit();
-        expect(chooseBillingProfileAction).toHaveBeenCalledWith("bprof_ka");
+        expect(chooseBillingProfileAction).toHaveBeenCalledWith(
+            "bprof_ka",
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "The move to Asha Fitness is cancelled. Saroh keeps billing Asha Foods LLP.",
         );
-        expect(refresh).toHaveBeenCalled();
+        readAgain();
         expect(sheet()).toBeNull();
     });
 

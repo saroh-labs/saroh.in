@@ -182,7 +182,10 @@ describe("Members can pause from their account", () => {
         draw();
         await press(button("Edit: Members can pause from their account"));
         await press(flip());
-        expect(actions.setMembersCanPause).toHaveBeenCalledWith(false);
+        expect(actions.setMembersCanPause).toHaveBeenCalledWith(
+            false,
+            undefined,
+        );
         expect(flip()?.getAttribute("aria-checked")).toBe("false");
         expect(row()).toBe(
             "No. You can still pause anyone from their subscription.",
@@ -198,7 +201,10 @@ describe("Members can pause from their account", () => {
         await act(async () => {
             await expect(undo()).resolves.toEqual({ ok: true });
         });
-        expect(actions.setMembersCanPause).toHaveBeenLastCalledWith(true);
+        expect(actions.setMembersCanPause).toHaveBeenLastCalledWith(
+            true,
+            undefined,
+        );
         expect(row()).toBe("Yes, for 2, 4 or 8 weeks.");
         expect(flip()?.getAttribute("aria-checked")).toBe("true");
     });

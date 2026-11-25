@@ -20,6 +20,8 @@ export interface SectionItem<V extends string = string> {
     note?: string;
     /** Button mode: the panel this section shows. */
     controls?: string;
+    /** Link mode: the link's client navigation, as `next/link` takes it. */
+    onNavigate?: (e: { preventDefault: () => void }) => void;
 }
 
 /**
@@ -119,6 +121,7 @@ export function SectionList<V extends string = string>({
                 key={item.value}
                 id={`${idPrefix}-${item.value}`}
                 href={item.href ?? "#"}
+                onNavigate={item.onNavigate}
                 aria-current={on ? "page" : undefined}
                 className={cn(cls, "relative")}
             >

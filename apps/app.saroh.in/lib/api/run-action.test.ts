@@ -160,6 +160,10 @@ const CATCHES_ITSELF = [
     "await bookingSave(",
     // `useOrderSave().saved`: reads the screen's queries again, never throws.
     "await saved(",
+    // `useLocationsSave().listed`: re-reads the list through `settle`, never throws.
+    "await located.listed(",
+    // `useClassPackSave().saved` (`packsSaved`): re-reads, swallows its own failure.
+    "await save.saved(",
 ];
 
 function sources(dir: string): string[] {

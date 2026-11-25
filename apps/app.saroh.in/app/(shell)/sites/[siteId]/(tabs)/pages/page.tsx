@@ -3,10 +3,10 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { FileText, Plug } from "lucide-react";
-import { notFound, redirect, unstable_rethrow } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { PagesArea } from "@/components/sites/pages-area/pages-area";
+import { SitePagesContainer } from "@/components/sites/area/site-screens";
 import {
     liveAiApps,
     offersAssistantWayIn,
@@ -15,21 +15,11 @@ import { listAiConnections } from "@/lib/ai-connections/service";
 import { formatList } from "@/lib/home/needs";
 import { requireSession } from "@/lib/session";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
-import { businessAddress } from "@/lib/sites/default-site";
 import {
     describePendingChanges,
     pendingChangeCount,
 } from "@/lib/sites/pending";
-import {
-    getSite,
-    getSiteChanges,
-    getSiteOverview,
-    listSiteRedirects,
-} from "@/lib/sites/service";
-import {
-    readWebAddressLinks,
-    RENDERER_APEX,
-} from "@/lib/sites/share-links-read";
+import { getSite } from "@/lib/sites/service";
 import { pageState } from "@/lib/sites/site-state";
 import { pageUpdatedIso } from "@/lib/sites/updated";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
@@ -60,8 +50,8 @@ export default async function SitePagesPage({
 }) {
     const { siteId } = await params;
     const session = await requireSession();
-    if (await websiteAreaOn())
-        return <WebsitePages siteId={siteId} userId={session.user.id} />;
+    // The Website area: on React Query (DEC-259), read in the browser.
+    if (await websiteAreaOn()) return <SitePagesContainer siteId={siteId} />;
     const site = await getSite(siteId);
     if (!site) notFound();
     // A reader reads the pages in the editor, read-only (DEC-200).
@@ -229,57 +219,5 @@ function AiWayIn() {
                 </span>
             </span>
         </p>
-    );
-}
-
-/**
- * Pages in the Website area (plan 2026-11-18-001 U5): the list with its
- * page health and last edits, and each page's settings sheet. The health
- * and the edits come from the Overview's read, so the Needs fixing count
- * is Overview's; when it fails the list still loads, without them.
- */
-async function WebsitePages({
-    siteId,
-    userId,
-}: {
-    siteId: string;
-    userId: string;
-}) {
-    const [site, overview, redirects, webAddress, wayIn, changes] =
-        await Promise.all([
-            getSite(siteId),
-            getSiteOverview(siteId).catch((error: unknown): null => {
-                unstable_rethrow(error);
-                return null;
-            }),
-            listSiteRedirects(siteId).catch(() => null),
-            readWebAddressLinks(),
-            aiWayIn(userId),
-            // The Status filter's source, the status chip's units; without it the list loads, without Status.
-            getSiteChanges(siteId).catch((error: unknown): null => {
-                unstable_rethrow(error);
-                return null;
-            }),
-        ]);
-    if (!site) notFound();
-    return (
-        <PagesArea
-            siteId={site.id}
-            siteName={site.name}
-            pages={site.pages}
-            host={
-                businessAddress(site, webAddress, RENDERER_APEX)?.host ?? null
-            }
-            live={site.currentPublicationId !== null}
-            siteImageUrl={site.socialImageUrl ?? null}
-            canUpdate={site.can.manageSettings}
-            addableKinds={site.addablePageKinds}
-            health={overview?.needsDoing ?? null}
-            edits={overview?.pageEdits ?? null}
-            lastPublishedAt={overview?.lastPublished?.at ?? null}
-            redirects={redirects}
-            changes={changes?.units ?? null}
-            footer={wayIn ? <AiWayIn /> : null}
-        />
     );
 }

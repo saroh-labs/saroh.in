@@ -132,7 +132,8 @@ describe("the sheet", () => {
         expect(setAccountUpdates).toHaveBeenCalledTimes(1);
         expect(setAccountUpdates).toHaveBeenCalledWith(false);
         expect(s.sheet()).toBe(null);
-        expect(refresh).toHaveBeenCalled();
+        // On React Query (DEC-259) the tab reads again; never a server render.
+        expect(refresh).not.toHaveBeenCalled();
         expect(showError).not.toHaveBeenCalled();
         expect(showUndo).toHaveBeenCalledTimes(1);
         const [message, undo] = showUndo.mock.calls[0] as [

@@ -15,6 +15,13 @@ import { StorefrontsScreen } from "./storefronts-screen";
 
 /** The address's `?section=`, as each test sets it. */
 const address = vi.hoisted(() => ({ section: null as string | null }));
+const located = vi.hoisted(() => ({
+    orgId: "org_1",
+    patch: vi.fn(),
+    listed: vi.fn(() => Promise.resolve()),
+    reread: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@/lib/stores/use-stores", () => ({ useLocationSave: () => located }));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
     useSearchParams: () =>
@@ -193,7 +200,11 @@ describe("the location limit, by the choice (UX-036)", () => {
         // Nothing is sent until Save.
         expect(update).not.toHaveBeenCalled();
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(online.id, { kind: "SHOP" });
+        expect(update).toHaveBeenCalledWith(
+            online.id,
+            { kind: "SHOP" },
+            "org_1",
+        );
         const alert = document.querySelector("#location-kind-error");
         expect(alert?.textContent).toBe(
             "You've reached your 2 places customers visit on this plan.",
@@ -215,7 +226,11 @@ describe("the location limit, by the choice (UX-036)", () => {
         await press(item("Change"));
         await press(item("Yes, they visit"));
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(online.id, { kind: "SHOP" });
+        expect(update).toHaveBeenCalledWith(
+            online.id,
+            { kind: "SHOP" },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "Customers visit this location now",
         );
@@ -252,9 +267,13 @@ describe("Pick-up needs a counter (UX-025)", () => {
         expect(pickupSays()).toMatch(/late after/);
 
         await press(item("Turn off"));
-        expect(update).toHaveBeenCalledWith(online.id, {
-            fulfilmentTypes: [],
-        });
+        expect(update).toHaveBeenCalledWith(
+            online.id,
+            {
+                fulfilmentTypes: [],
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Pick-up turned off.");
         // Off now, and with no counter it can't come back on.
         expect(pickupSays()).toBe("Not offered");
@@ -268,9 +287,13 @@ describe("Pick-up needs a counter (UX-025)", () => {
         draw();
         expect(host.textContent).toContain("Pick-up is still on");
         await press(item("Turn Pick-up off"));
-        expect(update).toHaveBeenCalledWith(online.id, {
-            fulfilmentTypes: [],
-        });
+        expect(update).toHaveBeenCalledWith(
+            online.id,
+            {
+                fulfilmentTypes: [],
+            },
+            "org_1",
+        );
         expect(item("Turn Pick-up off")).toBeUndefined();
     });
 
@@ -311,7 +334,11 @@ describe("Pick-up needs a counter (UX-025)", () => {
             "Its address and opening hours aren't shown, and it can't offer pick-up. The saved address and hours are kept.",
         );
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(shop.id, { kind: "ONLINE" });
+        expect(update).toHaveBeenCalledWith(
+            shop.id,
+            { kind: "ONLINE" },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "This location has no counter now",
         );
@@ -561,11 +588,15 @@ describe("a way's Edit sheet", () => {
         expect(update).not.toHaveBeenCalled();
         await press(item("Save"));
         expect(update).toHaveBeenCalledTimes(1);
-        expect(update).toHaveBeenCalledWith(shop.id, {
-            localDeliveryFee: "40",
-            freeShippingThreshold: "999",
-            lateAfterMinutes: { LOCAL_DELIVERY: 240 },
-        });
+        expect(update).toHaveBeenCalledWith(
+            shop.id,
+            {
+                localDeliveryFee: "40",
+                freeShippingThreshold: "999",
+                lateAfterMinutes: { LOCAL_DELIVERY: 240 },
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Local delivery saved.");
         // Saved: the sheet closes.
         expect(sheet()).toBeNull();
@@ -581,9 +612,13 @@ describe("a way's Edit sheet", () => {
         expect(update).not.toHaveBeenCalled();
         await press(chip("2 days"));
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(shop.id, {
-            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
-        });
+        expect(update).toHaveBeenCalledWith(
+            shop.id,
+            {
+                fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Shipping turned on.");
     });
 
@@ -594,9 +629,13 @@ describe("a way's Edit sheet", () => {
         await press(chip("Other…"));
         type(field("delivery-pickup-late"), "3");
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(shop.id, {
-            lateAfterMinutes: { PICKUP: 180 },
-        });
+        expect(update).toHaveBeenCalledWith(
+            shop.id,
+            {
+                lateAfterMinutes: { PICKUP: 180 },
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "Pick-up orders now count as late after 3 hours.",
         );
@@ -761,7 +800,11 @@ describe("the tax rate, read first (Payments)", () => {
         expect(update).not.toHaveBeenCalled();
         await press(item("Save"));
         expect(update).toHaveBeenCalledTimes(1);
-        expect(update).toHaveBeenCalledWith(taxed.id, { taxRate: "12.5" });
+        expect(update).toHaveBeenCalledWith(
+            taxed.id,
+            { taxRate: "12.5" },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith("Tax rate set to 12.5%.");
         expect(sheet()).toBeNull();
         expect(says()).toBe("12.5% of each order's items, before delivery");

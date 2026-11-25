@@ -46,6 +46,13 @@ vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
 }));
 const refresh = vi.fn();
+// Settings › Share is on React Query (DEC-259): a save reads Settings
+// again (`useSettingsSave().saved`), never the page.
+const { settingsSaved } = vi.hoisted(() => ({ settingsSaved: vi.fn() }));
+vi.mock("@/lib/settings/use-settings", () => ({
+    useSettingsSave: () => ({ orgId: undefined, saved: settingsSaved }),
+    asOrg: () => [],
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh }),
 }));
@@ -522,7 +529,7 @@ describe("QrMaker — branded", () => {
         // Uploaded, and nothing saved until Save.
         expect(upload).toHaveBeenCalledTimes(1);
         expect(saveBusinessLogo).not.toHaveBeenCalled();
-        expect(refresh).not.toHaveBeenCalled();
+        expect(settingsSaved).not.toHaveBeenCalled();
 
         await click(inSheet("Save"));
         await settle();
@@ -530,7 +537,7 @@ describe("QrMaker — branded", () => {
         expect(showSuccess).toHaveBeenCalledWith(
             "Logo saved. It prints on your invoices and receipts.",
         );
-        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(settingsSaved).toHaveBeenCalledTimes(1);
         expect(sheet()).toBeNull();
         // Still on the maker, with what was chosen.
         expect(radio("Logo + colour")?.getAttribute("aria-checked")).toBe(
@@ -568,13 +575,13 @@ describe("QrMaker — branded", () => {
         expect(sheet()?.querySelector('[role="alert"]')?.textContent).toBe(
             "A logo is under 1 MB. Choose a smaller image.",
         );
-        expect(refresh).not.toHaveBeenCalled();
+        expect(settingsSaved).not.toHaveBeenCalled();
 
         await click(inSheet("Cancel"));
         await settle();
         expect(sheet()).toBeNull();
         expect(saveBusinessLogo).toHaveBeenCalledTimes(1);
-        expect(refresh).not.toHaveBeenCalled();
+        expect(settingsSaved).not.toHaveBeenCalled();
     });
 
     it("someone who may not set the logo reads where it is set, with nothing to press", async () => {

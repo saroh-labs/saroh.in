@@ -36,9 +36,9 @@ export function isTypingIn(el: Element | null | undefined): boolean {
  * new address (13 Nov 2026).
  *
  * Next 16 follows a `history.replaceState` (it must: DEV_LEARNINGS, "an
- * address written in place went back to the old one"), so `/new` →
- * `/<id>/edit` renders the edit route and the editor mounts again, scrolled
- * to the top. The record is saved by then (the address only moves after the
+ * address written in place went back to the old one"), and the next save
+ * that lands with nothing newer asks for `/<id>/edit` (`useAutosave`), so
+ * the editor mounts again, scrolled to the top. The record is saved by then (the address only moves after the
  * first save), so the page's place is all that is lost: where it was
  * scrolled and what had focus. The old page leaves it here and the new one
  * takes it on mount, within a few seconds and only at that address.

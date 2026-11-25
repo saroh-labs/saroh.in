@@ -1,20 +1,15 @@
 import { cache } from "react";
 
 import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
-import { ServiceEditor } from "@/components/services/service-editor/service-editor";
-import { rowLock } from "@/lib/billing/access";
-import { readMeetSetup } from "@/lib/google-calendar/meet-setup";
+import { ServiceContainer } from "@/components/services/service-editor/service-container";
 import { recordTitle } from "@/lib/page-title";
-import { readPriceHistory } from "@/lib/price-history/service";
-import { billingAccessOrNull } from "@/lib/saroh-billing/service";
-import { loadEditorContext } from "@/lib/services/editor-data";
-import { listRules, readService } from "@/lib/services/service";
-import { readServiceUsage } from "@/lib/services/usage-read";
+import { readCanEditServices } from "@/lib/services/editor-data";
+import { readService } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
-import { readShareSetup } from "@/lib/share-item/read";
-import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 
-// One read for the tab's title and the page.
+import Loading from "./loading";
+
+// One read for the tab's title and the page's gate.
 const readOne = cache((serviceId: string) => readService(serviceId));
 
 /** The service's own name in the tab; "Service" when it can't be read. */
@@ -36,9 +31,14 @@ export async function generateMetadata({
 
 /**
  * Bookings › Services › a service (E2): the Service Editor. It opens from
- * a service's row on Bookings › Services and from the calendar's links. Its own
- * weekly hours, who takes it and how it is booked each degrade on their
- * own; a service that can't be read says so rather than "isn't here".
+ * a service's row on Bookings › Services and from the calendar's links.
+ *
+ * On React Query (DEC-259): the page's gates are the service the tab's
+ * title reads anyway (missing, forbidden or failed each say so, never
+ * "isn't here" for a failure) and `service:write`; the service, its own
+ * hours, how it is used, its price history and the editor's context are
+ * `ServiceContainer`'s one read (`/api/services/[serviceId]`), behind the
+ * route's loader.
  */
 export default async function ServiceEditorPage({
     params,
@@ -47,21 +47,10 @@ export default async function ServiceEditorPage({
 }) {
     const { serviceId } = await params;
     await requireSession();
-
-    const [read, context, rules, access, priceHistory, web] = await Promise.all(
-        [
-            readOne(serviceId),
-            loadEditorContext(),
-            listRules(serviceId),
-            // Deposits are taken online: locked on a plan without it.
-            billingAccessOrNull(),
-            // What it has cost (12 Oct 2026). Optional: a read that fails is
-            // said in its place.
-            readPriceHistory("services", serviceId).catch(() => null),
-            // Share as a post (#1375): the booking page's live address.
-            readWebAddressLinks(),
-        ],
-    );
+    const [read, canEdit] = await Promise.all([
+        readOne(serviceId),
+        readCanEditServices(),
+    ]);
     if (!read.ok) {
         return (
             <ServiceEditorState
@@ -70,58 +59,11 @@ export default async function ServiceEditorPage({
             />
         );
     }
-    if (!context.ok) {
-        return (
-            <ServiceEditorState
-                state={context.forbidden ? "forbidden" : "failed"}
-                retryHref={`/services/${serviceId}`}
-            />
-        );
-    }
-    const service = read.service;
-    const {
-        services,
-        staff,
-        hasPage,
-        hasStorefront,
-        payment,
-        gstRegistered,
-        businessPriceMode,
-        canEdit,
-        timezone,
-        currency,
-    } = context.context;
-    const bookUrl = web?.links.book ?? null;
-    const [usage, shareSetup] = await Promise.all([
-        readServiceUsage([service.id], timezone),
-        bookUrl ? readShareSetup(web) : Promise.resolve(null),
-    ]);
-
     return (
-        <ServiceEditor
-            // A different service starts from its own saved values.
-            key={service.id}
-            service={service}
-            rules={rules}
-            staff={staff?.staff ?? null}
-            usage={usage?.[service.id] ?? null}
-            currency={service.currency ?? currency}
-            timezone={timezone}
-            openingHours={staff?.openingHours ?? null}
+        <ServiceContainer
+            serviceId={serviceId}
             canEdit={canEdit}
-            hasPage={hasPage}
-            hasStorefront={hasStorefront}
-            paymentsLock={rowLock(access, "payments")}
-            payment={payment}
-            gstRegistered={gstRegistered}
-            businessPriceMode={businessPriceMode}
-            // A name another service already has says so, with the way to it.
-            others={services.map((s) => ({ id: s.id, name: s.name }))}
-            priceHistory={priceHistory}
-            meet={await readMeetSetup()}
-            share={
-                shareSetup && bookUrl ? { setup: shareSetup, bookUrl } : null
-            }
+            skeleton={<Loading />}
         />
     );
 }

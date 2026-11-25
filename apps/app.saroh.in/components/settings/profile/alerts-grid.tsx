@@ -13,6 +13,7 @@ import type {
     AlertCell,
     AlertChange,
     AlertKey,
+    AlertPreferences,
     AlertPreferencesRead,
 } from "@/lib/notifications/preferences";
 import {
@@ -41,12 +42,22 @@ const GRID_COLS: Record<number, string> = {
  * `useSettingsUndo`): Undo saves the switch back, and is refused in words
  * if it has changed since. The switch moves as it is pressed and goes back
  * if the save is refused. What the grid shows otherwise is the server's —
- * the save refreshes the page, so there is no copy of it to drift.
+ * the save refreshes the page, so there is no copy of it to drift. On
+ * React Query (`save`, DEC-259) the write takes the tab's business and its
+ * answer goes into the cache before the switch lets go.
  *
  * Only what can deliver can be switched on (`alertGrid`): a channel with no
  * provider (WhatsApp) is off and fixed, with the line that says why.
  */
-export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
+export function AlertsGrid({
+    read,
+    save,
+}: {
+    read: AlertPreferencesRead;
+    /** Your profile's tab on React Query: its business, and where a saved answer goes. */
+    save?: { orgId: string; saved: (prefs: AlertPreferences) => void };
+}) {
+    const org = save ? ([save.orgId] as const) : ([] as const);
     const [pending, startTransition] = useTransition();
     const [shown, flipShown] = useOptimistic(
         read,
@@ -71,18 +82,20 @@ export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
         };
         startTransition(async () => {
             flipShown(change);
-            const result = await runAction(() => saveAlert(change));
+            const result = await runAction(() => saveAlert(change, ...org));
             if (!result) return;
             if (!result.ok) {
                 showError(result.error, "Your alerts are as they were.");
                 return;
             }
+            save?.saved(result.data);
             const undo = alertUndo(change);
             offer(alertSaved(change), async () => {
-                const back = await runAction(() => undoAlert(undo), {
+                const back = await runAction(() => undoAlert(undo, ...org), {
                     quiet: true,
                 });
                 if (!back) return { ok: false, error: UNREACHED };
+                if (back.ok) save?.saved(back.data);
                 return back.ok
                     ? { ok: true }
                     : { ok: false, error: back.error };

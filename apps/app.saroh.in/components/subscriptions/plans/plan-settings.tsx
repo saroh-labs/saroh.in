@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
@@ -21,6 +20,7 @@ import {
     timingSentence,
 } from "@/lib/subscriptions/plan-settings";
 import type { SubscriptionSettings } from "@/lib/subscriptions/service";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 import { Row, Section } from "@saroh/ui/settings-rows";
 
 import { AutopayTimingSheet } from "./autopay-timing-sheet";
@@ -55,7 +55,7 @@ export function PlanSettings({
     canWrite: boolean;
     nowIso?: string;
 }) {
-    const router = useRouter();
+    const { orgId, settingsSaved } = useSubscriptionSave();
     // What was last saved here, so a row reads a save at once; the page's
     // own read takes over when it arrives.
     const [shown, setShown] = useState(settings);
@@ -100,12 +100,12 @@ export function PlanSettings({
 
     function pauseChanged(on: boolean) {
         setShown((s) => (s ? { ...s, membersCanPause: on } : s));
-        router.refresh();
+        settingsSaved();
         showUndo(pauseSaved(on), async () => {
-            const res = await setMembersCanPause(!on);
+            const res = await setMembersCanPause(!on, orgId);
             if (!res.ok) return res;
             setShown((s) => (s ? { ...s, membersCanPause: !on } : s));
-            router.refresh();
+            settingsSaved();
             return { ok: true };
         });
     }
@@ -121,12 +121,12 @@ export function PlanSettings({
                     : s,
             );
         put(next);
-        router.refresh();
+        settingsSaved();
         showUndo(TIMING_SAVED, async () => {
-            const res = await setAutopayChargeTiming(before);
+            const res = await setAutopayChargeTiming(before, orgId);
             if (!res.ok) return res;
             put(before);
-            router.refresh();
+            settingsSaved();
             return { ok: true };
         });
     }

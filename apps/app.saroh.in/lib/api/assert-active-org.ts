@@ -54,3 +54,17 @@ export function writeAsOrg<R>(
         return (await assertActiveOrg(orgId)) ?? write();
     }, isOrganizationList);
 }
+
+/**
+ * A write shared by a React Query screen, which sends its business, and
+ * one not on it yet, which doesn't: `writeAsOrg` when `orgId` came, else
+ * the write as it was. The refusal (`ORG_MOVED`) is `{ ok: false, error }`,
+ * which every write's own failure shape already allows, so callers keep
+ * reading its extras (`code`, `suggestion`) as absent.
+ */
+export function writeAsOrgIfSent<R extends { ok: boolean }>(
+    orgId: string | undefined,
+    write: () => Promise<R>,
+): Promise<R> {
+    return orgId ? (writeAsOrg(orgId, write) as Promise<R>) : write();
+}

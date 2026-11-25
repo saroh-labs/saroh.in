@@ -5,23 +5,17 @@ import { PausedNote } from "@/components/billing/paused-banner";
 import { navCan } from "@/components/shared/navigation/nav-items";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { WebsiteHeader } from "@/components/sites/header/website-header";
-import { ChangesBar } from "@/components/sites/shell/changes-bar";
-import { mayReadForms, siteGroups } from "@/components/sites/shell/group-map";
-import { SiteSectionHeading } from "@/components/sites/shell/section-heading";
-import {
-    SitePhoneNav,
-    SiteSectionList,
-} from "@/components/sites/shell/section-list";
-import { SiteHeader } from "@/components/sites/shell/site-header";
+import { mayReadForms } from "@/components/sites/shell/group-map";
+import { SiteFrame } from "@/components/sites/shell/site-frame";
 import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { pausedSiteIds, pausedWords } from "@/lib/billing/paused";
 import { listPostCategories, listPosts } from "@/lib/content/service";
 import { businessZone } from "@/lib/format/business-zone";
 import { listForms } from "@/lib/forms/service";
+import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
-import { businessAddress } from "@/lib/sites/default-site";
 import { getSite, listSites } from "@/lib/sites/service";
 import { siteAddressOf } from "@/lib/sites/share-links";
 import {
@@ -29,7 +23,6 @@ import {
     RENDERER_APEX,
 } from "@/lib/sites/share-links-read";
 import { siteState } from "@/lib/sites/site-state";
-import { siteStatus } from "@/lib/sites/site-status";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 
 /**
@@ -42,10 +35,17 @@ import { websiteAreaOn } from "@/lib/sites/website-area-switch";
  * places a tab leads to — so they live outside this group and keep their own
  * screens.
  *
- * With the Website area on (the api's switch, DEC-240), the same reads draw the redesigned
- * area instead (plan 2026-11-18-001 U3): the site header over Overview and
- * the four groups. Off, today's header and tabs, unchanged.
+ * With the Website area on (the api's switch, DEC-240), the redesigned
+ * area (plan 2026-11-18-001 U3) on React Query (DEC-259): this layout
+ * awaits only its gates (the session, the switch, what this person may do)
+ * and `SiteFrame` reads the site header in the browser. Off, today's
+ * header and tabs, unchanged and read here.
  */
+/** When this render ran: what `SiteFrame` compares to see a later one. */
+function renderedNow(): string {
+    return String(Date.now());
+}
+
 export default async function WebsiteTabsLayout({
     params,
     children,
@@ -55,6 +55,33 @@ export default async function WebsiteTabsLayout({
 }) {
     const { siteId } = await params;
     await requireSession();
+
+    if (await websiteAreaOn()) {
+        const organization = await resolveActiveOrganization();
+        const actor = {
+            role: organization?.role ?? null,
+            actions: organization?.actions,
+        };
+        return (
+            <SiteFrame
+                siteId={siteId}
+                access={{
+                    // The API's `site.can.edit` is `section:write`.
+                    canEdit: permits(organization, "section:write"),
+                    mayReadForms: mayReadForms(organization),
+                    mayBusiness: navCan(actor, "org:settings:read"),
+                    mayTeam: navCan(actor, "member:read"),
+                }}
+                mayCreate={navCan(actor, "site:create")}
+                askAi={askAiOn() && organization?.role !== "REVIEWER"}
+                // A later render (a tab not on React Query yet saved and
+                // refreshed) reads the header again.
+                rendered={renderedNow()}
+            >
+                {children}
+            </SiteFrame>
+        );
+    }
 
     const [site, sites, organization, posts, webAddress, paused] =
         await Promise.all([
@@ -112,107 +139,10 @@ export default async function WebsiteTabsLayout({
     }));
     const thisPaused = pausedSites.includes(site.id);
     const reached = siteAddressOf(site, webAddress, RENDERER_APEX);
-    const actor = {
-        role: organization?.role ?? null,
-        actions: organization?.actions,
-    };
-    const mayCreate = navCan(actor, "site:create");
-
-    if (await websiteAreaOn()) {
-        const reader = !site.can.edit;
-        // One web address per business (DEC-230): the header shows the
-        // business's default, and the switcher this one site until adding
-        // sites ships.
-        const address = businessAddress(site, webAddress, RENDERER_APEX);
-        // From the list's summary when there is one, as today's header.
-        const status = siteStatus(sites.find((s) => s.id === site.id) ?? site, {
-            reader,
-        });
-        const here = {
-            id: site.id,
-            name: site.name.trim() || "Untitled site",
-            host: address?.host ?? null,
-            status,
-            paused: thisPaused,
-        };
-        const groups = siteGroups(site.id, {
-            canEdit: site.can.edit,
-            mayReadForms: formsReadable,
-            mayBusiness: navCan(actor, "org:settings:read"),
-            mayTeam: navCan(actor, "member:read"),
-        });
-        const waiting = site.can.publish ? status.waiting : 0;
-        // The Publish sheet (U11), for whoever may publish; a Reviewer
-        // approves in the editor instead (DEC-226).
-        const publish = site.can.publish
-            ? {
-                  siteId: site.id,
-                  siteName: here.name,
-                  host: address?.host ?? null,
-                  pages: site.pages,
-                  neverPublished: site.currentPublicationId === null,
-                  pendingSectionChanges: site.pendingSectionChanges,
-                  pendingSiteChanges: site.pendingSiteChanges,
-                  needsApproval: site.publishNeedsApproval === true,
-                  canOverride: site.canOverride === true,
-                  addressFix: webAddress
-                      ? {
-                            address: webAddress.address,
-                            platformOrigin: webAddress.platformOrigin,
-                            canChange: webAddress.canChange === true,
-                        }
-                      : null,
-              }
-            : null;
-        return (
-            <PageContainer width="full">
-                <div
-                    className={
-                        waiting > 0
-                            ? "flex flex-col gap-5 max-[759px]:pb-20"
-                            : "flex flex-col gap-5"
-                    }
-                >
-                    <SiteHeader
-                        site={here}
-                        sites={[here]}
-                        address={address?.host ?? `/${site.slug}`}
-                        liveUrl={
-                            site.currentPublication && address
-                                ? address.url
-                                : null
-                        }
-                        qrUrl={address?.url ?? null}
-                        canEdit={site.can.edit}
-                        mayCreate={mayCreate}
-                        askAi={askAiOn() && organization?.role !== "REVIEWER"}
-                        publish={publish}
-                    />
-                    {thisPaused ? (
-                        <PausedNote>{pausedWords("site")}</PausedNote>
-                    ) : null}
-                    <div className="grid min-w-0 gap-5 min-[760px]:grid-cols-[220px_minmax(0,1fr)] min-[760px]:gap-8">
-                        <SiteSectionList siteId={site.id} groups={groups} />
-                        <div className="flex min-w-0 flex-col gap-5">
-                            <SitePhoneNav siteId={site.id} groups={groups} />
-                            <SiteSectionHeading
-                                siteId={site.id}
-                                groups={groups}
-                                canEdit={site.can.edit}
-                                postCategories={postCategories}
-                            />
-                            {children}
-                        </div>
-                    </div>
-                </div>
-                <ChangesBar
-                    siteId={site.id}
-                    waiting={waiting}
-                    publish={publish}
-                />
-            </PageContainer>
-        );
-    }
+    const mayCreate = navCan(
+        { role: organization?.role ?? null, actions: organization?.actions },
+        "site:create",
+    );
 
     return (
         <PageContainer width="full">

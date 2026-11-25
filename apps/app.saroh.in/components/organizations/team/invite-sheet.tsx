@@ -15,6 +15,7 @@ import type {
     OrganizationInvitation,
     OrganizationMember,
 } from "@/lib/organizations/members";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckRow } from "@saroh/ui/check-row";
 import { ChoiceGroup } from "@saroh/ui/choice-group";
@@ -30,7 +31,6 @@ import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Check } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { InviteDiaryPerson } from "./invite-diary-person";
 import type { RoleBook } from "./role-book";
@@ -79,7 +79,7 @@ export function InviteSheet({
     diaryPeople: DiaryPerson[];
     onSent: () => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const schema = inviteSchema({
         memberEmails: members.map((m) => m.email),
         invitedEmails: invitations.map((i) => i.email),
@@ -143,14 +143,17 @@ export function InviteSheet({
         send(`invite:${email}`, {
             description: `${email} joins as ${book.labelOf(values.role)}.`,
             run: async () => {
-                const res = await inviteMember({
-                    email,
-                    role: values.role,
-                    ...(values.role === "REVIEWER"
-                        ? { siteIds: values.siteIds }
-                        : {}),
-                    ...(values.staffId ? { staffId: values.staffId } : {}),
-                });
+                const res = await inviteMember(
+                    {
+                        email,
+                        role: values.role,
+                        ...(values.role === "REVIEWER"
+                            ? { siteIds: values.siteIds }
+                            : {}),
+                        ...(values.staffId ? { staffId: values.staffId } : {}),
+                    },
+                    ...asOrg(save.orgId),
+                );
                 if (res.ok) return { ok: true };
                 // The plan's team limit (U13): its notice, not a toast.
                 if (res.plan) {
@@ -171,7 +174,7 @@ export function InviteSheet({
             onSent: () => {
                 blank();
                 onSent();
-                router.refresh();
+                save.saved({ shell: true });
             },
             onBack: () => {
                 if (planned) return blank();

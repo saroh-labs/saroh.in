@@ -188,7 +188,11 @@ describe("the Plans tab without memberships on the plan", () => {
         tab([plan()], LOCK);
         act(() => item("Archive")?.click());
         await act(() => Promise.resolve());
-        expect(actions.setPlanArchived).toHaveBeenCalledWith("plan_1", true);
+        expect(actions.setPlanArchived).toHaveBeenCalledWith(
+            "plan_1",
+            true,
+            undefined,
+        );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Monthly archived. Its 3 subscribers carry on, and nobody new can join.",
         );
@@ -209,7 +213,11 @@ describe("the Plans tab with memberships on the plan", () => {
         expect(buttons()).toContain("Sell again");
         act(() => item("Archive")?.click());
         await act(() => Promise.resolve());
-        expect(actions.setPlanArchived).toHaveBeenCalledWith("plan_1", true);
+        expect(actions.setPlanArchived).toHaveBeenCalledWith(
+            "plan_1",
+            true,
+            undefined,
+        );
         expect(toast.showUndo).toHaveBeenCalledWith(
             "Monthly archived. Its 3 subscribers carry on, and nobody new can join.",
             expect.any(Function),
@@ -221,7 +229,11 @@ describe("the Plans tab with memberships on the plan", () => {
         tab(BOTH(), null);
         act(() => item("Sell again")?.click());
         await act(() => Promise.resolve());
-        expect(actions.setPlanArchived).toHaveBeenCalledWith("plan_2", false);
+        expect(actions.setPlanArchived).toHaveBeenCalledWith(
+            "plan_2",
+            false,
+            undefined,
+        );
         expect(toast.showUndo).toHaveBeenCalledWith(
             "Yearly is open to sign-ups again.",
             expect.any(Function),

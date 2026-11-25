@@ -10,6 +10,7 @@ import { addressProblems, ChangePlanDialog } from "./change-plan-dialog";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+    usePathname: () => "/settings/billing/plans",
 }));
 const quoteChangeAction = vi.fn();
 const changePlanAction = vi.fn();

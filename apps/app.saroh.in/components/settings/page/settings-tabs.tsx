@@ -1,8 +1,11 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 import { SETTINGS_PAGES } from "@/components/shared/navigation/nav-items";
+import { useHeldIntegrationsNote } from "@/lib/providers/use-providers";
+import { IN_PLACE_TABS, inPlaceTab } from "@/lib/settings/queries";
 import { settingsPageLabel } from "@/lib/settings/search";
 import { SectionList } from "@saroh/ui/section-list";
 
@@ -43,7 +46,32 @@ export function SettingsTabs({
     kind?: string;
 }) {
     const pathname = usePathname();
+    // Integrations' own read knows its line better than the server's
+    // render once a connect there has changed it.
+    const held = useHeldIntegrationsNote();
+    const noteOf = (href: string) =>
+        href === "/settings/integrations" && held !== undefined
+            ? (held ?? undefined)
+            : notes?.[href];
     const pages = SETTINGS_PAGES.filter((page) => hrefs.includes(page.href));
+    // In place there is no server render to write the title: it follows
+    // the address here, Back and Forward included. The unread count in
+    // front is the shell's to put back (`useUnreadTitle`).
+    useEffect(() => {
+        const here = inPlaceTab(pathname);
+        if (!here) return;
+        const title = (href: string) => {
+            const page = SETTINGS_PAGES.find((p) => p.href === href);
+            return page ? `${settingsPageLabel(page, kind)} · Settings` : "";
+        };
+        const want = title(here);
+        for (const other of IN_PLACE_TABS) {
+            const was = title(other);
+            if (other !== here && document.title.includes(was)) {
+                document.title = document.title.replace(was, want);
+            }
+        }
+    }, [pathname, kind]);
     const current = pages.find(
         (page) =>
             pathname === page.href || pathname.startsWith(`${page.href}/`),
@@ -58,10 +86,19 @@ export function SettingsTabs({
             items={pages.map((page) => ({
                 value: page.href,
                 label: settingsPageLabel(page, kind),
+                onNavigate:
+                    current && inPlaceTab(current.href) && inPlaceTab(page.href)
+                        ? (e: { preventDefault: () => void }) => {
+                              e.preventDefault();
+                              if (page.href !== pathname) {
+                                  window.history.pushState(null, "", page.href);
+                              }
+                          }
+                        : undefined,
                 href: page.href,
                 icon: page.icon,
                 description: page.description,
-                note: notes?.[page.href],
+                note: noteOf(page.href),
             }))}
         />
     );

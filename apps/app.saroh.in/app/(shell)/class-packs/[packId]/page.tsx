@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import type { SellContext } from "@/components/class-packs/pack-detail/pack-detail";
-import { PackDetailScreen } from "@/components/class-packs/pack-detail/pack-detail";
+import { PackDetailContainer } from "@/components/class-packs/pack-detail/pack-detail";
 import { PackEditorState } from "@/components/class-packs/pack-editor/editor-states";
 import { PageContainer } from "@/components/shared/page/page-container";
 import {
@@ -11,27 +10,14 @@ import {
     canWritePacks,
 } from "@/lib/class-packs/access";
 import { tabFromQuery } from "@/lib/class-packs/pack-detail";
-import {
-    getPackDetail,
-    readPackEvents,
-    readPackHolders,
-    readPackPurchases,
-    readPackSales,
-    readPackUsed,
-    readSellContext,
-} from "@/lib/class-packs/pack-detail-data";
-import { readFreeCancelHours } from "@/lib/class-packs/packs-page";
-import { getSellingTerms } from "@/lib/class-packs/service";
-import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
-import { contactPickerOptions } from "@/lib/invoices/contacts";
-import { modulesOrUnknown } from "@/lib/modules/guard";
-import { permits } from "@/lib/organizations/permits";
+import { getPackDetail } from "@/lib/class-packs/pack-detail-data";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
-import { readServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 
-// One read for the tab's title and the page.
+import Loading from "./loading";
+
+// One read for the tab's title and the page's not-found.
 const readPack = cache((packId: string) => getPackDetail(packId));
 
 /** The pack's own name in the tab; "Class pack" when it can't be read. */
@@ -48,19 +34,17 @@ export async function generateMetadata({
     );
 }
 
-const FALLBACK_ZONE = DEFAULT_BUSINESS_ZONE;
-
 /**
  * Bookings › Packs › one pack (round-2 E16 and E17), after "Saroh Pack
  * Detail": Overview, Who has it with Extend, Used this week, Sales and
- * Activity, each tab's read on its own. `pack:read` covers the whole pack,
- * its prices and takings included (DEC-039), so it is the one gate; the
- * receipts behind the Overview's card are asked for only by someone who
- * may open invoices while Payments is on, and the sell dialog's reads
- * only by someone who may sell a pack on sale.
+ * Activity. `pack:read` covers the whole pack, its prices and takings
+ * included (DEC-039), so it is the one gate.
  *
- * The pack is the required read — an unknown id is the not-found state.
- * Everything else is optional and costs only its own part when it fails.
+ * On React Query (DEC-259), loaded in the browser: the gate is decided
+ * here, with the pack the tab's title reads anyway (missing, or another
+ * business's, is this page's 404); the pack and each tab's read
+ * (`/api/class-packs/[packId]`) are `PackDetailContainer`'s query, read
+ * from the browser behind the route's loader.
  */
 export default async function PackDetailPage({
     params,
@@ -78,108 +62,17 @@ export default async function PackDetailPage({
     if (!canReadPacks(organization)) {
         return <PackEditorState state="forbidden" retryHref="/class-packs" />;
     }
-
-    const [pack, modules] = await Promise.all([
-        readPack(packId),
-        modulesOrUnknown(),
-    ]);
-    if (!pack) notFound();
-
-    const canWrite = canWritePacks(organization);
-    const canSell = canSellPacks(organization);
-    // Receipts live in Invoices, under Payments: switched off or rolled out
-    // of, the card is never drawn (DEC-057). Unknown fails open, as the rail.
-    const paymentsOn =
-        modules?.find((m) => m.key === "PAYMENTS")?.readiness !== "DISABLED";
-    const readsInvoices = paymentsOn && permits(organization, "invoice:read");
-
-    const [
-        holders,
-        used,
-        sales,
-        events,
-        purchases,
-        services,
-        freeCancelHours,
-        sell,
-    ] = await Promise.all([
-        readPackHolders(pack.id),
-        readPackUsed(pack.id),
-        readPackSales(pack.id),
-        readPackEvents(pack.id),
-        readsInvoices ? readPackPurchases(pack.id) : null,
-        readServices(),
-        readFreeCancelHours(),
-        canSell && pack.status === "ACTIVE" ? readSell() : null,
-    ]);
-    const own = services.ok
-        ? services.services.filter((s) =>
-              pack.services.some((p) => p.id === s.id),
-          )
-        : null;
-    // Dates read in the zone its services are booked in.
-    const timeZone = own?.[0]?.timezone ?? FALLBACK_ZONE;
-    if (sell && !sell.packs.some((p) => p.id === pack.id)) {
-        sell.packs.push(pack);
-    }
+    if (!(await readPack(packId))) notFound();
 
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-            <PackDetailScreen
-                // Another pack starts on its own tab and lens.
-                key={pack.id}
-                pack={pack}
-                holders={holders}
-                used={used}
-                sales={sales}
-                events={events}
-                invoices={readsInvoices}
-                receipts={
-                    purchases?.state === "ok"
-                        ? purchases.data.map((p) => ({
-                              invoiceId: p.invoiceId,
-                              contact: { name: p.contact.name },
-                              createdAt: p.createdAt,
-                          }))
-                        : null
-                }
-                dropIns={
-                    own?.map((s) => ({
-                        id: s.id,
-                        // What one visit costs to pay, GST and all.
-                        priceCents: s.payCents ?? s.priceCents,
-                        currency: s.currency,
-                    })) ?? null
-                }
-                freeCancelHours={freeCancelHours}
-                timeZone={timeZone}
-                nowIso={new Date().toISOString()}
-                canWrite={canWrite}
-                canSell={canSell}
-                sell={sell}
+            <PackDetailContainer
+                packId={packId}
+                skeleton={<Loading />}
+                canWrite={canWritePacks(organization)}
+                canSell={canSellPacks(organization)}
                 initialTab={tabFromQuery(query.tab)}
             />
         </PageContainer>
     );
-}
-
-/** The sell dialog's reads: who to sell to, and what they have had. */
-async function readSell(): Promise<SellContext> {
-    const [contacts, context, terms] = await Promise.all([
-        contactPickerOptions(),
-        readSellContext(),
-        getSellingTerms(),
-    ]);
-    return {
-        contacts,
-        held: context.held.map((p) => ({
-            contactId: p.contact.id,
-            packId: p.pack.id,
-            left: p.left,
-            standing: p.standing,
-        })),
-        packs: context.packs,
-        invoicesOnSale: terms.invoicesOnSale,
-        gst: terms.gst,
-    };
 }

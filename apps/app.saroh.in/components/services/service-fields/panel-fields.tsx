@@ -9,6 +9,7 @@ import type { PlanLock } from "@/lib/billing/access";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { callName } from "@/lib/services/call-name";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
+import type { ServicePerson } from "@/lib/services/queries";
 import type { DepositMode } from "@/lib/services/service";
 import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
 import type {
@@ -30,7 +31,7 @@ import {
     sameNameAs,
 } from "@/lib/services/service-form";
 import type { PanelKey } from "@/lib/services/service-panels";
-import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
+import type { BookingPaymentView } from "@/lib/staff/types";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { TimezoneSelect } from "./timezone-select";
 
@@ -54,8 +55,8 @@ import { WhereField } from "./where-field";
 export interface PanelSetup {
     currency: string;
     /** Null when the people on the diary couldn't be read. */
-    staff: StaffView[] | null;
-    people: readonly StaffView[];
+    staff: ServicePerson[] | null;
+    people: readonly ServicePerson[];
     payment: BookingPaymentView | null;
     paymentsLock: PlanLock | null;
     /** What is saved: a deposit kept on a locked plan, a length changed. */

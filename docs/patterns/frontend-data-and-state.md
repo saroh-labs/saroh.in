@@ -96,6 +96,27 @@ There is no global client store. React Query holds server state only, in
   holds the last answer greyed (`keepPreviousData`) until the new one lands,
   and Back draws a seen one from the cache. The page and the container turn
   the address into the key through one pure function (`calendarAt`).
+- **Sibling routes drawn in place** (Settings › Team, Your profile,
+  Business, Modules, Integrations, Plan and billing, Your data and
+  Activity): each page checks its own gate and renders one client screen
+  (`SettingsTabScreen`) that draws the tab its address names; the side
+  list's links between them `pushState` (`onNavigate`) instead of asking the
+  server, and the title follows the address. Their reads are `settings`
+  tier, so a tab seen before is drawn with no read. A save there reads the
+  tab shown again and marks the others stale (`useSettingsSave`); one the
+  shell draws (a membership, an invitation: who is paused) calls
+  `afterSettingsSave()`; a role or membership marks `['organizations']`
+  stale. Nothing `router.refresh()`es; the Business tab's actions keep their
+  `revalidatePath` (the header's name, the words for what is set up), and
+  "Help improve Saroh" revalidates the layout, whose gate starts the
+  recorder. Modules, Integrations and Plan and billing are keyed under
+  `settings` too (`['settings', orgId, 'modules' | 'providers' |
+'billing']`), so one Settings save reads them; a module on or off, a
+  provider connected or disconnected, a plan, an add-on or a payment
+  confirmed calls `afterSettingsSave()` (the rail). Their parts shared with
+  a screen still drawn on the server (Change plan, a module's gate) draw it
+  again only off a React Query route (`useServerRefresh`). The side list's
+  Integrations line follows Integrations' read once held.
 - **A write from a shared component** (a sheet used by a React Query screen
   and by a server-rendered one, like the bookings cancel sheet): it saves
   through the domain's save context (`useBookingSave`), whose default is
@@ -146,7 +167,12 @@ There is no global client store. React Query holds server state only, in
   `getActiveOrgId` and `organizationsOnce` share `memberOrganizations`; read
   the list through `organizationsOnce` (or `resolveActiveOrganization()`),
   never `listOrganizations`, which is for a Server Action that changed it.
-- **Never cached:** billing secrets, API keys, tokens, provider credentials. The
+- **Never cached:** billing secrets, API keys, tokens, provider credentials. A
+  key, a webhook address, an AI app's connection or a data download crosses
+  its route field by field (a key as its `prefix`); a new key's token or a
+  webhook's secret is shown once from its action's own answer, and a
+  download's link is made when Download is pressed (Settings › API and AI
+  apps, Your data; tested with a leaky API answer). The
   dehydrate allowlist (`dehydrate-allow.ts`) stays explicit, though no page
   dehydrates any more.
 
@@ -157,12 +183,13 @@ Every `defineRead` names its `tier` (`lib/query/freshness.ts`), and
 `gcTime` and `refetchInterval`; the API stays the boundary, the tier only
 decides how often the browser asks.
 
-| Tier       | Who changes it                  | Rule                                                                                                                                                                                                                      | Reads                                                                                                                                                                     |
-| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `settings` | someone in Settings, rarely     | `staleTime`/`gcTime` `Infinity`; read again by its saves (`afterSettingsSave()`, which tells the other tabs on the `BroadcastChannel`), by any 403 on a read (`onReadError`, once per 10 s), and quietly every 10 minutes | `/api/shell`                                                                                                                                                              |
-| `records`  | the team                        | `staleTime` 5 min; its own saves invalidate what they changed                                                                                                                                                             | products, product, customers, customer, requests, invoices, invoice, invoice summary, stock levels, log, checks, order options, Home setup, discount codes, discount code |
-| `live`     | customers and the outside world | `staleTime` 30 s; the 45 s live refresh and coming back to the tab read it again (no timer of its own)                                                                                                                    | Home, orders, order, tickets, bookings list and diary, calendar, notifications, `/api/shell/live`                                                                         |
+| Tier       | Who changes it                  | Rule                                                                                                                                                                                                                      | Reads                                                                                                                                                                                                                                           |
+| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings` | someone in Settings, rarely     | `staleTime`/`gcTime` `Infinity`; read again by its saves (`afterSettingsSave()`, which tells the other tabs on the `BroadcastChannel`), by any 403 on a read (`onReadError`, once per 10 s), and quietly every 10 minutes | `/api/shell`, Settings › Team, Your profile, Business, Modules, Integrations, Plan and billing, Share, API and AI apps' tabs (not Usage), Locations (the list, a location), categories, Product settings                                        |
+| `records`  | the team                        | `staleTime` 5 min; its own saves invalidate what they changed                                                                                                                                                             | products, product, customers, customer, requests, invoices, invoice, invoice summary, stock levels, log, checks, order options, Home setup, Settings › Your data, Activity, discount codes, discount code, collections, reviews, review invites |
+| `live`     | customers and the outside world | `staleTime` 30 s; the 45 s live refresh and coming back to the tab read it again (no timer of its own)                                                                                                                    | Home, orders, order, tickets, bookings list and diary, calendar, `/api/shell/live`, API usage (Refresh reads it), notifications                                                                                                                 |
 
+- **Before moving a page to the browser, list what its server render did besides reading data** (a refusal with its own wording, a remount after `revalidatePath`, a redirect) and keep each on purpose; run the screen's browser specs (`pnpm prepush --e2e`) before calling it done (DEV_LEARNINGS, 25 Nov).
 - **The shell reads in the browser.** The `(shell)` layout's server render
   reads only what a gate needs: the session, the business list, the open
   business (the role) and, only when needed, a closing business's refunds

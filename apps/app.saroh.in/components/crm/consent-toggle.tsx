@@ -3,10 +3,10 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { setConsent } from "@/lib/messages/actions";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
@@ -30,12 +30,12 @@ export function ConsentToggle({
     /** Current consent status per channel; absent = no record (allowed). */
     consent: Partial<Record<MessageChannel, ConsentStatus>>;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const [busy, setBusy] = useState<MessageChannel | null>(null);
 
     async function toggle(channel: MessageChannel, next: ConsentStatus) {
         const res = await runAction(
-            () => setConsent({ contactId, channel, status: next }),
+            () => setConsent({ contactId, channel, status: next }, save.orgId),
             { setBusy: (on) => setBusy(on ? channel : null) },
         );
         if (!res) return;
@@ -48,7 +48,7 @@ export function ConsentToggle({
                 ? `${CHANNEL_LABEL[channel]} consent granted.`
                 : `${CHANNEL_LABEL[channel]} consent revoked.`,
         );
-        router.refresh();
+        void save.saved();
     }
 
     return (

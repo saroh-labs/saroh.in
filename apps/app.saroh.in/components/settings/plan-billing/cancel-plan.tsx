@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { CalendarX2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -17,6 +16,7 @@ import {
 import type { CancelOffer } from "@/lib/saroh-billing/plan-view";
 import type { CancelWords } from "@/lib/saroh-billing/quote-words";
 import { cancelWords } from "@/lib/saroh-billing/quote-words";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 
 /** Said when the API answered with something that isn't a move to Free. */
@@ -34,7 +34,7 @@ const NOT_CANCELLED = "Your plan couldn't be cancelled. Nothing changed.";
  * Your plan says it ends. Nothing takes it back yet (no undo in the API).
  */
 export function CancelPlan({ offer }: { offer: CancelOffer }) {
-    const router = useRouter();
+    const { orgId } = useSettingsSave();
     const trigger = useRef<HTMLButtonElement>(null);
     const [quoting, setQuoting] = useState(false);
     const [words, setWords] = useState<CancelWords | null>(null);
@@ -63,7 +63,11 @@ export function CancelPlan({ offer }: { offer: CancelOffer }) {
 
     async function cancel() {
         const res = await runAction(
-            () => changePlanAction({ plan: offer.freePlanId, cycle: "month" }),
+            () =>
+                changePlanAction(
+                    { plan: offer.freePlanId, cycle: "month" },
+                    ...asOrg(orgId),
+                ),
             { quiet: true },
         );
         if (!res) return { ok: false, error: undefined };
@@ -78,7 +82,6 @@ export function CancelPlan({ offer }: { offer: CancelOffer }) {
                 ? `Plan cancelled. You keep ${offer.planName} until ${formatDate(at, viewerTimeZone())}.`
                 : `Plan cancelled. You're on ${offer.freePlanName} from today.`,
         );
-        router.refresh();
         return { ok: true };
     }
 

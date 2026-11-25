@@ -43,7 +43,7 @@ import { DetailPanel } from "./detail-panel";
 import type { EditorProps } from "./editor-props";
 import { BackToServices } from "./editor-props";
 import { NewServiceFoot, NewServiceSide } from "./new-service-side";
-import { useServiceSave } from "./use-service-save";
+import { useServiceEditorSave } from "./use-service-save";
 
 /** The five questions' own fields: a problem in any keeps More closed. */
 const QUESTIONS: readonly ServiceField[] = [
@@ -68,7 +68,7 @@ const QUESTIONS: readonly ServiceField[] = [
  * Add service is never off: pressing it with gaps says how many and
  * which over the form, each again at its field, and the keyboard goes to
  * the first. Discard asks "Discard what you typed?" once something is
- * typed. It goes in up to three calls (`useServiceSave`); when the
+ * typed. It goes in up to three calls (`useServiceEditorSave`); when the
  * service is added and its hours are not, the page says so with Try
  * again.
  */
@@ -105,7 +105,7 @@ export function NewService(props: EditorProps) {
             ownHours("one"),
         ),
     );
-    const store = useServiceSave({
+    const store = useServiceEditorSave({
         serviceId: null,
         initial,
         people,

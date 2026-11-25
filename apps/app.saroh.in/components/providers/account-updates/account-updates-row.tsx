@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
@@ -21,6 +20,7 @@ import {
     accountUpdatesSaved,
 } from "@/lib/communications/account-updates";
 import { setAccountUpdates } from "@/lib/communications/account-updates-actions";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { RadioCards } from "@saroh/ui/choice-group";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Row } from "@saroh/ui/settings-rows";
@@ -113,7 +113,7 @@ export function AccountUpdatesSheet({
     open: boolean;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const settings = useSettingsSave();
     const noteId = useId();
     const [choice, setChoice] = useState<AccountUpdatesChoice>(
         state.on ? "on" : "off",
@@ -123,19 +123,26 @@ export function AccountUpdatesSheet({
     const changed = next !== state.on;
 
     async function save() {
-        const res = await runAction(() => setAccountUpdates(next), {
-            setBusy: setPending,
-        });
+        const res = await runAction(
+            () => setAccountUpdates(next, ...asOrg(settings.orgId)),
+            {
+                setBusy: setPending,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
         onClose();
-        router.refresh();
+        // The email prompt's words read it too: the tab is read again.
+        settings.saved();
         showUndo(accountUpdatesSaved(next), async () => {
-            const undo = await setAccountUpdates(state.on);
-            router.refresh();
+            const undo = await setAccountUpdates(
+                state.on,
+                ...asOrg(settings.orgId),
+            );
+            if (undo.ok) settings.saved();
             return undo;
         });
     }

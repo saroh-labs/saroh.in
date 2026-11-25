@@ -1,98 +1,35 @@
-import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
-import { PartialRead } from "@saroh/ui/failed-read";
+import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { ServicesScreen } from "@/components/services/list/services-screen";
+import { ServicesContainer } from "@/components/services/list/services-container";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
-import { canWriteCourses } from "@/lib/courses/access";
-import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
-import { readMissingRates } from "@/lib/gst-rates/service";
-import { modulesOrUnknown } from "@/lib/modules/guard";
-import { rolledOut } from "@/lib/modules/rollout";
-import { permits } from "@/lib/organizations/permits";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { startingCurrency } from "@/lib/organizations/starting-currency";
-import { alsoSellFeatures } from "@/lib/services/also-sell";
-import { readBookingLink } from "@/lib/services/booking-link-read";
-import {
-    businessCurrencyOf,
-    readCanEditServices,
-    readHasBookingPage,
-    readStaffOrNull,
-} from "@/lib/services/editor-data";
-import { readServices } from "@/lib/services/service";
-import { readServiceUsage } from "@/lib/services/usage-read";
+import { canReadServices } from "@/lib/services/access";
+import { readCanEditServices } from "@/lib/services/editor-data";
 import { requireSession } from "@/lib/session";
-import { readShareSetup } from "@/lib/share-item/read";
-import { readWebAddressLinks } from "@/lib/sites/share-links-read";
-import { readBookingPayment } from "@/lib/staff/service";
-import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
- * Bookings › Services (U16, E2; U15, #1031): what people can book. The
- * services read is the page; the staff read (who takes each), the
- * bookings read (how each is used) and the sites read (whether there is
- * a booking page) degrade on their own and say so. The module list, for
- * "Also sell" (E12) and New course in the New service menu, leaves both
- * out when it can't be read; how people
- * pay (DEC-088) marks nothing when it can't. A GST-registered business with
- * priced things on sale and no GST rate reads one line saying so, with the
- * sheet to choose them in; unread, it says nothing.
+ * Bookings › Services (U16, E2; U15, #1031): what people can book.
+ *
+ * On React Query (DEC-259), loaded in the browser: the page awaits only
+ * its gates, `service:read` (a role without it is told so, calmly, never
+ * shown a failure) and `service:write` (what the screen offers). The
+ * services, who takes each, how each is used, the booking page, "Also
+ * sell" and the GST notice are `ServicesContainer`'s one read
+ * (`/api/services`), drawn into the real header at once.
  */
 export const metadata = { title: "Services" };
 
-/** What someone whose role can't read services is told. */
-async function servicesDenied() {
-    const organization = await resolveActiveOrganization();
-    return whoCanChange({
-        thing: "Services",
-        business: organization?.name,
-        role: organization ? knownRoleName(organization) : null,
-    });
-}
-
 export default async function ServicesPage() {
     await requireSession();
-    const [
-        read,
-        staffList,
-        hasPage,
-        canEdit,
-        modules,
-        payment,
-        missingRates,
-        organization,
-        bookingLink,
-    ] = await Promise.all([
-        readServices(),
-        readStaffOrNull(),
-        readHasBookingPage(),
-        readCanEditServices(),
-        modulesOrUnknown(),
-        readBookingPayment(),
-        // What is on sale with no GST rate; null draws no notice.
-        readMissingRates(),
+    const [organization, canEdit] = await Promise.all([
         resolveActiveOrganization(),
-        // "Your booking page" (DEC-175); null leaves the row out.
-        readBookingLink(),
+        readCanEditServices(),
     ]);
-    // Share as a post (#1375): the booking page's card, while it is live.
-    const shareSetup =
-        // The card is drawn for whoever may see posts (`social:read`).
-        bookingLink?.state === "live" && permits(organization, "social:read")
-            ? await readShareSetup(await readWebAddressLinks())
-            : null;
-    // New course joins New service only while Courses is on here and this
-    // role may add one: the same answers the Courses screen gives.
-    const canNewCourse =
-        canWriteCourses(organization) &&
-        rolledOut(modules ?? []).some(
-            (m) => m.key === "COURSES" && m.lifecycle === "ENABLED",
-        );
 
-    if (!read.ok) {
+    if (!canReadServices(organization)) {
         return (
             <PageContainer width="full">
                 <PageHeader
@@ -100,67 +37,23 @@ export default async function ServicesPage() {
                     title="Services"
                 />
                 <div>
-                    {read.forbidden ? (
-                        // A denial is not a failure: nothing broke and
-                        // trying again does the same thing. The denied
-                        // card, never the red one (`saroh-product-states`).
-                        <PermissionDeniedState {...await servicesDenied()} />
-                    ) : (
-                        <FailedState
-                            title={couldntLoad("your services")}
-                            retryHref="/services"
-                        />
-                    )}
+                    <PermissionDeniedState
+                        {...whoCanChange({
+                            thing: "Services",
+                            business: organization?.name,
+                            role: organization
+                                ? knownRoleName(organization)
+                                : null,
+                        })}
+                    />
                 </div>
             </PageContainer>
         );
     }
 
-    const services = read.services;
-    const timezone =
-        staffList?.timezone ??
-        services.at(0)?.timezone ??
-        DEFAULT_BUSINESS_ZONE;
-    const usage = await readServiceUsage(
-        services.map((s) => s.id),
-        timezone,
-    );
-
     return (
         <PageContainer width="full">
-            <div>
-                {staffList && usage ? null : (
-                    <PartialRead
-                        className="mb-3"
-                        things={
-                            !staffList && !usage
-                                ? "who takes each service or how much each is booked"
-                                : !staffList
-                                  ? "who takes each service"
-                                  : "how much each service is booked"
-                        }
-                    />
-                )}
-                <ServicesScreen
-                    services={services}
-                    staff={staffList?.staff ?? null}
-                    usage={usage}
-                    currency={
-                        services.some((s) => s.currency)
-                            ? businessCurrencyOf(services)
-                            : await startingCurrency()
-                    }
-                    canEdit={canEdit}
-                    hasPage={hasPage}
-                    payment={payment}
-                    alsoSell={alsoSellFeatures(modules)}
-                    modules={modules ?? []}
-                    missingRates={missingRates}
-                    canNewCourse={canNewCourse}
-                    bookingLink={bookingLink}
-                    shareSetup={shareSetup}
-                />
-            </div>
+            <ServicesContainer canEdit={canEdit} />
         </PageContainer>
     );
 }

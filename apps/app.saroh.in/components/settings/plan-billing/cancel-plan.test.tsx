@@ -12,6 +12,10 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh, replace: vi.fn(), push: vi.fn() }),
 }));
+const afterSettingsSave = vi.fn();
+vi.mock("@/lib/query/invalidate", () => ({
+    afterSettingsSave: () => afterSettingsSave() as unknown,
+}));
 const quoteChangeAction = vi.fn();
 const changePlanAction = vi.fn();
 vi.mock("@/lib/saroh-billing/billing-actions", () => ({
@@ -167,7 +171,10 @@ describe("Cancel plan", () => {
         expect(showSuccess).toHaveBeenCalledWith(
             expect.stringMatching(/^Plan cancelled\. You keep Plan B until /),
         );
-        expect(refresh).toHaveBeenCalled();
+        // The plan is a setting the shell draws: this tab and the shell
+        // read again, and no server render (DEC-259).
+        expect(afterSettingsSave).toHaveBeenCalledTimes(1);
+        expect(refresh).not.toHaveBeenCalled();
         expect(dialog()).toBeNull();
     });
 
@@ -182,6 +189,7 @@ describe("Cancel plan", () => {
             "Only the owner can change the plan.",
         );
         expect(refresh).not.toHaveBeenCalled();
+        expect(afterSettingsSave).not.toHaveBeenCalled();
     });
 
     it("a quote that can't be had is said, and nothing opens", async () => {

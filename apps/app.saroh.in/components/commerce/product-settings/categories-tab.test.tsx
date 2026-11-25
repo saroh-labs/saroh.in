@@ -30,6 +30,16 @@ vi.mock("@/lib/products/settings-actions", () => ({
         actions.restoreCategory(...a) as unknown,
 }));
 const refresh = vi.fn();
+// A save reads Product settings again (`productSettingsSaved`, DEC-259).
+vi.mock("@/lib/products/use-product-settings", () => ({
+    useProductSettingsSave: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
 }));
@@ -156,7 +166,7 @@ describe("New category", () => {
         const input = open();
         s.type(input, "  Body care ");
         await s.submit(s.dialog());
-        expect(actions.addCategory).toHaveBeenCalledWith("Body care");
+        expect(actions.addCategory).toHaveBeenCalledWith("Body care", "org_1");
         expect(s.dialog()).toBe(null);
         expect(refresh).toHaveBeenCalled();
         expect(showUndo.mock.calls[0][0]).toBe("Body care added.");
@@ -240,6 +250,7 @@ describe("Rename", () => {
         expect(actions.renameCategory).toHaveBeenCalledWith(
             "c1",
             "Face serums",
+            "org_1",
         );
         expect(s.dialog()).toBe(null);
         expect(showUndo.mock.calls[0][0]).toBe("Serums is now Face serums.");
@@ -307,7 +318,7 @@ describe("Merge", () => {
             "The 3 products in Serums move to Lip care, and Serums goes away.",
         );
         await s.submit(s.sheet());
-        expect(actions.mergeCategory).toHaveBeenCalledWith("c1", "c2");
+        expect(actions.mergeCategory).toHaveBeenCalledWith("c1", "c2", "org_1");
         expect(s.sheet()).toBe(null);
         expect(showUndo.mock.calls[0][0]).toBe("Serums merged into Lip care.");
     });
@@ -317,7 +328,7 @@ describe("Merge", () => {
         open();
         s.press("Uncategorized", s.sheet());
         await s.submit(s.sheet());
-        expect(actions.mergeCategory).toHaveBeenCalledWith("c1", null);
+        expect(actions.mergeCategory).toHaveBeenCalledWith("c1", null, "org_1");
     });
 
     it("stays open with the choice when the server refuses", async () => {
@@ -349,7 +360,7 @@ describe("Delete", () => {
         await s.settle();
         // It can be undone, so there is no confirm.
         expect(s.confirm()).toBe(null);
-        expect(actions.removeCategory).toHaveBeenCalledWith("c1");
+        expect(actions.removeCategory).toHaveBeenCalledWith("c1", "org_1");
         expect(showUndo.mock.calls[0][0]).toBe("Serums deleted.");
         expect(showUndo.mock.calls[0][2]).toEqual({
             description: "Its 3 products are now Uncategorized.",

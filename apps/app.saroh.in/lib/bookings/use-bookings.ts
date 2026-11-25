@@ -15,11 +15,14 @@ import { useOrgId } from "@/lib/query/org";
 import { useActionMutation } from "@/lib/query/use-action-mutation";
 
 import { calendarKeys } from "@/lib/calendar/queries";
+import { customersKeys } from "@/lib/customers/queries";
 import { homeKeys } from "@/lib/home/queries";
-import type { BookingsAsk, DiaryAsk } from "./queries";
+import { invoicesKeys } from "@/lib/invoices/queries";
+import type { BookingAsk, BookingsAsk, DiaryAsk } from "./queries";
 
 import {
     availabilityRead,
+    bookingRead,
     bookingsKeys,
     bookingsRead,
     diaryRead,
@@ -52,6 +55,14 @@ export function useAvailability() {
     return useQuery(availabilityRead.options(useOrgId(), {}));
 }
 
+/**
+ * One booking's page (U26). Opened again, it draws what was read last at
+ * once and reads it again behind it (`live`: stale after 30 seconds).
+ */
+export function useBooking(ask: BookingAsk) {
+    return useQuery(bookingRead.options(useOrgId(), ask));
+}
+
 /** A booking write, given the open business's id when on React Query. */
 export type BookingWrite<R> = (...orgId: [] | [string]) => Promise<R>;
 
@@ -63,8 +74,8 @@ type RunOptions = NonNullable<Parameters<typeof runAction>[1]>;
  * - `save`: `runAction`'s semantics (busy cleared, one sentence when it
  *   never got there, `{ ok: false }` handed back untouched).
  * - `saved`: what the screen does after: on a screen still server-rendered
- *   (the diary, a booking's page) a `router.refresh()`; on the list,
- *   nothing, since `save` has already read the list again.
+ *   (Hours) a `router.refresh()`; on React Query, nothing, since `save`
+ *   has already read the screen again.
  * - `refresh`: read the screen again after a write made some other way
  *   (hours, time off, a refusal that says the time went): a
  *   `router.refresh()` off React Query, else the bookings reads again.
@@ -91,7 +102,7 @@ export function useBookingSave(): BookingSave {
     return (
         useContext(BookingSaveContext) ?? {
             save: (write, run) => runAction(() => write(), run),
-            // rq-refresh-ok: a booking's page is server-rendered until U26.
+            // rq-refresh-ok: a bookings part outside the bookings screens' providers.
             saved: () => router.refresh(),
             // rq-refresh-ok: as above.
             refresh: () => router.refresh(),
@@ -104,12 +115,13 @@ type Write = (orgId: string) => Promise<unknown>;
 const pass = (write: Write, orgId: string) => write(orgId);
 
 /**
- * The bookings screens' saves (DEC-259), the list's, the diary's and
- * Hours and time off's (whose read is under `bookings` too):
- * through `useActionMutation`, so the action gets the tab's business (and
- * refuses a moved tab), then what is on screen is read once (the other
- * bookings read marked stale), and Home and the Business calendar are marked stale (not mounted
- * here, so nothing else is read). A refused write invalidates nothing.
+ * The bookings screens' saves (DEC-259), the list's, the diary's and a
+ * booking's page: through `useActionMutation`, so the action gets the
+ * tab's business (and refuses a moved tab), then what is on screen is read
+ * once (the other bookings reads marked stale), and Home, the Business
+ * calendar, Customers (a person's bookings) and Invoices (a payment taken)
+ * are marked stale (not mounted here, so nothing else is read). A refused
+ * write invalidates nothing.
  */
 export function useBookingSaveWithQuery(): BookingSave {
     const orgId = useOrgId();
@@ -118,6 +130,8 @@ export function useBookingSaveWithQuery(): BookingSave {
         bookingsKeys(orgId),
         homeKeys(orgId),
         calendarKeys(orgId),
+        customersKeys(orgId),
+        invoicesKeys(orgId),
     ];
     const m = useActionMutation(pass, {
         invalidates,

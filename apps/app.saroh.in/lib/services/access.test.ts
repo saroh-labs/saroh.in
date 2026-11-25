@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canReadBookings } from "./access";
+import { canReadBookings, canReadServices } from "./access";
 
 describe("canReadBookings", () => {
     it("follows the actions the API resolved", () => {
@@ -21,5 +21,19 @@ describe("canReadBookings", () => {
 
     it("doesn't lock when there is no organization to judge by", () => {
         expect(canReadBookings(null)).toBe(true);
+    });
+});
+
+describe("canReadServices", () => {
+    it("follows service:read, and fails closed with no organization", () => {
+        expect(
+            canReadServices({ role: "MEMBER", actions: ["service:read"] }),
+        ).toBe(true);
+        expect(canReadServices({ role: "OWNER", actions: ["site:read"] })).toBe(
+            false,
+        );
+        expect(canReadServices({ role: "REVIEWER" })).toBe(false);
+        expect(canReadServices({ role: "MEMBER" })).toBe(true);
+        expect(canReadServices(null)).toBe(false);
     });
 });

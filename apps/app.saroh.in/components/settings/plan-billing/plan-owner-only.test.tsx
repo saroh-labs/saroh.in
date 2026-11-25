@@ -9,6 +9,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { toWire } from "@/lib/query/define-read";
 import type { AddonRow, PickerRow } from "@/lib/saroh-billing/plan-view";
 
 import { AddonsCard } from "./addons-card";
@@ -17,8 +18,10 @@ import { PlanChooser } from "./plan-chooser";
 import { YourPlan } from "./your-plan";
 
 const resolveActiveOrganization = vi.fn();
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/organizations/service", () => ({
     resolveActiveOrganization: () => resolveActiveOrganization() as unknown,
+    activeOrganizationOnce: () => resolveActiveOrganization() as unknown,
 }));
 vi.mock("@/lib/session", () => ({ requireSession: () => Promise.resolve() }));
 // Plans shown, as the runner has it everywhere else (DEC-136).
@@ -94,11 +97,20 @@ const OWNER = {
     actions: [...ADMIN.actions, "billing:manage"],
 };
 
+/**
+ * The tab as the browser draws it (DEC-259): its route's gate, then its
+ * read as the wire carries it, drawn by the view; refused, a denial.
+ */
 async function page(org: unknown): Promise<string> {
     resolveActiveOrganization.mockResolvedValue(org);
-    const { default: PlanBillingPage } =
-        await import("@/app/(shell)/settings/(sections)/billing/page");
-    return renderToStaticMarkup(await PlanBillingPage());
+    const { billingServer, mayReadBilling } =
+        await import("@/lib/saroh-billing/screen-service");
+    if (!(await mayReadBilling())) return "REFUSED";
+    const { BillingView } =
+        await import("@/components/settings/tabs/billing-tab");
+    const screen = toWire(await billingServer.service({}));
+    if (!screen) throw new Error("No answer");
+    return renderToStaticMarkup(<BillingView screen={screen} />);
 }
 
 /** The next screen: Change plan. */
@@ -222,8 +234,12 @@ describe("Settings › Plan and billing, by who is reading", () => {
             role: "MEMBER",
             actions: ["org:read"],
         });
-        expect(html).toContain("You can&#x27;t open Plan and billing");
-        expect(html).not.toContain("Your plan");
+        // The route refuses it, and the page says so itself, by name.
+        expect(html).toBe("REFUSED");
+        const { default: PlanBillingPage } =
+            await import("@/app/(shell)/settings/(sections)/billing/page");
+        const own = renderToStaticMarkup(await PlanBillingPage());
+        expect(own).toContain("You can&#x27;t open Plan and billing");
     });
 });
 

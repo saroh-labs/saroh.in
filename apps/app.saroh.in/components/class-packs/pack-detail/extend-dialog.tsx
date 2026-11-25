@@ -6,7 +6,6 @@ import { ChipGroup } from "@saroh/ui/choice-group";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -22,6 +21,7 @@ import {
     extendedTo,
     extendedToast,
 } from "@/lib/class-packs/pack-holders";
+import { useClassPackSave } from "@/lib/class-packs/use-class-packs";
 import { FormDialog } from "@saroh/ui/form-dialog";
 
 /** Who is being given days, as the dialog needs them. */
@@ -48,7 +48,7 @@ export function ExtendDialog({
     nowIso: string;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const packSave = useClassPackSave();
     const now = new Date(nowIso);
     const ids = { days: useId(), why: useId(), help: useId(), err: useId() };
     const choices = extendChoices(target.expiresAt, now);
@@ -67,7 +67,7 @@ export function ExtendDialog({
         if (busy || why.length === 0) return;
         setError(null);
         const res = await runAction(
-            () => extendHolder(target.purchaseId, days, why),
+            () => extendHolder(target.purchaseId, days, why, packSave.orgId),
             { setBusy, quiet: true, onUnreached: setError },
         );
         if (!res) return;
@@ -77,8 +77,8 @@ export function ExtendDialog({
         }
         showSuccess(extendedToast(target.name, res.data.expiresAt, timeZone));
         onClose();
-        // rq-refresh-ok: shared with a server-rendered list; on a customer's page it also redraws the tabs drawn there (Leads, Courses, packs, plans) and hydrates the customer read again (until U19/U20 and their units).
-        router.refresh();
+        // Class packs and the customer's page read again (DEC-259).
+        await packSave.saved();
     }
 
     return (

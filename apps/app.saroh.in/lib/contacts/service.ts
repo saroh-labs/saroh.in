@@ -1,5 +1,12 @@
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
+import {
+    apiFetch,
+    destroy,
+    getJson,
+    getList,
+    mutate,
+    orgBase,
+} from "@/lib/api/http";
 import type { EnquiryEntry } from "@/lib/crm/enquiries";
 
 /**
@@ -74,24 +81,30 @@ export interface UpdateContactInput {
     company?: string;
 }
 
-/** The org's contacts (newest first) with their rollup. Empty on any failure. */
+/**
+ * The org's contacts (newest first) with their rollup. A failed read throws
+ * (`getList`), never an empty list; a caller that can do without them
+ * catches.
+ */
 export async function listContacts(): Promise<ContactListItem[]> {
     const base = await orgBase();
     if (!base) return [];
-    const res = await apiFetch(`${base}/contacts`);
-    if (!res.ok) return [];
-    return (await res.json()) as ContactListItem[];
+    return getList<ContactListItem>(`${base}/contacts`);
 }
 
-/** A contact + its leads, or null when missing / not permitted. */
+/**
+ * A contact + its leads; null when there is no such contact here (a 404).
+ * Any other failure throws (`getJson`), so "missing" and "couldn't be read"
+ * stay apart.
+ */
 export async function getContact(
     contactId: string,
 ): Promise<ContactDetail | null> {
     const base = await orgBase();
     if (!base) return null;
-    const res = await apiFetch(`${base}/contacts/${contactId}`);
-    if (!res.ok) return null;
-    return (await res.json()) as ContactDetail;
+    return getJson<ContactDetail>(
+        `${base}/contacts/${encodeURIComponent(contactId)}`,
+    );
 }
 
 /** Patch a contact's descriptive fields. */

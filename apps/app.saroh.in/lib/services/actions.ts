@@ -11,7 +11,6 @@ import type {
     BookByHandInput,
     BookingOutcome,
     CreateServiceInput,
-    Service,
     Slot,
     UpdateServiceInput,
 } from "./service";
@@ -27,7 +26,7 @@ import {
     keepService as keepServiceApi,
     listAvailability as listAvailabilityApi,
     readReassignCandidates as readReassignCandidatesApi,
-    readServices,
+    readServicesForPicker,
     reassignBooking as reassignBookingApi,
     recordBookingOutcome as recordBookingOutcomeApi,
     replaceRules as replaceRulesApi,
@@ -81,36 +80,44 @@ export async function createBookingPayLink(bookingId: string, orgId?: string) {
     return createBookingPayLinkApi(bookingId);
 }
 
-export async function createService(input: CreateServiceInput) {
-    return createServiceApi(input);
+export async function createService(input: CreateServiceInput, orgId?: string) {
+    const write = () => createServiceApi(input);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 export async function updateService(
     serviceId: string,
     input: UpdateServiceInput,
+    orgId?: string,
 ) {
-    return updateServiceApi(serviceId, input);
+    const write = () => updateServiceApi(serviceId, input);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Keep a sample service as it is (DEC-189). */
-export async function keepService(serviceId: string) {
-    return keepServiceApi(serviceId);
+export async function keepService(serviceId: string, orgId?: string) {
+    const write = () => keepServiceApi(serviceId);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Keep every sample service as it is (DEC-189). */
-export async function keepAllSamples() {
-    return keepAllSamplesApi();
+export async function keepAllSamples(orgId?: string) {
+    const write = () => keepAllSamplesApi();
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
-export async function archiveService(serviceId: string) {
-    return archiveServiceApi(serviceId);
+export async function archiveService(serviceId: string, orgId?: string) {
+    const write = () => archiveServiceApi(serviceId);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 export async function replaceRules(
     serviceId: string,
     rules: AvailabilityRuleInput[],
+    orgId?: string,
 ) {
-    return replaceRulesApi(serviceId, rules);
+    const write = () => replaceRulesApi(serviceId, rules);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 export async function cancelBooking(
@@ -175,8 +182,10 @@ export async function rescheduleBooking(
 export async function reassignBooking(
     bookingId: string,
     input: { staffId: string; startAt?: string },
+    orgId?: string,
 ) {
-    return reassignBookingApi(bookingId, input);
+    const write = () => reassignBookingApi(bookingId, input);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Who could take a booking at a time (#1157): Change who's list. */
@@ -231,33 +240,6 @@ export async function listAvailability(
  * tells a merchant they have no services, or that chosen ones were deleted,
  * because a read failed.
  */
-export async function listServicesForPicker(): Promise<
-    | {
-          ok: true;
-          services: Pick<
-              Service,
-              | "id"
-              | "name"
-              | "status"
-              | "durationMinutes"
-              | "priceCents"
-              | "currency"
-          >[];
-      }
-    | { ok: false; forbidden: boolean }
-> {
-    const read = await readServices();
-    if (!read.ok) return read;
-    return {
-        ok: true,
-        services: read.services.map((s) => ({
-            id: s.id,
-            name: s.name,
-            status: s.status,
-            // The editor's "From Services" rows (U47) show both.
-            durationMinutes: s.durationMinutes,
-            priceCents: s.priceCents,
-            currency: s.currency,
-        })),
-    };
+export async function listServicesForPicker() {
+    return readServicesForPicker();
 }

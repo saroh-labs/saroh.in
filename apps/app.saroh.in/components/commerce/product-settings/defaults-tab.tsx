@@ -7,7 +7,6 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { markMomentSeen } from "@/lib/moments/actions";
@@ -27,6 +26,7 @@ import {
     suggestionLine,
     toEntry,
 } from "@/lib/products/settings-rules";
+import { useProductSettingsSave } from "@/lib/products/use-product-settings";
 
 import { listTable } from "@/components/shared/lists/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
@@ -49,7 +49,7 @@ import { SettingsReadOnly, TabIntro, useUnsaved } from "./product-settings";
  * chooses to update the ones still on the old value.
  */
 export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
-    const router = useRouter();
+    const { orgId, saved } = useProductSettingsSave();
     const { report } = useUnsaved();
     const [pending, start] = useTransition();
     const fresh = rowsFrom(catalogue);
@@ -102,20 +102,22 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
         said: (updated: number) => string,
     ): Promise<boolean> {
         const res = await runAction(() =>
-            saveDefaults(entries.map(toEntry), update),
+            saveDefaults(entries.map(toEntry), update, orgId),
         );
         if (!res) return false;
         if (!res.ok) {
             showError(res.error);
             return false;
         }
-        router.refresh();
+        void saved();
         showUndo(said(res.data.updatedCount), () =>
             start(async () => {
-                const undo = await runAction(() => undoDefaults(res.data));
+                const undo = await runAction(() =>
+                    undoDefaults(res.data, orgId),
+                );
                 if (!undo) return;
                 if (!undo.ok) showError(undo.error);
-                router.refresh();
+                void saved();
             }),
         );
         return true;

@@ -2,7 +2,6 @@
 
 import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -19,6 +18,7 @@ import {
     timingTimeline,
     timingTitle,
 } from "@/lib/subscriptions/autopay-timing";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 import { Field } from "@saroh/ui/field";
 
 const BUSINESS = "BUSINESS";
@@ -43,7 +43,7 @@ export function PlanAutopayTiming({
     canWrite: boolean;
     nowIso: string;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useSubscriptionSave();
     const id = useId();
     const [value, setValue] = useState<AutopayChargeTiming | null>(planTiming);
     const [pending, start] = useTransition();
@@ -62,7 +62,7 @@ export function PlanAutopayTiming({
         setValue(next);
         start(async () => {
             const res = await runAction(() =>
-                setPlanChargeTiming(planId, next),
+                setPlanChargeTiming(planId, next, orgId),
             );
             if (!res) return setValue(before);
             if (!res.ok) {
@@ -75,7 +75,7 @@ export function PlanAutopayTiming({
                     ? "Timing saved. This plan's renewals charge this way from now on."
                     : "Timing saved. This plan follows the business setting.",
             );
-            router.refresh();
+            await saved();
         });
     }
 

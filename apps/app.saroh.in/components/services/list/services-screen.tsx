@@ -25,6 +25,7 @@ import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import type { BookingLinkView } from "@/lib/services/booking-link";
 import { callName } from "@/lib/services/call-name";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
+import type { ServicePerson } from "@/lib/services/queries";
 import type { Service } from "@/lib/services/service";
 import type { WhoFields } from "@/lib/services/service-cards";
 import {
@@ -39,7 +40,7 @@ import {
 } from "@/lib/services/service-cards";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { ShareSetup } from "@/lib/share-item/share";
-import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
+import type { BookingPaymentView } from "@/lib/staff/types";
 import { AlsoSell } from "./also-sell";
 import { BookingLinkRow } from "./booking-link-row";
 import type { ServiceRowView } from "./services-rows";
@@ -100,7 +101,7 @@ export function ServicesScreen({
     missingRates?: MissingRates | null;
     services: Service[];
     /** Null when the staff read failed. */
-    staff: StaffView[] | null;
+    staff: ServicePerson[] | null;
     /** Null when the bookings read failed. */
     usage: Record<string, ServiceUsage> | null;
     currency: string;

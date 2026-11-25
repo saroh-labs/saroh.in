@@ -23,7 +23,14 @@ import {
  * device and in every business. The switch moves as it is pressed and goes
  * back if the save is refused.
  */
-export function UsageSharingCard({ on }: { on: boolean }) {
+export function UsageSharingCard({
+    on,
+    save,
+}: {
+    on: boolean;
+    /** Your profile's tab on React Query: its business, and where a saved choice goes. */
+    save?: { orgId: string; saved: (on: boolean) => void };
+}) {
     const [pending, startTransition] = useTransition();
     const [shown, setShown] = useOptimistic(on);
 
@@ -34,13 +41,18 @@ export function UsageSharingCard({ on }: { on: boolean }) {
         if (!next) browserTracking?.stopReplay();
         startTransition(async () => {
             setShown(next);
-            const result = await runAction(() => saveUsageSharing(next));
+            const result = await runAction(() =>
+                save
+                    ? saveUsageSharing(next, save.orgId)
+                    : saveUsageSharing(next),
+            );
             // It never got there, and has been said: the switch goes back.
             if (!result) return;
             if (!result.ok) {
                 showError(result.error, "Your choice is as it was.");
                 return;
             }
+            save?.saved(next);
             showSuccess(
                 next
                     ? "You're sharing how you use Saroh"

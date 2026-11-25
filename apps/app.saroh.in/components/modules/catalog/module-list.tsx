@@ -32,6 +32,7 @@ import {
 } from "@/lib/modules/switch-plan";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
 import { afterSettingsSave } from "@/lib/query/invalidate";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { Notice } from "@saroh/ui/notice";
 
 /**
@@ -189,6 +190,7 @@ function ModuleRow({
     onTurnOn: (key: string) => void;
 }) {
     const [pending, startTransition] = useTransition();
+    const { orgId } = useSettingsSave();
     const [asking, setAsking] = useState(false);
     // What the API said turning it off touches (F13), read on the flip: the
     // sentence with real counts, and anything that refuses it.
@@ -245,7 +247,12 @@ function ModuleRow({
         startTransition(async () => {
             for (const [key, status] of changes) {
                 const result = await runAction(() =>
-                    setModuleStatusAction(key, status),
+                    setModuleStatusAction(
+                        key,
+                        status,
+                        undefined,
+                        ...asOrg(orgId),
+                    ),
                 );
                 if (!result) return;
                 if (!result.ok) {

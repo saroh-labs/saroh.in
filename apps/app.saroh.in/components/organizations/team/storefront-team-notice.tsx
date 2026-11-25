@@ -4,12 +4,12 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import { Store } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { dismissStorefrontTeamNotice } from "@/lib/organizations/member-actions";
 import type { StorefrontTeamNoticePerson } from "@/lib/organizations/members";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 /** "3 people from your locations are now on your team as Location team". */
 export function storefrontNoticeTitle(count: number, roleLabel: string) {
@@ -41,20 +41,23 @@ export function StorefrontTeamNotice({
     roleLabel: string;
     onChangeRole: (userId: string) => void;
 }) {
-    const router = useRouter();
+    const save = useSettingsSave();
     const [dismissing, setDismissing] = useState(false);
     if (people.length === 0) return null;
 
     async function dismiss() {
-        const res = await runAction(() => dismissStorefrontTeamNotice(), {
-            setBusy: setDismissing,
-        });
+        const res = await runAction(
+            () => dismissStorefrontTeamNotice(...asOrg(save.orgId)),
+            {
+                setBusy: setDismissing,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
-        router.refresh();
+        save.saved();
     }
 
     return (

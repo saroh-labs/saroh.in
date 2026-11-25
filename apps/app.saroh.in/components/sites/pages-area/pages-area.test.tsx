@@ -63,6 +63,8 @@ const pages = [
     }),
 ];
 
+const SAVE = { orgId: "org_1", saved: () => Promise.resolve() };
+
 const render = (over: Partial<Parameters<typeof PagesArea>[0]> = {}) =>
     renderToStaticMarkup(
         <PagesArea
@@ -73,6 +75,7 @@ const render = (over: Partial<Parameters<typeof PagesArea>[0]> = {}) =>
             live
             siteImageUrl={null}
             canUpdate
+            save={SAVE}
             health={[
                 {
                     pageId: "p2",

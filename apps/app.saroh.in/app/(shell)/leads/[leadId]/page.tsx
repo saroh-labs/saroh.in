@@ -1,35 +1,18 @@
-import { formatMoney } from "@/lib/format/money";
 import { readBusinessCurrency } from "@/lib/organizations/business-currency";
-import { Badge } from "@saroh/ui/badge";
-import { IntentLink } from "@saroh/ui/intent-link";
-import { PageHeader } from "@saroh/ui/page-header";
-import { notFound } from "next/navigation";
+import { forbidden } from "next/navigation";
 
-import { ActivityTimeline } from "@/components/crm/activity-timeline";
-import { ConsentToggle } from "@/components/crm/consent-toggle";
-import { EnquiryCard } from "@/components/crm/enquiry-card";
-import { LeadActions } from "@/components/crm/lead-actions";
-import { LeadStatusControl } from "@/components/crm/lead-status-control";
-import { MessageHistory } from "@/components/crm/message-history";
-import { MoveStageControl } from "@/components/crm/move-stage-control";
-import { DeleteLeadMenu } from "@/components/leads/delete-lead-menu";
-import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
-import { PageContainer } from "@/components/shared/page/page-container";
-import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
-import { readOnlyLine } from "@/components/shared/states/who-can-change";
+import { LeadDetailContainer } from "@/components/crm/lead-detail-container";
 import { canOrUnknown } from "@/lib/access/require-can";
-import { personHref } from "@/lib/contacts/person-href";
-import { contactName, LEAD_STATUS } from "@/lib/crm/format";
-import { getLead } from "@/lib/leads/service";
 import { composerGate } from "@/lib/messages/composer-gate";
-import type { ConsentStatus, MessageChannel } from "@/lib/messages/service";
-import { listContactConsents, listLeadMessages } from "@/lib/messages/service";
+import type { MessageChannel } from "@/lib/messages/service";
 import { rolledOut } from "@/lib/modules/rollout";
 import { listModules } from "@/lib/modules/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCommsProviders } from "@/lib/providers/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+
+import Loading from "./loading";
 
 /** The tab's title (UX-081): without one it read the bare "Saroh". */
 // "Lead", never their name: a tab's title shows in a screen share, in
@@ -62,21 +45,28 @@ export const metadata = { title: "Lead" };
  * the note, follow-up and message forms open in side sheets from one row of
  * buttons under the header (`LeadActions`). Consent is a readout with its
  * own switches, so it stays on the page, under the history.
+ *
+ * On React Query (DEC-259), loaded in the browser: the gates (the layout's
+ * CRM `ModuleGate`, `lead:read`, what this role may do), the currency and
+ * what each channel can send are the page's; the lead, its messages and
+ * its contact's consent (`/api/leads/[leadId]`) are `LeadDetailContainer`'s
+ * query, read behind the route's loader and again after every write.
  */
 export default async function LeadDetailPage({
     params,
 }: {
     params: Promise<{ leadId: string }>;
 }) {
-    const { leadId } = await params;
     await requireSession();
-
-    // A lead's Worth is in the business's currency (owner, 11 Oct).
-    const [lead, currency] = await Promise.all([
-        getLead(leadId),
+    const [{ leadId }, organization, currency, modules] = await Promise.all([
+        params,
+        resolveActiveOrganization(),
+        // A lead's Worth is in the business's currency (owner, 11 Oct).
         readBusinessCurrency(),
+        listModules().catch(() => null),
     ]);
-    if (!lead) notFound();
+    // A role without leads is refused, not "not found" (UX-027).
+    if (!canOrUnknown(organization, "lead:read")) forbidden();
 
     /*
      * Each control asks what the API asks of its write (`leads.service.ts`,
@@ -86,25 +76,6 @@ export default async function LeadDetailPage({
      * Someone who reads the lead without them reads it: no button that would
      * only be refused.
      */
-    const organization = await resolveActiveOrganization();
-    const canWrite = canOrUnknown(organization, "lead:write");
-    const canLog = canOrUnknown(organization, "activity:write");
-    const canMessage = canOrUnknown(organization, "message:write");
-    const canConsent = canOrUnknown(organization, "consent:write");
-
-    const stages = lead.pipeline?.stages ?? [];
-    const amount = formatMoney(lead.value, currency, { decimals: "always" });
-    // Timeline newest-first for reading; the API returns it oldest-first.
-    const timeline = [...lead.activities].reverse();
-
-    // Communications (S6-002): message history (newest first) + this contact's
-    // per-channel consent. Messages need no contact; consent is contact-scoped.
-    const contactId = lead.contact?.id ?? null;
-    const [messages, consents, modules] = await Promise.all([
-        listLeadMessages(lead.id),
-        contactId ? listContactConsents(contactId) : Promise.resolve([]),
-        listModules().catch(() => null),
-    ]);
     const comms = modules
         ? rolledOut(modules).find((m) => m.key === "COMMUNICATIONS")
         : undefined;
@@ -125,142 +96,17 @@ export default async function LeadDetailPage({
             providers,
             access,
         });
-    const gates = { EMAIL: gateFor("EMAIL"), WHATSAPP: gateFor("WHATSAPP") };
-    const consentByChannel = consents.reduce<
-        Partial<Record<MessageChannel, ConsentStatus>>
-    >((acc, c) => {
-        acc[c.channel] = c.status;
-        return acc;
-    }, {});
 
     return (
-        <PageContainer>
-            <PageHeader
-                breadcrumb={[
-                    <IntentLink data-ph-unmask="" key="leads" href="/leads">
-                        Leads
-                    </IntentLink>,
-                    lead.title,
-                ]}
-                holdsData
-                title={lead.title}
-                description={
-                    lead.contact ? (
-                        <>
-                            <IntentLink
-                                href={personHref(lead.contact.id)}
-                                className="hover:underline"
-                            >
-                                {contactName(lead.contact)}
-                            </IntentLink>
-                            {" · "}
-                            {lead.contact.email}
-                            {amount ? ` · Worth: ${amount}` : ""}
-                        </>
-                    ) : amount ? (
-                        `Worth: ${amount}`
-                    ) : undefined
-                }
-                actions={
-                    <>
-                        {lead.stage && (
-                            <Badge variant="neutral">{lead.stage.name}</Badge>
-                        )}
-                        <Badge variant={LEAD_STATUS[lead.status].variant}>
-                            {LEAD_STATUS[lead.status].label}
-                        </Badge>
-                        {canWrite ? (
-                            <>
-                                <EditLeadDialog
-                                    leadId={lead.id}
-                                    title={lead.title}
-                                    value={lead.value}
-                                    currency={currency}
-                                />
-                                <DeleteLeadMenu
-                                    leadId={lead.id}
-                                    title={lead.title}
-                                    contactName={
-                                        lead.contact
-                                            ? contactName(lead.contact)
-                                            : null
-                                    }
-                                />
-                            </>
-                        ) : null}
-                    </>
-                }
-            />
-
-            {canWrite ? null : (
-                <ReadOnlyNote>{readOnlyLine("this lead")}</ReadOnlyNote>
-            )}
-
-            <LeadActions
-                leadId={lead.id}
-                contactId={contactId}
-                consent={consentByChannel}
-                gates={gates}
-                canLog={canLog}
-                canMessage={canMessage}
-            />
-
-            {lead.enquiries && lead.enquiries.length > 0 ? (
-                <div className="mb-8">
-                    <EnquiryCard
-                        enquiries={lead.enquiries}
-                        knownEmail={lead.contact?.email ?? null}
-                    />
-                </div>
-            ) : null}
-
-            {/* Its stage and status are the badges in the header for
-                someone who can't move them. */}
-            {canWrite ? (
-                <div className="mb-8 flex flex-wrap gap-4 rounded-lg border p-4">
-                    {stages.length > 0 && (
-                        <MoveStageControl
-                            leadId={lead.id}
-                            currentStageId={lead.stageId}
-                            stages={stages}
-                        />
-                    )}
-                    <LeadStatusControl leadId={lead.id} status={lead.status} />
-                </div>
-            ) : null}
-
-            <h2 data-ph-unmask="" className="mb-3 text-lg font-semibold">
-                Messages
-            </h2>
-            <div className="mb-8">
-                <MessageHistory messages={messages} />
-            </div>
-
-            <h2 data-ph-unmask="" className="mb-3 text-lg font-semibold">
-                Activity
-            </h2>
-            <div className="mb-8">
-                <ActivityTimeline
-                    leadId={lead.id}
-                    activities={timeline}
-                    canWrite={canLog}
-                />
-            </div>
-
-            {/* Communications off: nothing can be sent or consented to
-                here, so there is no consent to show. */}
-            {contactId && gates.EMAIL.kind !== "off" ? (
-                <div className="grid gap-2 rounded-lg border p-4">
-                    <h2 data-ph-unmask="" className="text-sm font-medium">
-                        Consent and unsubscribe
-                    </h2>
-                    <ConsentToggle
-                        contactId={contactId}
-                        consent={consentByChannel}
-                        canWrite={canConsent}
-                    />
-                </div>
-            ) : null}
-        </PageContainer>
+        <LeadDetailContainer
+            skeleton={<Loading />}
+            ask={{ leadId }}
+            canWrite={canOrUnknown(organization, "lead:write")}
+            canLog={canOrUnknown(organization, "activity:write")}
+            canMessage={canOrUnknown(organization, "message:write")}
+            canConsent={canOrUnknown(organization, "consent:write")}
+            currency={currency}
+            gates={{ EMAIL: gateFor("EMAIL"), WHATSAPP: gateFor("WHATSAPP") }}
+        />
     );
 }

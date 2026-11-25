@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { textLinkClass } from "@saroh/ui/text-link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -16,10 +15,12 @@ import {
     CHOOSE_WHO,
 } from "@/lib/billing-profiles/view";
 
+import { useSettingsSave } from "@/lib/settings/use-settings";
 import {
     ChangeBillingProfileSheet,
     EditBillingProfileSheet,
 } from "./billing-profile-sheets";
+
 import { RefreshButton } from "./refresh-button";
 import { card, cardHead } from "./styles";
 
@@ -47,7 +48,7 @@ export function BillingProfilePanel({
 }: {
     view: BusinessBillingProfile | null;
 }) {
-    const router = useRouter();
+    const settings = useSettingsSave();
     const [open, setOpen] = useState<"edit" | "change" | null>(null);
     // A fresh draft each opening.
     const [opening, setOpening] = useState(0);
@@ -56,7 +57,8 @@ export function BillingProfilePanel({
         setOpen(which);
     };
     const close = () => setOpen(null);
-    const saved = () => router.refresh();
+    // Only this tab draws who Saroh bills.
+    const saved = () => settings.saved();
 
     if (view === null) {
         return (

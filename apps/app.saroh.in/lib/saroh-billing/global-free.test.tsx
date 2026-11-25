@@ -36,6 +36,7 @@ vi.mock("@/lib/api/http", () => ({
     orgBase: () => Promise.resolve("/organizations/org_1"),
 }));
 vi.mock("@/lib/session", () => ({ requireSession: () => Promise.resolve() }));
+vi.mock("server-only", () => ({}));
 // Whether the API sells Global its plans (stage 9) is `plansOpen`'s own test;
 // here it follows the switch, as before.
 vi.mock("@/lib/saroh-billing/service", async (actual) => ({
@@ -55,8 +56,8 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/",
 }));
 
-import PlanBillingPage from "@/app/(shell)/settings/(sections)/billing/page";
 import ChangePlanPage from "@/app/(shell)/settings/(sections)/billing/plans/page";
+import { BillingView } from "@/components/settings/tabs/billing-tab";
 import { access, row } from "@/lib/billing/fixtures.test-data";
 import { importNext } from "@/lib/billing/meter";
 import { offlinePayHint } from "@/lib/invoices/offline-hint";
@@ -65,6 +66,7 @@ import { trackersLock } from "@/lib/sites/trackers-lock";
 
 import { FREE_NOTE, freeNoteShown } from "./global-free";
 import { tellMeWhenPaidPlans } from "./paid-plans-actions";
+import { billingServer } from "./screen-service";
 
 const UPGRADE = /upgrade|paid plan/i;
 
@@ -97,7 +99,11 @@ describe("Global, Free-only (no Saroh billing)", () => {
 
     it("shows the Free note on Plan and billing, with Tell me when and no plan to buy", async () => {
         expect(freeNoteShown()).toBe(true);
-        const html = renderToStaticMarkup(await PlanBillingPage());
+        // The tab's read (DEC-259) says Free, and the tab draws the note.
+        const screen = await billingServer.service({});
+        expect(screen).toEqual({ kind: "free" });
+        if (!screen) throw new Error("No answer");
+        const html = renderToStaticMarkup(<BillingView screen={screen} />);
         expect(html).toContain("You&#x27;re on Free");
         expect(html).toContain("Paid plans aren&#x27;t available yet");
         expect(html).toContain(FREE_NOTE.ask);
