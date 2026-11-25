@@ -242,8 +242,7 @@ describe("no page words a failed read of its own", () => {
         /(couldn(?:'|&apos;)t|could not) be (?:read|loaded|counted)(?: just now)?[,.]/i;
     const KEPT: Record<string, string> = {
         // A stored copy that can no longer be read: nothing to try again.
-        "app/(shell)/sites/[siteId]/versions/[publicationId]/page.tsx":
-            "stored copy",
+        "components/sites/versions/site-version-screen.tsx": "stored copy",
     };
 
     it("in the words a screen used to choose for itself", () => {
