@@ -11,6 +11,9 @@ import type { OrderRead } from "@/lib/orders/read";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 
+const PILL =
+    "rounded-full border px-2 py-0.5 text-[12px] font-bold tabular-nums";
+
 /**
  * The order's page header: "Sell › Orders › #1063", its number and status, how long it has waited ("Late" in words and
  * Saffron once the API says it is late, by its type's rule), when and where
@@ -28,7 +31,11 @@ export function OrderHeading({
     order: OrderRead;
     number: string;
     standing: { label: string; tone: StepTone };
-    age: { text: string; late: boolean; rule: string | null } | null;
+    /**
+     * How long it has waited; "soon" before the clock is read, which keeps
+     * the pill's room so the page doesn't move when it appears.
+     */
+    age: { text: string; late: boolean; rule: string | null } | "soon" | null;
     /**
      * How it is fulfilled, in words, where the type says more than
      * its type's word ("Pick-up at Hill Road"): "Booking, in person · next visit today,
@@ -62,11 +69,19 @@ export function OrderHeading({
             }
             description={
                 <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
-                    {age ? (
+                    {age === "soon" ? (
+                        <span
+                            aria-hidden="true"
+                            data-ph-unmask=""
+                            className={cn(PILL, "invisible border-transparent")}
+                        >
+                            Waiting 0 min
+                        </span>
+                    ) : age ? (
                         <span
                             title={age.rule ?? undefined}
                             className={cn(
-                                "rounded-full border px-2 py-0.5 text-[12px] font-bold tabular-nums",
+                                PILL,
                                 age.late
                                     ? "border-border-strong bg-muted text-foreground"
                                     : "border-transparent bg-muted text-neutral-700 dark:text-muted-foreground",
