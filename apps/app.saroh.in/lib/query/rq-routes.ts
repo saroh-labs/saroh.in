@@ -18,6 +18,7 @@ export const RQ_ROUTES: readonly string[] = [
     "/calendar",
     "/bookings",
     "/bookings/all",
+    "/bookings/availability",
     "/commerce/products",
     "/commerce/products/[productId]",
     "/commerce/orders",

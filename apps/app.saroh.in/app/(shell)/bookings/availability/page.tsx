@@ -1,230 +1,64 @@
-import { FailedState } from "@saroh/ui/data-state";
-import { PartialRead } from "@saroh/ui/failed-read";
-import { PageHeader } from "@saroh/ui/page-header";
-
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
-import { AvailabilityEditor } from "@/components/bookings/availability/availability-editor";
-
+import { AvailabilityContainer } from "@/components/bookings/availability/availability-container";
 import { PageContainer } from "@/components/shared/page/page-container";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
-import type { KeptBooking } from "@/lib/services/availability-rules";
-import { calendarHref } from "@/lib/services/calendar-href";
-import {
-    addDays,
-    dayBounds,
-    localDateOf,
-    localMinuteOf,
-    weekdayOf,
-    whoFor,
-} from "@/lib/services/diary";
-import {
-    listServices,
-    readBookingsCalendar,
-    readNow,
-} from "@/lib/services/service";
-import { readServiceHours } from "@/lib/services/service-hours-read";
 import { requireSession } from "@/lib/session";
 import { seatNote } from "@/lib/staff/seat-note";
-import type { StaffList } from "@/lib/staff/service";
-import {
-    getBookingRules,
-    listStaff,
-    readBookingPayment,
-    readPersonRules,
-    readRuleRequests,
-} from "@/lib/staff/service";
-import { tidyWeek } from "@/lib/staff/starting-week";
-import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
- * Bookings › Hours and time off (U16; V2 in U17, DEC-170): each person's
- * weekly hours, time off and one-off extra hours, and the business's
- * booking rules, each saved as it is changed. Reads the staff (U3) and
- * three weeks of bookings (U4) — the bookings only to say which fall
- * outside the hours or in extra hours; time off and closures ask the API
- * what they cover (E3). Without them the screen still works and says it
- * could not check. With nobody on the diary it also reads the services'
- * own hours, as the calendar's "Service hours" column does
- * (`readServiceHours`), to say the week customers can book today.
- * `?person=` opens on someone (the calendar's ⋯ "Arjun's hours and time
- * off", a rule request's alert), or `all` on everyone.
- *
- * Each person's own booking rules (U20, #1038) come with the staff; on
- * top, an owner or admin reads the requests waiting, and a Member their
- * own diary's request (waiting, or its outcome until they say OK). Either
- * read failing leaves the rules on the page, without the request.
+ * Bookings › Hours and time off (U16; V2 in U17, DEC-170; on React Query
+ * in U25, DEC-259): each person's weekly hours, time off and one-off
+ * extra hours, and the business's booking rules, each saved as it is
+ * changed. The page awaits only its gates (the session, the business and
+ * what the role may do) and the plan's seat note, which the plan notice
+ * reads anyway; everything else is `/api/bookings/availability`, read in
+ * the browser (`readAvailability`). `?person=` opens on someone (the
+ * calendar's ⋯ "Arjun's hours and time off", a rule request's alert), or
+ * `all` on everyone.
  */
 export const metadata = { title: "Hours and time off" };
-
-async function readStaff(): Promise<StaffList | null> {
-    try {
-        return await listStaff();
-    } catch {
-        return null;
-    }
-}
 
 export default async function AvailabilityPage({
     searchParams,
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const [session, params] = await Promise.all([
+    const [session, params, organization, plan] = await Promise.all([
         requireSession(),
         searchParams,
+        resolveActiveOrganization(),
+        billingAccessOrNull(),
     ]);
     const person = typeof params.person === "string" ? params.person : null;
-    const [organization, staffList, rules, services, payment, plan] =
-        await Promise.all([
-            resolveActiveOrganization(),
-            readStaff(),
-            getBookingRules().catch(() => null),
-            listServices(),
-            readBookingPayment(),
-            billingAccessOrNull(),
-        ]);
-
-    if (!staffList) {
-        return (
-            <PageContainer width="full">
-                <PageHeader
-                    breadcrumb={["Bookings", "Hours and time off"]}
-                    title="Hours and time off"
-                />
-                <div>
-                    <FailedState
-                        title={couldntLoad("everyone's hours")}
-                        retryHref="/bookings/availability"
-                    />
-                </div>
-            </PageContainer>
-        );
-    }
-
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
-    const decides = may("service:write");
-    const myDiary = staffList.staff.find(
-        (p) =>
-            p.status === "ACTIVE" &&
-            Boolean(session.user.id) &&
-            p.membership?.userId === session.user.id,
-    );
-    const timezone = staffList.timezone;
-    const today = localDateOf(new Date(readNow()), timezone);
-    const [calendar, serviceHours, requests, mine] = await Promise.all([
-        readBookingsCalendar(
-            dayBounds(today, timezone).from.toISOString(),
-            dayBounds(addDays(today, 21), timezone).to.toISOString(),
-        ),
-        // Only read while nobody is on the diary; null otherwise.
-        readServiceHours(services, staffList),
-        decides ? readRuleRequests() : Promise.resolve(null),
-        !decides && myDiary
-            ? readPersonRules(myDiary.id)
-            : Promise.resolve(null),
-    ]);
-
-    // The live bookings with a person: this week's for "outside these
-    // hours", and a count per person per day for extra hours.
-    const weekEnd = addDays(today, 7);
-    let kept: KeptBooking[] | null = null;
-    let bookedOn: Record<string, number> | null = null;
-    if (calendar) {
-        const counts: Record<string, number> = {};
-        kept = [];
-        bookedOn = counts;
-        const count = (staffId: string, date: string) => {
-            const key = `${staffId}|${date}`;
-            counts[key] = (counts[key] ?? 0) + 1;
-        };
-        for (const diary of calendar.diaries) {
-            if (!diary.person) continue;
-            const staffId = diary.person.id;
-            for (const b of diary.bookings) {
-                if (b.status === "CANCELLED") continue;
-                const date = localDateOf(b.startAt, timezone);
-                count(staffId, date);
-                if (date < weekEnd) {
-                    kept.push({
-                        id: b.id,
-                        staffId,
-                        weekday: weekdayOf(date),
-                        start: localMinuteOf(b.startAt, timezone),
-                        who: whoFor(b),
-                        date,
-                        href: `/bookings/${b.id}`,
-                    });
-                }
-            }
-            // A class is one thing on the day, however many are on it.
-            for (const s of diary.classes) {
-                if (s.bookings.every((b) => b.status === "CANCELLED")) continue;
-                const date = localDateOf(s.startAt, timezone);
-                count(staffId, date);
-                if (date < weekEnd) {
-                    kept.push({
-                        id: s.key,
-                        staffId,
-                        weekday: weekdayOf(date),
-                        start: localMinuteOf(s.startAt, timezone),
-                        who: s.service.name,
-                        date,
-                        href: calendarHref("day", date, { person: staffId }),
-                    });
-                }
-            }
-        }
-    }
+    const may = organization?.actions
+        ? permitsFor(organization)
+        : (_: string) =>
+              organization?.role === "OWNER" || organization?.role === "ADMIN";
     return (
         <PageContainer width="full">
             <div>
-                {calendar ? null : (
-                    <PartialRead
-                        className="mb-3"
-                        things="bookings"
-                        so="The hours below can't say which bookings they would leave out."
-                    />
-                )}
-                {/* Everyone who takes bookings uses a team seat (DEC-105). */}
-                {may("service:write") ? (
-                    <PlanLimitNotice moduleId="members" className="mb-3" />
-                ) : null}
-                <AvailabilityEditor
-                    staff={staffList.staff}
-                    closures={staffList.closures}
-                    openingHours={staffList.openingHours ?? null}
-                    rules={rules}
-                    serviceHours={
-                        serviceHours ? tidyWeek(serviceHours.hours) : null
-                    }
-                    services={services
-                        .filter(
-                            (s) => s.status === "ACTIVE" && s.showOnBookingPage,
-                        )
-                        .map((s) => ({ id: s.id, name: s.name }))}
-                    seatNote={seatNote(plan)}
-                    timezone={timezone}
-                    today={today}
-                    kept={kept}
-                    bookedOn={bookedOn}
+                <AvailabilityContainer
                     person={person}
                     business={organization?.name ?? "the business"}
                     me={session.user.name ?? ""}
+                    meId={session.user.id}
                     // A Member keeps anyone's hours, time off and extra
                     // hours (DEC-170, Q13); who takes bookings, closing
                     // the business and its rules stay `service:write`.
                     canEdit={may("hours:write")}
                     canManage={may("service:write")}
-                    onlineBlocker={payment?.onlineBlocker}
-                    personRules={{
-                        meId: session.user.id,
-                        requests,
-                        mine,
-                    }}
+                    seatNote={seatNote(plan)}
+                    limitNotice={
+                        // Everyone who takes bookings uses a team seat (DEC-105).
+                        may("service:write") ? (
+                            <PlanLimitNotice
+                                moduleId="members"
+                                className="mb-3"
+                            />
+                        ) : null
+                    }
                 />
             </div>
         </PageContainer>

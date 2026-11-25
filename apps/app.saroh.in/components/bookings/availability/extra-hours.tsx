@@ -7,10 +7,10 @@ import { OptionSelect } from "@saroh/ui/option-select";
 import { TextLink } from "@saroh/ui/text-link";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { CalendarDays, Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { useBookingSave } from "@/lib/bookings/use-bookings";
 import { formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { firstName } from "@/lib/names";
@@ -66,7 +66,7 @@ export function ExtraHoursBody({
     canEdit: boolean;
 }) {
     const id = useId();
-    const router = useRouter();
+    const { refresh, org } = useBookingSave();
     const [gone, setGone] = useState<string[]>([]);
     const [adding, setAdding] = useState(false);
     const [staffId, setStaffId] = useState(who ?? people.at(0)?.id ?? "");
@@ -88,7 +88,7 @@ export function ExtraHoursBody({
     async function close(item: ExtraItem) {
         setGone((g) => [...g, item.x.id]);
         const res = await runAction(() =>
-            removeExtraHours(item.staffId, item.x.id),
+            removeExtraHours(item.staffId, item.x.id, ...org),
         );
         if (!res) {
             setGone((g) => g.filter((x) => x !== item.x.id));
@@ -102,7 +102,7 @@ export function ExtraHoursBody({
             );
             return;
         }
-        router.refresh();
+        refresh();
         const day = formatDay(item.x.date.slice(0, 10), {
             weekday: "short",
             today,
@@ -112,14 +112,18 @@ export function ExtraHoursBody({
                 ? `Extra hours on ${day} closed. The ${count(item.booked, "booking stays", "bookings stay")}.`
                 : `Extra hours on ${day} closed.`,
             async () => {
-                const back = await addExtraHours(item.staffId, {
-                    date: item.x.date.slice(0, 10),
-                    startMinute: item.x.startMinute,
-                    endMinute: item.x.endMinute,
-                });
+                const back = await addExtraHours(
+                    item.staffId,
+                    {
+                        date: item.x.date.slice(0, 10),
+                        startMinute: item.x.startMinute,
+                        endMinute: item.x.endMinute,
+                    },
+                    ...org,
+                );
                 if (!back.ok) return back;
                 setGone((g) => g.filter((x) => x !== item.x.id));
-                router.refresh();
+                refresh();
                 return { ok: true };
             },
         );
@@ -134,11 +138,11 @@ export function ExtraHoursBody({
         );
         const res = await runAction(
             () =>
-                addExtraHours(staffId, {
-                    date,
-                    startMinute: from,
-                    endMinute: to,
-                }),
+                addExtraHours(
+                    staffId,
+                    { date, startMinute: from, endMinute: to },
+                    ...org,
+                ),
             { setBusy },
         );
         if (!res) return;
@@ -149,14 +153,14 @@ export function ExtraHoursBody({
         const added = res.data.extraHours.find((x) => !known.has(x.id));
         setAdding(false);
         setTried(false);
-        router.refresh();
+        refresh();
         showUndo(
             `Extra hours added: ${formatDay(date, { weekday: "short", today })}, ${spanWords(from, to)}.`,
             async () => {
                 if (!added) return { ok: true };
-                const back = await removeExtraHours(staffId, added.id);
+                const back = await removeExtraHours(staffId, added.id, ...org);
                 if (!back.ok) return back;
-                router.refresh();
+                refresh();
                 return { ok: true };
             },
         );
