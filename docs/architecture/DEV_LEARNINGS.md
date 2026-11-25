@@ -7083,3 +7083,10 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** the check reads the registry as text and took every quoted string in the array; an apostrophe in a comment between entries ("the others' writers") paired with the next quote and swallowed the entries after it.
 - **Fix:** `stringList` in `scripts/check-no-refresh-in-rq.mjs` drops `//` comments before reading the strings (test in `check-no-refresh-in-rq.test.mjs`).
 - **Rule:** a list a check reads as text holds plain string literals; comments in it are fine now, but keep quotes out of them where another check parses the same way.
+
+## Moving a page to the browser dropped what the server render had been doing (25 Nov 2026)
+
+- **Symptom:** PR #1501's CI: a Member, Reviewer, Calendar-only or location-team person opening `/settings/billing` no longer saw "You can't open Plan and billing"; the Plan Editor's first save left "Saved as a draft…" on screen and never moved to the plan's own page (`subscriptions.spec.ts`).
+- **Cause:** both behaviours came from the server render, not from the data. (1) The old billing page refused the role itself; once the page only rendered `SettingsTabScreen`, the read route's 403 reached a generic section error. (2) The editor's next save used to `revalidatePath`, which redrew the page at the moved address and mounted the edit route; with saves that revalidate nothing, the `/new` page stayed mounted.
+- **Fix:** the billing page checks `mayReadBilling()` on the server and draws its own denied view, as Activity and Your data do; the editor remembers the moved address and, on the next landed save with nothing pending, `router.replace`s to it (`use-autosave.ts`).
+- **Rule:** before moving a page's data to the browser, list what its server render did besides reading data (refusals with their own wording, remounts after `revalidatePath`, redirects) and keep each one on purpose. A screen unit runs its screens' browser specs (`pnpm prepush --e2e`) before it is called done. `docs/patterns/frontend-data-and-state.md`.
