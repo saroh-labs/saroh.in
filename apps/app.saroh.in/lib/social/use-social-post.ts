@@ -20,6 +20,7 @@ import {
     workingKinds,
 } from "./saroh-social-view";
 import { SOCIAL_WORDS } from "./saroh-social-words";
+import { useSocialStale } from "./use-social";
 
 /** What Create post knows about Saroh Social, read once on the server. */
 export interface SocialCompose {
@@ -74,6 +75,7 @@ export function useSocialPost({
     zone: string;
 }) {
     const router = useRouter();
+    const stale = useSocialStale();
     const [on, setOn] = useState<ChannelKind[]>(() =>
         workingKinds(social.channels),
     );
@@ -178,6 +180,7 @@ export function useSocialPost({
                         whenWords(res.data.publishAt ?? publishAt ?? "", zone),
                     ),
         );
+        stale();
         router.push(`/social?post=${encodeURIComponent(res.data.id)}`);
         return true;
     }

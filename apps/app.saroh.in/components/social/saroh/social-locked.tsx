@@ -34,6 +34,7 @@ export function SocialLocked({
             <FailedState
                 size="panel"
                 title={SOCIAL_WORDS.couldntCheck}
+                // rq-refresh-ok: the plan check is the page's gate, drawn on the server; nothing here is a query.
                 onRetry={() => router.refresh()}
             />
         );
