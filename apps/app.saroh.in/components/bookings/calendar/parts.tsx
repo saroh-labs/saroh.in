@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { StatusTone } from "@/components/shared/lists/status-badge";
@@ -38,7 +38,7 @@ export function BookingsLocked({
                 {...whoCanChange({ thing: "Bookings", business, role })}
                 action={
                     <Button asChild variant="outline" className="wk-press">
-                        <Link href="/">Back to Home</Link>
+                        <IntentLink href="/">Back to Home</IntentLink>
                     </Button>
                 }
             />

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { CopyValue } from "@/components/sites/search-tracking/parts";
@@ -84,9 +84,9 @@ export function AddressGroup({
                                 ) : null}
                                 {canChangeAddress ? (
                                     <Button variant="outline" size="sm" asChild>
-                                        <Link href={WEB_ADDRESS_HREF}>
+                                        <IntentLink href={WEB_ADDRESS_HREF}>
                                             Change
-                                        </Link>
+                                        </IntentLink>
                                     </Button>
                                 ) : null}
                             </div>

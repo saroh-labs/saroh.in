@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { IntentLink } from "./intent-link";
 
 /**
  * The link's look, for the rare caller that must draw one on an element of
@@ -28,7 +29,11 @@ type AnchorProps = Common &
         href: string;
         /** Opens in a new tab, and says so with the glyph and to a screen reader. */
         external?: boolean;
-        /** Next's `scroll` and `prefetch`, for an in-app link. */
+        /**
+         * Next's `scroll` and `prefetch`, for an in-app link. Without
+         * `prefetch` the page is fetched ahead only once someone points at,
+         * touches or focuses the link (`IntentLink`).
+         */
         scroll?: boolean;
         prefetch?: boolean;
         onClick?: React.MouseEventHandler<HTMLAnchorElement>;
@@ -93,15 +98,22 @@ export function TextLink(props: TextLinkProps) {
             </a>
         );
     }
+    if (prefetch !== undefined) {
+        return (
+            <Link
+                href={href}
+                scroll={scroll}
+                prefetch={prefetch}
+                className={cls}
+                {...rest}
+            >
+                {children}
+            </Link>
+        );
+    }
     return (
-        <Link
-            href={href}
-            scroll={scroll}
-            prefetch={prefetch}
-            className={cls}
-            {...rest}
-        >
+        <IntentLink href={href} scroll={scroll} className={cls} {...rest}>
             {children}
-        </Link>
+        </IntentLink>
     );
 }

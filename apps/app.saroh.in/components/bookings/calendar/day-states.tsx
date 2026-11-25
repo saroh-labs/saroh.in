@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { TextLink } from "@saroh/ui/text-link";
 import { Info, Plus, Users } from "lucide-react";
-import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
 /**
@@ -108,7 +108,7 @@ export function FirstDayHelp({
                 <div className="flex shrink-0 gap-2">
                     {hoursHref ? (
                         <Button asChild variant="outline">
-                            <Link href={hoursHref}>{change}</Link>
+                            <IntentLink href={hoursHref}>{change}</IntentLink>
                         </Button>
                     ) : null}
                     <Button onClick={dismiss}>Got it</Button>
@@ -160,12 +160,12 @@ export function FirstDayHelp({
                 </ol>
                 <div className="mt-2.5 flex items-center justify-between">
                     {hoursHref ? (
-                        <Link
+                        <IntentLink
                             href={hoursHref}
                             className="inline-flex min-h-11 items-center text-[13.5px] font-semibold text-background underline underline-offset-2"
                         >
                             {change}
-                        </Link>
+                        </IntentLink>
                     ) : (
                         <span />
                     )}

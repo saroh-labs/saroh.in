@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useState } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -132,7 +132,9 @@ function ActivitySheet({
             description={`${sentence}, ${detail.when}.`}
             footer={
                 <Button asChild className="min-w-[160px] flex-1">
-                    <Link href={line.where.href}>Open {line.where.label}</Link>
+                    <IntentLink href={line.where.href}>
+                        Open {line.where.label}
+                    </IntentLink>
                 </Button>
             }
         >

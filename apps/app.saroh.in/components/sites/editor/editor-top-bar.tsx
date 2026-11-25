@@ -1,10 +1,10 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { ChevronDown, ChevronLeft, Eye } from "lucide-react";
-import Link from "next/link";
 
 import { TopBarActions } from "@/components/sites/editor/top-bar-actions";
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
@@ -73,7 +73,7 @@ export function EditorTopBar(props: EditorTopBarProps) {
                      * link; the way out is the Website crumb before it.
                      */}
                     <Tip label={address ?? undefined}>
-                        <Link
+                        <IntentLink
                             href={`/sites/${siteId}/pages`}
                             aria-label="Back to Website"
                             className="flex shrink-0 items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[0.78125rem] text-muted-foreground transition-colors duration-fast hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
@@ -83,7 +83,7 @@ export function EditorTopBar(props: EditorTopBarProps) {
                                 className="size-[15px] shrink-0"
                             />
                             Website
-                        </Link>
+                        </IntentLink>
                     </Tip>
                     <span
                         aria-hidden

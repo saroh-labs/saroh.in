@@ -1,9 +1,9 @@
 "use client";
 
 import { FormDialog } from "@saroh/ui/form-dialog";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
@@ -199,13 +199,13 @@ export function SellPackDialog({
                 {nothingToSell ? (
                     <p className="text-[13px] text-muted-foreground">
                         There is no pack on sale yet.{" "}
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             href="/class-packs/new"
                             className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                             Make one
-                        </Link>{" "}
+                        </IntentLink>{" "}
                         first.
                     </p>
                 ) : nobody ? (

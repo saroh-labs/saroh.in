@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import type { ReactNode } from "react";
 
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -56,7 +56,7 @@ export function AccessDenied({
             note={note}
             action={
                 <Button asChild variant="outline" className="wk-press">
-                    <Link href={backHref}>{backLabel}</Link>
+                    <IntentLink href={backHref}>{backLabel}</IntentLink>
                 </Button>
             }
         />

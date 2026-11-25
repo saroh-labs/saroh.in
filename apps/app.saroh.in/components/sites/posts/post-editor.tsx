@@ -6,10 +6,10 @@ import { POST_TITLE_MAX } from "@saroh/api-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -161,7 +161,9 @@ export function PostEditor({
         <div className="flex min-h-[calc(100dvh-var(--app-header-h,3.5rem))] flex-col">
             <header className="sticky top-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2">
                 <Button variant="ghost" size="xs" asChild className="-ml-2">
-                    <Link href={`/sites/${siteId}/posts`}>← Posts</Link>
+                    <IntentLink href={`/sites/${siteId}/posts`}>
+                        ← Posts
+                    </IntentLink>
                 </Button>
 
                 {/* Which of the two states this is in, and — the part a

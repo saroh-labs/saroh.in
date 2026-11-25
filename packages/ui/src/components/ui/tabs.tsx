@@ -1,7 +1,7 @@
 "use client";
 
 import * as TabsPrimitive from "@radix-ui/react-tabs";
-import Link from "next/link";
+import { IntentLink } from "./intent-link";
 
 import * as React from "react";
 import { cn } from "../../lib/utils";
@@ -158,7 +158,7 @@ export function TabStrip<V extends string = string>({
                     />
                 ) : null}
                 {links ? (
-                    <Link
+                    <IntentLink
                         id={idOf(t.value)}
                         // A tab's name is Saroh's own words, as on `TabsTrigger`.
                         data-ph-unmask=""
@@ -170,7 +170,7 @@ export function TabStrip<V extends string = string>({
                     >
                         {body(t, on)}
                         <LinkPending />
-                    </Link>
+                    </IntentLink>
                 ) : (
                     <button
                         id={idOf(t.value)}

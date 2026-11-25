@@ -10,8 +10,8 @@ import {
     Search,
     Unplug,
 } from "lucide-react";
-import Link from "next/link";
 import * as React from "react";
+import { IntentLink } from "./intent-link";
 
 import type { NoResultsCause, ProviderKind } from "../../lib/state-copy";
 import {
@@ -297,7 +297,7 @@ function StateAction({
     reload?: boolean;
 }) {
     // A plain anchor for a full load, the router's link otherwise.
-    const Anchor = reload ? "a" : Link;
+    const Anchor = reload ? "a" : IntentLink;
     if (size === "inline") {
         const text =
             "wk-press inline-flex items-center rounded-sm font-medium text-foreground underline underline-offset-[3px] hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground coarse:min-h-11";

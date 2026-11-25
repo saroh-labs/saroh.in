@@ -1,10 +1,10 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Plus, RadioTower } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import type {
@@ -63,10 +63,10 @@ export function SarohSocialPage({
     const canPost = access.canPost;
     const newPost = canPost ? (
         <Button asChild size={narrow ? "default" : "lg"}>
-            <Link href="/social/new" data-new-post="">
+            <IntentLink href="/social/new" data-new-post="">
                 <Plus aria-hidden className="size-4" />
                 {SOCIAL_WORDS.newPost}
-            </Link>
+            </IntentLink>
         </Button>
     ) : null;
 
@@ -83,9 +83,9 @@ export function SarohSocialPage({
                     onChannels
                         ? [
                               "Grow",
-                              <Link key="social" href="/social">
+                              <IntentLink key="social" href="/social">
                                   {SOCIAL_WORDS.social}
-                              </Link>,
+                              </IntentLink>,
                           ]
                         : ["Grow", SOCIAL_WORDS.social]
                 }
@@ -109,7 +109,7 @@ export function SarohSocialPage({
                                 size={narrow ? "default" : "lg"}
                                 className="bg-card"
                             >
-                                <Link
+                                <IntentLink
                                     href="/social?tab=channels"
                                     data-channels-link=""
                                 >
@@ -118,7 +118,7 @@ export function SarohSocialPage({
                                         className="size-4"
                                     />
                                     {SOCIAL_WORDS.channels}
-                                </Link>
+                                </IntentLink>
                             </Button>
                             {newPost}
                         </>

@@ -2,8 +2,8 @@ import { autopayCharges } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { PartialRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { NOTHING_CHANGED, planLabel } from "@saroh/ui/lib/state-copy";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import {
@@ -229,7 +229,9 @@ export default async function PlanBillingPage({
                     // own: the way to the plans is still here.
                     <p>
                         <Button asChild variant="outline">
-                            <Link href={PLANS_HREF}>{planLabel()}</Link>
+                            <IntentLink href={PLANS_HREF}>
+                                {planLabel()}
+                            </IntentLink>
                         </Button>
                     </p>
                 ) : null}

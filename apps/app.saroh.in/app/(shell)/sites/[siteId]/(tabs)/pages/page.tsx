@@ -1,8 +1,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { FileText, Plug } from "lucide-react";
-import Link from "next/link";
 import { notFound, redirect, unstable_rethrow } from "next/navigation";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -76,7 +76,9 @@ export default async function SitePagesPage({
                 description="This site has a domain but nothing on it."
                 action={
                     <Button asChild>
-                        <Link href={editorHref}>Open the editor</Link>
+                        <IntentLink href={editorHref}>
+                            Open the editor
+                        </IntentLink>
                     </Button>
                 }
             />
@@ -110,13 +112,13 @@ export default async function SitePagesPage({
                                 ? "The public still sees the last published version."
                                 : "Nothing is public until the site is published."}
                         </span>
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             href={editorHref}
                             className="font-medium underline-offset-4 hover:underline"
                         >
                             Review and publish
-                        </Link>
+                        </IntentLink>
                     </div>
                 </Notice>
             ) : null}
@@ -136,7 +138,7 @@ export default async function SitePagesPage({
                             key={page.id}
                             className="border-b border-border last:border-b-0"
                         >
-                            <Link
+                            <IntentLink
                                 href={`${editorHref}?page=${page.id}`}
                                 aria-label={`${page.title}, ${state.label.toLowerCase()}. Open in the editor.`}
                                 className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
@@ -178,7 +180,7 @@ export default async function SitePagesPage({
                                         </Badge>
                                     }
                                 />
-                            </Link>
+                            </IntentLink>
                         </li>
                     );
                 })}
@@ -214,12 +216,12 @@ function AiWayIn() {
                 className="mt-0.5 size-4 shrink-0 text-muted-foreground"
             />
             <span>
-                <Link
+                <IntentLink
                     href="/settings/developers/ai"
                     className="font-semibold text-foreground underline decoration-border-strong underline-offset-[3px] coarse:inline-block coarse:py-2.5"
                 >
                     Edit your site from your AI assistant
-                </Link>
+                </IntentLink>
                 <span className="text-muted-foreground">
                     {" · Works with "}
                     {formatList(liveAiApps().map((app) => app.name))}. Changes

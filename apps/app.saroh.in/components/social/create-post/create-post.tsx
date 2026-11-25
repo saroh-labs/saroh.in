@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { PartialRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { useState } from "react";
 
 import type { ShareSetup } from "@/lib/share-item/share";
@@ -81,9 +81,9 @@ export function CreatePost({
             holdsData={false}
             compactOnPhone
             breadcrumb={[
-                <Link key="social" href="/social">
+                <IntentLink key="social" href="/social">
                     {POST_WORDS.social}
-                </Link>,
+                </IntentLink>,
                 POST_WORDS.title,
             ]}
             title={own ? POST_WORDS.ownTitle : POST_WORDS.title}

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { upgradeHref } from "@/lib/billing/access";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
@@ -23,12 +23,12 @@ export function PaidRefusal({ name }: { name: string }) {
             {plansShown() ? (
                 <>
                     {" "}
-                    <Link
+                    <IntentLink
                         href={upgradeHref()}
                         className="font-medium underline underline-offset-2"
                     >
                         See plans
-                    </Link>
+                    </IntentLink>
                 </>
             ) : null}
         </p>

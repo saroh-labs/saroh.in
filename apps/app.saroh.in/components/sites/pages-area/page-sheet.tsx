@@ -6,13 +6,13 @@ import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { Field } from "@saroh/ui/field";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import { Notice } from "@saroh/ui/notice";
 import { Switch } from "@saroh/ui/switch";
 import { Textarea } from "@saroh/ui/textarea";
 import { showSuccess } from "@saroh/ui/toast";
 import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
-import Link from "next/link";
 import { useId, useState } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
@@ -492,12 +492,12 @@ function OpenPageSheet({
                 </section>
 
                 {editorHref ? (
-                    <Link
+                    <IntentLink
                         href={editorHref}
                         className="justify-self-start text-sm font-medium underline underline-offset-4"
                     >
                         Open this page in the editor
-                    </Link>
+                    </IntentLink>
                 ) : null}
             </FormSheet>
             {guard.dialog}

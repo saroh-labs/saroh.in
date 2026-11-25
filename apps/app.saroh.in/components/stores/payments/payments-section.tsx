@@ -2,6 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import {
     Select,
@@ -11,7 +12,6 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 import { Lock } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { providerName } from "@/lib/payments/providers";
@@ -104,11 +104,15 @@ function OnlinePayments({ store, canEdit, pending, save }: SectionProps) {
                     <span data-ph-unmask="">Online payments</span>
                     {status.badge}
                 </div>
-                <Link data-ph-unmask="" href={PROVIDERS_HREF} className={LINK}>
+                <IntentLink
+                    data-ph-unmask=""
+                    href={PROVIDERS_HREF}
+                    className={LINK}
+                >
                     {connected.length === 0
                         ? "Connect a provider"
                         : "Manage providers"}
-                </Link>
+                </IntentLink>
             </div>
             <Note>{status.note}</Note>
             {choice ? (

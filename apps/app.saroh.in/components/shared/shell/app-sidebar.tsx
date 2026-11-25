@@ -1,9 +1,9 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverAnchor, PopoverContent } from "@saroh/ui/popover";
 import { Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useCallback, useState, useSyncExternalStore } from "react";
 
@@ -253,7 +253,7 @@ export function AppSidebar({
                                         >
                                             <PopoverAnchor asChild>
                                                 <Tip label={item.label}>
-                                                    <Link
+                                                    <IntentLink
                                                         href={item.href}
                                                         // On the icon rail a section opens its
                                                         // flyout instead of navigating: its
@@ -346,7 +346,7 @@ export function AppSidebar({
                                                                 className="group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only"
                                                             />
                                                         ) : null}
-                                                    </Link>
+                                                    </IntentLink>
                                                 </Tip>
                                             </PopoverAnchor>
                                             {item.children?.length ? (
@@ -473,7 +473,7 @@ function NavFlyout({
             {rows.map((child) => {
                 const on = isNavChildCurrent(pathname, child.href, rows);
                 return (
-                    <Link
+                    <IntentLink
                         key={child.href}
                         href={child.href}
                         onClick={onLeave}
@@ -500,7 +500,7 @@ function NavFlyout({
                                 className="ml-2 shrink-0"
                             />
                         ) : null}
-                    </Link>
+                    </IntentLink>
                 );
             })}
         </PopoverContent>
@@ -574,7 +574,7 @@ function SiteTree({
                 );
                 const waiting = counts?.[child.href] ?? 0;
                 return (
-                    <Link
+                    <IntentLink
                         key={child.href}
                         href={child.href}
                         aria-current={active ? "page" : undefined}
@@ -610,7 +610,7 @@ function SiteTree({
                                 className="shrink-0"
                             />
                         ) : null}
-                    </Link>
+                    </IntentLink>
                 );
             })}
         </div>

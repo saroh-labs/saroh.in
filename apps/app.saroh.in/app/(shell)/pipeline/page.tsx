@@ -2,8 +2,8 @@ import { formatMoney } from "@/lib/format/money";
 import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Badge } from "@saroh/ui/badge";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { PipelineBoardStart } from "@/components/crm/pipeline-board-start";
@@ -214,12 +214,12 @@ export default async function PipelinePage() {
                                                 key={lead.id}
                                                 className="rounded-md border bg-background p-3 shadow-sm"
                                             >
-                                                <Link
+                                                <IntentLink
                                                     href={`/leads/${lead.id}`}
                                                     className="text-sm font-medium hover:underline"
                                                 >
                                                     {lead.title}
-                                                </Link>
+                                                </IntentLink>
                                                 <p className="text-xs text-muted-foreground">
                                                     {lead.contact
                                                         ? contactName(

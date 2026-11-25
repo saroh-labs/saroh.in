@@ -1,8 +1,8 @@
 "use client";
 
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useId, useState } from "react";
 
 import { QR_INK } from "@/lib/qr/colours";
@@ -114,13 +114,13 @@ export function QrLookControls({
                         {keptBranded ? `${lock.kept} ` : null}
                         {lock.line}{" "}
                         <PlanWay fallback={lock.plan}>
-                            <Link
+                            <IntentLink
                                 href={lock.href}
                                 aria-label={lock.cta}
                                 className={linkClass}
                             >
                                 {lock.plan}
-                            </Link>
+                            </IntentLink>
                         </PlanWay>
                         .
                     </p>

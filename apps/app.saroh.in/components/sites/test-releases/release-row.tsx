@@ -2,6 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import {
@@ -13,7 +14,6 @@ import {
     Rocket,
     Trash2,
 } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { useEditorReadOnly } from "@/components/sites/editor/read-only";
@@ -201,7 +201,7 @@ export function ReleaseRow({
                             </Button>
                         )}
                         <Button size="sm" variant="outline" asChild>
-                            <Link
+                            <IntentLink
                                 href={`/sites/${siteId}/releases/${release.id}`}
                             >
                                 <MessageSquareText
@@ -209,7 +209,7 @@ export function ReleaseRow({
                                     className="size-4"
                                 />
                                 Review
-                            </Link>
+                            </IntentLink>
                         </Button>
                         {readOnly ? null : release.status === "scheduled" ? (
                             can.canPublish ? (

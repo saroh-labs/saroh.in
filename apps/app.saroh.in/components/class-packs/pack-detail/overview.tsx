@@ -1,5 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import type { PackDetailTab } from "@/lib/class-packs/pack-detail";
 import type {
@@ -93,14 +93,14 @@ export function PackOverviewTab({
                                 {c.k}
                             </span>
                             {"href" in c.open ? (
-                                <Link
+                                <IntentLink
                                     data-ph-unmask=""
                                     href={c.open.href}
                                     aria-label={`Open ${c.k}`}
                                     className={`${QUIET_LINK} text-[12px] coarse:inline-flex coarse:min-h-11 coarse:items-center`}
                                 >
                                     Open
-                                </Link>
+                                </IntentLink>
                             ) : (
                                 <button
                                     data-ph-unmask=""
@@ -124,13 +124,13 @@ export function PackOverviewTab({
                             <div className="flex flex-col gap-1 text-[12px] leading-[1.45] text-muted-foreground">
                                 {c.lines.map((l) =>
                                     l.href ? (
-                                        <Link
+                                        <IntentLink
                                             key={l.text}
                                             href={l.href}
                                             className="rounded-[4px] text-muted-foreground transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground/70"
                                         >
                                             {l.text}
-                                        </Link>
+                                        </IntentLink>
                                     ) : (
                                         <span key={l.text}>{l.text}</span>
                                     ),
@@ -147,10 +147,10 @@ export function PackOverviewTab({
                 </h2>
                 {editHref ? (
                     <Button asChild variant="outline" size="sm">
-                        <Link href={editHref}>
+                        <IntentLink href={editHref}>
                             <Pencil />
                             Edit
-                        </Link>
+                        </IntentLink>
                     </Button>
                 ) : null}
                 <span

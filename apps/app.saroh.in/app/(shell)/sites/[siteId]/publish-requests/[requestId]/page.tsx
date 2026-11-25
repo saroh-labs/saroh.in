@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { PageContainer } from "@/components/shared/page/page-container";
 import { PublishRequestScreen } from "@/components/sites/publish-request/publish-request-screen";
@@ -30,9 +30,9 @@ export default async function PublishRequestPage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link data-ph-unmask="" key="site" href="/sites">
+                    <IntentLink data-ph-unmask="" key="site" href="/sites">
                         Website
-                    </Link>,
+                    </IntentLink>,
                     "Publish request",
                 ]}
                 holdsData
@@ -57,7 +57,9 @@ export default async function PublishRequestPage({
                         variant="outline"
                         className="justify-self-start"
                     >
-                        <Link href="/sites">Back to the website</Link>
+                        <IntentLink href="/sites">
+                            Back to the website
+                        </IntentLink>
                     </Button>
                 </div>
             )}

@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { dismissToasts, showUndo } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -179,9 +179,13 @@ export function PlanDetail({
                     className="mb-0"
                     breadcrumb={[
                         "Payments",
-                        <Link data-ph-unmask="" key="plans" href={PLANS_HREF}>
+                        <IntentLink
+                            data-ph-unmask=""
+                            key="plans"
+                            href={PLANS_HREF}
+                        >
                             Plans
-                        </Link>,
+                        </IntentLink>,
                         plan.name,
                     ]}
                     title={plan.name}
@@ -212,15 +216,15 @@ export function PlanDetail({
                                     // From the plan itself (UX-080): the
                                     // dialog, opened on this plan.
                                     <Button asChild variant="outline">
-                                        <Link href={subscribeTo}>
+                                        <IntentLink href={subscribeTo}>
                                             Subscribe someone
-                                        </Link>
+                                        </IntentLink>
                                     </Button>
                                 ) : null}
                                 <Button asChild>
-                                    <Link href={editHref(plan.id)}>
+                                    <IntentLink href={editHref(plan.id)}>
                                         Edit plan
-                                    </Link>
+                                    </IntentLink>
                                 </Button>
                             </>
                         ) : undefined

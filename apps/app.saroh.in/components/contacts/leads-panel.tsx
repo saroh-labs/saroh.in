@@ -1,6 +1,6 @@
 import { formatMoney } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import type { ContactDetail } from "@/lib/contacts/service";
@@ -63,7 +63,7 @@ export function LeadsPanel({
                             key={lead.id}
                             className="border-b border-foreground/10 last:border-b-0"
                         >
-                            <Link
+                            <IntentLink
                                 href={`/leads/${lead.id}`}
                                 className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11"
                             >
@@ -84,7 +84,7 @@ export function LeadsPanel({
                                 <Badge variant={status.variant}>
                                     {status.label}
                                 </Badge>
-                            </Link>
+                            </IntentLink>
                         </li>
                     );
                 })}

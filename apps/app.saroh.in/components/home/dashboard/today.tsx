@@ -3,9 +3,9 @@
 import { clockValue, formatClock } from "@/lib/format/datetime";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId, useMemo, useState } from "react";
 
@@ -247,12 +247,12 @@ function TodayLine({
                 {formatClock(row.time)}
             </span>
             <span className="grid min-w-0 gap-0.5">
-                <Link
+                <IntentLink
                     href={row.href}
                     className="text-sm font-medium text-foreground after:absolute after:inset-0 after:rounded-none focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
                 >
                     {row.what}
-                </Link>
+                </IntentLink>
                 {row.who ? (
                     <span className="text-[12.5px] text-muted-foreground">
                         {row.who}

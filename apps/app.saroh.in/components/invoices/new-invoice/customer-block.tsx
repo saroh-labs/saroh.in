@@ -2,10 +2,10 @@
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 import { useId } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Controller, useWatch } from "react-hook-form";
@@ -263,7 +263,7 @@ export function NoContactsYet({
             <div className="mt-4 flex flex-wrap gap-2">
                 <NewContact onAdded={onAdded} solid />
                 <Button variant="ghost" asChild>
-                    <Link href="/contacts">Go to Contacts</Link>
+                    <IntentLink href="/contacts">Go to Contacts</IntentLink>
                 </Button>
             </div>
         </div>

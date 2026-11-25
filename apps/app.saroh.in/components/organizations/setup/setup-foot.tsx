@@ -2,8 +2,8 @@
 
 import { authClient } from "@saroh/auth/client";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ProgressBar } from "@saroh/ui/progress-bar";
-import Link from "next/link";
 
 import { accountsLoginUrl } from "@/lib/accounts";
 import { clearSetupDraft } from "@/lib/organizations/setup-steps";
@@ -73,7 +73,7 @@ export function SetupFoot({
                         variant="ghost"
                         className="sm:-ml-4 sm:mr-auto"
                     >
-                        <Link href={backTo}>Back</Link>
+                        <IntentLink href={backTo}>Back</IntentLink>
                     </Button>
                 ) : null}
                 <Button

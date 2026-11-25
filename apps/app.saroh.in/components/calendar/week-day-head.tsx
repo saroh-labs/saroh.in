@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Plus } from "lucide-react";
-import Link from "next/link";
 
 import type { WeekColumn } from "@/lib/calendar/week-columns";
 import type { ClosedDay } from "@/lib/calendar/week-days";
@@ -140,7 +140,7 @@ export function DayHead({
             </button>
             <div className="min-h-2 px-2.5 pb-2">
                 {book ? (
-                    <Link
+                    <IntentLink
                         href={book}
                         aria-label={`Book on ${col.dow} ${col.n}`}
                         className="inline-flex min-h-7 items-center gap-1 text-[12px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
@@ -151,7 +151,7 @@ export function DayHead({
                             strokeWidth={2.4}
                         />
                         Book
-                    </Link>
+                    </IntentLink>
                 ) : closed ? (
                     <span
                         className="block truncate text-[11.5px] font-semibold text-muted-foreground"
@@ -197,7 +197,9 @@ export function ClosedCard({
                     size="sm"
                     className="h-auto min-h-8 whitespace-normal px-2.5 py-1.5 text-[12px] leading-[1.3] coarse:min-h-11"
                 >
-                    <Link href={openHours}>Open hours on this day</Link>
+                    <IntentLink href={openHours}>
+                        Open hours on this day
+                    </IntentLink>
                 </Button>
             ) : null}
         </div>

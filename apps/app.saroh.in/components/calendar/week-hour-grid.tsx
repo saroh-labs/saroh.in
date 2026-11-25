@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { GRID_PX, hourLabels } from "@/lib/calendar/hour-layout";
 import type { HourDay } from "@/lib/calendar/week-hours";
@@ -88,7 +88,7 @@ export function WeekHourGrid({
                         >
                             {allDay.map((chip) => (
                                 <Tip key={chip.key} label={chip.full}>
-                                    <Link
+                                    <IntentLink
                                         href={chip.href}
                                         aria-label={chip.full}
                                         className={cn(
@@ -101,7 +101,7 @@ export function WeekHourGrid({
                                         )}
                                     >
                                         {chip.title}
-                                    </Link>
+                                    </IntentLink>
                                 </Tip>
                             ))}
                             {allDayMore > 0 ? (
@@ -171,7 +171,7 @@ export function WeekHourGrid({
                             ))}
                             {blocks.map((b) => (
                                 <Tip key={b.key} label={b.full}>
-                                    <Link
+                                    <IntentLink
                                         href={b.href}
                                         aria-label={b.full}
                                         className={cn(
@@ -205,7 +205,7 @@ export function WeekHourGrid({
                                         <span className="block truncate text-[11.5px] font-semibold leading-[1.25]">
                                             {b.title}
                                         </span>
-                                    </Link>
+                                    </IntentLink>
                                 </Tip>
                             ))}
                         </div>

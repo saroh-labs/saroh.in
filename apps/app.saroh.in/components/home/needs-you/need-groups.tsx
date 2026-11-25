@@ -7,8 +7,8 @@ import type { ChecklistRow } from "@/lib/setup-checklist";
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { TextLink } from "@saroh/ui/text-link";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId, useMemo, useState } from "react";
 
@@ -373,7 +373,7 @@ export function GroupActions({
     if (group.kind === "ORDERS") {
         return (
             <Button asChild variant="outline" size="sm">
-                <Link href={group.href}>Open orders</Link>
+                <IntentLink href={group.href}>Open orders</IntentLink>
             </Button>
         );
     }
@@ -383,7 +383,7 @@ export function GroupActions({
                 {/* U8's seam: Remind all sits before See bills. */}
                 {remindAll ? remindAll(group) : null}
                 <Button asChild variant="ghost" size="sm">
-                    <Link href={group.href}>See bills</Link>
+                    <IntentLink href={group.href}>See bills</IntentLink>
                 </Button>
             </>
         );
@@ -392,7 +392,7 @@ export function GroupActions({
     if (one.kind === "link") {
         return (
             <Button asChild variant="outline" size="sm">
-                <Link href={one.href}>{one.label}</Link>
+                <IntentLink href={one.href}>{one.label}</IntentLink>
             </Button>
         );
     }

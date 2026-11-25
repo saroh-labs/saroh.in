@@ -2,10 +2,10 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { CalendarCheck } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -85,14 +85,14 @@ export function FollowUpsList({
                         <ListRow
                             title={t.body?.trim() ?? "Follow up"}
                             sub={
-                                <Link
+                                <IntentLink
                                     href={`/leads/${t.leadId}`}
                                     className="underline-offset-4 hover:text-foreground hover:underline"
                                 >
                                     {lead
                                         ? `${lead.title}${lead.who ? ` · ${lead.who}` : ""}`
                                         : "Open the lead"}
-                                </Link>
+                                </IntentLink>
                             }
                             end={
                                 <>

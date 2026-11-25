@@ -3,9 +3,9 @@ import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Plus } from "lucide-react";
-import Link from "next/link";
 
 import { dayRow } from "@/lib/calendar/day-rows";
 import type { LayerStyle, Off } from "@/lib/calendar/layers";
@@ -68,10 +68,10 @@ export function DayActions({
                     variant={i === 0 ? "default" : "outline"}
                     className="w-full gap-1.5 max-[759px]:h-12 max-[759px]:text-[15px]"
                 >
-                    <Link href={s.href}>
+                    <IntentLink href={s.href}>
                         <Plus aria-hidden className="size-4" />
                         {s.label}
-                    </Link>
+                    </IntentLink>
                 </Button>
             ))}
         </div>
@@ -261,7 +261,7 @@ export function DayPanel({
                                     : null;
                                 return (
                                     <li key={item.id}>
-                                        <Link
+                                        <IntentLink
                                             href={row.href}
                                             className="flex min-h-[52px] items-center gap-2.5 border-b border-border/70 py-2 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/70 min-[760px]:min-h-0 min-[760px]:gap-3"
                                         >
@@ -306,13 +306,13 @@ export function DayPanel({
                                                     )}
                                                 </span>
                                             ) : null}
-                                        </Link>
+                                        </IntentLink>
                                     </li>
                                 );
                             })}
                         </ul>
                         {more > 0 ? (
-                            <Link
+                            <IntentLink
                                 href={moreHref(layer.key, day.date)}
                                 className="inline-flex min-h-11 items-center text-[13px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground min-[760px]:min-h-9"
                             >
@@ -320,7 +320,7 @@ export function DayPanel({
                                 layer.key === "classes"
                                     ? `${more} more · open the day in Bookings`
                                     : `${more} more · open ${layer.label}`}
-                            </Link>
+                            </IntentLink>
                         ) : null}
                     </section>
                 );

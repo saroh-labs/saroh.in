@@ -1,5 +1,5 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 
 import type { MeetSetup } from "@/components/services/service-fields/where-field";
 import type { PlanLock } from "@/lib/billing/access";
@@ -78,12 +78,12 @@ export const SERVICES_HREF = "/services";
 /** "‹ Services", over the page's title. */
 export function BackToServices() {
     return (
-        <Link
+        <IntentLink
             href={SERVICES_HREF}
             className="mb-2 inline-flex items-center gap-1 rounded-sm text-[12.5px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
         >
             <ArrowLeft aria-hidden className="size-3.5" />
             Services
-        </Link>
+        </IntentLink>
     );
 }

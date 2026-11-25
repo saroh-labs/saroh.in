@@ -1,6 +1,6 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ListTable } from "@saroh/ui/list-table";
 import { ChevronRight } from "lucide-react";
-import Link from "next/link";
 
 import { GROUP_ICONS } from "./group-icons";
 import type { SiteGroup, SiteGroupId } from "./group-map";
@@ -29,7 +29,7 @@ export function SiteHome({
                         group.sections[0];
                     return (
                         <li key={group.id}>
-                            <Link
+                            <IntentLink
                                 href={to.href}
                                 className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
@@ -51,7 +51,7 @@ export function SiteHome({
                                     aria-hidden
                                     className="size-4 shrink-0 text-muted-foreground"
                                 />
-                            </Link>
+                            </IntentLink>
                         </li>
                     );
                 })}

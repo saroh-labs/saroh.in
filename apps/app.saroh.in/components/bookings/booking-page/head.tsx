@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ArrowLeft, MoreHorizontal } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { MoreRow } from "@/components/bookings/quick-look/quick-look-more";
@@ -46,13 +46,13 @@ export function PageHead({
     return (
         <>
             <div className="mb-2.5 flex items-center justify-between gap-2">
-                <Link
+                <IntentLink
                     href="/bookings/all"
                     className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-[12.5px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[760px]:min-h-0"
                 >
                     <ArrowLeft aria-hidden className="size-3.5" />
                     All bookings
-                </Link>
+                </IntentLink>
                 <span className="min-[760px]:hidden">
                     <PageMore
                         title={more.title}

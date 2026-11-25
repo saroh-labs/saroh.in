@@ -2,8 +2,8 @@
 
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -199,9 +199,11 @@ export function PublishFlags({
                                         size="sm"
                                         className="h-auto shrink-0 p-0 font-semibold coarse:min-h-11"
                                     >
-                                        <Link href={WEB_ADDRESS_SETTINGS_HREF}>
+                                        <IntentLink
+                                            href={WEB_ADDRESS_SETTINGS_HREF}
+                                        >
                                             {FIX_WORD.addressMissing}
-                                        </Link>
+                                        </IntentLink>
                                     </Button>
                                 )
                             }

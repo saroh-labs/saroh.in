@@ -3,10 +3,10 @@
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { CopyButton } from "@saroh/ui/copy-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -132,7 +132,7 @@ export function BookingLinkRow({
             </Button>
         ) : row.kind === "draft" && row.publish === "website" ? (
             <Button asChild size="sm" variant="outline">
-                <Link href={WEBSITE_HREF}>Open Website</Link>
+                <IntentLink href={WEBSITE_HREF}>Open Website</IntentLink>
             </Button>
         ) : row.kind === "none" && row.action === "make" ? (
             <Button
@@ -145,7 +145,7 @@ export function BookingLinkRow({
             </Button>
         ) : row.kind === "none" && row.action === "website" ? (
             <Button asChild size="sm" variant="outline">
-                <Link href={WEBSITE_HREF}>Open Website</Link>
+                <IntentLink href={WEBSITE_HREF}>Open Website</IntentLink>
             </Button>
         ) : undefined;
 

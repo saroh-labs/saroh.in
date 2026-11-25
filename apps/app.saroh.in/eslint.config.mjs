@@ -40,6 +40,16 @@ const queryImports = (patterns = []) => [
                 message:
                     "Make a QueryClient only in lib/query/client.ts (makeQueryClient) or server-client.ts (getServerQueryClient); use useQueryClient() in a component.",
             },
+            {
+                // Nothing in the app is fetched ahead just for being on
+                // screen: every prefetch of a page is two Worker requests,
+                // and the sidebar, Home and list rows started ~35 a page.
+                // IntentLink fetches ahead on pointer, touch or focus.
+                name: "next/link",
+                importNames: ["default"],
+                message:
+                    'Use IntentLink from "@saroh/ui/intent-link": it prefetches on intent, not on sight.',
+            },
         ],
         patterns: [...restrictedImportOptions.patterns, ...patterns],
     },

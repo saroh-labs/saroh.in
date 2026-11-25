@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import type { CourseServiceOption } from "@/components/courses/course-form";
 import { CourseForm } from "@/components/courses/course-form";
@@ -53,20 +53,22 @@ export default async function NewCoursePage() {
                     className="mb-0"
                     breadcrumb={[
                         "Bookings",
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             key="courses"
                             href="/courses"
                             className="hover:text-foreground"
                         >
                             Courses
-                        </Link>,
+                        </IntentLink>,
                         "New",
                     ]}
                     title="New course"
                     actions={
                         <Button variant="outline" asChild>
-                            <Link href="/courses">Back to courses</Link>
+                            <IntentLink href="/courses">
+                                Back to courses
+                            </IntentLink>
                         </Button>
                     }
                 />
@@ -74,13 +76,13 @@ export default async function NewCoursePage() {
                     <p className="max-w-[60ch] text-[13.5px] text-muted-foreground">
                         A course runs on a bookable service, and there is none
                         yet.{" "}
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             href="/services/new"
                             className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
                         >
                             Make a service
-                        </Link>{" "}
+                        </IntentLink>{" "}
                         first. Its length and how many it takes at once set the
                         course's sessions and seats.
                     </p>

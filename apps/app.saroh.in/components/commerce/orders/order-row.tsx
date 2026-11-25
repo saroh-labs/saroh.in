@@ -1,6 +1,6 @@
 import { Checkbox } from "@saroh/ui/checkbox";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { BusinessDate } from "@/components/shared/dates/business-zone";
@@ -282,7 +282,7 @@ export function OrderGridRow({
                                 {v.customer}
                             </button>
                         ) : (
-                            <Link
+                            <IntentLink
                                 href={v.href}
                                 className={cn(
                                     ROW_LINK,
@@ -290,7 +290,7 @@ export function OrderGridRow({
                                 )}
                             >
                                 {v.customer}
-                            </Link>
+                            </IntentLink>
                         )}
                         <AttentionTag attention={v.attention} />
                     </div>
@@ -405,9 +405,9 @@ export function OrderCardFrame({
                             {words}
                         </button>
                     ) : (
-                        <Link href={href} className={cn(ROW_LINK, name)}>
+                        <IntentLink href={href} className={cn(ROW_LINK, name)}>
                             {words}
-                        </Link>
+                        </IntentLink>
                     )}
                     {aside}
                 </div>

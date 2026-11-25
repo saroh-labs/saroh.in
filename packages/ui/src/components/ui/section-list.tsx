@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "./intent-link";
 
 import type { ComponentType, ReactNode } from "react";
 import { useRef } from "react";
@@ -115,7 +115,7 @@ export function SectionList<V extends string = string>({
             </>
         );
         return links ? (
-            <Link
+            <IntentLink
                 key={item.value}
                 id={`${idPrefix}-${item.value}`}
                 href={item.href ?? "#"}
@@ -124,7 +124,7 @@ export function SectionList<V extends string = string>({
             >
                 {body}
                 <LinkPending />
-            </Link>
+            </IntentLink>
         ) : (
             <button
                 key={item.value}

@@ -3,9 +3,9 @@
 import type { BadgeProps } from "@saroh/ui/badge";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { TicketPercent } from "lucide-react";
-import Link from "next/link";
 
 import { DataView } from "@/components/shared/data-view/data-view";
 import type {
@@ -139,7 +139,9 @@ export function DiscountsScreen({
                 actions={
                     canWrite ? (
                         <Button asChild>
-                            <Link href="/commerce/discounts/new">New code</Link>
+                            <IntentLink href="/commerce/discounts/new">
+                                New code
+                            </IntentLink>
                         </Button>
                     ) : undefined
                 }
@@ -163,7 +165,9 @@ export function DiscountsScreen({
                     note: "A code takes money off an order: everything, or only the products you choose.",
                     action: canWrite ? (
                         <Button asChild>
-                            <Link href="/commerce/discounts/new">New code</Link>
+                            <IntentLink href="/commerce/discounts/new">
+                                New code
+                            </IntentLink>
                         </Button>
                     ) : undefined,
                 }}

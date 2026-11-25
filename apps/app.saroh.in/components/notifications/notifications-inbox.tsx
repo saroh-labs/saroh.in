@@ -3,9 +3,9 @@
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { Bell } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -169,7 +169,7 @@ export function NotificationsInbox({
                                 }
                                 className="wk-item border-b border-border last:border-b-0"
                             >
-                                <Link
+                                <IntentLink
                                     href={notificationHref(n)}
                                     aria-label={`${n.title}${fresh ? ", unread" : ""}${n.body ? `. ${n.body}` : ""}. ${when}`}
                                     data-unread={fresh ? "" : undefined}
@@ -206,7 +206,7 @@ export function NotificationsInbox({
                                             </time>
                                         }
                                     />
-                                </Link>
+                                </IntentLink>
                             </li>
                         );
                     })}

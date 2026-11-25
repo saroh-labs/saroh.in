@@ -1,5 +1,6 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Segmented } from "@saroh/ui/segmented";
 import {
@@ -10,7 +11,6 @@ import {
     SheetTrigger,
 } from "@saroh/ui/sheet";
 import { CalendarDays, ChevronDown, X } from "lucide-react";
-import Link from "next/link";
 import { useRef, useState } from "react";
 
 import type { InsightsPeriod } from "@/lib/insights/period";
@@ -134,7 +134,7 @@ export function PeriodSheet({
                             const on = c.period === value;
                             return (
                                 <li key={c.period}>
-                                    <Link
+                                    <IntentLink
                                         href={c.href}
                                         scroll={false}
                                         aria-current={on ? "true" : undefined}
@@ -164,7 +164,7 @@ export function PeriodSheet({
                                                 {c.line}
                                             </small>
                                         </span>
-                                    </Link>
+                                    </IntentLink>
                                 </li>
                             );
                         })}

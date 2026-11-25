@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Check, ChevronLeft, MoreHorizontal } from "lucide-react";
-import Link from "next/link";
 
 import type { PostEditorModel } from "../editor/post-model";
 
@@ -55,13 +55,13 @@ export function PhonePostBar({
             // buttons, whole, instead of being cut to "L…" and "Save".
             className="flex h-14 shrink-0 items-center gap-0.5 border-b bg-background pl-0.5 pr-2.5 max-[360px]:h-auto max-[360px]:flex-wrap max-[360px]:pt-1.5"
         >
-            <Link
+            <IntentLink
                 href={`/sites/${data.siteId}/overview`}
                 aria-label="Back to Website"
                 className="grid size-11 shrink-0 place-items-center rounded-lg transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <ChevronLeft aria-hidden className="size-5" />
-            </Link>
+            </IntentLink>
             <span aria-hidden className="hidden flex-1 max-[360px]:block" />
             <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 pl-0.5 leading-tight max-[360px]:order-last max-[360px]:basis-full max-[360px]:flex-row max-[360px]:items-center max-[360px]:gap-2 max-[360px]:px-2.5 max-[360px]:pb-2">
                 <span

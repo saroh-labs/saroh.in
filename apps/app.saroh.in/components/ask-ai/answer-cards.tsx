@@ -6,10 +6,10 @@ import type {
 } from "@saroh/api-contract";
 import { MEDIA } from "@saroh/auth/security-headers";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
 import { Info } from "lucide-react";
-import Link from "next/link";
 import type * as React from "react";
 import { useState } from "react";
 
@@ -150,12 +150,12 @@ function Foot({
             <Info className="size-3.5 shrink-0" aria-hidden />
             {more ? <span>+{more} more</span> : null}
             {href && link ? (
-                <Link
+                <IntentLink
                     href={href}
                     className="font-medium text-foreground underline underline-offset-2"
                 >
                     {link.label} ›
-                </Link>
+                </IntentLink>
             ) : null}
         </div>
     );
@@ -213,7 +213,7 @@ function ProductsCard({ card }: { card: AskAiProductsCard }) {
                     return (
                         <li key={p.id}>
                             {href ? (
-                                <Link
+                                <IntentLink
                                     href={href}
                                     className={cn(
                                         box,
@@ -222,7 +222,7 @@ function ProductsCard({ card }: { card: AskAiProductsCard }) {
                                     )}
                                 >
                                     {body}
-                                </Link>
+                                </IntentLink>
                             ) : (
                                 <div className={box}>{body}</div>
                             )}
@@ -341,12 +341,12 @@ function TableCard({ card }: { card: AskAiTableCard }) {
                                             {/* One line a value: a long name is cut, never wrapped to three. */}
                                             {/* The first cell carries the row's link, as DataView's rows. */}
                                             {i === 0 && rowHref(r) ? (
-                                                <Link
+                                                <IntentLink
                                                     href={rowHref(r) ?? ""}
                                                     className="block truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                                                 >
                                                     {value}
-                                                </Link>
+                                                </IntentLink>
                                             ) : (
                                                 <span className="block truncate">
                                                     {value}

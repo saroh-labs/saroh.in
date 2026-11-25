@@ -1,8 +1,8 @@
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ArrowLeft, Inbox } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
@@ -97,10 +97,10 @@ export default async function FormEntriesPage({
                         size="xs"
                         className="-ml-2 mb-1 text-muted-foreground"
                     >
-                        <Link href={`/sites/${siteId}/forms`}>
+                        <IntentLink href={`/sites/${siteId}/forms`}>
                             <ArrowLeft className="mr-1 size-3.5" />
                             All forms
-                        </Link>
+                        </IntentLink>
                     </Button>
                     <h2 className="font-display text-[19px] font-semibold tracking-[-0.02em]">
                         {form.name}
@@ -137,14 +137,14 @@ export default async function FormEntriesPage({
                                     <div className="min-w-0">
                                         <p className="truncate text-[13.5px] font-medium">
                                             {entry.contact ? (
-                                                <Link
+                                                <IntentLink
                                                     href={personHref(
                                                         entry.contact.id,
                                                     )}
                                                     className="hover:underline"
                                                 >
                                                     {entry.contact.name}
-                                                </Link>
+                                                </IntentLink>
                                             ) : (
                                                 who
                                             )}
@@ -165,11 +165,11 @@ export default async function FormEntriesPage({
                                             variant="outline"
                                             size="sm"
                                         >
-                                            <Link
+                                            <IntentLink
                                                 href={`/leads/${entry.leadId}`}
                                             >
                                                 Open lead
-                                            </Link>
+                                            </IntentLink>
                                         </Button>
                                     ) : null}
                                 </div>

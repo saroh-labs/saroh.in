@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { TextLink } from "@saroh/ui/text-link";
-import Link from "next/link";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
@@ -102,7 +102,7 @@ function sheetFoot(
     if (!offers) {
         return (
             <Button asChild variant="outline" className="w-full">
-                <Link href={all.href}>{all.label}</Link>
+                <IntentLink href={all.href}>{all.label}</IntentLink>
             </Button>
         );
     }
@@ -112,7 +112,7 @@ function sheetFoot(
     return (
         <>
             <Button asChild variant="outline" className="flex-1">
-                <Link href={all.href}>{all.label}</Link>
+                <IntentLink href={all.href}>{all.label}</IntentLink>
             </Button>
             {line ? (
                 <p

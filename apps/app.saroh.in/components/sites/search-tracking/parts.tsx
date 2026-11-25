@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { FailedState } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -130,7 +130,7 @@ export function LockNotice({ lock }: { lock: TrackersLock }) {
                     size="sm"
                     className="shrink-0"
                 >
-                    <Link href={lock.href}>{lock.cta}</Link>
+                    <IntentLink href={lock.href}>{lock.cta}</IntentLink>
                 </Button>
             </PlanWay>
         </div>

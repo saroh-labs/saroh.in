@@ -2,9 +2,9 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
-import Link from "next/link";
 import { useRef } from "react";
 
 import { arrivalProps } from "@/components/shared/live-refresh/arrival-props";
@@ -137,7 +137,7 @@ function GroupRow({
                 arrival.className,
             )}
         >
-            <Link
+            <IntentLink
                 href={need.href}
                 className="grid min-w-0 flex-[1_1_220px] content-center gap-0.5 rounded text-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
             >
@@ -154,7 +154,7 @@ function GroupRow({
                         {line}
                     </span>
                 ) : null}
-            </Link>
+            </IntentLink>
             {done ? (
                 // Under the struck title, as the design draws it.
                 <span className="-mt-1 basis-full">
@@ -172,7 +172,9 @@ function GroupRow({
                     ) : null}
                     {!confirming && stock ? (
                         <Button asChild variant="outline" size="sm">
-                            <Link href={stock.href}>{stock.label}</Link>
+                            <IntentLink href={stock.href}>
+                                {stock.label}
+                            </IntentLink>
                         </Button>
                     ) : null}
                     {!confirming && inline ? (

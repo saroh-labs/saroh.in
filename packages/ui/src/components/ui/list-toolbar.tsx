@@ -1,7 +1,6 @@
 "use client";
 
 import { SlidersHorizontal } from "lucide-react";
-import Link from "next/link";
 import * as React from "react";
 import { MONEY_LOCALE } from "../../lib/money";
 import {
@@ -15,6 +14,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "./button";
 import { chipClass } from "./chip";
 import { CountBadge } from "./count-badge";
+import { IntentLink } from "./intent-link";
 import type { Option } from "./option-select";
 import { OptionSelect } from "./option-select";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
@@ -563,14 +563,14 @@ function PageNumber({
     if (step.href !== undefined) {
         return (
             <Button variant="outline" className={look} asChild>
-                <Link
+                <IntentLink
                     href={step.href}
                     onNavigate={step.onNavigate}
                     scroll={false}
                     aria-label={`Page ${words}`}
                 >
                     {words}
-                </Link>
+                </IntentLink>
             </Button>
         );
     }
@@ -598,13 +598,13 @@ function PageButton({ step, words }: { step: PageStep | null; words: string }) {
     if (step.href !== undefined) {
         return (
             <Button variant="outline" asChild>
-                <Link
+                <IntentLink
                     href={step.href}
                     onNavigate={step.onNavigate}
                     scroll={false}
                 >
                     {words}
-                </Link>
+                </IntentLink>
             </Button>
         );
     }

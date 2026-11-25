@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useEffect, useRef, useState } from "react";
 
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
@@ -43,7 +43,9 @@ export function PublishBar({
                 </p>
                 {canPublish ? (
                     <Button asChild size="sm" className="shrink-0">
-                        <Link href={editorHref}>Review and publish</Link>
+                        <IntentLink href={editorHref}>
+                            Review and publish
+                        </IntentLink>
                     </Button>
                 ) : null}
             </div>

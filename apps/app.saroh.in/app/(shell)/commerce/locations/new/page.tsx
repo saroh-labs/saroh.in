@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { LimitReachedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { sellCrumbs } from "@/components/commerce/sell-pages/sell-crumbs";
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -78,11 +78,11 @@ export default async function NewStorefrontPage() {
                     description="Close one you no longer sell from to add another."
                     secondary={
                         <Button asChild variant="outline">
-                            <Link href="/commerce/locations">
+                            <IntentLink href="/commerce/locations">
                                 {storefronts.length === 1
                                     ? "Go to your location"
                                     : "Go to locations"}
-                            </Link>
+                            </IntentLink>
                         </Button>
                     }
                 />

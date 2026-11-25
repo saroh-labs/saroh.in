@@ -2,10 +2,10 @@
 
 import { AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { listTable } from "@saroh/ui/list-table";
 import { Check, X } from "lucide-react";
-import Link from "next/link";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { formatTime } from "@/lib/format/datetime";
@@ -192,13 +192,13 @@ export function BookingRow({
                 </span>
             </span>
             <span className="min-w-0 min-[760px]:contents">
-                <Link
+                <IntentLink
                     href={`/bookings/${b.id}`}
                     data-ph-mask=""
                     className="block truncate rounded-sm text-[14.5px] font-semibold text-foreground after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[760px]:text-[14px]"
                 >
                     {who}
-                </Link>
+                </IntentLink>
                 <span className="block truncate text-[12.5px] text-muted-foreground min-[760px]:text-[13.5px]">
                     {what}
                 </span>

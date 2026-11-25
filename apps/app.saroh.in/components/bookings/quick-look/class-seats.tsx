@@ -2,8 +2,8 @@
 
 import { formatTime, formatWeekday } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { personHref } from "@/lib/contacts/person-href";
 import type {
@@ -114,12 +114,12 @@ export function ClassSeats({
                         >
                             <div className="min-w-0 flex-[1_1_150px]">
                                 {b.contact ? (
-                                    <Link
+                                    <IntentLink
                                         href={personHref(b.contact.id)}
                                         className="text-[13px] font-semibold text-foreground hover:underline"
                                     >
                                         {whoFor(b)}
-                                    </Link>
+                                    </IntentLink>
                                 ) : (
                                     <span className="text-[13px] font-semibold">
                                         {whoFor(b)}

@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
 import {
     CalendarDays,
@@ -12,7 +13,6 @@ import {
     Video,
     X,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -107,12 +107,12 @@ export function GoogleCalendarScreen({
                         <>
                             {" "}
                             <PlanWay>
-                                <Link
+                                <IntentLink
                                     href={morePlan.href}
                                     className="font-semibold underline underline-offset-2"
                                 >
                                     {planLabel(morePlan.name)}
-                                </Link>
+                                </IntentLink>
                             </PlanWay>
                         </>
                     ) : null}
@@ -178,12 +178,12 @@ export function GoogleCalendarScreen({
                                 <p className="m-0 mt-3 text-[13px] text-muted-foreground">
                                     Busy times from more Google accounts come
                                     with {morePlan.name}.{" "}
-                                    <Link
+                                    <IntentLink
                                         href={morePlan.href}
                                         className="ml-1 font-semibold text-foreground underline underline-offset-2"
                                     >
                                         {planLabel(morePlan.name)}
-                                    </Link>
+                                    </IntentLink>
                                 </p>
                             </PlanWay>
                         ) : null}

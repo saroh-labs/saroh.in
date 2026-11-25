@@ -1,7 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { QrCode } from "lucide-react";
-import Link from "next/link";
 
 import { ModuleGate } from "@/components/modules/gate/module-gate";
 import { QrShare } from "@/components/qr/share/qr-share";
@@ -62,7 +62,7 @@ async function Share() {
                     description="A QR code opens a page on your website, so it needs one first. Once your site is there, its codes are made here."
                     action={
                         <Button asChild>
-                            <Link href="/sites">Go to Website</Link>
+                            <IntentLink href="/sites">Go to Website</IntentLink>
                         </Button>
                     }
                 />

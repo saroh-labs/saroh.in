@@ -5,9 +5,9 @@ import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Plus } from "lucide-react";
-import Link from "next/link";
 
 import type { Shortcut } from "@/lib/calendar/range";
 import type {
@@ -203,10 +203,10 @@ export function WeekDay({
                         variant="outline"
                         className="h-11 gap-1.5 rounded-[10px] px-3.5"
                     >
-                        <Link href={s.href} aria-label={s.label}>
+                        <IntentLink href={s.href} aria-label={s.label}>
                             <Plus aria-hidden className="size-4" />
                             {s.label === "Book on this day" ? "Book" : s.label}
-                        </Link>
+                        </IntentLink>
                     </Button>
                 ))}
             </div>
@@ -231,7 +231,7 @@ export function WeekDay({
             {chips.length > 0 ? (
                 <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {chips.map((c) => (
-                        <Link
+                        <IntentLink
                             key={c.key}
                             href={c.href}
                             className={cn(
@@ -242,7 +242,7 @@ export function WeekDay({
                             )}
                         >
                             <span className="truncate">{c.title}</span>
-                        </Link>
+                        </IntentLink>
                     ))}
                 </div>
             ) : null}
@@ -254,7 +254,7 @@ export function WeekDay({
                             key={r.key}
                             className="border-b border-border/70 last:border-b-0"
                         >
-                            <Link
+                            <IntentLink
                                 href={r.href}
                                 className="flex min-h-14 items-center gap-2.5 px-3 py-1.5 text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted"
                             >
@@ -296,19 +296,19 @@ export function WeekDay({
                                         {r.action}
                                     </span>
                                 ) : null}
-                            </Link>
+                            </IntentLink>
                         </li>
                     ))}
                 </ul>
             ) : null}
 
             {more > 0 ? (
-                <Link
+                <IntentLink
                     href={`/bookings?date=${encodeURIComponent(date)}&layout=day`}
                     className="inline-flex min-h-11 items-center text-[13px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 active:text-muted-foreground"
                 >
                     {more} more · open the day in Bookings
-                </Link>
+                </IntentLink>
             ) : null}
 
             {n === 0 && extra.closed ? (

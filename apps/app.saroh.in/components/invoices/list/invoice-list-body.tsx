@@ -2,10 +2,10 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { useLocalPages } from "@saroh/ui/page-sizes";
 import { ReceiptText } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import {
@@ -89,9 +89,9 @@ export function InvoiceListBody({
                     action={
                         canWrite ? (
                             <Button asChild>
-                                <Link href="/billing/invoices/new">
+                                <IntentLink href="/billing/invoices/new">
                                     New invoice
-                                </Link>
+                                </IntentLink>
                             </Button>
                         ) : undefined
                     }

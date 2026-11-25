@@ -5,11 +5,11 @@ import {
     FailedState,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { NotFound } from "@saroh/ui/not-found";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Archive } from "lucide-react";
-import Link from "next/link";
 
 import {
     readOnlyLine,
@@ -74,9 +74,9 @@ export function PackEditorState({
                                     variant="outline"
                                     className="wk-press"
                                 >
-                                    <Link href={BACK_TO_PACKS.href}>
+                                    <IntentLink href={BACK_TO_PACKS.href}>
                                         {BACK_TO_PACKS.label}
-                                    </Link>
+                                    </IntentLink>
                                 </Button>
                             }
                         />
@@ -94,9 +94,9 @@ export function PackEditorState({
                                     variant="ghost"
                                     className="wk-press"
                                 >
-                                    <Link href={BACK_TO_PACKS.href}>
+                                    <IntentLink href={BACK_TO_PACKS.href}>
                                         {BACK_TO_PACKS.label}
-                                    </Link>
+                                    </IntentLink>
                                 </Button>
                             }
                         />
@@ -117,11 +117,13 @@ export function PackEditorState({
                             action={
                                 <Button asChild variant="outline">
                                     {state === "forbidden" ? (
-                                        <Link href="/">Back to Home</Link>
+                                        <IntentLink href="/">
+                                            Back to Home
+                                        </IntentLink>
                                     ) : (
-                                        <Link href={BACK_TO_PACKS.href}>
+                                        <IntentLink href={BACK_TO_PACKS.href}>
                                             {BACK_TO_PACKS.label}
-                                        </Link>
+                                        </IntentLink>
                                     )}
                                 </Button>
                             }

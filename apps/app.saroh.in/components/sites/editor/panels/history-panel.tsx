@@ -2,10 +2,10 @@
 
 import { Button } from "@saroh/ui/button";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Segmented } from "@saroh/ui/segmented";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { History } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -250,10 +250,10 @@ export function HistoryPanel({ model }: HistoryPanelProps) {
                 )}
                 <div className="px-4 pt-4">
                     <Button asChild variant="outline" className="w-full">
-                        <Link href={`/sites/${siteId}/versions`}>
+                        <IntentLink href={`/sites/${siteId}/versions`}>
                             <History aria-hidden className="size-4" />
                             See all versions
-                        </Link>
+                        </IntentLink>
                     </Button>
                 </div>
             </div>

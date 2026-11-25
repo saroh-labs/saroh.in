@@ -4,9 +4,9 @@ import {
     FailedState,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
 import { Children } from "react";
 
 import { whoCanChange } from "@/components/shared/states/who-can-change";
@@ -69,7 +69,7 @@ export function StateLink({
             variant={primary ? "default" : "outline"}
             className="wk-press"
         >
-            <Link href={href}>{children}</Link>
+            <IntentLink href={href}>{children}</IntentLink>
         </Button>
     );
 }

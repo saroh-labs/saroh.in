@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ChevronRight, Landmark } from "lucide-react";
-import Link from "next/link";
 
 import {
     CHEQUES_ACTION,
@@ -29,7 +29,7 @@ export function DeskChequesLine({ cheques }: { cheques: HomeChequesWaiting }) {
                 >
                     <Landmark className="size-[18px]" />
                 </span>
-                <Link
+                <IntentLink
                     href={cheques.href}
                     className="grid min-w-0 flex-[1_1_240px] gap-0.5 rounded text-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
                 >
@@ -39,10 +39,12 @@ export function DeskChequesLine({ cheques }: { cheques: HomeChequesWaiting }) {
                     <span className="text-pretty text-[12.5px] leading-[1.4] text-muted-foreground">
                         {CHEQUES_SUB}
                     </span>
-                </Link>
+                </IntentLink>
                 <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
                     <Button asChild variant="ghost" size="sm">
-                        <Link href={cheques.href}>{CHEQUES_ACTION}</Link>
+                        <IntentLink href={cheques.href}>
+                            {CHEQUES_ACTION}
+                        </IntentLink>
                     </Button>
                 </span>
             </div>
@@ -61,7 +63,7 @@ export function PhoneChequesLine({ cheques }: { cheques: HomeChequesWaiting }) {
             data-cheques-line=""
             className="border-t border-border first:border-t-0"
         >
-            <Link
+            <IntentLink
                 href={cheques.href}
                 className="flex min-h-[54px] w-full items-center gap-3 py-2 pl-3.5 pr-3 text-left text-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active"
             >
@@ -76,7 +78,7 @@ export function PhoneChequesLine({ cheques }: { cheques: HomeChequesWaiting }) {
                     aria-hidden
                     className="size-[18px] shrink-0 text-muted-foreground"
                 />
-            </Link>
+            </IntentLink>
         </li>
     );
 }

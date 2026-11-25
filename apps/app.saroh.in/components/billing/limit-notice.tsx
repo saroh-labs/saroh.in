@@ -1,8 +1,8 @@
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
 import { ProgressBar } from "@saroh/ui/progress-bar";
-import Link from "next/link";
 
 import type { PromptKey } from "@/lib/billing/upgrade-prompts";
 
@@ -63,7 +63,7 @@ export function LimitNoticeBlock({
                                 {cta}
                             </UpgradePromptLink>
                         ) : (
-                            <Link href={href}>{cta}</Link>
+                            <IntentLink href={href}>{cta}</IntentLink>
                         )}
                     </Button>
                 </PlanWay>

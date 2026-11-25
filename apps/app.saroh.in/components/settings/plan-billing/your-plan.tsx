@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
-import Link from "next/link";
 import { Fragment } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -147,14 +147,14 @@ export function YourPlan(props: YourPlanProps) {
                     action={
                         message.action && canChange ? (
                             <Button asChild size="sm" variant="outline">
-                                <Link
+                                <IntentLink
                                     href={changeHref(
                                         message.action.planId,
                                         message.action.cycle,
                                     )}
                                 >
                                     {message.action.label}
-                                </Link>
+                                </IntentLink>
                             </Button>
                         ) : undefined
                     }

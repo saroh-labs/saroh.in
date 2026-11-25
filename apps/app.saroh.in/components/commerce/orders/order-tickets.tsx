@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronLeft, Printer } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 import { BusinessDate } from "@/components/shared/dates/business-zone";
@@ -64,13 +64,13 @@ export function OrderTickets({
                 className="mb-5 print:hidden"
                 breadcrumb={[
                     "Sell",
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="orders"
                         href="/commerce/orders"
                     >
                         Orders
-                    </Link>,
+                    </IntentLink>,
                     "Tickets",
                 ]}
                 title={summary.title}
@@ -82,10 +82,10 @@ export function OrderTickets({
                 actions={
                     <>
                         <Button asChild variant="outline">
-                            <Link href="/commerce/orders">
+                            <IntentLink href="/commerce/orders">
                                 <ChevronLeft aria-hidden className="size-4" />
                                 Orders
-                            </Link>
+                            </IntentLink>
                         </Button>
                         {orders.length > 0 ? (
                             <Button

@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { formatDate } from "@/lib/format/datetime";
 import { initials } from "@/lib/names";
@@ -121,11 +121,11 @@ export function PublishChanges({
                                     size="sm"
                                     className="h-auto shrink-0 p-0 font-semibold coarse:min-h-11"
                                 >
-                                    <Link
+                                    <IntentLink
                                         href={`/sites/${siteId}/posts/${post.id}`}
                                     >
                                         Open
-                                    </Link>
+                                    </IntentLink>
                                 </Button>
                             </li>
                         ))}

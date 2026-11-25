@@ -1,8 +1,8 @@
 import { PageContainer } from "@/components/shared/page/page-container";
 import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import {
     WHO_CAN_CHANGE,
@@ -31,12 +31,20 @@ export function ServiceEditorState({
         <PageContainer width="full">
             <PageHeader
                 breadcrumb={[
-                    <Link data-ph-unmask="" key="bookings" href="/bookings">
+                    <IntentLink
+                        data-ph-unmask=""
+                        key="bookings"
+                        href="/bookings"
+                    >
                         Bookings
-                    </Link>,
-                    <Link data-ph-unmask="" key="services" href="/services">
+                    </IntentLink>,
+                    <IntentLink
+                        data-ph-unmask=""
+                        key="services"
+                        href="/services"
+                    >
                         Services
-                    </Link>,
+                    </IntentLink>,
                 ]}
                 title="Service"
             />
@@ -70,9 +78,9 @@ export function ServiceEditorState({
                                     variant="ghost"
                                     className="wk-press"
                                 >
-                                    <Link href="/services">
+                                    <IntentLink href="/services">
                                         {backTo("Services")}
-                                    </Link>
+                                    </IntentLink>
                                 </Button>
                             }
                         />
@@ -92,12 +100,14 @@ export function ServiceEditorState({
                             action={
                                 <Button asChild variant="outline">
                                     {state === "cant-add" ? (
-                                        <Link href="/services">
+                                        <IntentLink href="/services">
                                             Back to services
-                                        </Link>
+                                        </IntentLink>
                                     ) : (
                                         // The list would only say the same.
-                                        <Link href="/">Back to Home</Link>
+                                        <IntentLink href="/">
+                                            Back to Home
+                                        </IntentLink>
                                     )}
                                 </Button>
                             }

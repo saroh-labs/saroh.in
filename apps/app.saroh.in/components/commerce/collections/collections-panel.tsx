@@ -3,9 +3,9 @@
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PartialRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Pencil } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -132,7 +132,7 @@ export function CollectionsPanel({
                             )}
                         >
                             <div className="flex items-baseline gap-2">
-                                <Link
+                                <IntentLink
                                     href={
                                         on
                                             ? clearHref
@@ -143,7 +143,7 @@ export function CollectionsPanel({
                                     className="min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground after:absolute after:inset-0 after:rounded-[12px] hover:underline"
                                 >
                                     {c.name}
-                                </Link>
+                                </IntentLink>
                                 <Button
                                     size="xs"
                                     type="button"

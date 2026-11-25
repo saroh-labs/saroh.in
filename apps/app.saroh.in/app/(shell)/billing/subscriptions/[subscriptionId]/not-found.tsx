@@ -1,6 +1,6 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { NotFound } from "@saroh/ui/not-found";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { PageContainer } from "@/components/shared/page/page-container";
 
@@ -13,13 +13,13 @@ export default function NotFoundPage() {
             <PageHeader
                 breadcrumb={[
                     "Payments",
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="list"
                         href="/billing/subscriptions"
                     >
                         Subscriptions
-                    </Link>,
+                    </IntentLink>,
                     "Not found",
                 ]}
                 title="Subscription"

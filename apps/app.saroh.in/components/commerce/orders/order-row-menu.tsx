@@ -16,6 +16,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import {
     Ban,
     Check,
@@ -25,7 +26,6 @@ import {
     Printer,
     Undo2,
 } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { usePayLink } from "@/components/commerce/order-payment/pay-link";
@@ -112,7 +112,7 @@ export function OrderRowMenu({
             case "next":
                 return item.step?.via === "page" && !item.disabled ? (
                     <DropdownMenuItem key="next" asChild className={ITEM}>
-                        <Link
+                        <IntentLink
                             href={orderPageHref(
                                 row.store.id,
                                 row.id,
@@ -121,7 +121,7 @@ export function OrderRowMenu({
                         >
                             <Check aria-hidden />
                             {item.label}…
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 ) : (
                     <DropdownMenuItem
@@ -145,10 +145,10 @@ export function OrderRowMenu({
             case "print":
                 return (
                     <DropdownMenuItem key="print" asChild className={ITEM}>
-                        <Link href={item.href}>
+                        <IntentLink href={item.href}>
                             <Printer aria-hidden />
                             {item.label}
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 );
             case "pay-link":
@@ -170,10 +170,10 @@ export function OrderRowMenu({
             case "open":
                 return (
                     <DropdownMenuItem key="open" asChild className={ITEM}>
-                        <Link href={item.href}>
+                        <IntentLink href={item.href}>
                             <ExternalLink aria-hidden />
                             {item.label}
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 );
             case "refund":
@@ -189,10 +189,10 @@ export function OrderRowMenu({
                         variant="destructive"
                         className={ITEM}
                     >
-                        <Link href={item.href}>
+                        <IntentLink href={item.href}>
                             <Undo2 aria-hidden />
                             {item.label}
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 );
             case "cancel":

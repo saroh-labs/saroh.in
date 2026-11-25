@@ -1,5 +1,6 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Sheet,
@@ -9,7 +10,6 @@ import {
     SheetTrigger,
 } from "@saroh/ui/sheet";
 import { Plus, X } from "lucide-react";
-import Link from "next/link";
 import { useRef, useState } from "react";
 
 import type { HomeNew } from "@/components/shared/navigation/quick-actions";
@@ -84,7 +84,7 @@ export function NewSheet({ items, roleLine }: HomeNew) {
                     <ul className="grid gap-0.5">
                         {items.map((item) => (
                             <li key={item.key}>
-                                <Link
+                                <IntentLink
                                     href={item.href}
                                     onClick={() => setOpen(false)}
                                     className={cn(
@@ -94,7 +94,7 @@ export function NewSheet({ items, roleLine }: HomeNew) {
                                     )}
                                 >
                                     <NewRowBody item={item} />
-                                </Link>
+                                </IntentLink>
                             </li>
                         ))}
                     </ul>

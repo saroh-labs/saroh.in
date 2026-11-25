@@ -1,5 +1,5 @@
 import { CopyButton } from "@saroh/ui/copy-button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { StateBadge } from "@/components/sites/header/website-header";
@@ -30,12 +30,12 @@ export function SiteCard({ site }: { site: SiteCardData }) {
         <li className="relative flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-card p-4 transition-colors duration-fast focus-within:ring-2 focus-within:ring-ring hover:bg-muted/40">
             <div className="flex min-w-0 items-center gap-2.5">
                 <SiteTile name={site.name} className="size-8" />
-                <Link
+                <IntentLink
                     href={overviewHref(site.id)}
                     className="min-w-0 truncate text-base font-semibold after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
                 >
                     {site.name}
-                </Link>
+                </IntentLink>
             </div>
             {site.host ? (
                 <div className="flex min-w-0 items-center gap-1">

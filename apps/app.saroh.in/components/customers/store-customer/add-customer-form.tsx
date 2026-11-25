@@ -11,9 +11,9 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -185,7 +185,9 @@ export function AddCustomerForm() {
                         Add customer
                     </Button>
                     <Button asChild variant="outline">
-                        <Link href="/commerce/customers">Cancel</Link>
+                        <IntentLink href="/commerce/customers">
+                            Cancel
+                        </IntentLink>
                     </Button>
                 </div>
             </form>

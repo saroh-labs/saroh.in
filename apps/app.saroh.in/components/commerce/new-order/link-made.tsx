@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { ShareLink } from "@saroh/ui/copy-button";
 import { StepCard } from "./parts";
@@ -49,7 +49,7 @@ export function LinkMade({
             </p>
             <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <Button asChild variant="outline" size="sm">
-                    <Link href={orderHref}>Open the order</Link>
+                    <IntentLink href={orderHref}>Open the order</IntentLink>
                 </Button>
                 <Button
                     type="button"

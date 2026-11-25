@@ -1,9 +1,9 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageContainer } from "@saroh/ui/page-container";
 import type { PageHeaderProps } from "@saroh/ui/page-header";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Lock } from "lucide-react";
-import Link from "next/link";
 
 /**
  * One Settings section's title, beside the side list: the page header every
@@ -49,9 +49,9 @@ export function SettingsPanelHeader({
                     parent
                         ? [
                               "Settings",
-                              <Link key="parent" href={parent.href}>
+                              <IntentLink key="parent" href={parent.href}>
                                   {parent.label}
-                              </Link>,
+                              </IntentLink>,
                               title,
                           ]
                         : ["Settings", title]

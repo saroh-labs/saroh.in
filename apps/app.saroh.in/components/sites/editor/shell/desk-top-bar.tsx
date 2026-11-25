@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import {
@@ -12,7 +13,6 @@ import {
     Redo2,
     Undo2,
 } from "lucide-react";
-import Link from "next/link";
 
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
@@ -59,14 +59,14 @@ export function DeskTopBar({
                 data-editor-bar=""
                 className="flex h-[60px] shrink-0 items-center gap-1 overflow-hidden whitespace-nowrap border-b bg-background pl-2 pr-3"
             >
-                <Link
+                <IntentLink
                     href={`/sites/${siteId}/overview`}
                     aria-label="Back to Website"
                     className="flex h-10 shrink-0 items-center gap-1.5 rounded-[9px] pl-1.5 pr-2.5 text-sm font-semibold transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ChevronLeft aria-hidden className="size-[18px]" />
                     <span className="hidden min-[1600px]:inline">Website</span>
-                </Link>
+                </IntentLink>
                 <Divider />
                 <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                     <PopoverTrigger asChild>

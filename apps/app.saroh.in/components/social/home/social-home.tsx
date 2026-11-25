@@ -3,12 +3,12 @@
 import { Button } from "@saroh/ui/button";
 import { PartialRead } from "@saroh/ui/failed-read";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { TextLink } from "@saroh/ui/text-link";
 import { Plus, X } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -81,10 +81,10 @@ export function SocialHome({
             actions={
                 posts.length > 0 || narrow ? (
                     <Button asChild size={narrow ? "default" : "lg"}>
-                        <Link href={NEW} data-new-post="">
+                        <IntentLink href={NEW} data-new-post="">
                             <Plus aria-hidden className="size-4" />
                             {POST_WORDS.newPost}
-                        </Link>
+                        </IntentLink>
                     </Button>
                 ) : undefined
             }
@@ -154,9 +154,9 @@ export function SocialHome({
                                             {s.line}
                                         </span>
                                         <Button asChild className="mt-2 w-fit">
-                                            <Link href={openItem(s.key)}>
+                                            <IntentLink href={openItem(s.key)}>
                                                 {POST_WORDS.makeThis}
-                                            </Link>
+                                            </IntentLink>
                                         </Button>
                                     </div>
                                     <IconButton
@@ -216,7 +216,7 @@ function PostTile({
     const item = ownItem(post);
     return (
         <div className="grid gap-2">
-            <Link
+            <IntentLink
                 href={openPost(post.id)}
                 className="relative flex justify-center rounded-2xl bg-muted p-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -234,7 +234,7 @@ function PostTile({
                     />
                 </span>
                 <span className="sr-only">{name}</span>
-            </Link>
+            </IntentLink>
             <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
                     <b
@@ -420,7 +420,7 @@ function FirstPosts({
             <ul className="flex flex-wrap justify-center gap-[26px]">
                 {cards.map((c) => (
                     <li key={c.key} className="w-[190px]">
-                        <Link
+                        <IntentLink
                             href={c.href}
                             className="grid gap-2 rounded-[6px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
                         >
@@ -436,7 +436,7 @@ function FirstPosts({
                                     {c.why}
                                 </span>
                             </span>
-                        </Link>
+                        </IntentLink>
                     </li>
                 ))}
             </ul>

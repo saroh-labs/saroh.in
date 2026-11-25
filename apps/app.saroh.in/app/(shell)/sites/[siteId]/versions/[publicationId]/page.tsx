@@ -2,8 +2,8 @@ import { formatDateTime } from "@/lib/format/datetime";
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PartialNotice } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -77,20 +77,20 @@ export default async function PastVersionPage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="site"
                         href={`/sites/${siteId}/pages`}
                     >
                         Website
-                    </Link>,
-                    <Link
+                    </IntentLink>,
+                    <IntentLink
                         data-ph-unmask=""
                         key="versions"
                         href={`/sites/${siteId}/versions`}
                     >
                         Version history
-                    </Link>,
+                    </IntentLink>,
                     formatDateTime(publication.publishedAt, zone, {
                         year: "always",
                     }),
@@ -104,9 +104,9 @@ export default async function PastVersionPage({
                 }
                 actions={
                     <Button variant="outline" asChild>
-                        <Link href={`/sites/${siteId}/versions`}>
+                        <IntentLink href={`/sites/${siteId}/versions`}>
                             Version history
-                        </Link>
+                        </IntentLink>
                     </Button>
                 }
             />
@@ -173,14 +173,14 @@ export default async function PastVersionPage({
                                 p.path === page?.path ? "secondary" : "ghost"
                             }
                         >
-                            <Link
+                            <IntentLink
                                 href={`${base}?path=${encodeURIComponent(p.path)}`}
                                 aria-current={
                                     p.path === page?.path ? "page" : undefined
                                 }
                             >
                                 {p.title}
-                            </Link>
+                            </IntentLink>
                         </Button>
                     ))}
                 </nav>

@@ -4,9 +4,9 @@ import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -274,13 +274,13 @@ export function SubscriptionDetail({
                     className="mb-0"
                     breadcrumb={[
                         "Payments",
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             key="list"
                             href="/billing/subscriptions"
                         >
                             Subscriptions
-                        </Link>,
+                        </IntentLink>,
                         name,
                     ]}
                     title={name}

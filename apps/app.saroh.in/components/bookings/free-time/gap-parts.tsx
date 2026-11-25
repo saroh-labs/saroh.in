@@ -2,11 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import { ChipGroup, RadioCards } from "@saroh/ui/choice-group";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { ArrowLeft, Clock, Scissors } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode, RefObject } from "react";
 import { useId } from "react";
 
@@ -92,7 +92,7 @@ export function ServiceList({
                     time.
                 </p>
                 <Button asChild variant="outline" size="sm" className="mt-1">
-                    <Link href="/services">Open Services</Link>
+                    <IntentLink href="/services">Open Services</IntentLink>
                 </Button>
             </div>
         );

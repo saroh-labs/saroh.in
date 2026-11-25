@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { PageLoading } from "@/components/shared/page/page-loading";
 
@@ -8,9 +8,9 @@ export default function Loading() {
             shape="editor"
             width="full"
             breadcrumb={[
-                <Link data-ph-unmask="" key="0" href="/sites">
+                <IntentLink data-ph-unmask="" key="0" href="/sites">
                     Website
-                </Link>,
+                </IntentLink>,
             ]}
             label="Loading the post"
         />

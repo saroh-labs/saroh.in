@@ -422,6 +422,37 @@ storage, and a signed-in customer's phone comes back from their account.
   from their last placed order (`GET public/sites/:siteId/checkout/address`)
   and nothing new is stored for it.
 
+## Links never fetch ahead in the merchant app — **Current** (24 Nov 2026)
+
+Owner, 24 Nov: nothing in the merchant app is prefetched; only what's
+needed is loaded. A hovered prefetch was measured to cost two more Worker
+requests and make the click no faster (the click still fetches the page,
+and the section's `loading.tsx` already paints at once), so the app's root
+`providers.tsx` sets `<LinkPrefetchProvider mode="never">`: an
+`IntentLink` there never prefetches, even on hover or focus. saroh.in and
+the other sites keep the default, prefetch on intent.
+
+- **Every in-app link is `IntentLink`** (`@saroh/ui/intent-link`):
+  `prefetch={false}` until a pointer enters, a touch starts or it takes
+  focus, then Next's own prefetch. In `apps/app.saroh.in` the default
+  import of `next/link` is a lint error (`eslint.config.mjs`); `TextLink`,
+  `TabStrip`, `Segmented`, `ListToolbar` paging, `DataView` rows and the
+  other `@saroh/ui` pieces use it too. `useLinkStatus` stays allowed.
+- **Why.** Every app page is dynamic, so a plain `<Link>` on screen costs
+  two Worker requests (the route tree, `next-router-segment-prefetch:
+/_tree`; then the page from its first unshared segment down to its
+  `loading.tsx`, which runs that section's layout gates and the
+  `generateMetadata` business read). The sidebar, Home's cards and list rows
+  made ~35 a page load, 56 on Home; a search re-prefetched the list's tabs
+  and pages on every keystroke. Now 0 on load.
+- **A click is not slower.** The prefetch only ever held the part down to
+  `loading.tsx`; the click asks for the page anyway, and the router shows
+  the loading state at once without it (production build, 24 Nov: a cold
+  sidebar click paints the new heading and skeleton in ~20 ms, the page in
+  ~330 ms, the same as after a hover).
+- No `router.prefetch` anywhere in the app. Add one only for a flow that
+  measurably needs it, with the reason beside it.
+
 ## Loading inside a screen — **Current** (21 Nov 2026)
 
 A change inside a screen (another post, page, tab, filter or sort) greys

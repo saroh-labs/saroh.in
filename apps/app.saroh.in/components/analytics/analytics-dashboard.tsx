@@ -1,7 +1,7 @@
 import { formatNumber } from "@/lib/format/money";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight, ChevronUp } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type {
@@ -113,12 +113,12 @@ function Figure({
     return (
         <li className="min-w-0" data-figure={testId}>
             {href ? (
-                <Link
+                <IntentLink
                     href={href}
                     className={`group ${shape} transition-colors duration-fast hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-muted`}
                 >
                     {body}
-                </Link>
+                </IntentLink>
             ) : (
                 <div className={shape}>{body}</div>
             )}

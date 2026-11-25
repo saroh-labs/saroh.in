@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "./intent-link";
 
 import * as React from "react";
 import { cn } from "../../lib/utils";
@@ -144,7 +144,7 @@ export function Segmented<V extends string = string>({
                 {options.map((o) => {
                     const on = o.value === value;
                     return (
-                        <Link
+                        <IntentLink
                             key={o.value}
                             href={o.href ?? "#"}
                             onNavigate={o.onNavigate}
@@ -156,7 +156,7 @@ export function Segmented<V extends string = string>({
                         >
                             {inner(o)}
                             <LinkPending />
-                        </Link>
+                        </IntentLink>
                     );
                 })}
             </nav>

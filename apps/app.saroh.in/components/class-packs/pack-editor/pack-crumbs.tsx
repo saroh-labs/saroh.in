@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import type { ReactNode } from "react";
 
 /**
@@ -8,12 +8,12 @@ import type { ReactNode } from "react";
  */
 export function packCrumbs(here: string | null): ReactNode[] {
     return [
-        <Link data-ph-unmask="" key="bookings" href="/bookings">
+        <IntentLink data-ph-unmask="" key="bookings" href="/bookings">
             Bookings
-        </Link>,
-        <Link data-ph-unmask="" key="packs" href="/class-packs">
+        </IntentLink>,
+        <IntentLink data-ph-unmask="" key="packs" href="/class-packs">
             Class packs
-        </Link>,
+        </IntentLink>,
         ...(here ? [here] : []),
     ];
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { useWebsiteArea } from "@/components/sites/website-area";
 import type { StaffView } from "@/lib/staff/types";
@@ -30,13 +30,13 @@ export function TeamPageSwitch({
                 On the website&apos;s Our team page
             </span>
             {canManage ? (
-                <Link
+                <IntentLink
                     data-ph-unmask=""
                     href="/sites/our-team"
                     className="shrink-0 whitespace-nowrap font-semibold underline decoration-border underline-offset-[3px] hover:decoration-foreground"
                 >
                     Change in Website
-                </Link>
+                </IntentLink>
             ) : null}
         </div>
     );

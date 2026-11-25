@@ -1,8 +1,8 @@
 import { Badge } from "@saroh/ui/badge";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { chooseOrganization } from "@/lib/organizations/actions";
@@ -146,13 +146,13 @@ export default async function ChoosePage({
 
             <p className="sa-rise mt-5 text-[12.5px] text-muted-foreground">
                 Starting something new?{" "}
-                <Link
+                <IntentLink
                     data-ph-unmask=""
                     href="/onboarding"
                     className="text-foreground underline-offset-4 transition-colors duration-fast hover:underline"
                 >
                     Add a business
-                </Link>
+                </IntentLink>
             </p>
         </SplitShell>
     );

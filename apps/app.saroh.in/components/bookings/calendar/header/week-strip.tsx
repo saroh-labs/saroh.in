@@ -1,7 +1,7 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { useScreenLink } from "@/components/shared/page/screen-pending";
 import type { DayFacts } from "@/lib/services/calendar-header";
@@ -40,7 +40,7 @@ export function WeekStrip({
             {cells.map((c) => {
                 const href = hrefFor(layout, c.date);
                 return (
-                    <Link
+                    <IntentLink
                         key={c.date}
                         href={href}
                         onNavigate={screenLink(href)}
@@ -75,7 +75,7 @@ export function WeekStrip({
                                     ? c.count
                                     : "–"}
                         </span>
-                    </Link>
+                    </IntentLink>
                 );
             })}
         </nav>

@@ -3,10 +3,10 @@
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
 import { Ticket } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -132,14 +132,14 @@ export function PacksScreen({
             <PageHeader
                 holdsData="description"
                 breadcrumb={[
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="bookings"
                         href="/bookings"
                         className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                         Bookings
-                    </Link>,
+                    </IntentLink>,
                     "Class packs",
                 ]}
                 title="Class packs"
@@ -158,12 +158,14 @@ export function PacksScreen({
                     canWrite ? (
                         <>
                             <Button asChild variant="outline">
-                                <Link href="/class-packs/new?kind=one-to-one">
+                                <IntentLink href="/class-packs/new?kind=one-to-one">
                                     New one-to-one pack
-                                </Link>
+                                </IntentLink>
                             </Button>
                             <Button asChild>
-                                <Link href="/class-packs/new">New pack</Link>
+                                <IntentLink href="/class-packs/new">
+                                    New pack
+                                </IntentLink>
                             </Button>
                         </>
                     ) : undefined
@@ -191,7 +193,9 @@ export function PacksScreen({
                     action={
                         canWrite ? (
                             <Button asChild>
-                                <Link href="/class-packs/new">New pack</Link>
+                                <IntentLink href="/class-packs/new">
+                                    New pack
+                                </IntentLink>
                             </Button>
                         ) : undefined
                     }

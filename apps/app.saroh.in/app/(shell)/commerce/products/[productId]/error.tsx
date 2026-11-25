@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { reportError } from "@saroh/ui/lib/report-error";
 import { backTo, couldntLoad } from "@saroh/ui/lib/state-copy";
-import Link from "next/link";
 import { useEffect } from "react";
 
 import { ProductPageFrame } from "@/components/commerce/product-page/page-state";
@@ -57,9 +57,9 @@ export default function ProductError({
                 reference={error.digest}
                 action={
                     <Button asChild variant="ghost" className="wk-press">
-                        <Link href="/commerce/products">
+                        <IntentLink href="/commerce/products">
                             {backTo("Products")}
-                        </Link>
+                        </IntentLink>
                     </Button>
                 }
             />

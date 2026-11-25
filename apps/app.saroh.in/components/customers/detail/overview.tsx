@@ -5,8 +5,8 @@ import { AbsentOr, AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { addedByHand, addedLine } from "@/lib/customer-workspace/added";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
@@ -286,7 +286,7 @@ function ClassesLeft({
                         </span>
                     </div>
                     {m ? (
-                        <Link
+                        <IntentLink
                             href={`/billing/subscriptions/${m.subscriptionId}`}
                             className="mt-2.5 block border-t border-foreground/10 pb-2 pt-2.5 text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-foreground"
                         >
@@ -321,10 +321,10 @@ function ClassesLeft({
                                     {change}
                                 </div>
                             ) : null}
-                        </Link>
+                        </IntentLink>
                     ) : null}
                     {packs.map((p) => (
-                        <Link
+                        <IntentLink
                             key={p.name + p.sub}
                             href={p.href}
                             className="block border-t border-foreground/10 pb-2 pt-2.5 text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-foreground"
@@ -348,7 +348,7 @@ function ClassesLeft({
                             >
                                 {p.sub}
                             </div>
-                        </Link>
+                        </IntentLink>
                     ))}
                     {!m && !packs.length ? (
                         <EmptyState

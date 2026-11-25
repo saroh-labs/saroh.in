@@ -1,7 +1,7 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { ArrowRight, ChevronUp } from "lucide-react";
-import Link from "next/link";
 import { useId } from "react";
 
 import type { GoingCard } from "@/lib/home/week";
@@ -74,7 +74,7 @@ export function HowItsGoing({
                             key={card.key}
                             className={cn(i > 0 && "border-t border-border")}
                         >
-                            <Link
+                            <IntentLink
                                 href={card.href}
                                 data-going={card.key}
                                 className="flex min-h-[60px] items-center gap-3 px-4 py-2.5 text-foreground transition-colors duration-fast hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted"
@@ -94,7 +94,7 @@ export function HowItsGoing({
                                 <span className="font-display text-[21px] font-semibold tabular-nums tracking-[-0.02em]">
                                     {card.value}
                                 </span>
-                            </Link>
+                            </IntentLink>
                         </li>
                     ))}
                 </ul>
@@ -112,7 +112,7 @@ export function HowItsGoing({
                 >
                     {cards.map((card) => (
                         <li key={card.key} className="min-w-0">
-                            <Link
+                            <IntentLink
                                 href={card.href}
                                 data-going={card.key}
                                 className="flex h-full flex-col gap-[3px] rounded-xl border border-border bg-card px-[15px] py-[13px] text-foreground transition-colors duration-fast hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-muted"
@@ -141,7 +141,7 @@ export function HowItsGoing({
                                     ) : null}
                                     {card.sub}
                                 </span>
-                            </Link>
+                            </IntentLink>
                         </li>
                     ))}
                 </ul>

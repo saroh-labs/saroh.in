@@ -1,8 +1,8 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronDown } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { QuickLook } from "@/components/shared/forms/quick-look";
@@ -83,7 +83,7 @@ export function SitePicker({
                         const on = o.id === (chosen?.id ?? null);
                         return (
                             <li key={o.id ?? "all"}>
-                                <Link
+                                <IntentLink
                                     href={o.href}
                                     scroll={false}
                                     aria-current={on ? "true" : undefined}
@@ -118,7 +118,7 @@ export function SitePicker({
                                             {o.line}
                                         </small>
                                     </span>
-                                </Link>
+                                </IntentLink>
                             </li>
                         );
                     })}

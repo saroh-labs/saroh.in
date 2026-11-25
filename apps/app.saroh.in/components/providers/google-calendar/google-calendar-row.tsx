@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { showError } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useId } from "react";
 
 import { Monogram } from "@/components/providers/connections/provider-row";
@@ -73,12 +73,12 @@ export function GoogleCalendarRow({
                             }
                             size="sm"
                         >
-                            <Link
+                            <IntentLink
                                 href={GOOGLE_CALENDAR_HREF}
                                 aria-label="Manage Google Calendar"
                             >
                                 Manage
-                            </Link>
+                            </IntentLink>
                         </Button>
                     )}
                 </div>

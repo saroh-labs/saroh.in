@@ -7,8 +7,8 @@ import {
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { isAbsentText } from "@saroh/ui/lib/absent";
-import Link from "next/link";
 
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import type {
@@ -160,13 +160,13 @@ export function SalesTab({
                         Each sale
                     </h2>
                     {allReceiptsHref ? (
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             href={allReceiptsHref}
                             className={`${LINK} text-[12.5px]`}
                         >
                             All its receipts
-                        </Link>
+                        </IntentLink>
                     ) : null}
                 </div>
                 <div
@@ -192,13 +192,13 @@ export function SalesTab({
                                     {s.when}
                                 </span>
                                 <span className="min-w-0 flex-[1_1_160px]">
-                                    <Link
+                                    <IntentLink
                                         href={s.href}
                                         aria-label={`Open ${s.name}`}
                                         className={NAME_LINK}
                                     >
                                         {s.name}
-                                    </Link>
+                                    </IntentLink>
                                 </span>
                                 <span className="font-semibold tabular-nums">
                                     {s.amount}
@@ -221,14 +221,14 @@ export function SalesTab({
                                     </span>
                                 ) : null}
                                 {s.receiptHref ? (
-                                    <Link
+                                    <IntentLink
                                         data-ph-unmask=""
                                         href={s.receiptHref}
                                         aria-label={`Receipt for ${s.name}, ${s.when}`}
                                         className={`${LINK} text-[12.5px]`}
                                     >
                                         Receipt
-                                    </Link>
+                                    </IntentLink>
                                 ) : null}
                             </li>
                         ))}

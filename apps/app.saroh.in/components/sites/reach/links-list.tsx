@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { SharePageButton } from "@/components/sites/share/share-page-sheet";
 import type { SitePage, SiteRedirect } from "@/lib/sites/service";
@@ -47,12 +47,12 @@ export function LinksList({
                 <p className="text-sm text-muted-foreground">
                     Each page has one link. Change it in the page&apos;s
                     settings, on{" "}
-                    <Link
+                    <IntentLink
                         href={`/sites/${siteId}/pages`}
                         className="font-medium text-foreground underline underline-offset-4"
                     >
                         Pages
-                    </Link>
+                    </IntentLink>
                     .
                 </p>
             </div>

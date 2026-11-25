@@ -1,7 +1,7 @@
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { planLabel } from "@saroh/ui/lib/state-copy";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { BillingAccessView } from "@/lib/billing/access";
@@ -58,7 +58,9 @@ export function PlanEndingBanner({
                 </p>
                 <PlanWay className="text-foreground/80">
                     <Button asChild size="sm" className="shrink-0">
-                        <Link href={upgradeHref()}>{planLabel()}</Link>
+                        <IntentLink href={upgradeHref()}>
+                            {planLabel()}
+                        </IntentLink>
                     </Button>
                 </PlanWay>
             </div>

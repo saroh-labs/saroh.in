@@ -1,6 +1,6 @@
 import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -253,11 +253,11 @@ export default async function PersonPage({
     if (acts.newInvoice && detail.invoices !== undefined && !removed) {
         actions.inv = (
             <Button size="sm" variant="outline" asChild>
-                <Link
+                <IntentLink
                     href={`/billing/invoices/new?contactId=${encodeURIComponent(contactId)}`}
                 >
                     New invoice
-                </Link>
+                </IntentLink>
             </Button>
         );
     }

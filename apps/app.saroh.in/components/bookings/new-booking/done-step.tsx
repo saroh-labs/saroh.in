@@ -3,6 +3,7 @@
 import { MoneyIcon } from "@/components/shared/money-icon";
 import { Button } from "@saroh/ui/button";
 import { useCopy } from "@saroh/ui/copy-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import {
@@ -15,7 +16,6 @@ import {
     MessageSquareText,
     Plus,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -234,7 +234,7 @@ export function DoneStep({
             </div>
             <div className="hidden shrink-0 items-center gap-2 border-t border-border bg-card px-6 py-3 min-[760px]:flex">
                 <Button asChild variant="outline" size="lg">
-                    <Link href={view}>View booking</Link>
+                    <IntentLink href={view}>View booking</IntentLink>
                 </Button>
                 <Button
                     type="button"
@@ -316,9 +316,9 @@ function NextRow({
                 {body}
             </a>
         ) : href.startsWith("/") ? (
-            <Link href={href} className={rowClass}>
+            <IntentLink href={href} className={rowClass}>
                 {body}
-            </Link>
+            </IntentLink>
         ) : (
             <a href={href} className={rowClass}>
                 {body}

@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { CopyButton } from "@saroh/ui/copy-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { showError, showUndo, showWarning } from "@saroh/ui/toast";
 import { Lightbulb } from "lucide-react";
-import Link from "next/link";
 import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -332,7 +332,7 @@ function SuggestionAction({
         case "link":
             return (
                 <Button asChild size="sm" className={MAIN}>
-                    <Link href={action.href}>{action.label}</Link>
+                    <IntentLink href={action.href}>{action.label}</IntentLink>
                 </Button>
             );
     }

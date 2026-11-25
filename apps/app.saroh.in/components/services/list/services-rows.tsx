@@ -1,11 +1,11 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, ListTableHead, listTable } from "@saroh/ui/list-table";
 import { ScrollX } from "@saroh/ui/scroll-x";
 import { TextLink } from "@saroh/ui/text-link";
-import Link from "next/link";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
@@ -233,12 +233,12 @@ export function ServicesTable({
                                 className={cn(listTable.row, DESK_GRID)}
                             >
                                 <div role="cell" className="min-w-0">
-                                    <Link
+                                    <IntentLink
                                         href={hrefOf(row.service)}
                                         className="font-semibold text-foreground underline-offset-4 hover:underline"
                                     >
                                         {row.service.name}
-                                    </Link>
+                                    </IntentLink>
                                     <SampleBits
                                         row={row}
                                         onKeep={onKeep}
@@ -313,7 +313,7 @@ export function ServicesPhoneList({
                     className="flex items-start gap-2.5 border-b border-border py-3 pl-3.5 pr-2 last:border-b-0"
                 >
                     <div className="min-w-0 flex-1">
-                        <Link
+                        <IntentLink
                             href={hrefOf(row.service)}
                             className="block text-foreground"
                         >
@@ -331,7 +331,7 @@ export function ServicesPhoneList({
                             <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
                                 {row.weekPhone}
                             </span>
-                        </Link>
+                        </IntentLink>
                         <SampleBits
                             row={row}
                             onKeep={onKeep}

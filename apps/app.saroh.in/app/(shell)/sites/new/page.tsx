@@ -1,8 +1,8 @@
 import { Button } from "@saroh/ui/button";
 import { LimitReachedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Globe } from "lucide-react";
-import Link from "next/link";
 
 import { PageContainer } from "@/components/shared/page/page-container";
 import { CreateSiteForm } from "@/components/sites/new-site/create-site-form";
@@ -95,9 +95,9 @@ export default async function NewSitePage({
             <PageContainer width="form">
                 <PageHeader
                     breadcrumb={[
-                        <Link data-ph-unmask="" key="site" href="/sites">
+                        <IntentLink data-ph-unmask="" key="site" href="/sites">
                             Website
-                        </Link>,
+                        </IntentLink>,
                         "New site",
                     ]}
                     title="New site"
@@ -109,9 +109,9 @@ export default async function NewSitePage({
                     secondary={
                         // The site's own name: masked in a recording.
                         <Button data-ph-mask="" asChild variant="outline">
-                            <Link href={`/sites/${existing.id}/pages`}>
+                            <IntentLink href={`/sites/${existing.id}/pages`}>
                                 Go to {name}
-                            </Link>
+                            </IntentLink>
                         </Button>
                     }
                 />
@@ -138,9 +138,9 @@ export default async function NewSitePage({
         <PageContainer width="form">
             <PageHeader
                 breadcrumb={[
-                    <Link data-ph-unmask="" key="site" href="/sites">
+                    <IntentLink data-ph-unmask="" key="site" href="/sites">
                         Website
-                    </Link>,
+                    </IntentLink>,
                     "New site",
                 ]}
                 title="New site"

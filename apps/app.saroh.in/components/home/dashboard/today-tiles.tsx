@@ -1,7 +1,7 @@
 import { AbsentValue } from "@saroh/ui/absent-value";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { CalendarClock, CircleCheck, Package } from "lucide-react";
-import Link from "next/link";
 
 import { MoneyIcon } from "@/components/shared/money-icon";
 import type { TileView } from "@/lib/home/tiles";
@@ -58,7 +58,7 @@ function TileIcon({ tile }: { tile: TileView }) {
 
 function Tile({ tile }: { tile: TileView }) {
     return (
-        <Link
+        <IntentLink
             href={tile.href}
             data-tile={tile.key}
             className="flex h-full min-h-[104px] flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3.5 text-foreground transition-colors duration-fast hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-muted"
@@ -83,6 +83,6 @@ function Tile({ tile }: { tile: TileView }) {
             >
                 {tile.sub}
             </span>
-        </Link>
+        </IntentLink>
     );
 }

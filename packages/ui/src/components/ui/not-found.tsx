@@ -1,5 +1,5 @@
-import Link from "next/link";
 import * as React from "react";
+import { IntentLink } from "./intent-link";
 
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
@@ -144,7 +144,7 @@ export function NotFound({
                     variant={card ? "outline" : "default"}
                     size={card ? "sm" : "default"}
                 >
-                    <Link href={primary.href}>{primary.label}</Link>
+                    <IntentLink href={primary.href}>{primary.label}</IntentLink>
                 </Button>
                 {secondary ? (
                     <Button
@@ -152,7 +152,9 @@ export function NotFound({
                         variant={card ? "ghost" : "outline"}
                         size={card ? "sm" : "default"}
                     >
-                        <Link href={secondary.href}>{secondary.label}</Link>
+                        <IntentLink href={secondary.href}>
+                            {secondary.label}
+                        </IntentLink>
                     </Button>
                 ) : null}
             </div>

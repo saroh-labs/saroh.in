@@ -1,7 +1,7 @@
 import { EmptyState, FailedState, PartialNotice } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Users } from "lucide-react";
-import Link from "next/link";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { SubscriberRow } from "@/lib/subscriptions/plan-detail";
@@ -54,7 +54,7 @@ export function PlanSubscribers({
             <ul className="overflow-hidden rounded-[12px] border border-border">
                 {rows.map((r, i) => (
                     <li key={r.id}>
-                        <Link
+                        <IntentLink
                             href={`/billing/subscriptions/${encodeURIComponent(r.id)}`}
                             className={cn(
                                 "flex flex-wrap items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
@@ -86,7 +86,7 @@ export function PlanSubscribers({
                             <span className="flex-[0_0_140px] text-[12.5px] text-muted-foreground">
                                 {r.when}
                             </span>
-                        </Link>
+                        </IntentLink>
                     </li>
                 ))}
             </ul>

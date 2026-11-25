@@ -8,12 +8,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ListSearch } from "@saroh/ui/list-search";
 import { Notice } from "@saroh/ui/notice";
 import { PageHeader } from "@saroh/ui/page-header";
 import { TextLink } from "@saroh/ui/text-link";
 import { CalendarClock, ChevronDown, Plus } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
@@ -219,20 +219,20 @@ export function ServicesScreen({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
-                        <Link data-ph-unmask="" href={NEW_SERVICE_HREF}>
+                        <IntentLink data-ph-unmask="" href={NEW_SERVICE_HREF}>
                             New service
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                        <Link data-ph-unmask="" href={NEW_COURSE_HREF}>
+                        <IntentLink data-ph-unmask="" href={NEW_COURSE_HREF}>
                             New course
-                        </Link>
+                        </IntentLink>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
         ) : (
             <Button asChild className={look}>
-                <Link href={NEW_SERVICE_HREF}>{words}</Link>
+                <IntentLink href={NEW_SERVICE_HREF}>{words}</IntentLink>
             </Button>
         );
     };
@@ -286,9 +286,9 @@ export function ServicesScreen({
                     action={
                         canEdit ? (
                             <Button asChild>
-                                <Link href={NEW_SERVICE_HREF}>
+                                <IntentLink href={NEW_SERVICE_HREF}>
                                     Add your first service
-                                </Link>
+                                </IntentLink>
                             </Button>
                         ) : undefined
                     }
@@ -345,9 +345,9 @@ export function ServicesScreen({
                                 action={
                                     canEdit ? (
                                         <Button asChild variant="outline">
-                                            <Link href={nobody.link.href}>
+                                            <IntentLink href={nobody.link.href}>
                                                 {nobody.link.label}
-                                            </Link>
+                                            </IntentLink>
                                         </Button>
                                     ) : undefined
                                 }

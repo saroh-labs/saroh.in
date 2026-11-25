@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import type {
@@ -150,7 +150,7 @@ function MakeItYours({
                             size="sm"
                             className="shrink-0"
                         >
-                            <Link href={item.href}>{item.cta}</Link>
+                            <IntentLink href={item.href}>{item.cta}</IntentLink>
                         </Button>
                     </li>
                 ))}

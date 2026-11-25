@@ -2,9 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
@@ -132,7 +132,9 @@ export function StorefrontsScreen({
             actions={
                 canCreate && storefronts.length > 0 ? (
                     <Button asChild>
-                        <Link href={newStorefrontHref}>New location</Link>
+                        <IntentLink href={newStorefrontHref}>
+                            New location
+                        </IntentLink>
                     </Button>
                 ) : undefined
             }
@@ -149,9 +151,9 @@ export function StorefrontsScreen({
                     action={
                         canCreate ? (
                             <Button asChild variant="brand">
-                                <Link href={newStorefrontHref}>
+                                <IntentLink href={newStorefrontHref}>
                                     New location
-                                </Link>
+                                </IntentLink>
                             </Button>
                         ) : undefined
                     }

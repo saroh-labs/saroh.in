@@ -5,9 +5,9 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Label } from "@saroh/ui/label";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId } from "react";
 
@@ -132,7 +132,7 @@ export function FixedBlockInspector({
             {/* A new tab, for the same reason as the Services link. It lands
                 on the row with its sheet open (`?edit=`): the menu from the
                 header, the footer from the footer. */}
-            <Link
+            <IntentLink
                 href={settingsEditHref(
                     siteId,
                     part === "header" ? "menu" : "footer",
@@ -141,7 +141,7 @@ export function FixedBlockInspector({
                 rel="noopener"
             >
                 Open Website settings
-            </Link>
+            </IntentLink>
         </Button>
     );
 

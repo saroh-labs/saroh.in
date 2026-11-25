@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
-import Link from "next/link";
 
 import { PlanWay } from "@/components/billing/plan-way";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
@@ -100,7 +100,7 @@ export function PlanAsides({ items }: { items: readonly ReadyAside[] }) {
                             size="sm"
                             className="shrink-0"
                         >
-                            <Link href={item.href}>{item.cta}</Link>
+                            <IntentLink href={item.href}>{item.cta}</IntentLink>
                         </Button>
                     </PlanWay>
                 </li>

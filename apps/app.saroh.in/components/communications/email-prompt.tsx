@@ -1,5 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import type { EmailPrompt } from "@/lib/communications/email-setup";
 
@@ -39,7 +39,9 @@ export function EmailPromptBlock({ prompt }: { prompt: EmailPrompt }) {
                     {action.href.startsWith("#") ? (
                         <a href={action.href}>{action.label}</a>
                     ) : (
-                        <Link href={action.href}>{action.label}</Link>
+                        <IntentLink href={action.href}>
+                            {action.label}
+                        </IntentLink>
                     )}
                 </Button>
             ) : null}

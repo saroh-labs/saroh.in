@@ -10,8 +10,8 @@ import { PartialRead } from "@saroh/ui/failed-read";
 import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Check, ListFilter, Receipt, RotateCcw, Search } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
@@ -83,7 +83,7 @@ export function OrdersFailed({
                 reference={reference}
                 action={
                     <Button asChild variant="ghost" className="wk-press">
-                        <Link href="/">{backTo("Home")}</Link>
+                        <IntentLink href="/">{backTo("Home")}</IntentLink>
                     </Button>
                 }
             />
@@ -146,7 +146,7 @@ export function OrderLocked({ text }: { text: string }) {
                 description={text}
                 action={
                     <Button asChild variant="outline" className="wk-press mt-1">
-                        <Link href="/">Back to Home</Link>
+                        <IntentLink href="/">Back to Home</IntentLink>
                     </Button>
                 }
             />

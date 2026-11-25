@@ -1,5 +1,5 @@
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { AddCustomerForm } from "@/components/customers/store-customer/add-customer-form";
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -33,14 +33,14 @@ export default async function NewCustomerPage() {
             <PageHeader
                 breadcrumb={[
                     "Sell",
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="customers"
                         href="/commerce/customers"
                         className="hover:text-foreground"
                     >
                         Customers
-                    </Link>,
+                    </IntentLink>,
                     "New customer",
                 ]}
                 title="New customer"

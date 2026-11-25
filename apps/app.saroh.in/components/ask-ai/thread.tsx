@@ -11,6 +11,7 @@ import type {
 import { Button } from "@saroh/ui/button";
 import { useCopy } from "@saroh/ui/copy-button";
 import { IconButton } from "@saroh/ui/icon-button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
@@ -27,7 +28,6 @@ import {
     Square,
     TriangleAlert,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -485,7 +485,9 @@ function LockedLine({ upgradeTo }: { upgradeTo: string }) {
                 plansShown() ? (
                     <div>
                         <Button asChild size="sm">
-                            <Link href={upgradeHref()}>See plans</Link>
+                            <IntentLink href={upgradeHref()}>
+                                See plans
+                            </IntentLink>
                         </Button>
                     </div>
                 ) : null
@@ -530,7 +532,7 @@ function AtLimit({
     const plans =
         canChangePlan && plansShown() ? (
             <Button asChild variant="outline" className="h-11">
-                <Link href={upgradeHref()}>See plans</Link>
+                <IntentLink href={upgradeHref()}>See plans</IntentLink>
             </Button>
         ) : null;
     return (

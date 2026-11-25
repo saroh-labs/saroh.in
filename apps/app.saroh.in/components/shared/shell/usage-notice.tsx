@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
 import { showError } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -72,12 +72,12 @@ export function UsageNotice() {
         >
             <p className="text-pretty text-[13px] leading-normal">
                 {USAGE_NOTICE.body} {USAGE_NOTICE.turnOff}{" "}
-                <Link
+                <IntentLink
                     href={USAGE_NOTICE.href}
                     className="cursor-pointer rounded-sm font-semibold underline underline-offset-2 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70"
                 >
                     {USAGE_NOTICE.settings}
-                </Link>
+                </IntentLink>
                 .
             </p>
         </Notice>

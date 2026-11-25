@@ -1,9 +1,9 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Camera, ExternalLink, Globe } from "lucide-react";
-import Link from "next/link";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -73,7 +73,7 @@ function ViewAs({
             className="flex rounded-lg bg-muted p-0.5"
         >
             {(["team", "customer"] as const).map((v) => (
-                <Link
+                <IntentLink
                     data-ph-unmask=""
                     key={v}
                     href={`${productHref(storeId, productId)}${v === "customer" ? "&view=customer" : ""}`}
@@ -88,7 +88,7 @@ function ViewAs({
                     )}
                 >
                     {v === "team" ? "Your" : "Customer"} view
-                </Link>
+                </IntentLink>
             ))}
         </div>
     );
@@ -289,13 +289,13 @@ export function ProductHeader({
                 className="mb-0"
                 breadcrumb={[
                     "Sell",
-                    <Link
+                    <IntentLink
                         data-ph-unmask=""
                         key="list"
                         href="/commerce/products"
                     >
                         Products
-                    </Link>,
+                    </IntentLink>,
                     product.name,
                 ]}
                 title={product.name}
@@ -383,7 +383,7 @@ export function ProductHeader({
                 }
                 lead={
                     cover ? (
-                        <Link
+                        <IntentLink
                             href={photosHref}
                             scroll={false}
                             aria-label="Cover photo, open Photos"
@@ -398,7 +398,7 @@ export function ProductHeader({
                                 alt=""
                                 className="size-full object-cover"
                             />
-                        </Link>
+                        </IntentLink>
                     ) : !overview.canWrite ? (
                         // Nothing to add for a role that can't: a plain tile.
                         <div
@@ -408,7 +408,7 @@ export function ProductHeader({
                             <Camera className="size-[18px]" />
                         </div>
                     ) : (
-                        <Link
+                        <IntentLink
                             href={photosHref}
                             scroll={false}
                             aria-label="Add a photo"
@@ -419,7 +419,7 @@ export function ProductHeader({
                         >
                             <Camera aria-hidden className="size-[18px]" />
                             Add
-                        </Link>
+                        </IntentLink>
                     )
                 }
             />
@@ -459,7 +459,7 @@ function StatusLine({
             />
             <span>{visibilityLine(status, shopLive, paused)}</span>
             {shopLive === false && status === "PUBLISHED" && !paused ? (
-                <Link
+                <IntentLink
                     href="/sites"
                     className={cn(
                         FOCUS,
@@ -467,7 +467,7 @@ function StatusLine({
                     )}
                 >
                     Set up your shop
-                </Link>
+                </IntentLink>
             ) : null}
         </p>
     );

@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { planLabel } from "@saroh/ui/lib/state-copy";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { PausedView } from "@/lib/billing/paused";
@@ -39,7 +39,9 @@ export function PausedBanner({ view }: { view: PausedView | null }) {
                 </p>
                 <PlanWay className="text-foreground/80">
                     <Button asChild size="sm" className="shrink-0">
-                        <Link href={PLAN_AND_BILLING_HREF}>{planLabel()}</Link>
+                        <IntentLink href={PLAN_AND_BILLING_HREF}>
+                            {planLabel()}
+                        </IntentLink>
                     </Button>
                 </PlanWay>
             </div>

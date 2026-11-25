@@ -1,6 +1,6 @@
 import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { mediaCounter } from "@/lib/products/editor-sections";
@@ -48,13 +48,13 @@ export function OverviewPhotos({
                     />
                 ) : null}
                 {media.length ? (
-                    <Link
+                    <IntentLink
                         href={photosHref}
                         scroll={false}
                         className={`${FOCUS} rounded-sm px-0.5 text-[12px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground coarse:min-h-11`}
                     >
                         See all {media.length}
-                    </Link>
+                    </IntentLink>
                 ) : null}
             </CardHead>
             <div className="grid gap-2.5 px-[18px] pb-4">
@@ -63,7 +63,7 @@ export function OverviewPhotos({
                         {media.slice(0, 4).map((m, i) => {
                             const more = i === 3 && media.length > 4;
                             return (
-                                <Link
+                                <IntentLink
                                     key={m.id}
                                     href={photosHref}
                                     scroll={false}
@@ -88,7 +88,7 @@ export function OverviewPhotos({
                                             +{media.length - 3}
                                         </span>
                                     ) : null}
-                                </Link>
+                                </IntentLink>
                             );
                         })}
                     </div>

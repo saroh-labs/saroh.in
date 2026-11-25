@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { notFound } from "next/navigation";
 
 import {
@@ -55,7 +55,9 @@ export default async function ChangePlanPage() {
             parent={PARENT}
             actions={
                 <Button asChild variant="outline">
-                    <Link href={BILLING_HREF}>Back to Plan and billing</Link>
+                    <IntentLink href={BILLING_HREF}>
+                        Back to Plan and billing
+                    </IntentLink>
                 </Button>
             }
         />

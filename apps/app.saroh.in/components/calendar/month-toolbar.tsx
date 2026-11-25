@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 
 import { MonthStep } from "@/components/calendar/month-step";
 import type { CalendarView } from "@/components/calendar/view-switch";
@@ -95,12 +95,12 @@ export function MonthToolbar({
                         size="sm"
                         className="max-[759px]:h-11 max-[759px]:rounded-[10px] max-[759px]:px-3.5"
                     >
-                        <Link
+                        <IntentLink
                             href={current.href}
                             onNavigate={screenLink(current.href)}
                         >
                             {current.label}
-                        </Link>
+                        </IntentLink>
                     </Button>
                 )}
             </div>

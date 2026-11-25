@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useId, useState } from "react";
 
 import type { SellablePack } from "@/components/class-packs/list/sell-pack-dialog";
@@ -169,12 +169,12 @@ function PackItem({
             <div className="flex flex-wrap items-center gap-3.5">
                 <div className="min-w-0 flex-[2_1_220px]">
                     <div className="flex items-baseline gap-2.5">
-                        <Link
+                        <IntentLink
                             href={row.href}
                             className="min-w-0 flex-1 rounded-[4px] text-[14px] font-semibold text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
                         >
                             {row.name}
-                        </Link>
+                        </IntentLink>
                         <span className="text-[13px] font-semibold tabular-nums">
                             {row.left}
                         </span>
@@ -234,7 +234,7 @@ function PackItem({
                         <ul id={ids.uses} className="m-0 mt-1 list-none p-0">
                             {row.uses.map((u) => (
                                 <li key={u.key}>
-                                    <Link
+                                    <IntentLink
                                         href={u.href}
                                         className="-mx-1.5 flex flex-wrap items-center gap-2.5 rounded-md px-1.5 py-[7px] text-[13px] text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent"
                                     >
@@ -250,7 +250,7 @@ function PackItem({
                                         >
                                             {u.state.label}
                                         </StatusBadge>
-                                    </Link>
+                                    </IntentLink>
                                 </li>
                             ))}
                         </ul>

@@ -33,6 +33,7 @@ export const UI_FILES = [
     "components/ui/dialog.tsx",
     "components/ui/error-page.tsx",
     "components/ui/input.tsx",
+    "components/ui/intent-link.tsx",
     "components/ui/not-found.tsx",
     "components/ui/phone-input.tsx",
     "components/ui/popover.tsx",

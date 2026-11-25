@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@saroh/ui/intent-link";
 
 import { InvoiceForm } from "@/components/invoices/new-invoice/invoice-form";
 import { PageContainer } from "@/components/shared/page/page-container";
@@ -68,13 +68,13 @@ export default async function NewInvoicePage({
                 header={{
                     breadcrumb: [
                         ...((await paymentsModuleOn()) ? ["Payments"] : []),
-                        <Link
+                        <IntentLink
                             data-ph-unmask=""
                             key="list"
                             href="/billing/invoices"
                         >
                             Invoices
-                        </Link>,
+                        </IntentLink>,
                         "New invoice",
                     ],
                     title: "New invoice",

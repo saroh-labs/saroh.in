@@ -10,6 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Ban,
@@ -19,7 +20,6 @@ import {
     UserCheck,
     UserRound,
 } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -135,14 +135,14 @@ export function RowMenu({
                 const href =
                     action === "open" ? items.openHref : items.personHref;
                 return href ? (
-                    <Link
+                    <IntentLink
                         key={action}
                         href={href}
                         className={PHONE_ROW}
                         onClick={() => setOpen(false)}
                     >
                         {text}
-                    </Link>
+                    </IntentLink>
                 ) : null;
             }
             const fn =
@@ -201,7 +201,7 @@ export function RowMenu({
                     asChild
                     className="cursor-pointer"
                 >
-                    <Link href={href}>{text}</Link>
+                    <IntentLink href={href}>{text}</IntentLink>
                 </DropdownMenuItem>
             ) : null;
         }

@@ -1,6 +1,6 @@
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { Notice } from "@saroh/ui/notice";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import type { BillingAccessView } from "@/lib/billing/access";
@@ -40,7 +40,7 @@ export function PaymentDueBanner({
                     that you move to Free, and everything you made is kept.
                 </p>
                 <Button asChild size="sm" className="shrink-0">
-                    <Link href={PAY_DUE_HREF}>Pay now</Link>
+                    <IntentLink href={PAY_DUE_HREF}>Pay now</IntentLink>
                 </Button>
             </div>
         </Notice>

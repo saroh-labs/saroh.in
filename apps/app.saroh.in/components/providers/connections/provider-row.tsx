@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { showSuccess } from "@saroh/ui/toast";
 import { ExternalLink, Unplug } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
@@ -197,9 +197,9 @@ export function ProviderRowView({
                             </StatusBadge>
                             <PlanWay>
                                 <Button asChild variant="outline" size="sm">
-                                    <Link href={entry.lock.href}>
+                                    <IntentLink href={entry.lock.href}>
                                         {entry.lock.cta}
-                                    </Link>
+                                    </IntentLink>
                                 </Button>
                             </PlanWay>
                         </>
@@ -311,7 +311,9 @@ export function DomainsRowView({ row }: { row: DomainsRow }) {
                 <div className="flex flex-[0_1_auto] flex-wrap items-center gap-1.5 min-[760px]:ml-auto min-[760px]:justify-end">
                     {!connected ? (
                         <Button asChild size="sm">
-                            <Link href={row.setup.href}>{row.setup.label}</Link>
+                            <IntentLink href={row.setup.href}>
+                                {row.setup.label}
+                            </IntentLink>
                         </Button>
                     ) : null}
                     {row.refs.length > 0 ? (

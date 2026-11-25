@@ -1,8 +1,8 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight, Clock, Eye } from "lucide-react";
-import Link from "next/link";
 import type { ReactElement, ReactNode } from "react";
 
 import { GOOGLE_CALENDAR_HREF } from "@/lib/google-calendar/words";
@@ -160,7 +160,11 @@ export function OptionsSheet({
                         </span>
                     </SwitchRow>
                 </div>
-                <Link href={hours.href} className={LINK_ROW} onClick={close}>
+                <IntentLink
+                    href={hours.href}
+                    className={LINK_ROW}
+                    onClick={close}
+                >
                     <span className={ICON}>
                         <Clock aria-hidden />
                     </span>
@@ -169,7 +173,7 @@ export function OptionsSheet({
                         aria-hidden
                         className="size-3.5 text-muted-foreground max-[759px]:size-4"
                     />
-                </Link>
+                </IntentLink>
 
                 {google ? <GoogleLayer google={google} /> : null}
 
@@ -377,7 +381,10 @@ function GoogleLayer({
                     </li>
                 ))}
             </ul>
-            <Link href={GOOGLE_CALENDAR_HREF} className={cn(LINK_ROW, "mt-1")}>
+            <IntentLink
+                href={GOOGLE_CALENDAR_HREF}
+                className={cn(LINK_ROW, "mt-1")}
+            >
                 <span data-ph-unmask="" className="flex-1">
                     Open Settings › Integrations › Google Calendar
                 </span>
@@ -385,7 +392,7 @@ function GoogleLayer({
                     aria-hidden
                     className="size-3.5 text-muted-foreground max-[759px]:size-4"
                 />
-            </Link>
+            </IntentLink>
         </div>
     );
 }

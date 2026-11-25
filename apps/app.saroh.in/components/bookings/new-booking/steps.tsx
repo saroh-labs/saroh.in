@@ -2,8 +2,8 @@
 
 import { Button } from "@saroh/ui/button";
 import { Calendar } from "@saroh/ui/calendar";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useId } from "react";
 
@@ -69,9 +69,9 @@ export function ServiceStep({
                         : "Your services are booked by customers, on your booking page. Tick Your team under Who can book it on a service to book it here."}
                 </p>
                 <Button asChild className="mt-1.5">
-                    <Link href={none ? "/services/new" : "/services"}>
+                    <IntentLink href={none ? "/services/new" : "/services"}>
                         {none ? "Add a service" : "Open Services"}
-                    </Link>
+                    </IntentLink>
                 </Button>
             </div>
         );

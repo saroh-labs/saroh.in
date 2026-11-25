@@ -1,7 +1,7 @@
 "use client";
 
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { NOTIFICATIONS_NAV } from "@/components/shared/navigation/nav-items";
@@ -24,7 +24,7 @@ export function NotificationsLink({ unread }: { unread: number }) {
     const Icon = NOTIFICATIONS_NAV.icon;
     return (
         <Tip label={NOTIFICATIONS_NAV.label}>
-            <Link
+            <IntentLink
                 href={NOTIFICATIONS_NAV.href}
                 aria-label={
                     unread > 0
@@ -47,7 +47,7 @@ export function NotificationsLink({ unread }: { unread: number }) {
                         className="absolute -right-1 -top-1 min-w-[18px] px-1 py-px ring-2 ring-background"
                     />
                 ) : null}
-            </Link>
+            </IntentLink>
         </Tip>
     );
 }

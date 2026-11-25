@@ -1,8 +1,8 @@
 import { formatMoney } from "@/lib/format/money";
 import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Badge } from "@saroh/ui/badge";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ActivityTimeline } from "@/components/crm/activity-timeline";
@@ -137,9 +137,9 @@ export default async function LeadDetailPage({
         <PageContainer>
             <PageHeader
                 breadcrumb={[
-                    <Link data-ph-unmask="" key="leads" href="/leads">
+                    <IntentLink data-ph-unmask="" key="leads" href="/leads">
                         Leads
-                    </Link>,
+                    </IntentLink>,
                     lead.title,
                 ]}
                 holdsData
@@ -147,12 +147,12 @@ export default async function LeadDetailPage({
                 description={
                     lead.contact ? (
                         <>
-                            <Link
+                            <IntentLink
                                 href={personHref(lead.contact.id)}
                                 className="hover:underline"
                             >
                                 {contactName(lead.contact)}
-                            </Link>
+                            </IntentLink>
                             {" · "}
                             {lead.contact.email}
                             {amount ? ` · Worth: ${amount}` : ""}

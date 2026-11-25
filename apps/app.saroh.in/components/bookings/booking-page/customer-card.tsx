@@ -2,10 +2,10 @@
 
 import { Avatar, AvatarFallback, avatarInitials } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { ArrowRight, Mail, Phone, User } from "lucide-react";
-import Link from "next/link";
 import type { CSSProperties } from "react";
 
 import { personHref } from "@/lib/contacts/person-href";
@@ -133,7 +133,7 @@ export function CustomerCard({
             ) : null}
             {contactId ? (
                 <>
-                    <Link
+                    <IntentLink
                         href={personHref(contactId)}
                         data-ph-mask=""
                         className="flex min-h-12 items-center gap-3 text-[14px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring min-[760px]:hidden"
@@ -142,15 +142,18 @@ export function CustomerCard({
                             <ArrowRight aria-hidden className="size-[18px]" />
                         </span>
                         <span className="flex-1">Open {first}&apos;s page</span>
-                    </Link>
+                    </IntentLink>
                     <Button
                         asChild
                         variant="outline"
                         className="mt-2.5 hidden w-full min-[760px]:inline-flex"
                     >
-                        <Link href={personHref(contactId)} data-ph-mask="">
+                        <IntentLink
+                            href={personHref(contactId)}
+                            data-ph-mask=""
+                        >
                             Open {first}&apos;s page
-                        </Link>
+                        </IntentLink>
                     </Button>
                 </>
             ) : null}

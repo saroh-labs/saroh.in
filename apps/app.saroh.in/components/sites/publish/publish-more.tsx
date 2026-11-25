@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IntentLink } from "@saroh/ui/intent-link";
 import { ChevronDown } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
 /** The ways on besides Publish, kept from the editor (DEC-071). */
@@ -97,7 +97,7 @@ function MoreLinks({
                 </Button>
             ) : null}
             <Button asChild variant="link" size="sm" className={link}>
-                <Link href={more.versionsHref}>See versions</Link>
+                <IntentLink href={more.versionsHref}>See versions</IntentLink>
             </Button>
             {more.testLinks ? (
                 <Button

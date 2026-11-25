@@ -7056,6 +7056,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** each message carries the tab's id and the listener drops its own; the switcher no longer refreshes; a switch keeps the cache (keys carry the business). One action POST, no RSC request, 14 API calls on Orders.
 - **Rule:** after a Server Action that sets a cookie or revalidates, don't `router.refresh()`. Tests in `lib/query/broadcast.test.ts` and `query-provider.test.tsx` post as another tab; a same-tab `announce` must not be heard. `docs/patterns/frontend-data-and-state.md`.
 
+## Links on screen cost two Worker requests each (24 Nov 2026)
+
+- **Symptom:** on saroh.io each Home load started ~50 Worker invocations and every page ~37, most of them RSC prefetches; a Products search added 30+.
+- **Cause:** every merchant-app page is dynamic, and a plain `<Link>` prefetches when it is on screen: a route-tree request (`next-router-segment-prefetch: /_tree`) and then the page from its first unshared segment down to `loading.tsx` (that section's layout gates plus the `generateMetadata` business read). The sidebar alone was ~22 of them on every page; a list's tabs and paging links carry `?q=`, so each keystroke prefetched them again.
+- **Fix:** every in-app link is `IntentLink` (`@saroh/ui/intent-link`, moved from `@saroh/marketing`): no prefetch until pointer, touch or focus. A production build now makes 0 prefetches on load for Home, Products, Orders and Customers, and 0 on a search. A cold click paints the new loading state at once, as before.
+- **Rule:** the default import of `next/link` is a lint error in `apps/app.saroh.in` (`eslint.config.mjs`). `docs/patterns/frontend-data-and-state.md` → Links fetch ahead on intent.
+
 ## A save that relied on the server's render left a client-loaded screen stale (25 Nov 2026)
 
 - **Symptom:** after React Query screens moved to loading in the browser (#1475), Track stock on a product page said "Stock is tracked for this product again" and moved to `?tab=stock&sheet=stock`, but the stock sheet never opened (`track-stock.spec.ts`). On a phone, Home's Remind all spec found no bills line.
