@@ -82,6 +82,7 @@ export function RestoreVersion({
                 onRestored();
                 return;
             }
+            // rq-refresh-ok: only a version's own page (not on React Query) restores here; Version history imports this file's words.
             router.refresh();
         });
     }

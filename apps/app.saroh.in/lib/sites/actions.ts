@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrgIfSent } from "@/lib/api/assert-active-org";
+
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 import { listVisitPlaces } from "@/lib/stores/storefronts";
 import { listPlans } from "@/lib/subscriptions/service";
@@ -188,8 +190,10 @@ export async function restorePublication(
     siteId: string,
     publicationId: string,
     override = false,
+    orgId?: string,
 ) {
-    return restorePublicationApi(siteId, publicationId, override);
+    const write = () => restorePublicationApi(siteId, publicationId, override);
+    return writeAsOrgIfSent(orgId, write);
 }
 
 /**
@@ -259,24 +263,42 @@ export async function updateSiteFooter(
     return updateSiteFooterApi(siteId, footer);
 }
 
-export async function createPage(siteId: string, input: CreatePageInput) {
-    return createPageApi(siteId, input);
+export async function createPage(
+    siteId: string,
+    input: CreatePageInput,
+    /** The tab's business, from a React Query screen (DEC-259). */
+    orgId?: string,
+) {
+    const write = () => createPageApi(siteId, input);
+    return writeAsOrgIfSent(orgId, write);
 }
 
 export async function updatePage(
     siteId: string,
     pageId: string,
     input: UpdatePageInput,
+    orgId?: string,
 ) {
-    return updatePageApi(siteId, pageId, input);
+    const write = () => updatePageApi(siteId, pageId, input);
+    return writeAsOrgIfSent(orgId, write);
 }
 
-export async function deletePage(siteId: string, pageId: string) {
-    return deletePageApi(siteId, pageId);
+export async function deletePage(
+    siteId: string,
+    pageId: string,
+    orgId?: string,
+) {
+    const write = () => deletePageApi(siteId, pageId);
+    return writeAsOrgIfSent(orgId, write);
 }
 
-export async function duplicatePage(siteId: string, pageId: string) {
-    return duplicatePageApi(siteId, pageId);
+export async function duplicatePage(
+    siteId: string,
+    pageId: string,
+    orgId?: string,
+) {
+    const write = () => duplicatePageApi(siteId, pageId);
+    return writeAsOrgIfSent(orgId, write);
 }
 
 /** Re-read the site's flags. Called after a save, so the dots settle with it. */
@@ -338,12 +360,19 @@ export async function revokePreviewLink(siteId: string, linkId: string) {
 export async function createSiteRedirect(
     siteId: string,
     input: { fromPath: string; toPath: string },
+    orgId?: string,
 ) {
-    return createSiteRedirectApi(siteId, input);
+    const write = () => createSiteRedirectApi(siteId, input);
+    return writeAsOrgIfSent(orgId, write);
 }
 
-export async function removeSiteRedirect(siteId: string, redirectId: string) {
-    return removeSiteRedirectApi(siteId, redirectId);
+export async function removeSiteRedirect(
+    siteId: string,
+    redirectId: string,
+    orgId?: string,
+) {
+    const write = () => removeSiteRedirectApi(siteId, redirectId);
+    return writeAsOrgIfSent(orgId, write);
 }
 
 /**

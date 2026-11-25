@@ -383,6 +383,42 @@ export async function readServices(): Promise<
     }
 }
 
+/**
+ * The org's services as the site editor's pickers draw them: a light row
+ * each, or why they couldn't be read (`readServices`). The pickers' read
+ * route and `listServicesForPicker` both answer this.
+ */
+export async function readServicesForPicker(): Promise<
+    | {
+          ok: true;
+          services: Pick<
+              Service,
+              | "id"
+              | "name"
+              | "status"
+              | "durationMinutes"
+              | "priceCents"
+              | "currency"
+          >[];
+      }
+    | { ok: false; forbidden: boolean }
+> {
+    const read = await readServices();
+    if (!read.ok) return read;
+    return {
+        ok: true,
+        services: read.services.map((s) => ({
+            id: s.id,
+            name: s.name,
+            status: s.status,
+            // The editor's "From Services" rows (U47) show both.
+            durationMinutes: s.durationMinutes,
+            priceCents: s.priceCents,
+            currency: s.currency,
+        })),
+    };
+}
+
 /** The org's services, newest first (excludes soft-deleted). Empty on failure. */
 export async function listServices(): Promise<Service[]> {
     const base = await orgBase();

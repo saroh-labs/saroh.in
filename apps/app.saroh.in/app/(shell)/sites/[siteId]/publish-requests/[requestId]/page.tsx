@@ -1,19 +1,13 @@
-import { Button } from "@saroh/ui/button";
-import { IntentLink } from "@saroh/ui/intent-link";
-import { Notice } from "@saroh/ui/notice";
-import { PageHeader } from "@saroh/ui/page-header";
-
-import { PageContainer } from "@/components/shared/page/page-container";
-import { PublishRequestScreen } from "@/components/sites/publish-request/publish-request-screen";
+import { PublishRequestContainer } from "@/components/sites/area/site-screens";
 import { requireSession } from "@/lib/session";
-import { readPublishRequest } from "@/lib/sites/publish-requests-api";
 
 /**
  * Where an AI app's publish request is answered (DEC-215 as amended 12 Nov
  * 2026). The app's link opens the business (`/open/:id?to=`) and lands
  * here. Reading never publishes: only the signed-in person's press does.
  * A 403 (no `site:publish`) is the shell's no-access state; a request that
- * isn't this business's or this site's reads as not here.
+ * isn't this business's or this site's reads as not here. On React Query
+ * (DEC-259): read in the browser.
  */
 export const metadata = { title: "Publish request · Website" };
 
@@ -24,45 +18,5 @@ export default async function PublishRequestPage({
 }) {
     const { siteId, requestId } = await params;
     await requireSession();
-    const view = await readPublishRequest(siteId, requestId);
-
-    return (
-        <PageContainer>
-            <PageHeader
-                breadcrumb={[
-                    <IntentLink data-ph-unmask="" key="site" href="/sites">
-                        Website
-                    </IntentLink>,
-                    "Publish request",
-                ]}
-                holdsData
-                title={view ? `Publish ${view.siteName}?` : "Publish request"}
-                description={
-                    view
-                        ? "An AI app prepared this. Only you can publish it."
-                        : undefined
-                }
-            />
-            {view ? (
-                <PublishRequestScreen view={view} requestId={requestId} />
-            ) : (
-                <div className="grid max-w-xl gap-4">
-                    <Notice tone="warning" role="status">
-                        This link doesn&apos;t open a publish request in this
-                        business. It may be for another business, or it was
-                        cleared after a week. Nothing was published.
-                    </Notice>
-                    <Button
-                        asChild
-                        variant="outline"
-                        className="justify-self-start"
-                    >
-                        <IntentLink href="/sites">
-                            Back to the website
-                        </IntentLink>
-                    </Button>
-                </div>
-            )}
-        </PageContainer>
-    );
+    return <PublishRequestContainer siteId={siteId} requestId={requestId} />;
 }

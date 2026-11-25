@@ -15,6 +15,7 @@ import {
     confirmPublishRequest,
     declinePublishRequest,
 } from "@/lib/sites/publish-requests-actions";
+import type { SiteSave } from "@/lib/sites/use-sites";
 
 /**
  * The publish request screen's state and its two answers (DEC-215 as
@@ -23,7 +24,12 @@ import {
  * A refusal the API names (expired, already answered, the draft changed)
  * moves the screen to that state; anything else is said in the foot.
  */
-export function usePublishRequest(view: PublishRequestView, requestId: string) {
+export function usePublishRequest(
+    view: PublishRequestView,
+    requestId: string,
+    /** The answer takes the tab's business; the site's reads go stale after it. */
+    save?: SiteSave,
+) {
     const [answered, setAnswered] = useState<PublishRequestAnswer | null>(null);
     const [refusedWith, setRefusedWith] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -35,13 +41,19 @@ export function usePublishRequest(view: PublishRequestView, requestId: string) {
         const res = await runAction(
             () =>
                 how === "confirm"
-                    ? confirmPublishRequest(view.siteId, requestId)
-                    : declinePublishRequest(view.siteId, requestId),
+                    ? confirmPublishRequest(view.siteId, requestId, save?.orgId)
+                    : declinePublishRequest(
+                          view.siteId,
+                          requestId,
+                          save?.orgId,
+                      ),
             { setBusy: (on) => setBusy(on ? how : null) },
         );
         if (!res) return;
         if (res.ok) {
             setAnswered(res.data);
+            // What went live (or waits for approval) changes the site's status.
+            void save?.saved();
             return;
         }
         if (res.code) setRefusedWith(res.code);

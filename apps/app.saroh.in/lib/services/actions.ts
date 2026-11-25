@@ -11,7 +11,6 @@ import type {
     BookByHandInput,
     BookingOutcome,
     CreateServiceInput,
-    Service,
     Slot,
     UpdateServiceInput,
 } from "./service";
@@ -27,7 +26,7 @@ import {
     keepService as keepServiceApi,
     listAvailability as listAvailabilityApi,
     readReassignCandidates as readReassignCandidatesApi,
-    readServices,
+    readServicesForPicker,
     reassignBooking as reassignBookingApi,
     recordBookingOutcome as recordBookingOutcomeApi,
     replaceRules as replaceRulesApi,
@@ -241,33 +240,6 @@ export async function listAvailability(
  * tells a merchant they have no services, or that chosen ones were deleted,
  * because a read failed.
  */
-export async function listServicesForPicker(): Promise<
-    | {
-          ok: true;
-          services: Pick<
-              Service,
-              | "id"
-              | "name"
-              | "status"
-              | "durationMinutes"
-              | "priceCents"
-              | "currency"
-          >[];
-      }
-    | { ok: false; forbidden: boolean }
-> {
-    const read = await readServices();
-    if (!read.ok) return read;
-    return {
-        ok: true,
-        services: read.services.map((s) => ({
-            id: s.id,
-            name: s.name,
-            status: s.status,
-            // The editor's "From Services" rows (U47) show both.
-            durationMinutes: s.durationMinutes,
-            priceCents: s.priceCents,
-            currency: s.currency,
-        })),
-    };
+export async function listServicesForPicker() {
+    return readServicesForPicker();
 }

@@ -67,6 +67,8 @@ const text = (html: string) =>
         .replace(/&#x27;/g, "'")
         .replace(/\s+/g, " ");
 
+const SAVE = { orgId: "org_1", saved: () => Promise.resolve() };
+
 function render(
     over: Partial<Parameters<typeof SiteVersions>[0]> = {},
 ): string {
@@ -75,6 +77,7 @@ function render(
             siteId="site_1"
             publications={history}
             canRestore
+            save={SAVE}
             {...over}
         />,
     );
@@ -214,6 +217,7 @@ describe("version times in the business's zone (UX-008)", () => {
                 siteId="site_1"
                 publications={[version({ id: "pub_x", publishedAt })]}
                 canRestore
+                save={SAVE}
             />
         );
         return text(

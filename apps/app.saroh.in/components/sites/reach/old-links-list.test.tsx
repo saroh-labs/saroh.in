@@ -42,6 +42,8 @@ const own: SiteRedirect = {
     live: true,
 };
 
+const SAVE = { orgId: "org_1", saved: () => Promise.resolve() };
+
 const render = (redirects: SiteRedirect[] | null, canEdit = true): string =>
     renderToStaticMarkup(
         <OldLinksList
@@ -50,6 +52,8 @@ const render = (redirects: SiteRedirect[] | null, canEdit = true): string =>
             pages={pages}
             redirects={redirects}
             canEdit={canEdit}
+            save={SAVE}
+            onRetry={() => undefined}
         />,
     );
 

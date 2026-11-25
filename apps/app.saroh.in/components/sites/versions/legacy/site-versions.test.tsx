@@ -63,6 +63,8 @@ const text = (html: string) =>
         .replace(/&#x27;/g, "'")
         .replace(/\s+/g, " ");
 
+const SAVE = { orgId: "org_1", saved: () => Promise.resolve() };
+
 function render(
     over: Partial<Parameters<typeof SiteVersions>[0]> = {},
 ): string {
@@ -72,6 +74,7 @@ function render(
             publications={history}
             changesRequested={false}
             canRestore
+            save={SAVE}
             {...over}
         />,
     );

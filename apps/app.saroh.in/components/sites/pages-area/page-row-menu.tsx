@@ -51,8 +51,11 @@ export function PageRowMenu({
     onSettings,
     onChanged,
     onDuplicated,
+    orgId,
 }: {
     siteId: string;
+    /** The tab's business, on a React Query screen (DEC-259). */
+    orgId?: string;
     page: SitePage;
     /** The page's full link; null before the site has an address. */
     url: string | null;
@@ -77,7 +80,9 @@ export function PageRowMenu({
     }
 
     async function duplicate() {
-        const res = await runAction(() => duplicatePage(siteId, page.id));
+        const res = await runAction(() =>
+            duplicatePage(siteId, page.id, orgId),
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
@@ -88,7 +93,7 @@ export function PageRowMenu({
 
     async function hide(hidden: boolean) {
         const res = await runAction(() =>
-            updatePage(siteId, page.id, { hidden }),
+            updatePage(siteId, page.id, { hidden }, orgId),
         );
         if (!res) return;
         if (!res.ok) return showError(res.error);
@@ -101,7 +106,7 @@ export function PageRowMenu({
     }
 
     async function remove() {
-        const res = await deletePage(siteId, page.id);
+        const res = await deletePage(siteId, page.id, orgId);
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Page deleted.");
         onChanged();

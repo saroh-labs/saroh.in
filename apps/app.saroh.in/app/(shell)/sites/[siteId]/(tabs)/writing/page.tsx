@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { SitePostsList } from "@/components/sites/posts/site-posts-list";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import { withQuery } from "@/lib/sites/with-query";
@@ -22,5 +23,11 @@ export default async function SiteWritingPage({
     if (!(await websiteAreaOn())) {
         redirect(withQuery(`/sites/${siteId}/posts`, await searchParams));
     }
-    return <SitePostsList siteId={siteId} />;
+    // The posts load in the browser (DEC-259); the plan's notice is the page's.
+    return (
+        <SitePostsList
+            siteId={siteId}
+            limitNotice={<PlanLimitNotice moduleId="blog" className="mb-4" />}
+        />
+    );
 }

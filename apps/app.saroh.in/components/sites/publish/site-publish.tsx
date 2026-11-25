@@ -10,6 +10,7 @@ import { runAction } from "@/lib/api/run-action";
 import { getReviewState, requestReview } from "@/lib/sites/actions";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import type { ReviewState, SitePage } from "@/lib/sites/service";
+import { useSiteSave } from "@/lib/sites/use-sites";
 import type { WebAddressFix } from "./address-fix";
 import { PublishSheet } from "./publish-sheet";
 import { usePublish } from "./use-publish";
@@ -48,6 +49,7 @@ export function SitePublish({
 }) {
     const router = useRouter();
     const phone = useNarrow();
+    const save = useSiteSave(data.siteId);
     const [review, setReview] = useState<ReviewState | null>(null);
     const refreshReview = async () => {
         setReview(await getReviewState(data.siteId).catch(() => null));
@@ -62,8 +64,8 @@ export function SitePublish({
         refreshReview,
         initialNeedsApproval: data.needsApproval,
         canOverride: data.canOverride,
-        // The header's chip and counts are the server's: read them again.
-        onLiveChanged: () => router.refresh(),
+        // The header's chip, the counts and the tab below: read them again.
+        onLiveChanged: () => void save.saved(),
     });
     const changes = usePublishChanges(data.siteId);
     const home = data.pages.find((p) => p.isHome) ?? data.pages.at(0);

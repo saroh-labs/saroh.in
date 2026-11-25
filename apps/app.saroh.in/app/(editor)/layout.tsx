@@ -4,13 +4,18 @@ import type { ReactNode } from "react";
 import { EditorAskAiProvider } from "@/components/ask-ai/editor-ask-ai";
 import { PlanAccessProvider } from "@/components/billing/plan-way";
 import { ModuleGate } from "@/components/modules/gate/module-gate";
+import { QueryProvider } from "@/components/shared/query/query-provider";
+import { SitesStaleOnLeave } from "@/components/sites/editor/editor-query";
 import { SiteFacesProvider } from "@/components/sites/looks/site-faces";
 import { WebsiteAreaProvider } from "@/components/sites/website-area";
 import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { getAskAiState } from "@/lib/ask-ai/service";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
-import { activeOrganizationOnce } from "@/lib/organizations/service";
+import {
+    activeOrganizationOnce,
+    organizationsOnce,
+} from "@/lib/organizations/service";
 import { activeBusinessTitle } from "@/lib/organizations/tab-title";
 import { SITE_FACES } from "@/lib/sites/site-fonts";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
@@ -44,10 +49,13 @@ export default async function EditorLayout({
     // to another plan only to someone who may and says who can to anyone
     // else (`PlanWay`). A business that couldn't be read says nothing, and
     // the page a link opens decides.
-    const [organization, websiteArea] = await Promise.all([
+    const [organization, websiteArea, organizations] = await Promise.all([
         activeOrganizationOnce().catch(() => undefined),
         // The Website area switch, as the api holds it (DEC-240).
         websiteAreaOn(),
+        // For React Query, as the shell holds it (DEC-259): the editors'
+        // pickers read through it.
+        organizationsOnce().catch(() => []),
     ]);
     // Ask AI, as the shell mounts it (`app-shell.tsx`): the editors' Ask AI
     // buttons open it by event, and without a host here nothing opened.
@@ -80,9 +88,19 @@ export default async function EditorLayout({
         </ModuleGate>
     );
     if (organization === undefined) return editor;
-    return (
+    const planned = (
         <PlanAccessProvider canChangePlan={mayChangePlan(organization)}>
             {editor}
         </PlanAccessProvider>
+    );
+    if (!organization) return planned;
+    // React Query for the editors, as the shell mounts it (DEC-259): one
+    // provider around the mounted editor, which stays one editor across
+    // `?page=`. Leaving marks the Website area's reads stale.
+    return (
+        <QueryProvider orgId={organization.id} organizations={organizations}>
+            <SitesStaleOnLeave />
+            {planned}
+        </QueryProvider>
     );
 }

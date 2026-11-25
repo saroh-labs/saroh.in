@@ -1,21 +1,21 @@
+"use client";
+
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
+import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { IntentLink } from "@saroh/ui/intent-link";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { ListCard, ListRow } from "@saroh/ui/list-card";
 import { NotebookPen } from "lucide-react";
-import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
-import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { activeCut, pausedListWords, postPaused } from "@/lib/billing/paused";
-import type { Post } from "@/lib/content/service";
-import { listPosts } from "@/lib/content/service";
-import { pausedOrNull } from "@/lib/saroh-billing/service";
-import { requireSession } from "@/lib/session";
-import { getSite } from "@/lib/sites/service";
+import { PageLoading } from "@/components/shared/page/page-loading";
+import { pausedListWords } from "@/lib/billing/paused";
+import type { PostRow } from "@/lib/sites/queries";
 import { postUpdatedIso } from "@/lib/sites/updated";
-import { ListCard, ListRow } from "@saroh/ui/list-card";
+import { useSitePosts, whenRefused } from "@/lib/sites/use-sites";
 
 /**
  * What a post's pill says: whether the PUBLIC is being served it (#232).
@@ -24,7 +24,7 @@ import { ListCard, ListRow } from "@saroh/ui/list-card";
  * published copy — decides "Published", and a post marked published with
  * nothing live says so rather than claiming it.
  */
-function postPill(post: Post): {
+function postPill(post: PostRow): {
     label: string;
     variant: "success" | "draft" | "warning" | "neutral";
 } {
@@ -38,28 +38,45 @@ function postPill(post: Post): {
 }
 
 /**
- * A site's posts: the Posts tab, and Writing in the Website area (ADR-004).
+ * A site's posts: the Posts tab, and Writing in the Website area (ADR-004),
+ * on React Query (DEC-259): one `records` read, rows in the list's own
+ * skeleton until it lands; a failure is said in the list's place.
  *
  * Reading it is `site:read`, so everyone who can reach the site can read its
  * posts — a reviewer included, deliberately: the writing is part of what they
  * were asked to look at. Writing it is `section:write`, and the header only
  * offers New post and Categories to someone the server says may (#313).
  */
-export async function SitePostsList({ siteId }: { siteId: string }) {
-    await requireSession();
-    const site = await getSite(siteId);
-    if (!site) notFound();
-
-    const [posts, paused] = await Promise.all([
-        listPosts(siteId),
-        // Past the plan's blog posts limit (#800): marked, and why.
-        pausedOrNull(),
-    ]);
-    const cut = activeCut(paused, "posts");
-    const isPaused = (p: Post) => postPaused(p, cut);
-    const pausedHere = posts.filter(isPaused).length;
+export function SitePostsList({
+    siteId,
+    limitNotice = null,
+}: {
+    siteId: string;
+    /** The plan's Blog limit notice, drawn by the page (a server read). */
+    limitNotice?: ReactNode;
+}) {
+    const read = useSitePosts(siteId);
+    if (read.isError && !read.data) whenRefused(read.error);
+    if (!read.data) {
+        return read.isError ? (
+            <FailedState
+                size="panel"
+                title={couldntLoad("posts")}
+                onRetry={() => void read.refetch()}
+                retrying={read.isFetching}
+            />
+        ) : (
+            <PageLoading
+                shape="rows"
+                width="full"
+                bare
+                label="Loading the posts"
+            />
+        );
+    }
+    const { posts, canEdit, prefix } = read.data;
+    const pausedHere = posts.filter((p) => p.paused).length;
     const base = `/sites/${siteId}/posts`;
-    const prefix = site.postsPrefix ?? "blog";
 
     if (posts.length === 0) {
         return (
@@ -68,7 +85,7 @@ export async function SitePostsList({ siteId }: { siteId: string }) {
                 title="No posts yet"
                 description="Posts are dated and listed newest first, like a journal or news."
                 action={
-                    site.can.edit ? (
+                    canEdit ? (
                         <Button asChild>
                             <IntentLink href={`${base}/new`}>
                                 New post
@@ -87,7 +104,7 @@ export async function SitePostsList({ siteId }: { siteId: string }) {
                     {pausedListWords("post", pausedHere)}
                 </PausedNote>
             ) : null}
-            <PlanLimitNotice moduleId="blog" className="mb-4" />
+            {limitNotice}
             <ListCard
                 main="Post"
                 paged={{ list: "site-posts", things: "posts" }}
@@ -105,7 +122,7 @@ export async function SitePostsList({ siteId }: { siteId: string }) {
                                 href={`${base}/${post.id}`}
                                 // A reader opens the post editor read-only,
                                 // with its notes (DEC-200 U8); the row says so.
-                                aria-label={`${site.can.edit ? "" : "View "}${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
+                                aria-label={`${canEdit ? "" : "View "}${post.title}, ${pill.label.toLowerCase()}${post.paused ? ", paused" : ""}`}
                                 className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
                                 <ListRow
@@ -115,7 +132,7 @@ export async function SitePostsList({ siteId }: { siteId: string }) {
                                             <Badge variant={pill.variant}>
                                                 {pill.label}
                                             </Badge>
-                                            {isPaused(post) ? (
+                                            {post.paused ? (
                                                 <Badge variant="warning">
                                                     Paused
                                                 </Badge>
@@ -145,7 +162,7 @@ export async function SitePostsList({ siteId }: { siteId: string }) {
                                             <ViewerDate
                                                 iso={postUpdatedIso(post)}
                                             />
-                                            {site.can.edit ? null : (
+                                            {canEdit ? null : (
                                                 <span
                                                     data-ph-unmask=""
                                                     className="font-medium text-foreground"

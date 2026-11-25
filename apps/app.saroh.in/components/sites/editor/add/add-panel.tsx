@@ -21,12 +21,12 @@ import {
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import { addBlockGroups } from "@/components/sites/blocks/block-kinds";
 import { BlockThumbnail } from "@/components/sites/blocks/block-thumbnail";
+import { useServicesForPicker } from "@/components/sites/blocks/use-services-for-picker";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import type { PickerReview } from "@/lib/product-reviews/picker-read";
 import { readReviewsForPicker } from "@/lib/product-reviews/picker-read";
-import { listServicesForPicker } from "@/lib/services/actions";
 import type { AddBusinessCounts } from "@/lib/sites/add-business-read";
 import { readAddBusiness } from "@/lib/sites/add-business-read";
 import {
@@ -89,7 +89,19 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
     const [query, setQuery] = useState("");
     const [pageSheet, setPageSheet] = useState<PageStart | null>(null);
     const [picking, setPicking] = useState(false);
-    const [services, setServices] = useState<ServicesRead | null>(null);
+    // The services pickers' one cached read (U33): Add opens from it.
+    const servicesLoad = useServicesForPicker();
+    const services: ServicesRead | null =
+        servicesLoad.status === "loading"
+            ? null
+            : servicesLoad.status === "ready"
+              ? {
+                    ok: true,
+                    services: servicesLoad.services.filter(
+                        (s) => s.status !== "ARCHIVED",
+                    ),
+                }
+              : { ok: false };
     // Storage throws on the server and in a private window: no Recent.
     const [recent] = useState<SectionType[]>(readRecent);
     const [counts, setCounts] = useState<AddBusinessCounts | null>(null);
@@ -112,28 +124,6 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
         readAddBusiness()
             .then((c) => live && setCounts(c))
             .catch(() => undefined);
-        return () => {
-            live = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        let live = true;
-        listServicesForPicker()
-            .then((r) => {
-                if (!live) return;
-                setServices(
-                    r.ok
-                        ? {
-                              ok: true,
-                              services: r.services.filter(
-                                  (s) => s.status !== "ARCHIVED",
-                              ),
-                          }
-                        : { ok: false },
-                );
-            })
-            .catch(() => live && setServices({ ok: false }));
         return () => {
             live = false;
         };

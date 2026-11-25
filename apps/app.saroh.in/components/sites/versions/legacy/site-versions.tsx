@@ -15,7 +15,6 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { CalendarClock, History } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -31,6 +30,7 @@ import {
 import type { SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import type { SiteSave } from "@/lib/sites/use-sites";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { Notice } from "@saroh/ui/notice";
 
@@ -77,6 +77,7 @@ export function SiteVersions({
     needsApproval = false,
     canOverride = false,
     scheduled = null,
+    save,
 }: {
     siteId: string;
     publications: SitePublication[];
@@ -98,9 +99,11 @@ export function SiteVersions({
     /** An owner who can publish: may restore past that setting (Q3). */
     canOverride?: boolean;
     scheduled?: ScheduledGoLives;
+    /** The restore takes the tab's business; the versions read again once it landed. */
+    save: SiteSave;
 }) {
     const zone = useBusinessZone();
-    const router = useRouter();
+    const { saved } = save;
     const [confirming, setConfirming] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const gate = restoreGate({
@@ -129,18 +132,18 @@ export function SiteVersions({
         const override = gate.kind === "override";
         startTransition(async () => {
             const res = await runAction(() =>
-                restorePublication(siteId, publicationId, override),
+                restorePublication(siteId, publicationId, override, save.orgId),
             );
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 // The setting was turned on since this page was read: the
                 // refusal says so, and the page reads it again.
-                if (res.code === "APPROVAL_REQUIRED") router.refresh();
+                if (res.code === "APPROVAL_REQUIRED") await saved();
                 return;
             }
             setConfirming(null);
-            router.refresh();
+            await saved();
             showSuccess(
                 override || res.data.bypassed
                     ? "That version is live again. Going live without approval is recorded in this list."
