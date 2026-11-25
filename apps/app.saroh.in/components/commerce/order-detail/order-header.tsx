@@ -72,6 +72,7 @@ export function OrderHeading({
                     {age === "soon" ? (
                         <span
                             aria-hidden="true"
+                            data-ph-unmask=""
                             className={cn(PILL, "invisible border-transparent")}
                         >
                             Waiting 0 min
