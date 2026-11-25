@@ -13,6 +13,7 @@ import { useId, useState } from "react";
 import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
 import { runAction } from "@/lib/api/run-action";
 import { createLead } from "@/lib/leads/actions";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { phoneProblem } from "@/lib/organizations/business-phone";
 import { Field } from "@saroh/ui/field";
 import { FormSheet } from "@saroh/ui/form-sheet";
@@ -67,6 +68,7 @@ export function AddLeadDialog({
     size?: "default" | "sm";
 }) {
     const router = useRouter();
+    const save = useLeadsSave();
     const [open, setOpen] = useState(false);
     const [who, setWho] = useState<"known" | "new">(
         contacts.length > 0 ? "known" : "new",
@@ -119,27 +121,30 @@ export function AddLeadDialog({
         const [firstName, ...rest] = name.trim().split(/\s+/);
         const res = await runAction(
             () =>
-                createLead({
-                    title: title.trim(),
-                    ...(stage ? { stageId: stage } : {}),
-                    ...(worth.trim()
-                        ? { value: Math.round(Number(worth.trim()) * 100) }
-                        : {}),
-                    ...(who === "known"
-                        ? { contactId }
-                        : {
-                              contact: {
-                                  email: email.trim(),
-                                  ...(firstName ? { firstName } : {}),
-                                  ...(rest.length
-                                      ? { lastName: rest.join(" ") }
-                                      : {}),
-                                  ...(phone.trim()
-                                      ? { phone: phone.trim() }
-                                      : {}),
-                              },
-                          }),
-                }),
+                createLead(
+                    {
+                        title: title.trim(),
+                        ...(stage ? { stageId: stage } : {}),
+                        ...(worth.trim()
+                            ? { value: Math.round(Number(worth.trim()) * 100) }
+                            : {}),
+                        ...(who === "known"
+                            ? { contactId }
+                            : {
+                                  contact: {
+                                      email: email.trim(),
+                                      ...(firstName ? { firstName } : {}),
+                                      ...(rest.length
+                                          ? { lastName: rest.join(" ") }
+                                          : {}),
+                                      ...(phone.trim()
+                                          ? { phone: phone.trim() }
+                                          : {}),
+                                  },
+                              }),
+                    },
+                    save.orgId,
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -156,8 +161,8 @@ export function AddLeadDialog({
             label: "Open lead",
             onClick: () => router.push(`/leads/${id}`),
         });
-        // rq-refresh-ok: shared with a server-rendered list; on a customer's page it also redraws the tabs drawn there (Leads, Courses, packs, plans) and hydrates the customer read again (until U19/U20 and their units).
-        router.refresh();
+        // The list, the board or their Leads tab reads it.
+        void save.saved();
     }
 
     return (

@@ -6,13 +6,13 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { CalendarCheck } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { completeTask } from "@/lib/leads/actions";
 import type { OpenTask } from "@/lib/leads/service";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { ListCard, ListRow } from "@saroh/ui/list-card";
 
@@ -31,7 +31,7 @@ export function FollowUpsList({
     /** Lead titles and who they are for, by id, to name each task's lead. */
     leads: Record<string, { title: string; who: string | null }>;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const [busy, setBusy] = useState<string | null>(null);
     // Read once, when the list is drawn: "overdue" is a judgement about the
     // moment the page loaded, and refreshing re-draws it.
@@ -41,7 +41,7 @@ export function FollowUpsList({
         return (
             <FailedState
                 title={couldntLoad("follow-ups")}
-                onRetry={() => router.refresh()}
+                onRetry={() => void save.saved()}
             />
         );
     }
@@ -56,13 +56,14 @@ export function FollowUpsList({
     }
 
     async function done(task: OpenTask) {
-        const res = await runAction(() => completeTask(task.leadId, task.id), {
-            setBusy: (on) => setBusy(on ? task.id : null),
-        });
+        const res = await runAction(
+            () => completeTask(task.leadId, task.id, save.orgId),
+            { setBusy: (on) => setBusy(on ? task.id : null) },
+        );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess("Follow-up completed.");
-        router.refresh();
+        void save.saved();
     }
 
     return (

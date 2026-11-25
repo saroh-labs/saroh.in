@@ -4,6 +4,7 @@
  * dashed card of "nothing here yet" or the red one of a failed read, and a
  * lead's write controls are drawn only for someone who may use them.
  */
+import { QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,9 +54,16 @@ import { ModuleGate } from "@/components/modules/gate/module-gate";
 import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
 import { postParagraphs } from "@/lib/content/plain-text";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
 
+// Inside React Query and a business, as the shell draws them (DEC-259).
 const text = (node: React.ReactNode) =>
-    renderToStaticMarkup(<>{node}</>)
+    renderToStaticMarkup(
+        <QueryClientProvider client={makeTestClient()}>
+            <OrgProvider orgId="org_1">{node}</OrgProvider>
+        </QueryClientProvider>,
+    )
         .replace(/&#x27;/g, "'")
         .replace(/&amp;/g, "&");
 

@@ -6,11 +6,11 @@ import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { PenLine } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { updateLead } from "@/lib/leads/actions";
+import { useLeadsSave } from "@/lib/leads/use-leads";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
@@ -31,7 +31,7 @@ export function EditLeadDialog({
     /** The business's currency: what a lead's Worth is in (owner, 11 Oct). */
     currency: string;
 }) {
-    const router = useRouter();
+    const save = useLeadsSave();
     const [open, setOpen] = useState(false);
     const [nextTitle, setNextTitle] = useState(title);
     const [worth, setWorth] = useState(
@@ -59,19 +59,23 @@ export function EditLeadDialog({
         setError(null);
         const res = await runAction(
             () =>
-                updateLead(leadId, {
-                    title: nextTitle.trim(),
-                    ...(worth.trim()
-                        ? { value: Math.round(Number(worth.trim()) * 100) }
-                        : {}),
-                }),
+                updateLead(
+                    leadId,
+                    {
+                        title: nextTitle.trim(),
+                        ...(worth.trim()
+                            ? { value: Math.round(Number(worth.trim()) * 100) }
+                            : {}),
+                    },
+                    save.orgId,
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;
         if (!res.ok) return showError(res.error);
         setOpen(false);
         showSuccess("Lead saved.");
-        router.refresh();
+        void save.saved();
     }
 
     return (

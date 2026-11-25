@@ -1,6 +1,7 @@
 import type { CrmResult } from "@/lib/api/http";
 import { forbidden } from "next/navigation";
 
+import { ApiError } from "@/lib/api/errors";
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 import type { EnquiryEntry } from "@/lib/crm/enquiries";
 
@@ -89,7 +90,10 @@ export interface UpdateLeadInput {
     value?: number;
 }
 
-/** The org's leads (newest first), optionally filtered. Empty on any failure. */
+/**
+ * The org's leads (newest first), optionally filtered. A failed read
+ * throws, never an empty list (a read route answers it 503).
+ */
 export async function listLeads(filter?: {
     pipelineId?: string;
     stageId?: string;
@@ -105,16 +109,22 @@ export async function listLeads(filter?: {
     // "You do not have access", never "Leads appear here as enquiries come
     // in" beside an Add a lead it can't use. Outside any try, so it lands.
     if (res.status === 403) forbidden();
-    if (!res.ok) return [];
+    if (!res.ok) throw new ApiError(res.status, "GET leads");
     return (await res.json()) as LeadListItem[];
 }
 
-/** A lead + contact + pipeline stages + activity timeline, or null. */
+/**
+ * A lead + contact + pipeline stages + activity timeline; null when there is
+ * no such lead here (a 404). A role refused is `forbidden()`; any other
+ * failure throws, so "missing" and "couldn't be read" stay apart.
+ */
 export async function getLead(leadId: string): Promise<LeadDetail | null> {
     const base = await orgBase();
     if (!base) return null;
-    const res = await apiFetch(`${base}/leads/${leadId}`);
-    if (!res.ok) return null;
+    const res = await apiFetch(`${base}/leads/${encodeURIComponent(leadId)}`);
+    if (res.status === 404) return null;
+    if (res.status === 403) forbidden();
+    if (!res.ok) throw new ApiError(res.status, "GET lead");
     return (await res.json()) as LeadDetail;
 }
 

@@ -77,7 +77,7 @@ export function ExtendDialog({
         }
         showSuccess(extendedToast(target.name, res.data.expiresAt, timeZone));
         onClose();
-        // rq-refresh-ok: shared with a server-rendered list; on a customer's page it also redraws the tabs drawn there (Leads, Courses, packs, plans) and hydrates the customer read again (until U19/U20 and their units).
+        // rq-refresh-ok: shared with a server-rendered list; on a customer's page it also redraws the tabs still drawn there (Courses, packs, plans) and hydrates the customer read again (until their units).
         router.refresh();
     }
 
