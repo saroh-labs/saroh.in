@@ -135,6 +135,8 @@ export default async function BookingsPage() {
                     can={can}
                     me={me}
                     initialStaff={who === EVERYONE ? null : who}
+                    zone={timezone}
+                    now={readNow()}
                 />
             </div>
         </PageContainer>

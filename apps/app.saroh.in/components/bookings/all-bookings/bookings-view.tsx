@@ -12,6 +12,10 @@ import { useMemo, useRef, useState } from "react";
 import { TakePayment } from "@/components/bookings/booking-page/take-payment";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
 import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
+import {
     PendingRegion,
     useScreenGo,
 } from "@/components/shared/page/screen-pending";
@@ -116,7 +120,7 @@ const EMPTY_LINE =
     "They show here when a customer books from your booking page, or when you add one.";
 
 export function BookingsView({
-    bookings,
+    bookings: read,
     timezone,
     now,
     initialView,
@@ -127,7 +131,11 @@ export function BookingsView({
     showCancelled = false,
     initialStaff = null,
 }: {
-    bookings: DiaryBooking[];
+    /**
+     * Null until the first read lands: the controls are here and work,
+     * the rows are skeletons, the counts wait (owner, 25 Nov).
+     */
+    bookings: DiaryBooking[] | null;
     /** The business's zone: every time is read in it (Q10). */
     timezone: string;
     /** The server's now, so the first render and the browser agree. */
@@ -151,6 +159,8 @@ export function BookingsView({
     /** "Show bookings for" opens on this person (Just me, or the last pick). */
     initialStaff?: string | null;
 }) {
+    const loading = read === null;
+    const bookings = read ?? NO_BOOKINGS;
     const go = useScreenGo();
     const { save, saved } = useBookingSave();
     const [view, setViewState] = useState<ViewId>(() => readView(initialView));
@@ -392,7 +402,7 @@ export function BookingsView({
         );
     };
 
-    if (bookings.length === 0 && !dates.date) {
+    if (!loading && bookings.length === 0 && !dates.date) {
         return (
             <EmptyState
                 icon={<CalendarDays />}
@@ -411,7 +421,7 @@ export function BookingsView({
                 <div className="flex items-center gap-2 max-[759px]:flex-wrap">
                     <ShowingPicker
                         view={view}
-                        counts={counts}
+                        counts={loading ? null : counts}
                         onChange={setView}
                     />
                     <SearchToggle
@@ -431,7 +441,7 @@ export function BookingsView({
                         services={choices.services}
                         staff={choices.staff}
                         me={me}
-                        showing={shown.length}
+                        showing={loading ? null : shown.length}
                         narrowedBy={narrowedBy}
                         viewLabel={viewLabel}
                         onClear={() => {
@@ -470,16 +480,27 @@ export function BookingsView({
                             Clear all
                         </Button>
                         <span aria-hidden>·</span>
-                        <span className="tabular-nums">
-                            {shown.length} of {bookings.length} shown
-                        </span>
+                        {loading ? (
+                            <FigureLoading />
+                        ) : (
+                            <span className="tabular-nums">
+                                {shown.length} of {bookings.length} shown
+                            </span>
+                        )}
                     </div>
                 ) : null}
             </div>
 
             {/* A date range is read for those days: the rows grey until it lands. */}
             <PendingRegion>
-                {shown.length === 0 ? (
+                {loading ? (
+                    <PageLoading
+                        bare
+                        width="full"
+                        shape="rows"
+                        label="Loading bookings"
+                    />
+                ) : shown.length === 0 ? (
                     searching || filtering ? (
                         <EmptyState
                             kind="no-results"
@@ -626,6 +647,8 @@ export function BookingsView({
         </div>
     );
 }
+
+const NO_BOOKINGS: DiaryBooking[] = [];
 
 /**
  * The register couldn't be read: said, with Try again, never "No bookings
