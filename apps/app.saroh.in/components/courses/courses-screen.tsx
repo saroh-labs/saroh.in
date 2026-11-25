@@ -13,6 +13,10 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import type { CourseTab } from "@/lib/courses/seats";
 import {
     courseTab,
@@ -66,7 +70,8 @@ export function CoursesScreen({
      * business; null when it couldn't be told, which draws nothing.
      */
     missingRates?: MissingRates | null;
-    courses: Course[];
+    /** Null until the list's read lands: the frame stands, the rows wait. */
+    courses: Course[] | null;
     canWrite: boolean;
     initialFilterId?: string;
 }) {
@@ -132,10 +137,16 @@ export function CoursesScreen({
             <PageHeader
                 breadcrumb={["Bookings", "Courses"]}
                 title="Courses"
-                count={countLabel(courses.length, {
-                    one: "course",
-                    other: "courses",
-                })}
+                count={
+                    courses ? (
+                        countLabel(courses.length, {
+                            one: "course",
+                            other: "courses",
+                        })
+                    ) : (
+                        <FigureLoading />
+                    )
+                }
                 className="mb-0"
                 actions={
                     canWrite ? (
@@ -152,7 +163,16 @@ export function CoursesScreen({
             <MissingRatesNotice missing={missingRates} />
             <DataView
                 viewId="courses"
-                rows={courses}
+                rows={courses ?? []}
+                isLoading={!courses}
+                loading={
+                    <PageLoading
+                        bare
+                        width="full"
+                        shape="rows"
+                        label="Loading courses"
+                    />
+                }
                 columns={columns}
                 rowKey={(c) => c.id}
                 rowHref={(c) => `/courses/${c.id}`}
