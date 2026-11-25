@@ -8,8 +8,6 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { listBusinessStores } from "@/lib/stores/service";
 
-import Loading from "./loading";
-
 /**
  * Sell → Customers (DEC-041, round 2 C4): the business's customers — everyone
  * who has paid or signs in on its website — keyed on the contact and read a
@@ -30,7 +28,8 @@ import Loading from "./loading";
  * storefronts (Add customer, Import) are the page's; the page of the list
  * as the address asks (`/api/customers`) and the open requests
  * (`/api/customers/requests`) are the containers' queries, read from the
- * browser behind the route's loader, and every later one in place.
+ * browser into the frame drawn at once (rows as skeletons), and every
+ * later one in place.
  */
 export const metadata = { title: "Customers" };
 
@@ -68,7 +67,6 @@ export default async function CustomersPage({
     if (canRemove && params.tab === "requests") {
         return (
             <RequestsContainer
-                skeleton={<Loading />}
                 heading={<ListHeading count={null} />}
                 canRemove={canRemove}
             />
@@ -83,7 +81,6 @@ export default async function CustomersPage({
 
     return (
         <CustomersContainer
-            skeleton={<Loading />}
             defaultSize={defaultSize}
             actions={organization.actions ?? null}
             canRemove={canRemove}

@@ -275,6 +275,17 @@ export function allowedQuery(
     };
 }
 
+/**
+ * Before the first page is read: the chips and sorts this viewer may use,
+ * as the API will answer them (a chip's count comes with the page).
+ */
+export function chipsAllowed(may: (action: string) => boolean): CustomerChip[] {
+    return CUSTOMER_CHIPS.filter((c) => CHIP_NEEDS[c].every(may));
+}
+export function sortsAllowed(may: (action: string) => boolean): CustomerSort[] {
+    return CUSTOMER_SORTS.filter((s) => SORT_NEEDS[s].every(may));
+}
+
 /** Whether anything narrows the list (for which empty state to show). */
 export function isNarrowed(query: ListQuery): boolean {
     return query.q.length > 0 || query.chip !== "all" || query.store !== null;

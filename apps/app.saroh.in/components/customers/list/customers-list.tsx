@@ -1,5 +1,9 @@
 "use client";
 
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { IntentLink } from "@saroh/ui/intent-link";
@@ -45,11 +49,15 @@ export function CustomersList({
     tabs = null,
     banner = null,
     pending = false,
+    may,
 }: {
+    /** What the viewer may ask, for the controls before the first page. */
+    may?: (action: string) => boolean;
     /** The page asked for is on its way: the last rows stay, greyed. */
     pending?: boolean;
     query: ListQuery;
-    page: CustomersPage;
+    /** Null until the first page is read: the frame, rows as skeletons. */
+    page: CustomersPage | null;
     /** The business's open storefronts, for Add customer and Import. */
     stores: { id: string; name: string }[];
     /** How many contacts, for the first-run state; `null` if unknown. */
@@ -91,13 +99,40 @@ export function CustomersList({
     const heading = (
         <>
             <ListHeading
-                count={page.everyone > 0 ? customersText(page.everyone) : null}
+                count={
+                    !page ? (
+                        <FigureLoading />
+                    ) : page.everyone > 0 ? (
+                        customersText(page.everyone)
+                    ) : null
+                }
                 actions={actions}
             />
             {tabs ? <div className="mb-4">{tabs}</div> : null}
             {banner}
         </>
     );
+    if (!page) {
+        return (
+            <div>
+                {heading}
+                <Filters
+                    query={query}
+                    page={null}
+                    go={go}
+                    may={may}
+                    stores={stores}
+                />
+                <PageLoading
+                    bare
+                    width="full"
+                    shape="rows"
+                    label="Loading customers"
+                />
+            </div>
+        );
+    }
+
     const notice = (
         <UnlinkedNotice
             count={page.unlinkedPaying}

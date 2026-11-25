@@ -16,8 +16,8 @@ export function CustomersTabs({
     openRequests,
 }: {
     active: CustomersTab;
-    /** Open requests; null when unknown. */
-    openRequests: number | null;
+    /** Open requests; null when unknown, undefined while being read. */
+    openRequests: number | null | undefined;
 }) {
     return (
         <TabStrip
