@@ -63,7 +63,21 @@ test.describe("Calendar | List", () => {
         page,
     }) => {
         await page.goto("/bookings?layout=week");
-        await expect(page.getByRole("link", { name: "Today" })).toBeVisible();
+        if (onPhone()) {
+            // On a phone Today shows only away from today (critique, 25 Nov).
+            await expect(page.getByRole("link", { name: "Today" })).toHaveCount(
+                0,
+            );
+            await expect(
+                page.getByRole("button", {
+                    name: /Change the day or the view$/,
+                }),
+            ).toContainText("Week");
+        } else {
+            await expect(
+                page.getByRole("link", { name: "Today" }),
+            ).toBeVisible();
+        }
         const sheet = page.getByRole("dialog", { name: "Go to a day" });
         await pressUntil(
             page.getByRole("button", { name: /Change the day or the view$/ }),
@@ -151,7 +165,18 @@ test.describe("the list's header", () => {
         await expect(page.getByPlaceholder("Search bookings")).toHaveCount(0);
         await page.getByRole("button", { name: "Search bookings" }).click();
         await expect(page.getByPlaceholder("Search bookings")).toBeVisible();
-        await expect(page.getByText(/^Times in \w+$/)).toBeVisible();
+        if (onPhone()) {
+            // The phone's header is Calendar | List and "…": the zone is
+            // said in the "…" sheet (critique, 25 Nov).
+            const sheet = page.getByRole("dialog", { name: "This list" });
+            await pressUntil(
+                page.getByRole("button", { name: /^This list:/ }),
+                sheet,
+            );
+            await expect(sheet.getByText(/^Times in \w+$/)).toBeVisible();
+        } else {
+            await expect(page.getByText(/^Times in \w+$/)).toBeVisible();
+        }
         await expect(page.getByText(/\d+ in all$/)).toHaveCount(0);
     });
 });
