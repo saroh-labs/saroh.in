@@ -1,7 +1,6 @@
 "use server";
 
 import { writeAsOrg } from "@/lib/api/assert-active-org";
-import { revalidatePath } from "next/cache";
 
 import type { UpdateContactInput } from "./service";
 import {
@@ -34,13 +33,9 @@ export async function removalPreviewAction(contactId: string) {
 /**
  * Remove their details for a privacy request (C11). `customer:remove` is
  * enforced by the API. As the tab's business (`writeAsOrg`, DEC-259):
- * Customers reads itself again; the Contacts list, still server-rendered,
- * is revalidated.
+ * nothing revalidated; Customers reads itself again and marks Contacts
+ * stale (`customersSaved`).
  */
 export async function removeDetailsAction(contactId: string, orgId: string) {
-    return writeAsOrg(orgId, async () => {
-        const result = await removeDetails(contactId);
-        if (result.ok) revalidatePath("/contacts");
-        return result;
-    });
+    return writeAsOrg(orgId, () => removeDetails(contactId));
 }
