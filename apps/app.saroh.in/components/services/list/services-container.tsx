@@ -36,6 +36,7 @@ export function ServicesContainer({ canEdit }: { canEdit: boolean }) {
                 breadcrumb={BREADCRUMB}
                 title="Services"
                 description={DESCRIPTION}
+                holdsData={false}
             />
         );
         if (query.isError) {
