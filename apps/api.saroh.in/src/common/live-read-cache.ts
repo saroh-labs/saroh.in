@@ -19,10 +19,14 @@
  * - **Bounded.** At most `maxKeys` answers; past that the oldest goes. A
  *   caller choosing the key (a timetable's `?services=`) cannot grow it.
  * - **Per process**, like the rate limiter: two API replicas keep two.
+ * - **`forget` retires answers a write changed**, and a read already under
+ *   way when it is called is not kept (it may have read before the write).
  */
 export class LiveReadCache<T> {
     private readonly kept = new Map<string, { value: T; at: number }>();
     private readonly flying = new Map<string, Promise<T>>();
+    /** Bumped by `forget`: a read that started before it isn't kept. */
+    private epoch = 0;
 
     constructor(
         readonly ttlMs = 30_000,
@@ -47,13 +51,17 @@ export class LiveReadCache<T> {
         const flying = this.flying.get(key);
         if (flying) return flying;
 
-        const read = (async () => {
+        const epoch = this.epoch;
+        // `let`: compared in `finally`, which a load that throws at once
+        // reaches before this is assigned.
+        let read: Promise<T> | undefined = undefined;
+        read = (async () => {
             try {
                 const value = await load();
-                this.keep(key, value, now);
+                if (this.epoch === epoch) this.keep(key, value, now);
                 return value;
             } finally {
-                this.flying.delete(key);
+                if (this.flying.get(key) === read) this.flying.delete(key);
             }
         })();
         this.flying.set(key, read);
@@ -73,7 +81,17 @@ export class LiveReadCache<T> {
 
     /** Forget everything (tests, and a process that wants a clean start). */
     clear(): void {
-        this.kept.clear();
+        this.forget("");
+    }
+
+    /** Forget every answer whose key starts with `prefix` (a write changed it). */
+    forget(prefix: string): void {
+        this.epoch += 1;
+        for (const map of [this.kept, this.flying]) {
+            for (const key of [...map.keys()]) {
+                if (key.startsWith(prefix)) map.delete(key);
+            }
+        }
     }
 
     private keep(key: string, value: T, at: number): void {

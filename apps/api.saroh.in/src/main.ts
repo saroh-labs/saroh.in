@@ -46,6 +46,7 @@ import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
 import { ApiKeyGuard } from "./modules/api-keys/api-key.guard";
+import { modulesCacheMiddleware } from "./modules/capabilities/modules-cache.middleware";
 import {
     META_WEBHOOK_PATH,
     metaWebhookBody,
@@ -128,6 +129,9 @@ async function bootstrap() {
     // Runs first so every request (incl. the mounted Better Auth handler) gets
     // a correlation id and its logs/error envelope can be traced.
     app.use(correlationIdMiddleware);
+
+    // A write forgets the module lists it may have changed (60 s cache).
+    app.use(modulesCacheMiddleware);
 
     // Global's addresses only for the saroh.tech sites' key holders until it
     // opens (GLOBAL_API_ACCESS_KEY, owner 16 Nov 2026).
