@@ -5,14 +5,11 @@ import type { MeetSetup } from "@/components/services/service-fields/where-field
 import type { PlanLock } from "@/lib/billing/access";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { PriceHistoryPage } from "@/lib/price-history/words";
+import type { ServicePerson } from "@/lib/services/queries";
 import type { AvailabilityRule, Service } from "@/lib/services/service";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { ShareSetup } from "@/lib/share-item/share";
-import type {
-    BookingPaymentView,
-    StaffView,
-    WeeklyRange,
-} from "@/lib/staff/types";
+import type { BookingPaymentView, WeeklyRange } from "@/lib/staff/types";
 
 /** What the Service Editor is handed, new or saved. */
 export interface EditorProps {
@@ -37,7 +34,7 @@ export interface EditorProps {
     /** Null when the service's own hours couldn't be read. */
     rules: AvailabilityRule[] | null;
     /** Null when the people on the diary couldn't be read. */
-    staff: StaffView[] | null;
+    staff: ServicePerson[] | null;
     /** Null when the bookings couldn't be counted. */
     usage: ServiceUsage | null;
     /** The business's currency. */

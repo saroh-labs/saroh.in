@@ -12,10 +12,10 @@ import type { ReactNode } from "react";
 import { useId } from "react";
 
 import { Face } from "@/components/bookings/availability/face";
+import type { ServicePerson } from "@/lib/services/queries";
 import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
 import type { ServiceKind } from "@/lib/services/service-editor";
 import { sameNameLine } from "@/lib/services/service-form";
-import type { StaffView } from "@/lib/staff/types";
 import { CheckRow } from "@saroh/ui/check-row";
 import { FailedRead } from "@saroh/ui/failed-read";
 
@@ -201,9 +201,9 @@ export function WhoDoesItQuestion({
     people,
 }: Edit & {
     /** Null when the people on the diary couldn't be read. */
-    staff: StaffView[] | null;
+    staff: ServicePerson[] | null;
     /** The active ones, who can do it. */
-    people: readonly StaffView[];
+    people: readonly ServicePerson[];
 }) {
     const id = useId();
     const error = problem("staffIds");
@@ -297,8 +297,8 @@ export function FiveQuestions({
     hidden: boolean;
     taken: { id: string; name: string } | null;
     currency: string;
-    staff: StaffView[] | null;
-    people: readonly StaffView[];
+    staff: ServicePerson[] | null;
+    people: readonly ServicePerson[];
 }) {
     const { draft, set, problem, leave } = edit;
     return (

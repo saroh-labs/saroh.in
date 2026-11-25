@@ -21,10 +21,17 @@ import type { AnchorHTMLAttributes } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
+import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { QueryClient } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+
 import { FACT_DOT } from "@/lib/format/join";
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
 import type { BookingLinkView } from "@/lib/services/booking-link";
+import { servicesKeys } from "@/lib/services/queries";
 import type { Service } from "@/lib/services/service";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
@@ -145,6 +152,13 @@ const FOUR = [BOTH, CUSTOMERS, TEAM, NEITHER];
 
 let root: Root;
 let host: HTMLDivElement;
+let client: QueryClient;
+let invalidated: MockInstance<QueryClient["invalidateQueries"]>;
+/** Services read again once after a save: what `router.refresh()` was. */
+const readAgain = () =>
+    expect(invalidated).toHaveBeenCalledWith({
+        queryKey: servicesKeys("org_1"),
+    });
 
 beforeEach(() => {
     (
@@ -153,6 +167,8 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
+    client = makeTestClient();
+    invalidated = vi.spyOn(client, "invalidateQueries");
     for (const fn of [
         ...Object.values(api),
         ...Object.values(toast),
@@ -196,18 +212,22 @@ function show({
 }: Shown = {}) {
     act(() =>
         root.render(
-            <ServicesScreen
-                services={services}
-                staff={staff}
-                usage={usage}
-                currency="INR"
-                canEdit={canEdit}
-                hasPage={hasPage}
-                payment={payment}
-                alsoSell={[]}
-                canNewCourse={canNewCourse}
-                bookingLink={bookingLink}
-            />,
+            <QueryClientProvider client={client}>
+                <OrgProvider orgId="org_1">
+                    <ServicesScreen
+                        services={services}
+                        staff={staff}
+                        usage={usage}
+                        currency="INR"
+                        canEdit={canEdit}
+                        hasPage={hasPage}
+                        payment={payment}
+                        alsoSell={[]}
+                        canNewCourse={canNewCourse}
+                        bookingLink={bookingLink}
+                    />
+                </OrgProvider>
+            </QueryClientProvider>,
         ),
     );
 }
@@ -422,10 +442,14 @@ describe("Taking bookings is a switch with Undo", () => {
     it("pauses at once: unticks both boxes, says so, offers Undo, asks nothing", async () => {
         show();
         await flip("Physio assessment");
-        expect(api.updateService).toHaveBeenCalledWith("sv_1", {
-            showOnBookingPage: false,
-            bookableByTeam: false,
-        });
+        expect(api.updateService).toHaveBeenCalledWith(
+            "sv_1",
+            {
+                showOnBookingPage: false,
+                bookableByTeam: false,
+            },
+            "org_1",
+        );
         expect(host.querySelector('[role="alertdialog"]')).toBeNull();
         for (const size of ["desk", "phone"] as const) {
             expect(checked("Physio assessment", size)).toBe("false");
@@ -433,7 +457,7 @@ describe("Taking bookings is a switch with Undo", () => {
                 "Paused",
             );
         }
-        expect(router.refresh).toHaveBeenCalled();
+        readAgain();
         expect(toast.showUndo.mock.calls[0]?.[0]).toBe(
             "Physio assessment paused. Nobody can book it, and bookings already made stay.",
         );
@@ -442,10 +466,14 @@ describe("Taking bookings is a switch with Undo", () => {
     it("Undo puts back exactly the boxes it had", async () => {
         show();
         await flip("Online review call", "phone");
-        expect(api.updateService).toHaveBeenCalledWith("sv_3", {
-            showOnBookingPage: false,
-            bookableByTeam: false,
-        });
+        expect(api.updateService).toHaveBeenCalledWith(
+            "sv_3",
+            {
+                showOnBookingPage: false,
+                bookableByTeam: false,
+            },
+            "org_1",
+        );
         const undo = toast.showUndo.mock.calls[0]?.[1] as () => Promise<{
             ok: boolean;
         }>;
@@ -455,9 +483,13 @@ describe("Taking bookings is a switch with Undo", () => {
         });
         expect(result?.ok).toBe(true);
         // Team only again: only the team's box comes back.
-        expect(api.updateService).toHaveBeenLastCalledWith("sv_3", {
-            bookableByTeam: true,
-        });
+        expect(api.updateService).toHaveBeenLastCalledWith(
+            "sv_3",
+            {
+                bookableByTeam: true,
+            },
+            "org_1",
+        );
         expect(checked("Online review call", "phone")).toBe("true");
         expect(rowOf("Online review call", "phone").textContent).toContain(
             "Team only",
@@ -467,11 +499,15 @@ describe("Taking bookings is a switch with Undo", () => {
     it("takes bookings again by ticking both boxes", async () => {
         show();
         await flip("Hip and back rehab");
-        expect(api.updateService).toHaveBeenCalledWith("sv_4", {
-            status: "ACTIVE",
-            showOnBookingPage: true,
-            bookableByTeam: true,
-        });
+        expect(api.updateService).toHaveBeenCalledWith(
+            "sv_4",
+            {
+                status: "ACTIVE",
+                showOnBookingPage: true,
+                bookableByTeam: true,
+            },
+            "org_1",
+        );
         expect(toast.showUndo.mock.calls[0]?.[0]).toBe(
             "Hip and back rehab is taking bookings again.",
         );
@@ -632,11 +668,11 @@ describe("a trade starter's samples (DEC-189)", () => {
         show({ services: SAMPLES });
         act(() => keepOf("Hair spa", "desk")?.click());
         await settle();
-        expect(api.keepService).toHaveBeenCalledWith("sv_s2");
+        expect(api.keepService).toHaveBeenCalledWith("sv_s2", "org_1");
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Hair spa kept. It's on your booking page now.",
         );
-        expect(router.refresh).toHaveBeenCalled();
+        readAgain();
     });
 
     it("Keep all keeps every one; a refusal is said", async () => {

@@ -2,7 +2,6 @@
 
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -16,6 +15,7 @@ import {
 } from "@/lib/services/service-cards";
 import type { Bookers } from "@/lib/services/service-form";
 import { bookersPatch, bookersToast } from "@/lib/services/service-form";
+import { useServiceSave } from "@/lib/services/use-services";
 
 /** How a caller draws a write: a change to the fields it shows now. */
 export type OnSet = (change: (now: WhoFields) => WhoFields) => void;
@@ -38,7 +38,7 @@ export type OnSet = (change: (now: WhoFields) => WhoFields) => void;
  * its Undo.
  */
 export function useTakingBookings() {
-    const router = useRouter();
+    const { orgId, saved } = useServiceSave();
     const [busy, setBusy] = useState<string | null>(null);
     const lastUndo = useRef<ToastId | null>(null);
 
@@ -57,26 +57,29 @@ export function useTakingBookings() {
         // Only the fields this write changes, and what they were.
         const back = whoPatch(next, was);
         onSet((now) => ({ ...now, ...whoPatch(was, next) }));
-        const res = await runAction(() => updateService(service.id, patch), {
-            setBusy: (on) => setBusy(on ? service.id : null),
-        });
+        const res = await runAction(
+            () => updateService(service.id, patch, orgId),
+            {
+                setBusy: (on) => setBusy(on ? service.id : null),
+            },
+        );
         if (!res?.ok) {
             // Drawn before its save: put it back.
             onSet((now) => ({ ...now, ...back }));
             if (res) showError(res.error);
             return;
         }
-        router.refresh();
+        void saved();
         if (lastUndo.current !== null) dismissToast(lastUndo.current);
         lastUndo.current = showUndo(said, async () => {
             const undone = await runAction(
-                () => updateService(service.id, back),
+                () => updateService(service.id, back, orgId),
                 { quiet: true },
             );
             if (!undone) return { ok: false, error: UNREACHED };
             if (undone.ok) {
                 onSet((now) => ({ ...now, ...back }));
-                router.refresh();
+                void saved();
             }
             return undone;
         });
