@@ -359,6 +359,29 @@ export class InvoiceSendService {
     }
 
     /**
+     * The send flag of many invoices, as {@link readFor} reads each one's,
+     * in a few batched reads (Home's Send reminder rows). A missing or
+     * another business's invoice is absent.
+     */
+    async sendFlagsFor(
+        organizationId: string,
+        invoiceIds: readonly string[],
+        now = new Date(),
+    ): Promise<Map<string, InvoiceSendView>> {
+        const rows = await prisma.invoice.findMany({
+            where: { id: { in: [...invoiceIds] }, organizationId },
+            select: SEND_SELECT,
+        });
+        const reaches = await this.channelsForMany(
+            prisma,
+            organizationId,
+            rows,
+            now,
+        );
+        return new Map([...reaches].map(([id, reach]) => [id, reach.send]));
+    }
+
+    /**
      * How this invoice can reach its customer now (DEC-173): the send flag,
      * whether an email can go and why not, and the phone WhatsApp would
      * open. Email can go when the business's provider is connected, there

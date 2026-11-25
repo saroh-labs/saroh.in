@@ -73,4 +73,25 @@ describe("LiveReadCache.secondsLeft", () => {
         expect(cache.secondsLeft("a", 22_500)).toBe(17);
         expect(cache.secondsLeft("a", 40_000)).toBe(0);
     });
+
+    it("forgets a prefix's answers, and doesn't keep a read that was under way when it did", async () => {
+        const cache = new LiveReadCache<number>();
+        await cache.get("org_a|x", async () => 1, 0);
+        await cache.get("org_b|x", async () => 2, 0);
+        cache.forget("org_a|");
+        expect(await cache.get("org_a|x", async () => 10, 1)).toBe(10);
+        expect(await cache.get("org_b|x", async () => 20, 1)).toBe(2);
+
+        let finish: (n: number) => void = () => {};
+        const slow = cache.get(
+            "org_c|x",
+            () => new Promise<number>((resolve) => (finish = resolve)),
+            2,
+        );
+        cache.forget("org_c|");
+        finish(3);
+        expect(await slow).toBe(3);
+        // The read that straddled the write isn't kept.
+        expect(await cache.get("org_c|x", async () => 4, 3)).toBe(4);
+    });
 });
