@@ -88,7 +88,7 @@ export function paidWords(
     if (b.paidWith === "DESK") {
         if (state === "in" && b.take) {
             const due = formatMoney(b.take.cents, b.service.currency ?? null);
-            return `${BOOKING_WORDS.paysAtVisit} · ${due} to take now`;
+            return `${due} · ${BOOKING_WORDS.awaitingPayment}`;
         }
         // The one payment word (DEC-257), as the block and the list say it.
         return price

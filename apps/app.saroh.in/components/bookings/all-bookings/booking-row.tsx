@@ -208,7 +208,7 @@ export function BookingRow({
                 >
                     {who}
                 </button>
-                <span className="block truncate text-[12.5px] text-muted-foreground min-[760px]:text-[13.5px]">
+                <span className="block text-[12.5px] text-muted-foreground min-[760px]:truncate min-[760px]:text-[13.5px]">
                     {what}
                 </span>
             </span>

@@ -224,9 +224,8 @@ export function useCalendarDays({
         booked: countBlocks(live),
         free: freeCount,
         money:
-            value !== null && currencyCode
-                ? formatMoney(value, currencyCode)
-                : null,
+            // "₹0 booked" says nothing: only a figure there is.
+            value && currencyCode ? formatMoney(value, currencyCode) : null,
         cancelledShown: cancelledShown ? cancelledCount : 0,
     });
 

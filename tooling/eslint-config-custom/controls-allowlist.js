@@ -104,8 +104,6 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/week-blocks.tsx": ["button"],
     // button: a row that is one button (a free time, a booking)
     "components/bookings/calendar/week-day-rows.tsx": ["button"],
-    // button: a calendar cell (the week strip)
-    "components/bookings/calendar/week-phone.tsx": ["button"],
     // button: a calendar cell
     "components/calendar/month-grid.tsx": ["button"],
     // button: the filter chip, a chip, a row that is one button (a person,

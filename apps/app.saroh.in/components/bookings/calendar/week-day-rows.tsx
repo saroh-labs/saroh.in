@@ -30,9 +30,11 @@ export function FreeRow({
 }) {
     const body = (
         <>
-            <span className="w-[76px] shrink-0 whitespace-nowrap text-[14px] font-bold tabular-nums">
+            {/* Lined up with a booking's line: its time, then its bar's room. */}
+            <span className="w-16 shrink-0 whitespace-nowrap text-[14px] font-bold tabular-nums">
                 {formatClock(free[0])}
             </span>
+            <span aria-hidden className="w-1 shrink-0" />
             <span className="min-w-0 flex-1">
                 Free · {firstName(column.name)} until {formatClock(free[1])}
             </span>

@@ -339,7 +339,9 @@ export function CalendarHeader({
         // row too), then the date naming its view, Today when away from
         // today, whose bookings with the summary, and the week strip.
         return (
-            <div data-calendar-header="" className="relative mb-3">
+            // `contents`: the sticky Calendar | List row sticks across the
+            // whole screen, not only while this header is in view.
+            <div data-calendar-header="" className="contents">
                 <BookingsPhoneBar current="calendar" options={options} />
                 <div className="flex min-w-0 items-center gap-2 pt-1">
                     <h1 className="m-0 flex min-w-0 flex-1">
@@ -434,6 +436,7 @@ export function CalendarHeader({
                     </p>
                 ) : null}
                 {newBooking}
+                <span aria-hidden className="block h-3" />
             </div>
         );
     }

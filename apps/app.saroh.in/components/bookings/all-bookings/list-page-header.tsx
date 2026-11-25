@@ -32,12 +32,14 @@ export function ListPageHeader({
     const options = <ListOptions opens={opens} me={me} zone={zone} />;
     if (phone) {
         return (
-            <div data-list-header="" className="mb-3">
+            // `contents`: the sticky row sticks across the whole page.
+            <div data-list-header="" className="contents">
                 <h1 data-ph-unmask="" className="sr-only">
                     All bookings
                 </h1>
                 <BookingsPhoneBar current="list" options={options} />
                 {newBooking}
+                <span aria-hidden className="block h-3" />
             </div>
         );
     }

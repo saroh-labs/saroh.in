@@ -448,7 +448,7 @@ describe.each([
         await press("Mark Kabir arrived");
         expect(act$.checkIn).toHaveBeenCalledOnce();
         expect(text()).toContain("Came");
-        expect(text()).toContain("Pays at the visit · ₹500 to take now");
+        expect(text()).toContain("₹500 · Awaiting payment");
         expect(button("Take ₹500")).toBeDefined();
         expect(text()).toContain("Book their next visit?");
         expect(button(/Move or cancel/)).toBeUndefined();
