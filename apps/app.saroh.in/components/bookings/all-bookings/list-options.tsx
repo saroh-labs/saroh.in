@@ -14,8 +14,8 @@ import { callName } from "@/lib/services/call-name";
 /**
  * The "…" of the List (BKVKept: "kept in both views, in the same place"):
  * the calendar's own sheet with the same items, Show cancelled bookings
- * (here: each day's fold open), Hours and time off, Start Bookings on, Show
- * bookings for, and what the colours mean. Being drawn also keeps List as
+ * (here: each day's fold open), Hours and time off, Start Bookings on and
+ * Show bookings for; no colour key, as the List draws no diary colours. Being drawn also keeps List as
  * the view Bookings was left on, for "Where I left it" on this device.
  */
 export function ListOptions({
@@ -52,7 +52,7 @@ export function ListOptions({
                     type="button"
                     variant="outline"
                     size="icon"
-                    aria-label="This list: show cancelled, hours, start on, colours"
+                    aria-label="This list: show cancelled, hours, start on"
                     className="shrink-0 max-[759px]:size-11 max-[759px]:rounded-full"
                 >
                     <MoreHorizontal aria-hidden className="size-[18px]" />
@@ -69,6 +69,8 @@ export function ListOptions({
                 href: "/bookings/availability",
                 label: "Hours and time off",
             }}
+            // The List draws no diary colours (critique, 25 Nov).
+            colours={false}
             start={opens.start}
             onStart={(start) => void change({ start })}
             showFor={opens.showFor}

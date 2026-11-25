@@ -29,7 +29,12 @@ const STEP_SMALL =
 /** The eyebrow over each part: the `.label` utility. */
 const LABEL = "label";
 const HELP = "mt-1.5 text-[12.5px] leading-normal text-muted-foreground";
-const VIEW_NAME = { day: "Day", week: "Week", list: "Agenda" } as const;
+const VIEW_NAME = {
+    day: "Day",
+    week: "Week",
+    list: "Agenda",
+    register: "List",
+} as const;
 
 /**
  * "Go to a day" (U2; BKMBookingsDayMonthSheet, BKDCalendarDay's date
@@ -82,6 +87,7 @@ export function DateSheet({
             title="Go to a day"
             subtitle={title}
             width={372}
+            half
             footer={
                 <Button
                     variant="outline"

@@ -13,6 +13,7 @@ import {
 } from "@saroh/ui/sheet";
 import { X } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
+import { useRef, useState } from "react";
 
 import { usePhone } from "./use-phone";
 
@@ -39,6 +40,7 @@ export function HeaderOverlay({
     footer,
     width,
     align = "start",
+    half = false,
     children,
 }: {
     open: boolean;
@@ -52,13 +54,26 @@ export function HeaderOverlay({
     /** The popover's width on the desk, in px (the boards': 360–380). */
     width: number;
     align?: "start" | "end";
+    /**
+     * On a phone, open half way (BKVCalendarBPhone's Vaul drawers): the
+     * handle drags (or a tap on it moves) to the full height and back,
+     * and down from half closes it. The foot stays pinned either way.
+     */
+    half?: boolean;
     children: ReactNode;
 }) {
     const phone = usePhone();
+    const [full, setFull] = useState(false);
+    const dragFrom = useRef<number | null>(null);
+    // Every opening starts at half again.
+    const change = (o: boolean) => {
+        if (!o) setFull(false);
+        onOpenChange(o);
+    };
 
     if (phone) {
         return (
-            <Sheet open={open} onOpenChange={onOpenChange}>
+            <Sheet open={open} onOpenChange={change}>
                 <SheetTrigger asChild>{trigger}</SheetTrigger>
                 <SheetContent
                     side="bottom"
@@ -66,12 +81,45 @@ export function HeaderOverlay({
                     data-header-sheet=""
                     // No line under the title: Radix is told there is none.
                     {...(subtitle ? {} : { "aria-describedby": undefined })}
-                    className="flex max-h-[calc(100dvh-40px)] flex-col gap-0 rounded-t-[18px] border-0 bg-card p-0 shadow-xl"
+                    data-snap={half ? (full ? "full" : "half") : undefined}
+                    className={cn(
+                        "flex max-h-[calc(100dvh-40px)] flex-col gap-0 rounded-t-[18px] border-0 bg-card p-0 shadow-xl",
+                        half &&
+                            "transition-[max-height,height] duration-base ease-out motion-reduce:transition-none",
+                        half &&
+                            (full ? "h-[calc(100dvh-40px)]" : "max-h-[55dvh]"),
+                    )}
                 >
-                    <span
-                        aria-hidden
-                        className="mx-auto mt-2 h-[5px] w-10 shrink-0 rounded-full bg-border"
-                    />
+                    {half ? (
+                        <button
+                            type="button"
+                            data-snap-handle=""
+                            aria-label={full ? "Show less" : "Show all"}
+                            onClick={() => setFull((f) => !f)}
+                            onPointerDown={(e) => {
+                                dragFrom.current = e.clientY;
+                            }}
+                            onPointerUp={(e) => {
+                                const from = dragFrom.current;
+                                dragFrom.current = null;
+                                if (from === null) return;
+                                const moved = e.clientY - from;
+                                if (moved < -24) setFull(true);
+                                else if (moved > 24) {
+                                    if (full) setFull(false);
+                                    else change(false);
+                                }
+                            }}
+                            className="mx-auto flex h-6 w-16 shrink-0 cursor-grab touch-none items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <span className="h-[5px] w-10 rounded-full bg-border" />
+                        </button>
+                    ) : (
+                        <span
+                            aria-hidden
+                            className="mx-auto mt-2 h-[5px] w-10 shrink-0 rounded-full bg-border"
+                        />
+                    )}
                     <div className="relative shrink-0 py-3 pl-5 pr-[60px]">
                         <SheetTitle className="text-[18px] leading-tight">
                             {title}

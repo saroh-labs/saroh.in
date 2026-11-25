@@ -235,7 +235,7 @@ test.describe("bookings calendar", () => {
         await expect(page.getByText(/Customers can book/)).toHaveCount(0);
     });
 
-    test("the … sheet holds cancelled, hours and what the colours mean; All bookings is List", async ({
+    test("the … sheet holds cancelled, All bookings, hours, the colours and your settings as rows", async ({
         page,
     }) => {
         await signIn(page);
@@ -251,15 +251,22 @@ test.describe("bookings calendar", () => {
         await expect(
             sheet.getByRole("switch", { name: "Show cancelled bookings" }),
         ).toBeVisible();
+        // Back in the sheet (owner, 22 Nov).
         await expect(
             sheet.getByRole("link", { name: "All bookings" }),
-        ).toHaveCount(0);
+        ).toBeVisible();
         // "Hours and time off" for Everyone, "Meera's hours and time off"
         // for one person.
         await expect(
             sheet.getByRole("link", { name: /hours and time off$/i }),
         ).toBeVisible();
-        await expect(sheet.getByText("What the colours mean")).toBeVisible();
+        await expect(
+            sheet.getByRole("button", { name: "What the colours mean" }),
+        ).toBeVisible();
+        // A setting is a row that says its value and opens its choices.
+        await sheet
+            .getByRole("button", { name: /^Start Bookings on: .+\. Change$/ })
+            .click();
         await expect(
             sheet.getByRole("radiogroup", { name: "Start Bookings on" }),
         ).toBeVisible();
@@ -268,7 +275,7 @@ test.describe("bookings calendar", () => {
         await expect(
             page
                 .getByRole("status")
-                .filter({ hasText: /booked/ })
+                .filter({ hasText: /session|booked/ })
                 .first(),
         ).toBeVisible();
     });

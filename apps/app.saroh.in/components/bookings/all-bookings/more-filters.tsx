@@ -155,6 +155,7 @@ export function BookingFilters({
             open={open}
             onOpenChange={setOpen}
             width={360}
+            half
             align="end"
             title="Filters"
             subtitle={`Showing: ${viewLabel}. Sort, dates, who, service, status`}

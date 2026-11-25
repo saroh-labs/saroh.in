@@ -2,8 +2,22 @@
 
 import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
-import { ChevronRight, Clock, Eye, Globe } from "lucide-react";
+import {
+    CalendarDays,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    Eye,
+    Globe,
+    LayoutGrid,
+    Link2,
+    List,
+    Play,
+    UserRound,
+    Users,
+} from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
+import { useState } from "react";
 
 import { GOOGLE_CALENDAR_HREF } from "@/lib/google-calendar/words";
 import type { ShowFor, StartView } from "@/lib/services/bookings-opens";
@@ -40,14 +54,24 @@ const STARTS: readonly { value: StartView; label: string; sub: string }[] = [
         label: "Agenda",
         sub: "Always opens on the day as a list of times",
     },
+    {
+        value: "register",
+        label: "List",
+        sub: "Always opens on the list of every booking",
+    },
 ];
 
+/** Where the sheet is: its rows, or one of the choices a row opens. */
+type Page = "main" | "start" | "showFor" | "busy" | "connected" | "colours";
+
 /**
- * The "…" options of the view (U2; the "This day" sheet of BKMBookingsDay,
- * BKDCalendarDay's ⋯ popover): show cancelled bookings, Hours and time off
- * (All bookings is the List of the header's Calendar | List switch), where Bookings starts and whose bookings it opens
- * on, and what the colours mean. The calendar's old row of extras (the
- * cancelled toggle, the colour key, the links) live here now.
+ * The "…" options of the view (U2; BKVCalendarBPhone's "…" panel,
+ * BKDCalendarDay's ⋯ popover), the same on Calendar and List: this view
+ * first (show cancelled bookings, All bookings on the Calendar, Hours and
+ * time off, Google busy times, what the colours mean on the Calendar),
+ * then your settings as rows that show what each is set to and open its
+ * choices (Start Bookings on, Show bookings for). A row's choices open in
+ * the same sheet, with Back.
  */
 export function OptionsSheet({
     open,
@@ -57,6 +81,8 @@ export function OptionsSheet({
     summary,
     cancelled,
     hours,
+    listHref,
+    colours = true,
     start,
     onStart,
     showFor,
@@ -80,6 +106,10 @@ export function OptionsSheet({
     };
     /** Hours and time off: "Meera's hours and time off" for one person. */
     hours: { href: string; label: string };
+    /** All bookings, the List (owner, 22 Nov): on the Calendar's sheet. */
+    listHref?: string;
+    /** What the colours mean: the Calendar's; the List has no colours. */
+    colours?: boolean;
     start: StartView;
     onStart: (start: StartView) => void;
     showFor: ShowFor;
@@ -109,6 +139,7 @@ export function OptionsSheet({
 }) {
     const phone = usePhone();
     const tap = phone ? "Tap" : "Click";
+    const [page, setPage] = useState<Page>("main");
     const opens: { value: ShowFor; label: string; sub: string }[] = [
         {
             value: "last",
@@ -131,18 +162,100 @@ export function OptionsSheet({
             : []),
     ];
     const close = () => onOpenChange(false);
+    const back = () => setPage("main");
+    const change = (o: boolean) => {
+        if (!o) setPage("main");
+        onOpenChange(o);
+    };
 
-    return (
-        <HeaderOverlay
-            open={open}
-            onOpenChange={onOpenChange}
-            trigger={trigger}
-            title={title}
-            subtitle={typeof summary === "string" ? summary : undefined}
-            width={380}
-            align="end"
-        >
-            <div className="max-[759px]:pb-6">
+    const sub = (label: string, body: ReactNode, line?: string): ReactNode => (
+        <div data-options-page={page}>
+            <button type="button" onClick={back} className={LINK_ROW}>
+                <span className={ICON}>
+                    <ChevronLeft aria-hidden />
+                </span>
+                <span className="flex-1">Back</span>
+            </button>
+            <div data-ph-unmask="" className={cn(LABEL, "mt-3")}>
+                {label}
+            </div>
+            {line ? (
+                <p className="m-0 mt-0.5 text-[12.5px] text-muted-foreground">
+                    {line}
+                </p>
+            ) : null}
+            {body}
+        </div>
+    );
+
+    const pick =
+        <V extends string>(on: (v: V) => void) =>
+        (v: V) => {
+            on(v);
+            back();
+        };
+
+    let body: ReactNode;
+    if (page === "start") {
+        body = sub(
+            "Start Bookings on",
+            <Choices
+                label="Start Bookings on"
+                value={start}
+                options={STARTS}
+                onChange={pick(onStart)}
+                className="mt-1.5"
+            />,
+        );
+    } else if (page === "showFor") {
+        body = sub(
+            "Show bookings for",
+            <Choices
+                label="Show bookings for"
+                value={showFor}
+                options={opens}
+                onChange={pick(onShowFor)}
+                className="mt-1.5"
+            />,
+        );
+    } else if (page === "busy" && google) {
+        body = sub(
+            "Whose busy times",
+            <Choices
+                label="Whose busy times"
+                value={google.show === "mine" ? "mine" : "all"}
+                options={[
+                    {
+                        value: "all",
+                        label: "Everyone's",
+                        sub: "Everyone's Google busy times on the diary",
+                    },
+                    {
+                        value: "mine",
+                        label: "Just mine",
+                        sub: "Only your own Google busy times",
+                    },
+                ]}
+                onChange={pick((v: "all" | "mine") => google.onChange(v))}
+                className="mt-1.5"
+            />,
+        );
+    } else if (page === "connected" && google) {
+        body = sub(
+            "Who's connected",
+            <Connected google={google} />,
+            "Connecting is each person's own, in Settings.",
+        );
+    } else if (page === "colours") {
+        body = sub(
+            "What the colours mean",
+            <ColourKey tap={tap} phone={phone} />,
+        );
+    } else {
+        const startNow = STARTS.find((o) => o.value === start)?.label ?? "";
+        const showNow = opens.find((o) => o.value === showFor)?.label ?? "";
+        body = (
+            <>
                 {zone && phone ? (
                     <p
                         data-zone-line=""
@@ -172,6 +285,19 @@ export function OptionsSheet({
                         </span>
                     </SwitchRow>
                 </div>
+                {listHref ? (
+                    <IntentLink
+                        href={listHref}
+                        className={LINK_ROW}
+                        onClick={close}
+                    >
+                        <span className={ICON}>
+                            <List aria-hidden />
+                        </span>
+                        <span className="flex-1">All bookings</span>
+                        <ChevronRight aria-hidden className={CHEVRON} />
+                    </IntentLink>
+                ) : null}
                 <IntentLink
                     href={hours.href}
                     className={LINK_ROW}
@@ -181,67 +307,91 @@ export function OptionsSheet({
                         <Clock aria-hidden />
                     </span>
                     <span className="flex-1">{hours.label}</span>
-                    <ChevronRight
-                        aria-hidden
-                        className="size-3.5 text-muted-foreground max-[759px]:size-4"
-                    />
+                    <ChevronRight aria-hidden className={CHEVRON} />
                 </IntentLink>
 
-                {google ? <GoogleLayer google={google} /> : null}
+                {google ? (
+                    <GoogleRows google={google} onOpen={setPage} />
+                ) : null}
 
-                <Choices
-                    label="Start Bookings on"
-                    value={start}
-                    options={STARTS}
-                    onChange={onStart}
-                    className="mt-3 max-[759px]:mt-3.5"
-                />
-                <Choices
-                    label="Show bookings for"
-                    value={showFor}
-                    options={opens}
-                    onChange={onShowFor}
-                    className="mt-3.5"
-                />
+                {colours ? (
+                    <PageRow
+                        icon={<LayoutGrid aria-hidden />}
+                        label="What the colours mean"
+                        onOpen={() => setPage("colours")}
+                    />
+                ) : null}
 
                 <div data-ph-unmask="" className={cn(LABEL, "mt-3.5")}>
-                    What the colours mean
+                    Your settings
                 </div>
-                <ul className="mt-1.5 grid gap-0.5 max-[759px]:mt-0 max-[759px]:gap-0">
-                    <Key swatch="bg-diary-one" name="A booking for one person">
-                        {tap} it to see who, mark them arrived or take payment.
-                    </Key>
-                    <Key swatch="bg-diary-class" name="A group class">
-                        Shows how many places are booked.
-                    </Key>
-                    <Key
-                        swatch="border-[1.5px] border-dashed border-success bg-success-subtle"
-                        name="Free time"
-                    >
-                        {tap} it to book someone in
-                        {phone ? "." : ", or block it."}
-                    </Key>
-                    <Key
-                        swatch={cn(
-                            "border border-border bg-card",
-                            CLOSED_HATCH,
-                        )}
-                        name="Closed"
-                    >
-                        Outside their hours. {tap} it to open it for bookings.
-                    </Key>
-                    <Key
-                        swatch={cn("border border-border bg-card", OFF_HATCH)}
-                        name="Time off"
-                    >
-                        Nobody can book them then.
-                    </Key>
-                    <Key swatch="!h-0.5 bg-destructive" name="Now">
-                        The red line on today.
-                    </Key>
-                </ul>
-            </div>
+                <PageRow
+                    icon={<Play aria-hidden />}
+                    label="Start Bookings on"
+                    value={startNow}
+                    onOpen={() => setPage("start")}
+                />
+                <PageRow
+                    icon={<UserRound aria-hidden />}
+                    label="Show bookings for"
+                    value={showNow}
+                    onOpen={() => setPage("showFor")}
+                />
+            </>
+        );
+    }
+
+    return (
+        <HeaderOverlay
+            open={open}
+            onOpenChange={change}
+            trigger={trigger}
+            title={title}
+            subtitle={typeof summary === "string" ? summary : undefined}
+            width={380}
+            align="end"
+            half
+        >
+            <div className="max-[759px]:pb-6">{body}</div>
         </HeaderOverlay>
+    );
+}
+
+const CHEVRON = "size-3.5 text-muted-foreground max-[759px]:size-4";
+
+/** A row that opens its choices in the sheet, saying what it is set to. */
+function PageRow({
+    icon,
+    label,
+    value,
+    onOpen,
+}: {
+    icon: ReactNode;
+    label: string;
+    /** What it is set to now: "Where I left it". */
+    value?: string;
+    onOpen: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            aria-label={value ? `${label}: ${value}. Change` : label}
+            className={LINK_ROW}
+        >
+            <span className={ICON}>{icon}</span>
+            <span className="min-w-0 flex-1">
+                <span data-ph-unmask="" className="block">
+                    {label}
+                </span>
+                {value ? (
+                    <span className="block text-[12px] font-normal text-muted-foreground max-[759px]:text-[12.5px]">
+                        {value}
+                    </span>
+                ) : null}
+            </span>
+            <ChevronRight aria-hidden className={CHEVRON} />
+        </button>
     );
 }
 
@@ -308,6 +458,42 @@ function Key({
     );
 }
 
+/** What the colours mean, one swatch a line (the Calendar's only). */
+function ColourKey({ tap, phone }: { tap: string; phone: boolean }) {
+    return (
+        <ul className="mt-1.5 grid gap-0.5 max-[759px]:mt-0 max-[759px]:gap-0">
+            <Key swatch="bg-diary-one" name="A booking for one person">
+                {tap} it to see who, mark them arrived or take payment.
+            </Key>
+            <Key swatch="bg-diary-class" name="A group class">
+                Shows how many places are booked.
+            </Key>
+            <Key
+                swatch="border-[1.5px] border-dashed border-success bg-success-subtle"
+                name="Free time"
+            >
+                {tap} it to book someone in
+                {phone ? "." : ", or block it."}
+            </Key>
+            <Key
+                swatch={cn("border border-border bg-card", CLOSED_HATCH)}
+                name="Closed"
+            >
+                Outside their hours. {tap} it to open it for bookings.
+            </Key>
+            <Key
+                swatch={cn("border border-border bg-card", OFF_HATCH)}
+                name="Time off"
+            >
+                Nobody can book them then.
+            </Key>
+            <Key swatch="!h-0.5 bg-destructive" name="Now">
+                The red line on today.
+            </Key>
+        </ul>
+    );
+}
+
 const STATE_WORDS = {
     CONNECTED: "Connected",
     LAPSED: "Needs reconnecting",
@@ -315,24 +501,32 @@ const STATE_WORDS = {
     NONE: "Not connected",
 } as const;
 
+type Google = NonNullable<Parameters<typeof OptionsSheet>[0]["google"]>;
+
 /**
- * What to show › Google busy times, and Who's connected (BKVGoogle). Busy
- * times are drawn as busy only, never what the event is. Everyone on the
- * diary can see who has connected; connecting is each person's own, in
- * Settings.
+ * What to show › Google busy times, Whose busy times and Who's connected
+ * (BKVGoogle): the layer is a switch; the other two are rows that say how
+ * they stand and open their page. Busy times are drawn as busy only, never
+ * what the event is.
  */
-function GoogleLayer({
+function GoogleRows({
     google,
+    onOpen,
 }: {
-    google: NonNullable<Parameters<typeof OptionsSheet>[0]["google"]>;
+    google: Google;
+    onOpen: (page: Page) => void;
 }) {
     const on = google.show !== "off";
+    const connected = google.team.filter((p) => p.state === "CONNECTED").length;
     return (
         <div data-google-layer="" className="mt-3.5">
             <div data-ph-unmask="" className={LABEL}>
                 What to show
             </div>
             <div className={ROW}>
+                <span className={ICON}>
+                    <CalendarDays aria-hidden />
+                </span>
                 <SwitchRow
                     checked={on}
                     onChange={(next) => google.onChange(next ? "all" : "off")}
@@ -353,22 +547,27 @@ function GoogleLayer({
                 </SwitchRow>
             </div>
             {on && google.mine ? (
-                <RadioCards
+                <PageRow
+                    icon={<Users aria-hidden />}
                     label="Whose busy times"
-                    value={google.show === "mine" ? "mine" : "all"}
-                    onChange={(v) => google.onChange(v)}
-                    options={[
-                        { value: "all", label: "Everyone's" },
-                        { value: "mine", label: "Just mine" },
-                    ]}
-                    className="mt-1.5 gap-1.5"
-                    rowClassName="min-h-11 gap-3 rounded-[10px] px-3 text-[13.5px] font-semibold has-[[data-state=checked]]:shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
+                    value={google.show === "mine" ? "Just mine" : "Everyone's"}
+                    onOpen={() => onOpen("busy")}
                 />
             ) : null}
+            <PageRow
+                icon={<Link2 aria-hidden />}
+                label="Who's connected"
+                value={`${connected} of ${google.team.length} connected`}
+                onOpen={() => onOpen("connected")}
+            />
+        </div>
+    );
+}
 
-            <div data-ph-unmask="" className={cn(LABEL, "mt-3.5")}>
-                Who&apos;s connected
-            </div>
+/** Who on the diary has connected Google Calendar, and where to connect. */
+function Connected({ google }: { google: Google }) {
+    return (
+        <>
             <ul className="mt-1.5 grid gap-0.5">
                 {google.team.map((p) => (
                     <li
@@ -400,11 +599,8 @@ function GoogleLayer({
                 <span data-ph-unmask="" className="flex-1">
                     Open Settings › Integrations › Google Calendar
                 </span>
-                <ChevronRight
-                    aria-hidden
-                    className="size-3.5 text-muted-foreground max-[759px]:size-4"
-                />
+                <ChevronRight aria-hidden className={CHEVRON} />
             </IntentLink>
-        </div>
+        </>
     );
 }

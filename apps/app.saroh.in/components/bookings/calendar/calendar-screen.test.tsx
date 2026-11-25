@@ -317,7 +317,10 @@ describe("the colours", () => {
         expect(host.querySelector('ul[aria-label="Key"]')).toBeNull();
         openOptions();
         const sheet = document.querySelector("[data-header-popover]");
-        expect(sheet?.textContent).toContain("What the colours mean");
+        const row = Array.from(sheet?.querySelectorAll("button") ?? []).find(
+            (b) => b.textContent === "What the colours mean",
+        );
+        act(() => row?.click());
         for (const name of [
             "A booking for one person",
             "A group class",

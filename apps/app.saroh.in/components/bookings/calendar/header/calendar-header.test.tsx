@@ -450,6 +450,7 @@ describe("Google busy times in the ⋯ sheet (BKVGoogle)", () => {
             }),
         });
         openOpts();
+        click(button(/^Who's connected: 0 of 3 connected\. Change$/));
         expect(popover()?.textContent).toContain(
             "Paused: your plan's calendar connections are used up",
         );
@@ -472,15 +473,16 @@ describe("Google busy times in the ⋯ sheet (BKVGoogle)", () => {
         expect(pop?.textContent).toContain(
             "Shown as busy, never what the event is",
         );
-        expect(pop?.textContent).toContain("Who's connected");
-        expect(pop?.textContent).toContain("You, Meera Iyer");
-        expect(pop?.textContent).toContain("Connected");
-        expect(pop?.textContent).toContain(
+        // One row that says how many, opening who.
+        click(button(/^Who's connected: 1 of 3 connected\. Change$/));
+        expect(popover()?.textContent).toContain("You, Meera Iyer");
+        expect(popover()?.textContent).toContain("Connected");
+        expect(popover()?.textContent).toContain(
             "Needs reconnecting · only they can",
         );
-        expect(pop?.textContent).toContain("Not connected");
+        expect(popover()?.textContent).toContain("Not connected");
         expect(
-            pop?.querySelector(
+            popover()?.querySelector(
                 'a[href="/settings/integrations/google-calendar"]',
             ),
         ).not.toBeNull();
@@ -496,36 +498,68 @@ describe("Google busy times in the ⋯ sheet (BKVGoogle)", () => {
         // The cancelled switch is first; Google's is second.
         click(switches[1]);
         expect(g.onChange).toHaveBeenCalledWith("off");
-        expect(
-            popover()?.querySelector(
-                '[role="radiogroup"][aria-label="Whose busy times"]',
-            ),
-        ).not.toBeNull();
+        click(button(/^Whose busy times: Everyone's\. Change$/));
+        click(
+            popover()?.querySelectorAll(
+                '[role="radiogroup"][aria-label="Whose busy times"] [role="radio"]',
+            )[1],
+        );
+        expect(g.onChange).toHaveBeenCalledWith("mine");
     });
 });
 
 describe("the ⋯ options", () => {
     const openOpts = () => click(button(/^This day:/));
+    /** A row that opens its choices: "Start Bookings on: Where I left it. Change". */
+    const openRow = (name: RegExp) =>
+        click(
+            Array.from(
+                popover()?.querySelectorAll<HTMLButtonElement>("button") ?? [],
+            ).find((b) => name.test(b.getAttribute("aria-label") ?? "")),
+        );
+    const radiosOf = (label: string) =>
+        Array.from(
+            popover()?.querySelectorAll(
+                `[role="radiogroup"][aria-label="${label}"] [role="radio"]`,
+            ) ?? [],
+        );
 
-    it("hold cancelled, hours, start on, show for and the colours; All bookings is the List switch now", () => {
+    it("holds this day, then your settings as rows saying how each is set", () => {
         draw({ picked: "arjun" });
         openOpts();
         const pop = popover();
         expect(pop?.textContent).toContain("This day");
         expect(pop?.textContent).toContain("1 cancelled today");
-        expect(pop?.querySelector('a[href="/bookings/all"]')).toBeNull();
-        expect(pop?.textContent).not.toContain("All bookings");
-        expect(pop?.textContent).toContain("Agenda");
+        // All bookings is back in the sheet (owner, 22 Nov).
+        expect(pop?.querySelector('a[href="/bookings/all"]')?.textContent).toBe(
+            "All bookings",
+        );
         expect(
             pop?.querySelector('a[href="/bookings/availability?person=arjun"]')
                 ?.textContent,
         ).toBe("Arjun’s hours and time off");
-        expect(pop?.textContent).toContain("Start Bookings on");
-        expect(pop?.textContent).toContain("Show bookings for");
+        expect(pop?.textContent).toContain("Your settings");
+        // Rows with their value, not radio lists.
+        expect(pop?.querySelector('[role="radiogroup"]')).toBeNull();
+        expect(
+            button(/^Start Bookings on: Where I left it\. Change$/),
+        ).toBeTruthy();
+        expect(
+            button(/^Show bookings for: The last person I picked\. Change$/),
+        ).toBeTruthy();
         expect(pop?.textContent).toContain("What the colours mean");
-        expect(pop?.textContent).toContain(
+        expect(pop?.textContent).not.toContain("Click it to book someone in");
+    });
+
+    it("what the colours mean opens in place, with Back", () => {
+        draw();
+        openOpts();
+        openRow(/^What the colours mean$/);
+        expect(popover()?.textContent).toContain(
             "Click it to book someone in, or block it.",
         );
+        click(button(/^Back$/));
+        expect(popover()?.textContent).toContain("Your settings");
     });
 
     it("the cancelled switch shows them", () => {
@@ -535,17 +569,21 @@ describe("the ⋯ options", () => {
         expect(props.cancelled.onChange).toHaveBeenCalledWith(true);
     });
 
-    it("Start Bookings on: Day is kept for the person", async () => {
+    it("Start Bookings on: Day is kept for the person; List is offered", async () => {
         draw();
         openOpts();
-        const group = popover()?.querySelector(
-            '[role="radiogroup"][aria-label="Start Bookings on"]',
-        );
-        const radios = Array.from(
-            group?.querySelectorAll('[role="radio"]') ?? [],
-        );
+        openRow(/^Start Bookings on/);
+        const radios = radiosOf("Start Bookings on");
+        expect(radios.map((r) => r.closest("label")?.textContent)).toEqual([
+            expect.stringContaining("Where I left it"),
+            expect.stringContaining("Day"),
+            expect.stringContaining("Week"),
+            expect.stringContaining("Agenda"),
+            expect.stringContaining("List"),
+        ]);
         expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual([
             "true",
+            "false",
             "false",
             "false",
             "false",
@@ -553,23 +591,15 @@ describe("the ⋯ options", () => {
         click(radios[1]);
         await flush();
         expect(save).toHaveBeenCalledWith({ start: "day" });
-        expect(
-            Array.from(group?.querySelectorAll('[role="radio"]') ?? []).map(
-                (r) => r.getAttribute("aria-checked"),
-            ),
-        ).toEqual(["false", "true", "false", "false"]);
+        // Back on the rows, saying the new value.
+        expect(button(/^Start Bookings on: Day\. Change$/)).toBeTruthy();
     });
 
     it("Show bookings for: Everyone and Just me go there and are kept", async () => {
         draw({ picked: "arjun" });
         openOpts();
-        const group = () =>
-            popover()?.querySelector(
-                '[role="radiogroup"][aria-label="Show bookings for"]',
-            );
-        const radios = Array.from(
-            group()?.querySelectorAll('[role="radio"]') ?? [],
-        );
+        openRow(/^Show bookings for/);
+        const radios = radiosOf("Show bookings for");
         expect(radios.map((r) => r.closest("label")?.textContent)).toEqual([
             expect.stringContaining("The last person I picked"),
             expect.stringContaining("Everyone"),
@@ -583,7 +613,8 @@ describe("the ⋯ options", () => {
             { scroll: false },
         );
         openOpts();
-        click(group()?.querySelectorAll('[role="radio"]')[2]);
+        openRow(/^Show bookings for/);
+        click(radiosOf("Show bookings for")[2]);
         await flush();
         expect(save).toHaveBeenCalledWith({ showFor: "me" });
         expect(push).toHaveBeenLastCalledWith(
@@ -595,6 +626,7 @@ describe("the ⋯ options", () => {
     it("offers no Just me to someone not on the diary", () => {
         draw({ me: null });
         openOpts();
+        openRow(/^Show bookings for/);
         expect(popover()?.textContent).not.toContain("Just me");
     });
 
@@ -605,16 +637,12 @@ describe("the ⋯ options", () => {
         } as never);
         draw();
         openOpts();
-        const group = popover()?.querySelector(
-            '[role="radiogroup"][aria-label="Start Bookings on"]',
-        );
-        click(group?.querySelectorAll('[role="radio"]')[2]);
+        openRow(/^Start Bookings on/);
+        click(radiosOf("Start Bookings on")[2]);
         await flush();
         expect(
-            Array.from(group?.querySelectorAll('[role="radio"]') ?? []).map(
-                (r) => r.getAttribute("aria-checked"),
-            ),
-        ).toEqual(["true", "false", "false", "false"]);
+            button(/^Start Bookings on: Where I left it\. Change$/),
+        ).toBeTruthy();
     });
 });
 
@@ -694,9 +722,13 @@ describe("the header on a phone", () => {
         expect(host.querySelector("[data-today-button]")).not.toBeNull();
     });
 
-    it("the ⋯ sheet says Tap", () => {
+    it("the ⋯ sheet opens half way, and its colours say Tap", () => {
         draw();
         click(button(/^This day:/));
+        expect(sheet()?.getAttribute("data-snap")).toBe("half");
+        click(button(/^Show all$/));
+        expect(sheet()?.getAttribute("data-snap")).toBe("full");
+        click(button(/^What the colours mean$/));
         expect(sheet()?.textContent).toContain("Tap it to book someone in.");
     });
 });

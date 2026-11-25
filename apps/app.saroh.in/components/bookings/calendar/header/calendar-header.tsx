@@ -303,6 +303,7 @@ export function CalendarHeader({
                         : cancelledLine(cancelled.count, periodWord),
             }}
             hours={{ href: hoursHref, label: hoursLabel }}
+            listHref="/bookings/all"
             start={opens.start}
             onStart={(start) => void change({ start })}
             showFor={opens.showFor}

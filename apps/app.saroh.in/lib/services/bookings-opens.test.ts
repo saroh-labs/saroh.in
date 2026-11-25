@@ -6,6 +6,7 @@ import {
     openingLayout,
     openingPerson,
     OPENS_DEFAULT,
+    opensOnList,
     readOpens,
 } from "./bookings-opens";
 
@@ -188,5 +189,29 @@ describe("nothing chose the view (Q4, U6)", () => {
                 lastUsed: "week",
             }),
         ).toBe(false);
+    });
+});
+
+describe("Start Bookings on List (owner, 25 Nov)", () => {
+    it("opens the register when nothing in the address chose a view", () => {
+        expect(
+            opensOnList({ params: {}, start: "register", lastUsed: "day" }),
+        ).toBe(true);
+        expect(
+            opensOnList({
+                params: { calendar: "1" },
+                start: "register",
+                lastUsed: null,
+            }),
+        ).toBe(false);
+        // The calendar it falls back to is the device's, else Day.
+        expect(
+            openingLayout({
+                asked: undefined,
+                start: "register",
+                lastUsed: null,
+            }),
+        ).toBe("day");
+        expect(readOpens({ start: "register" }).start).toBe("register");
     });
 });

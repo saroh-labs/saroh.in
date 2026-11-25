@@ -106,6 +106,7 @@ export function PeopleSheet({
             title="Whose bookings"
             subtitle={period}
             width={360}
+            half
             footer={
                 onAdd ? (
                     <Button
