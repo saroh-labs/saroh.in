@@ -14,9 +14,15 @@ import type { LocationPeople } from "@/lib/stores/people";
 
 import { PeopleSection } from "./people-section";
 
-const refresh = vi.fn();
+const located = vi.hoisted(() => ({
+    orgId: "org_1",
+    patch: vi.fn(),
+    listed: vi.fn(() => Promise.resolve()),
+    reread: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@/lib/stores/use-stores", () => ({ useLocationSave: () => located }));
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh }),
+    useRouter: () => ({ refresh: vi.fn() }),
 }));
 const invite = vi.fn();
 const revoke = vi.fn();
@@ -84,7 +90,13 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
-    for (const mock of [refresh, invite, revoke, showError, showSuccess]) {
+    for (const mock of [
+        located.reread,
+        invite,
+        revoke,
+        showError,
+        showSuccess,
+    ]) {
         mock.mockReset();
     }
 });
@@ -203,8 +215,8 @@ describe("the roster, read first", () => {
         await press(button("Cancel invitation"));
         // Gone from the list at once, and cancelled when its hold ends.
         expect(rows("location-invited")).toEqual([]);
-        expect(revoke).toHaveBeenCalledWith("st_hill", "inv_1");
-        expect(refresh).toHaveBeenCalled();
+        expect(revoke).toHaveBeenCalledWith("st_hill", "inv_1", "org_1");
+        expect(located.reread).toHaveBeenCalled();
     });
 });
 
@@ -250,6 +262,7 @@ describe("Invite someone", () => {
             "st_hill",
             "kiran.bose@example.com",
             "VIEWER",
+            "org_1",
         );
         expect(showSuccess).toHaveBeenCalledWith(
             "Sent to kiran.bose@example.com.",
@@ -257,7 +270,7 @@ describe("Invite someone", () => {
         );
         expect(sheet()).toBeNull();
         // The page reads the roster again, so the invitation shows.
-        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(located.reread).toHaveBeenCalledTimes(1);
     });
 
     it("an empty or malformed email is said under the field and not sent", async () => {
@@ -286,7 +299,7 @@ describe("Invite someone", () => {
         );
         expect(sheetName()).toBe("Invite someone");
         expect(email()?.value).toBe("kiran.bose@example.com");
-        expect(refresh).not.toHaveBeenCalled();
+        expect(located.reread).not.toHaveBeenCalled();
     });
 
     it("a refusal that names the email is said under it", async () => {
@@ -365,7 +378,7 @@ describe("the tab's other states", () => {
         );
         expect(host.textContent).not.toContain("No one else works here yet");
         await press(button("Try again"));
-        expect(refresh).toHaveBeenCalled();
+        expect(located.reread).toHaveBeenCalled();
     });
 
     it("someone the API shows no roster to is told so, not shown an empty list", () => {

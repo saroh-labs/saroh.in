@@ -78,6 +78,7 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "billing/invoices": "full", // `InvoicesContainer`
     "billing/invoices/[invoiceId]": "full", // `InvoiceDetailContainer`
     "commerce/stock": "full", // `StockContainer`
+    "commerce/locations": "full", // `LocationsContainer`
     "contacts/[contactId]": "full", // `CustomerDetailContainer`
     "leads/[leadId]": "default", // `LeadDetailContainer`
     // Ask AI's full page draws its list and conversation edge to edge.
