@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@saroh/ui/avatar";
 import { RadioCards } from "@saroh/ui/choice-group";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Notice } from "@saroh/ui/notice";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -15,6 +14,7 @@ import type {
     Read,
 } from "@/lib/social/saroh-social-types";
 import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
+import { useSocialSave } from "@/lib/social/use-social";
 
 /**
  * The Facebook Page to post to, or the Instagram account linked to one,
@@ -26,14 +26,17 @@ export function PagePicker({
     kind,
     choiceId,
     pages,
+    go,
     onClose,
 }: {
     kind: ChannelKind;
     choiceId: string;
     pages: Read<PageChoice[]> | null;
+    /** Open an address of Social, in place. */
+    go: (href: string) => void;
     onClose: () => void;
 }) {
-    const router = useRouter();
+    const { orgId, saved } = useSocialSave();
     const [page, setPage] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -44,18 +47,20 @@ export function PagePicker({
     async function choose() {
         if (!page) return setError(title);
         setError(null);
-        const res = await runAction(() => pickPage(kind, choiceId, page), {
-            setBusy,
-            quiet: true,
-            onUnreached: setError,
-        });
+        const res = await runAction(
+            () => pickPage(kind, choiceId, page, orgId),
+            {
+                setBusy,
+                quiet: true,
+                onUnreached: setError,
+            },
+        );
         if (!res) return;
         if (!res.ok) return setError(res.error);
-        router.replace(
+        await saved();
+        go(
             `/social?tab=channels&channel=${kind.toLowerCase()}&result=connected`,
-            { scroll: false },
         );
-        router.refresh();
     }
 
     return (

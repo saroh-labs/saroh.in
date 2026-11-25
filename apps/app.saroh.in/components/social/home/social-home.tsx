@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { DeleteMenu } from "@/components/shared/confirm/delete-menu";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
+import { PageLoading } from "@/components/shared/page/page-loading";
 import { DrawnCard } from "@/components/shared/share-item/insta-frame";
 import { SocialLine } from "@/components/shared/share-item/schedule-lock";
 import { formatRelative } from "@/lib/format/datetime";
@@ -22,8 +23,10 @@ import { cardImageUrl, firstStyle } from "@/lib/share-item/share";
 import { removeOwnPost } from "@/lib/social/actions";
 import type { OwnPost } from "@/lib/social/own-posts";
 import type { PickRow } from "@/lib/social/pick";
+import { ownPostsRead } from "@/lib/social/queries";
 import type { FirstPick } from "@/lib/social/today";
 import { firstPicks, worthPosting } from "@/lib/social/today";
+import { useSocialSave } from "@/lib/social/use-social";
 import { POST_WORDS } from "@/lib/social/words";
 
 import { OwnThumb } from "../create-post/pick-step";
@@ -59,15 +62,19 @@ export function SocialHome({
     canPost,
     failed,
 }: {
-    rows: PickRow[];
-    posts: OwnPost[];
+    /** Null, with `posts`, while their reads are on their way. */
+    rows: PickRow[] | null;
+    posts: OwnPost[] | null;
     setup: ShareSetup;
     canPost: boolean;
     failed: string[];
 }) {
     const narrow = useNarrow();
     const zone = useBusinessZone();
-    const suggestions = useDismissed(worthPosting(rows, zone), setup.siteId);
+    const suggestions = useDismissed(
+        worthPosting(rows ?? [], zone),
+        setup.siteId,
+    );
     const shown = narrow ? suggestions.list.slice(0, 1) : suggestions.list;
 
     const header = (
@@ -79,7 +86,8 @@ export function SocialHome({
             title={POST_WORDS.social}
             description={narrow ? undefined : POST_WORDS.socialDescription}
             actions={
-                posts.length > 0 || narrow ? (
+                // Known once Your posts lands; a phone always has it.
+                (posts && posts.length > 0) || narrow ? (
                     <Button asChild size={narrow ? "default" : "lg"}>
                         <IntentLink href={NEW} data-new-post="">
                             <Plus aria-hidden className="size-4" />
@@ -90,6 +98,20 @@ export function SocialHome({
             }
         />
     );
+
+    if (!rows || !posts) {
+        return (
+            <div>
+                {header}
+                <PageLoading
+                    bare
+                    shape="panels"
+                    width="full"
+                    label={POST_WORDS.loading}
+                />
+            </div>
+        );
+    }
 
     if (posts.length === 0) {
         return (
@@ -212,6 +234,7 @@ function PostTile({
     setup: ShareSetup;
     canPost: boolean;
 }) {
+    const { orgId, saved } = useSocialSave();
     const name = post.headline ?? POST_WORDS.ownTitle;
     const item = ownItem(post);
     return (
@@ -254,9 +277,14 @@ function PostTile({
                         keep={POST_WORDS.keepIt}
                         title={POST_WORDS.deleteTitle}
                         description={POST_WORDS.deleteWhat}
-                        onDelete={() => removeOwnPost(post.id)}
+                        onDelete={async () => {
+                            const res = await removeOwnPost(post.id, orgId);
+                            // Your posts alone: what's worth posting is unchanged.
+                            if (res.ok)
+                                await saved(ownPostsRead.key(orgId, {}));
+                            return res;
+                        }}
                         done={() => POST_WORDS.deleted}
-                        then="/social"
                     />
                 ) : null}
             </div>
