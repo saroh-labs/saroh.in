@@ -17,7 +17,13 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { QueryClient } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
 import type { BookingLinkView } from "@/lib/services/booking-link";
+import { servicesKeys } from "@/lib/services/queries";
 
 import { BookingLinkRow } from "./booking-link-row";
 
@@ -49,8 +55,8 @@ const api = { publish: vi.fn(), make: vi.fn() };
 // A server action: copying the link marks the share step (#1194).
 vi.mock("@/lib/moments/actions", () => ({ markMomentSeen: vi.fn() }));
 vi.mock("@/lib/services/booking-link-actions", () => ({
-    publishBookingPage: () => api.publish() as unknown,
-    makeBookingPage: () => api.make() as unknown,
+    publishBookingPage: (...a: unknown[]) => api.publish(...a) as unknown,
+    makeBookingPage: (...a: unknown[]) => api.make(...a) as unknown,
 }));
 const toast = { showSuccess: vi.fn(), showError: vi.fn() };
 vi.mock("@saroh/ui/toast", () => ({
@@ -74,6 +80,7 @@ const LIVE = view({ state: "live", published: true });
 
 let root: Root;
 let host: HTMLDivElement;
+let client: QueryClient;
 
 beforeEach(() => {
     (
@@ -82,6 +89,7 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
+    client = makeTestClient();
     api.publish.mockReset();
     api.make.mockReset();
     router.refresh.mockReset();
@@ -94,7 +102,15 @@ afterEach(() => {
 });
 
 function draw(v: BookingLinkView) {
-    act(() => root.render(<BookingLinkRow view={v} />));
+    act(() =>
+        root.render(
+            <QueryClientProvider client={client}>
+                <OrgProvider orgId="org_1">
+                    <BookingLinkRow view={v} />
+                </OrgProvider>
+            </QueryClientProvider>,
+        ),
+    );
 }
 const dialog = () => document.body.querySelector<HTMLElement>("[role=dialog]");
 function buttons(within: ParentNode | null = host) {
@@ -146,6 +162,7 @@ describe("Your booking page", () => {
 
     it("Publish booking page publishes in a sheet and ends on the link", async () => {
         api.publish.mockResolvedValue({ ok: true, data: LIVE });
+        const invalidated = vi.spyOn(client, "invalidateQueries");
         draw(view());
         await press(button("Publish booking page"));
         expect(dialog()?.textContent).toContain("Publish your booking page");
@@ -153,13 +170,18 @@ describe("Your booking page", () => {
             "Your website goes live with it",
         );
         await press(button("Publish booking page", dialog()));
-        expect(api.publish).toHaveBeenCalledTimes(1);
+        // The tab's business goes last (`writeAsOrg`).
+        expect(api.publish).toHaveBeenCalledWith("org_1");
         // Finished in place: the link to share, in the same sheet.
         expect(dialog()?.textContent).toContain("Your booking page is live");
         expect(buttons(dialog())).toEqual(
             expect.arrayContaining(["Copy link", "QR code", "Done"]),
         );
-        expect(router.refresh).toHaveBeenCalled();
+        // Services is read again, never the server page.
+        expect(invalidated).toHaveBeenCalledWith({
+            queryKey: servicesKeys("org_1"),
+        });
+        expect(router.refresh).not.toHaveBeenCalled();
         // And the row behind it is live.
         expect(host.querySelector(`a[href="${URL}"]`)).not.toBeNull();
     });
@@ -204,7 +226,7 @@ describe("Your booking page", () => {
         );
         expect(host.textContent).toContain("No booking page yet");
         await press(button("Make my booking page"));
-        expect(api.make).toHaveBeenCalledTimes(1);
+        expect(api.make).toHaveBeenCalledWith("org_1");
         expect(toast.showSuccess).toHaveBeenCalled();
         expect(buttons()).toEqual(["Publish booking page"]);
     });

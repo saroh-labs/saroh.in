@@ -1,5 +1,6 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
 import type { ApiResult } from "@/lib/api/failure";
 import { listServices } from "@/lib/services/service";
 
@@ -82,8 +83,13 @@ export async function setTeamPage(staffIds: string[]) {
     return staff.setTeamPage(staffIds);
 }
 
-export async function setStaffServices(staffId: string, serviceIds: string[]) {
-    return staff.setStaffServices(staffId, serviceIds);
+export async function setStaffServices(
+    staffId: string,
+    serviceIds: string[],
+    orgId?: string,
+) {
+    const write = () => staff.setStaffServices(staffId, serviceIds);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 export async function replaceStaffHours(staffId: string, hours: WeeklyRange[]) {

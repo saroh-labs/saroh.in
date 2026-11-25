@@ -11,6 +11,7 @@ import {
     replaceRules,
     updateService,
 } from "@/lib/services/actions";
+import type { ServicePerson } from "@/lib/services/queries";
 import type { ServiceDraft } from "@/lib/services/service-editor";
 import {
     changedParts,
@@ -19,8 +20,8 @@ import {
     TREATMENT_NEEDS_STOREFRONT,
 } from "@/lib/services/service-editor";
 import { hoursNotSaved, rulesOf } from "@/lib/services/service-hours-draft";
+import { useServiceSave } from "@/lib/services/use-services";
 import { setStaffServices } from "@/lib/staff/actions";
-import type { StaffView } from "@/lib/staff/types";
 
 /** How a Save went: all of it, or the service and not all the rest. */
 export type SaveOutcome = "saved" | "partly" | "refused";
@@ -30,14 +31,16 @@ export type SaveOutcome = "saved" | "partly" | "refused";
  * service, who does it (a call per person whose list changes), and its own
  * weekly hours (`PUT …/rules`, which replaces the set). `saved` is moved
  * forward one call at a time, so after a Save that got part of the way the
- * next one sends only what is left (`changedParts`).
+ * next one sends only what is left (`changedParts`). Each write passes
+ * the tab's business last (`writeAsOrg`); once it has gone, Services is
+ * read again (`useServiceSave`).
  *
  * A new service's Save that adds it and not its hours stays on the page,
  * says exactly that (`hoursFailed`), and editing goes on against the
  * service now added (`createdId`). An edit's panel stays open with what
  * was typed and says the same in a toast.
  */
-export function useServiceSave({
+export function useServiceEditorSave({
     serviceId: savedServiceId,
     initial,
     people,
@@ -49,7 +52,7 @@ export function useServiceSave({
     serviceId: string | null;
     initial: ServiceDraft;
     /** The active people on the diary. */
-    people: readonly StaffView[];
+    people: readonly ServicePerson[];
     /** Who does it could be read: it is written only then. */
     staffRead: boolean;
     /** Its own hours could be read: they are written only then. */
@@ -57,6 +60,7 @@ export function useServiceSave({
     currency: string;
 }) {
     const router = useRouter();
+    const { orgId, saved: readAgain } = useServiceSave();
     const [createdId, setCreatedId] = useState<string | null>(null);
     const serviceId = savedServiceId ?? createdId;
     const [saved, setSaved] = useState(initial);
@@ -78,7 +82,7 @@ export function useServiceSave({
             const next = should
                 ? [...p.serviceIds, id]
                 : p.serviceIds.filter((x) => x !== id);
-            const res = await setStaffServices(p.id, next);
+            const res = await setStaffServices(p.id, next, orgId);
             if (!res.ok) return res.error;
         }
         return null;
@@ -111,7 +115,7 @@ export function useServiceSave({
         let id = serviceId;
         if (id === null) {
             const res = await runAction(() =>
-                createService(serviceInput(draft, currency)),
+                createService(serviceInput(draft, currency), orgId),
             );
             if (!res?.ok) {
                 setSaving(false);
@@ -123,7 +127,7 @@ export function useServiceSave({
         } else if (parts.fields) {
             const target = id;
             const res = await runAction(() =>
-                updateService(target, serviceUpdate(draft, currency)),
+                updateService(target, serviceUpdate(draft, currency), orgId),
             );
             if (!res?.ok) {
                 setSaving(false);
@@ -155,9 +159,12 @@ export function useServiceSave({
             hoursRead && (creating ? draft.hours.length > 0 : parts.hours);
         if (sendHours) {
             const toSend = rulesOf(draft.hours) ?? [];
-            const res = await runAction(() => replaceRules(savedId, toSend), {
-                quiet: true,
-            });
+            const res = await runAction(
+                () => replaceRules(savedId, toSend, orgId),
+                {
+                    quiet: true,
+                },
+            );
             hoursError = res ? (res.ok ? null : res.error) : UNREACHED;
         }
         if (!hoursError) nowSaved = { ...nowSaved, hours: draft.hours };
@@ -193,14 +200,17 @@ export function useServiceSave({
                 });
                 showError(said.title, said.body);
             }
-            if (!creating) router.refresh();
+            // A new service stays here, saying its hours weren't saved.
+            await readAgain({ read: !creating });
             return "partly";
         }
         // Who does it is said above; a service just added still goes to its
         // own page, where it is picked again.
+        // Services is read again once; a new service's page reads its own,
+        // so here it is only marked stale.
+        await readAgain({ read: !added });
         if (!whoError) showSuccess(message);
         if (added) router.replace(`/services/${savedId}`);
-        else router.refresh();
         return whoError ? "partly" : "saved";
     }
 

@@ -26,8 +26,15 @@ import type { AnchorHTMLAttributes } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
+import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { QueryClient } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+
+import { OrgProvider } from "@/lib/query/org";
+import { makeTestClient } from "@/lib/query/test-utils";
+import { servicesKeys } from "@/lib/services/queries";
 import type { AvailabilityRule, Service } from "@/lib/services/service";
 import type { StaffView } from "@/lib/staff/types";
 
@@ -163,6 +170,8 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
+    client = makeTestClient();
+    invalidated = vi.spyOn(client, "invalidateQueries");
     for (const fn of [
         ...Object.values(api),
         ...Object.values(toast),
@@ -183,6 +192,21 @@ afterEach(() => {
     act(() => root.unmount());
     document.body.innerHTML = "";
 });
+
+let client: QueryClient;
+let invalidated: MockInstance<QueryClient["invalidateQueries"]>;
+/** How Services was asked again after a save: read now, or only marked stale. */
+const servicesInvalidations = () =>
+    invalidated.mock.calls
+        .map(
+            ([filters]) =>
+                filters as { queryKey?: unknown; refetchType?: string },
+        )
+        .filter(
+            (f) =>
+                JSON.stringify(f.queryKey) ===
+                JSON.stringify(servicesKeys("org_1")),
+        );
 
 function open({
     saved = null,
@@ -207,19 +231,23 @@ function open({
 } = {}) {
     act(() =>
         root.render(
-            <ServiceEditor
-                service={saved}
-                rules={rules}
-                staff={staff}
-                usage={usage}
-                currency="INR"
-                timezone="Asia/Kolkata"
-                openingHours={openingHours}
-                canEdit={canEdit}
-                hasPage={hasPage}
-                others={others}
-                share={share}
-            />,
+            <QueryClientProvider client={client}>
+                <OrgProvider orgId="org_1">
+                    <ServiceEditor
+                        service={saved}
+                        rules={rules}
+                        staff={staff}
+                        usage={usage}
+                        currency="INR"
+                        timezone="Asia/Kolkata"
+                        openingHours={openingHours}
+                        canEdit={canEdit}
+                        hasPage={hasPage}
+                        others={others}
+                        share={share}
+                    />
+                </OrgProvider>
+            </QueryClientProvider>,
         ),
     );
 }
@@ -447,6 +475,7 @@ describe.each([
                 showOnBookingPage: false,
                 bookableByTeam: false,
             }),
+            "org_1",
         );
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Dry needling added, paused. Tick who can book it when you're ready.",
@@ -529,10 +558,14 @@ describe.each([
         type(field("What is it called?"), "Open gym");
         type(field("Price"), "0");
         await press(button("Add service"));
-        expect(api.replaceRules).toHaveBeenCalledWith("sv_new", [
-            { dayOfWeek: 1, startMinute: 540, endMinute: 1140 },
-            { dayOfWeek: 2, startMinute: 540, endMinute: 1080 },
-        ]);
+        expect(api.replaceRules).toHaveBeenCalledWith(
+            "sv_new",
+            [
+                { dayOfWeek: 1, startMinute: 540, endMinute: 1140 },
+                { dayOfWeek: 2, startMinute: 540, endMinute: 1080 },
+            ],
+            "org_1",
+        );
         expect(router.replace).toHaveBeenCalledWith("/services/sv_new");
     });
 
@@ -576,16 +609,24 @@ describe("New service, adding it", () => {
                 showOnBookingPage: true,
                 bookableByTeam: true,
             }),
+            "org_1",
         );
-        expect(api.setStaffServices).toHaveBeenCalledWith("st_meera", [
-            "sv_new",
-        ]);
+        expect(api.setStaffServices).toHaveBeenCalledWith(
+            "st_meera",
+            ["sv_new"],
+            "org_1",
+        );
         // Someone does it: no hours of its own to send.
         expect(api.replaceRules).not.toHaveBeenCalled();
         expect(toast.showSuccess).toHaveBeenCalledWith(
             "Dry needling added. Customers can book it in the free time of who does it.",
         );
         expect(router.replace).toHaveBeenCalledWith("/services/sv_new");
+        // Its own page reads it: Services is only marked stale, never read here.
+        expect(servicesInvalidations()).toEqual([
+            { queryKey: servicesKeys("org_1"), refetchType: "none" },
+        ]);
+        expect(router.refresh).not.toHaveBeenCalled();
     });
 
     it("says it was added and its hours were not, stays, and Try again sends only the hours", async () => {
@@ -624,11 +665,15 @@ describe.each([
             "Customers book it on your booking page, and your team books it from Bookings. 9 bookings to come.",
         );
         await press(tick("Your team, from Bookings"));
-        expect(api.updateService).toHaveBeenCalledWith("sv_1", {
-            status: "ACTIVE",
-            showOnBookingPage: true,
-            bookableByTeam: false,
-        });
+        expect(api.updateService).toHaveBeenCalledWith(
+            "sv_1",
+            {
+                status: "ACTIVE",
+                showOnBookingPage: true,
+                bookableByTeam: false,
+            },
+            "org_1",
+        );
         expect(toast.showUndo).toHaveBeenCalledWith(
             "Physio assessment: only customers can book it now, on your booking page.",
             expect.any(Function),
@@ -657,9 +702,13 @@ describe.each([
         await act(async () => {
             await undoTeam();
         });
-        expect(api.updateService).toHaveBeenLastCalledWith("sv_1", {
-            bookableByTeam: true,
-        });
+        expect(api.updateService).toHaveBeenLastCalledWith(
+            "sv_1",
+            {
+                bookableByTeam: true,
+            },
+            "org_1",
+        );
         expect(
             tick("Your team, from Bookings").getAttribute("aria-checked"),
         ).toBe("true");
@@ -725,6 +774,7 @@ describe.each([
         expect(api.updateService).toHaveBeenCalledWith(
             "sv_1",
             expect.objectContaining({ durationMinutes: 60 }),
+            "org_1",
         );
         expect(api.updateService.mock.calls[0]?.[1]).not.toHaveProperty(
             "showOnBookingPage",
@@ -733,16 +783,25 @@ describe.each([
             "Saved: 60 min. New bookings use it, and 9 already made keep 45 min.",
         );
         expect(panel()).toBeNull();
+        // One save, one read of Services; the diary is only marked stale.
+        expect(servicesInvalidations()).toEqual([
+            { queryKey: servicesKeys("org_1") },
+        ]);
+        expect(router.refresh).not.toHaveBeenCalled();
     });
 
     it("More pauses it: both ticks off, with Undo", async () => {
         open({ saved, staff });
         await openMenu();
         await press(menuItem("Pause: untick both, nobody can book it"));
-        expect(api.updateService).toHaveBeenCalledWith("sv_1", {
-            showOnBookingPage: false,
-            bookableByTeam: false,
-        });
+        expect(api.updateService).toHaveBeenCalledWith(
+            "sv_1",
+            {
+                showOnBookingPage: false,
+                bookableByTeam: false,
+            },
+            "org_1",
+        );
         expect(text()).toContain(
             "Untick both to pause it. Bookings already made stay.",
         );
@@ -759,10 +818,14 @@ describe.each([
         );
         await press(buttonIn(ask, "Pause it instead"));
         expect(api.archiveService).not.toHaveBeenCalled();
-        expect(api.updateService).toHaveBeenCalledWith("sv_1", {
-            showOnBookingPage: false,
-            bookableByTeam: false,
-        });
+        expect(api.updateService).toHaveBeenCalledWith(
+            "sv_1",
+            {
+                showOnBookingPage: false,
+                bookableByTeam: false,
+            },
+            "org_1",
+        );
 
         await openMenu();
         await press(menuItem("Delete service"));
@@ -772,8 +835,13 @@ describe.each([
                 "Delete service",
             ),
         );
-        expect(api.archiveService).toHaveBeenCalledWith("sv_1");
+        expect(api.archiveService).toHaveBeenCalledWith("sv_1", "org_1");
         expect(router.push).toHaveBeenCalledWith("/services");
+        // Left for the list, which reads Services on arrival.
+        expect(servicesInvalidations().at(-1)).toEqual({
+            queryKey: servicesKeys("org_1"),
+            refetchType: "none",
+        });
     });
 
     it("a Member reads it and changes nothing", async () => {

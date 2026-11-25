@@ -1,9 +1,9 @@
 /**
  * Bookings › Services' route states (U15, #1031; board BKDStates): while
- * it loads, the real header over grey rows; when the services can't be
- * read, "Couldn't load your services" with Try again, never an empty
- * list; a role that can't read services is told why, calmly. Read as
- * markup; the list's own states are in `services-screen.test.tsx`.
+ * it loads, the real header over grey rows; a role that can't read
+ * services is told why, calmly, by the page's own gate. The list's
+ * reading states are the container's (`services-container.test.tsx`), its
+ * own states `services-screen.test.tsx`.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,41 +16,24 @@ vi.mock("@/lib/session", () => ({ requireSession: () => Promise.resolve() }));
 vi.mock("@/env", () => ({ env: {} }));
 vi.mock("@/lib/api/http", () => ({}));
 vi.mock("next/headers", () => ({}));
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
-    usePathname: () => "/services",
-    useSearchParams: () => new URLSearchParams(),
-}));
-
-const readServices = vi.fn();
-vi.mock("@/lib/services/service", () => ({
-    readServices: () => readServices() as unknown,
-}));
 vi.mock("@/lib/services/editor-data", () => ({
-    readStaffOrNull: () => Promise.resolve(null),
-    readHasBookingPage: () => Promise.resolve(true),
-    readCanEditServices: () => Promise.resolve(true),
-    businessCurrencyOf: () => "INR",
+    readCanEditServices: () => Promise.resolve(false),
 }));
-vi.mock("@/lib/services/usage-read", () => ({
-    readServiceUsage: () => Promise.resolve(null),
-}));
-vi.mock("@/lib/modules/guard", () => ({
-    modulesOrUnknown: () => Promise.resolve(null),
-}));
-vi.mock("@/lib/staff/service", () => ({
-    readBookingPayment: () => Promise.resolve(null),
-}));
-vi.mock("@/lib/gst-rates/service", () => ({
-    readMissingRates: () => Promise.resolve(null),
+const org = vi.hoisted(() => ({
+    business: null as null | Record<string, unknown>,
 }));
 vi.mock("@/lib/organizations/service", () => ({
-    resolveActiveOrganization: () =>
-        Promise.resolve({ id: "org_1", name: "Kaya Physio", role: "REVIEWER" }),
+    resolveActiveOrganization: () => Promise.resolve(org.business),
 }));
-vi.mock("@/lib/courses/access", () => ({ canWriteCourses: () => false }));
+vi.mock("@/components/services/list/services-container", () => ({
+    ServicesContainer: ({ canEdit }: { canEdit: boolean }) => (
+        <div data-container={String(canEdit)} />
+    ),
+}));
 
-beforeEach(() => readServices.mockReset());
+beforeEach(() => {
+    org.business = null;
+});
 
 describe("the Services route's states", () => {
     it("loading: the real title over grey, said once to a screen reader", () => {
@@ -60,18 +43,27 @@ describe("the Services route's states", () => {
         expect(html).toContain("Loading services");
     });
 
-    it("couldn't load: says so, with Try again, and no empty list", async () => {
-        readServices.mockResolvedValue({ ok: false });
-        const html = renderToStaticMarkup(await ServicesPage());
-        expect(html).toContain("Couldn&#x27;t load your services");
-        expect(html).toContain("Try again");
-        expect(html).not.toContain("No services yet");
-    });
-
-    it("a role that can't read services is told, not shown a failure", async () => {
-        readServices.mockResolvedValue({ ok: false, forbidden: true });
+    it("a role without service:read is told, not shown a failure, and nothing is read", async () => {
+        org.business = {
+            id: "org_1",
+            name: "Kaya Physio",
+            role: "REVIEWER",
+            actions: ["site:review"],
+        };
         const html = renderToStaticMarkup(await ServicesPage());
         expect(html).not.toContain("Couldn&#x27;t load");
+        expect(html).not.toContain("data-container");
         expect(html).toContain("Services");
+    });
+
+    it("hands a reader to the container, with what the role may change", async () => {
+        org.business = {
+            id: "org_1",
+            name: "Kaya Physio",
+            role: "MEMBER",
+            actions: ["service:read"],
+        };
+        const html = renderToStaticMarkup(await ServicesPage());
+        expect(html).toContain('data-container="false"');
     });
 });

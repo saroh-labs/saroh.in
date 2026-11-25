@@ -1,7 +1,6 @@
 "use client";
 
 import { showError, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
@@ -35,7 +34,6 @@ export function AlsoSell({
     /** Every module, for what the sheet brings with it. */
     modules?: readonly ModuleView[];
 }) {
-    const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [picked, setPicked] = useState<string[] | null>(null);
 
@@ -52,14 +50,15 @@ export function AlsoSell({
                 showError(refusalSentence(res));
                 return;
             }
+            // The modules, the list's "Also sell" and New course are
+            // settings reads: read again here, and in the other tabs.
             afterSettingsSave();
-            router.refresh();
             showUndo(alsoSellToast(f.label, false), async () => {
                 const back = await runAction(() => set(f.key, true), {
                     quiet: true,
                 });
                 if (!back) return { ok: false, error: UNREACHED };
-                router.refresh();
+                if (back.ok) afterSettingsSave();
                 return back.ok
                     ? true
                     : { ok: false, error: refusalSentence(back) };

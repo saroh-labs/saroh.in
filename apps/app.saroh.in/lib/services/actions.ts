@@ -81,36 +81,44 @@ export async function createBookingPayLink(bookingId: string, orgId?: string) {
     return createBookingPayLinkApi(bookingId);
 }
 
-export async function createService(input: CreateServiceInput) {
-    return createServiceApi(input);
+export async function createService(input: CreateServiceInput, orgId?: string) {
+    const write = () => createServiceApi(input);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 export async function updateService(
     serviceId: string,
     input: UpdateServiceInput,
+    orgId?: string,
 ) {
-    return updateServiceApi(serviceId, input);
+    const write = () => updateServiceApi(serviceId, input);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Keep a sample service as it is (DEC-189). */
-export async function keepService(serviceId: string) {
-    return keepServiceApi(serviceId);
+export async function keepService(serviceId: string, orgId?: string) {
+    const write = () => keepServiceApi(serviceId);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Keep every sample service as it is (DEC-189). */
-export async function keepAllSamples() {
-    return keepAllSamplesApi();
+export async function keepAllSamples(orgId?: string) {
+    const write = () => keepAllSamplesApi();
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
-export async function archiveService(serviceId: string) {
-    return archiveServiceApi(serviceId);
+export async function archiveService(serviceId: string, orgId?: string) {
+    const write = () => archiveServiceApi(serviceId);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 export async function replaceRules(
     serviceId: string,
     rules: AvailabilityRuleInput[],
+    orgId?: string,
 ) {
-    return replaceRulesApi(serviceId, rules);
+    const write = () => replaceRulesApi(serviceId, rules);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 export async function cancelBooking(

@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrg } from "@/lib/api/assert-active-org";
+import type { ApiFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { mutate } from "@/lib/api/http";
 
@@ -26,21 +28,24 @@ function asView(
  * booking page is on. Website › Publish's rules hold (who may, "Publishing
  * needs approval"); a refusal comes back in the API's words.
  */
-export async function publishBookingPage(): Promise<
-    CrmResult<BookingLinkView>
-> {
+export async function publishBookingPage(
+    orgId?: string,
+): Promise<CrmResult<BookingLinkView> | ApiFailure> {
     const fallback = "Couldn't publish your booking page. Try again.";
-    return asView(
-        await mutate("/booking-page/publish", "POST", {}, fallback),
-        fallback,
-    );
+    const write = async () =>
+        asView(
+            await mutate("/booking-page/publish", "POST", {}, fallback),
+            fallback,
+        );
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
 
 /** Make my booking page: the starter site on the business's address. */
-export async function makeBookingPage(): Promise<CrmResult<BookingLinkView>> {
+export async function makeBookingPage(
+    orgId?: string,
+): Promise<CrmResult<BookingLinkView> | ApiFailure> {
     const fallback = "Couldn't make your booking page. Try again.";
-    return asView(
-        await mutate("/booking-page", "POST", {}, fallback),
-        fallback,
-    );
+    const write = async () =>
+        asView(await mutate("/booking-page", "POST", {}, fallback), fallback);
+    return orgId ? writeAsOrg(orgId, write) : write();
 }
