@@ -8,6 +8,8 @@ import {
     bookingPaymentOf,
     creditChoice,
     formatMoney,
+    FREE,
+    isFreeService,
     laterWords,
     payCentsOf,
     payChoices,
@@ -48,36 +50,47 @@ export function payWords({
     waitMode: WaitMode;
 }) {
     const waiting = waitMode === "join" || waitMode === "waiting";
+    // A free service (DEC-261): booked straight away, with no way to pay,
+    // no amount and no credit spent on it.
+    const free = isFreeService(service);
     // What one booking costs to pay, GST and all: the API's amount, on the
     // button, the summary and the confirmation.
-    const price = service
-        ? formatMoney(payCentsOf(service), service.currency)
-        : null;
+    const price =
+        service && !free
+            ? formatMoney(payCentsOf(service), service.currency)
+            : null;
     const gstWords = serviceGstWords(service);
     // The ways this service may be paid (E8): the one chosen, else the
     // first — and a service that takes a deposit is at the desk only when
     // online can't take it (DEC-089). Only the ways the business allows
     // (DEC-088). A class credit of their own is offered first (A10).
     const way = bookingPaymentOf(page.rules);
-    const choices = service
-        ? [
-              ...(credit
-                  ? [
-                        creditChoice(
-                            credit,
-                            service.currency ?? page.currency ?? null,
-                        ),
-                    ]
-                  : []),
-              ...payChoices(service, page.payOnline, page.businessName, way),
-          ]
-        : [];
+    const choices =
+        service && !free
+            ? [
+                  ...(credit
+                      ? [
+                            creditChoice(
+                                credit,
+                                service.currency ?? page.currency ?? null,
+                            ),
+                        ]
+                      : []),
+                  ...payChoices(
+                      service,
+                      page.payOnline,
+                      page.businessName,
+                      way,
+                  ),
+              ]
+            : [];
     // A priced service nothing the business allows can pay for: it can't
     // be booked here, and the summary shows no payment line (#822). A
     // credit still books it.
-    const unpayable = credit
-        ? null
-        : unpayableText(service, page.payOnline, page.businessName, way);
+    const unpayable =
+        credit || free
+            ? null
+            : unpayableText(service, page.payOnline, page.businessName, way);
     const deskOffered = choices.some((c) => c.pay === "DESK");
     const chosenPay =
         choices.find((c) => c.pay === payChoice) ?? choices.at(0) ?? null;
@@ -96,20 +109,24 @@ export function payWords({
         ? ""
         : waiting
           ? "Waitlist"
-          : pay === "CREDIT"
-            ? "Uses 1 credit"
-            : pay === "DEPOSIT"
-              ? "Deposit now"
-              : pay === "NOW"
-                ? "To pay now"
-                : price
-                  ? later.label
-                  : "To pay";
+          : free
+            ? "Price"
+            : pay === "CREDIT"
+              ? "Uses 1 credit"
+              : pay === "DEPOSIT"
+                ? "Deposit now"
+                : pay === "NOW"
+                  ? "To pay now"
+                  : price
+                    ? later.label
+                    : "To pay";
     const due = unpayable
         ? ""
         : waiting
           ? zero
-          : (chosenPay?.amount ?? price ?? zero);
+          : free
+            ? FREE
+            : (chosenPay?.amount ?? price ?? zero);
     // Not signed in yet, the last step is signing in (A9).
     const confirmLabel = !signedIn
         ? "Continue to sign in"
@@ -143,6 +160,7 @@ export function payWords({
 
     return {
         waiting,
+        free,
         price,
         gstWords,
         choices,

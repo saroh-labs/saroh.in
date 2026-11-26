@@ -318,6 +318,7 @@ export function useBookingFlow(
         putPlace: waitlist.put,
         dropPlace: waitlist.drop,
         price: words.price,
+        free: words.free,
         payingNow: words.payingNow,
         rest: words.rest,
         whenText,

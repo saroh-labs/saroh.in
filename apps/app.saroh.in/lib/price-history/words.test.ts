@@ -235,6 +235,23 @@ describe("an item's rows", () => {
         expect(made.lines).toEqual(["Large: Price set at ₹900"]);
     });
 
+    it('says a price of 0 is free, never "₹0" (DEC-261)', () => {
+        const free = (before: string | null) =>
+            changeLine(
+                { field: "price", before, after: "0.00" },
+                { currency: "INR", first: before === null },
+            );
+        expect(free(null)).toBe("Set to Free");
+        expect(free("500.00")).toMatch(/^Changed from ₹500(\.00)? to Free$/);
+        // Back to paid.
+        expect(
+            changeLine(
+                { field: "price", before: "0.00", after: "500.00" },
+                { currency: "INR" },
+            ),
+        ).toMatch(/^Price set at ₹500(\.00)?$/);
+    });
+
     it("a new item's first row says what it was set at", () => {
         const [row] = priceHistoryRows(
             [

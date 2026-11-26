@@ -11,6 +11,7 @@ import { DateTime } from "luxon";
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { howPaid } from "../bookings/booking-calendar";
+import { isFreeBooking, shownPaidWith } from "../bookings/booking-money";
 import type { PaidWith } from "../bookings/dto";
 import { businessTimezone, fallbackZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -203,6 +204,8 @@ export interface DetailBooking {
     paidWithPack: boolean;
     /** MEMBERSHIP | PACK | PAID | DESK, from the record (U3); null if unknown. */
     paidWith: PaidWith | null;
+    /** Booked at a price of 0 (DEC-261): nothing to pay, said "Free". */
+    free: boolean;
     /** The pack whose class it used, while the redemption stands. */
     packName: string | null;
     /** Cancelled after the free-cancellation window: the class stays used. */
@@ -1082,10 +1085,18 @@ export class CustomerDetailService {
             status: true,
             outcome: true,
             paidWith: true,
+            snapshot: true,
             subscriptionId: true,
             cancelledLate: true,
             invoices: BOOKING_PAID_INVOICES,
-            service: { select: { id: true, name: true, capacity: true } },
+            service: {
+                select: {
+                    id: true,
+                    name: true,
+                    capacity: true,
+                    priceCents: true,
+                },
+            },
             staff: { select: { id: true, name: true } },
             packRedemption: {
                 select: {
@@ -1121,27 +1132,31 @@ export class CustomerDetailService {
                     where: { ...where, cancelledLate: true },
                 }),
             ]);
-        const view = (b: (typeof upcoming)[number]): DetailBooking => ({
-            id: b.id,
-            startAt: b.startAt.toISOString(),
-            endAt: b.endAt.toISOString(),
-            timezone: b.timezone,
-            service: { id: b.service.id, name: b.service.name },
-            isClass: b.service.capacity > 1,
-            staff: b.staff,
-            status: b.status,
-            outcome: b.outcome,
-            paidWithPack:
-                b.packRedemption !== null &&
-                b.packRedemption.reversedAt === null,
-            paidWith: howPaid(b),
-            packName:
-                b.packRedemption?.reversedAt === null
-                    ? b.packRedemption.purchase.pack.name
-                    : null,
-            cancelledLate: b.cancelledLate,
-            paid: bookingPaid(b.invoices, seesMoney),
-        });
+        const view = (b: (typeof upcoming)[number]): DetailBooking => {
+            const free = isFreeBooking(b.snapshot, b.service.priceCents);
+            return {
+                id: b.id,
+                startAt: b.startAt.toISOString(),
+                endAt: b.endAt.toISOString(),
+                timezone: b.timezone,
+                service: { id: b.service.id, name: b.service.name },
+                isClass: b.service.capacity > 1,
+                staff: b.staff,
+                status: b.status,
+                outcome: b.outcome,
+                paidWithPack:
+                    b.packRedemption !== null &&
+                    b.packRedemption.reversedAt === null,
+                paidWith: shownPaidWith(howPaid(b), free),
+                free,
+                packName:
+                    b.packRedemption?.reversedAt === null
+                        ? b.packRedemption.purchase.pack.name
+                        : null,
+                cancelledLate: b.cancelledLate,
+                paid: bookingPaid(b.invoices, seesMoney),
+            };
+        };
         return {
             upcoming: upcoming.map(view),
             past: past.map(view),

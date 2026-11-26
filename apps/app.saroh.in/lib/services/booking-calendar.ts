@@ -61,6 +61,11 @@ export interface DiaryBooking {
     } | null;
     staff: { id: string; name: string } | null;
     paidWith: PaidWith | null;
+    /**
+     * Booked at a price of 0 (DEC-261): nothing to pay, said "Free". Not a
+     * money figure, so every viewer has it. Absent from an older API.
+     */
+    free?: boolean;
     /** The pack paying for it, while its class is still spent on it. */
     packName: string | null;
     subscriptionId: string | null;

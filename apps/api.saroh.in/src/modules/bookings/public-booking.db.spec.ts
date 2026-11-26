@@ -858,6 +858,85 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
     });
 });
 
+describe("a free service on the booking page (DEC-261, real database)", () => {
+    let trial: string;
+
+    beforeAll(async () => {
+        // A free trial class: Mondays 13:00–15:00 UTC, nobody in particular.
+        trial = (
+            await bookings.createService(owner, {
+                name: "Free trial class",
+                durationMinutes: 30,
+                timezone: "UTC",
+                priceCents: 0,
+                currency: "INR",
+            })
+        ).id;
+        await prisma.availabilityRule.create({
+            data: {
+                organizationId: owner.organizationId,
+                serviceId: trial,
+                dayOfWeek: MONDAY,
+                startMinute: 13 * 60,
+                endMinute: 15 * 60,
+            },
+        });
+    });
+
+    it("books it straight away: no hold, no payment, no way to pay recorded", async () => {
+        const at = nextMonday(13, 3);
+        const { booking, payToken } = await publicBookings.bookOnline(
+            trial,
+            booker("free@example.in", "DESK", at),
+            "ip_free",
+        );
+        expect(payToken).toBeNull();
+        expect(booking).toMatchObject({
+            status: "CONFIRMED",
+            paidWith: null,
+            holdExpiresAt: null,
+        });
+        expect(
+            await prisma.invoice.count({ where: { bookingId: booking.id } }),
+        ).toBe(0);
+        expect(
+            await prisma.paymentIntent.count({
+                where: { invoice: { bookingId: booking.id } },
+            }),
+        ).toBe(0);
+    });
+
+    it("refuses paying for it, so a client can't make it a payment", async () => {
+        const at = nextMonday(14, 3);
+        await expect(
+            publicBookings.bookOnline(
+                trial,
+                booker("free-pay@example.in", "NOW", at),
+                "ip_free",
+            ),
+        ).rejects.toMatchObject({
+            response: { field: "pay" },
+        });
+        expect(
+            await prisma.booking.count({
+                where: { serviceId: trial, startAt: at },
+            }),
+        ).toBe(0);
+    });
+
+    it("a paid service stays paid: its price can't be dropped at booking", async () => {
+        // Nothing the booker sends sets the price: a paid one still holds
+        // for payment.
+        const at = nextMonday(7, 6);
+        const { payToken } = await publicBookings.bookOnline(
+            oneToOne,
+            { ...booker("paid@example.in", "NOW", at), priceCents: 0 } as never,
+            "ip_free",
+        );
+        expect(payToken).not.toBeNull();
+    });
+});
+
 describe("Where and the intake note (E7, real database)", () => {
     let consult: string;
 

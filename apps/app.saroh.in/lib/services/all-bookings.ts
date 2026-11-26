@@ -454,7 +454,7 @@ export const asksOutcome = needsOutcome;
 export interface MoneyCell {
     /** "₹600", or null when there is no figure to show. */
     amount: string | null;
-    /** "Awaiting payment", "Paid", "Pays at the visit"; null for "—". */
+    /** "Awaiting payment", "Paid", "Pays at the visit", "Free"; null for "—". */
     note: string | null;
 }
 
@@ -476,6 +476,9 @@ export function moneyCell(b: DiaryBooking): MoneyCell {
               }
             : { amount: null, note: "Nothing was paid" };
     }
+    // Free (DEC-261): the one payment word says so, and nothing is owed.
+    // Said in the amount's place, alone: never "—" over "Free".
+    if (b.free) return { amount: BOOKING_WORDS.free, note: null };
     const cents = b.take?.cents ?? b.service.priceCents ?? null;
     const amount =
         cents !== null && cents > 0 ? formatMoney(cents, currency) : null;

@@ -14969,7 +14969,8 @@
                       "amountMinor",
                       "currency"
                     ],
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "description": "An amountMinor of 0 makes it free: booked with nothing to pay, never a deposit or a payment. Left out, it has no price."
                   },
                   "timezone": {
                     "type": "string",
@@ -16035,7 +16036,8 @@
                       "amountMinor",
                       "currency"
                     ],
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "description": "An amountMinor of 0 makes it free: booked with nothing to pay, never a deposit or a payment. Left out, it has no price."
                   },
                   "timezone": {
                     "type": "string",

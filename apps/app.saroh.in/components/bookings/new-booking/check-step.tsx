@@ -28,7 +28,10 @@ export function CheckStep({
     packsFailed = null,
     refusal,
     where = null,
+    free = false,
 }: {
+    /** A free service (DEC-261): nothing to pay, so no way to pay is asked. */
+    free?: boolean;
     /**
      * Where (DEC-233, board GC2NewBooking): the service's own way, or a
      * Google Meet of this booking's own. Null while Google isn't on here.
@@ -63,7 +66,16 @@ export function CheckStep({
                     Needs attention: {attention}
                 </Notice>
             ) : null}
-            <PayChoice className="mt-1" {...pay} />
+            {free ? (
+                <p
+                    data-ph-unmask=""
+                    className="m-0 mt-1 text-sm text-muted-foreground"
+                >
+                    It&apos;s free, so there&apos;s nothing to pay.
+                </p>
+            ) : (
+                <PayChoice className="mt-1" {...pay} />
+            )}
             {packs && packs.options.length > 1 ? (
                 <OptionSelect
                     aria-label="Which pack"

@@ -547,6 +547,28 @@ describe.each([
 });
 
 describe("New booking, each state", { timeout: 15_000 }, () => {
+    it("a free service asks no way to pay, books with none, and says Free (DEC-261)", async () => {
+        await open({ services: [{ ...ASSESS, priceCents: 0 }, PILATES] });
+        await toCheck();
+        expect(text()).toContain("It's free, so there's nothing to pay.");
+        expect(text()).not.toContain("Pays at the visit");
+        expect(text()).toContain(
+            "Kabir Singh · Physio assessment · with Meera Iyer · free",
+        );
+        await press(foot());
+        const sent = bookByHand.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(sent).not.toHaveProperty("paidWith");
+        expect(sent).not.toHaveProperty("paidBy");
+        expect(text()).toContain("Kabir is booked");
+        expect(text()).toContain("Nothing to pay");
+        const wa = sheet().querySelector<HTMLAnchorElement>(
+            'a[href^="https://wa.me/"]',
+        );
+        expect(decodeURIComponent(wa?.getAttribute("href") ?? "")).toContain(
+            "It's free, there's nothing to pay.",
+        );
+    });
+
     it("finds an existing customer by phone and shows their Needs attention", async () => {
         readCustomerAttention.mockResolvedValue({
             entries: [
