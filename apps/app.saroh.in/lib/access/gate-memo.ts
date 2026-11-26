@@ -25,7 +25,8 @@ import { getActiveOrgId } from "@/lib/api/http";
  *   `forgetGate`: this isolate drops the business's entries. The browser
  *   sets a new epoch as its save lands (`afterSettingsSave`,
  *   `invalidateOrganizations`; `gate-epoch.ts`), so its next request in
- *   any isolate misses.
+ *   any isolate misses. A write the browser sends to the API itself gets
+ *   a new epoch from the API (`apps/api.saroh.in/src/common/gate-epoch.ts`).
  *   Someone else's role changed is seen by them within `GATE_MEMO_TTL_MS`.
  */
 
