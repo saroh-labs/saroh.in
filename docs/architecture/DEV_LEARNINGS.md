@@ -7186,3 +7186,108 @@ page's customers. The app's one caller now asks for a single email.
 **Rule**: a list read that grows with a business's activity has a page size
 and a hard maximum (`store-list-query.spec.ts`).
 **Category**: performance · `orders`, `customers`
+
+## API — a list the screen draws whole reads the newest rows only
+
+**Symptom**: 26 Nov 2026 release review: the inbox, a lead's messages,
+timeline and open tasks, and the contacts list read every row; a product's
+rating summary read one row per review.
+**Fix**: each reads the newest `LIST_LIMIT` (`common/store-list-query.ts`,
+the same number as the app's `lib/lists/capped.ts`), and Contacts says when
+it shows only the newest. The rating summary counts reviews per star in
+the database (`groupBy`).
+**Rule**: a list read that grows with a business's activity has a page
+size or a "latest N" window, and a summary is counted by the database, not
+read row by row and counted in the API.
+**Category**: performance · `notifications`, `communications`, `leads`,
+`contacts`, `products`
+
+## Limits — a key that opens nothing counts against its caller
+
+**Symptom**: 26 Nov 2026 release review: a public API, storefront or MCP
+call with a well-formed key that matched nothing answered 401 however
+often it came.
+**Fix**: the three front doors count each refused key or token per caller
+address (`api-keys/wrong-key-limit.ts`, a `SharedRateLimiter`); past the
+window the answer is 429 with `Retry-After`. A key that works is never
+counted, so callers sharing an address keep their own per-key limits.
+**Rule**: a credential check that reads the database on a miss counts the
+misses (lens 2). Tested in `wrong-key-limit.spec.ts`.
+**Category**: security · limits
+
+## Providers — every outbound call has a timeout
+
+**Symptom**: 26 Nov 2026 release review: some provider sends (email and
+WhatsApp through a business's own provider, some payment calls) and the
+main SMTP transport waited on their library defaults, which run to
+minutes; one slow provider held its job lane.
+**Fix**: each `fetch` passes `providerCallSignal()`, and every SMTP
+transport takes `SEND_TIMEOUTS` (`common/email.ts`). A send that times out
+throws, so the job's retry rules send it again; it is never marked sent.
+**Rule**: an outbound call sets a timeout. Enforced by
+`src/common/provider-timeouts.spec.ts`, which lists every `fetch` and
+`createTransport` without one. The job worker has no per-job ceiling on
+purpose: a handler can't be cancelled, and the data export keeps its
+lease past the visibility window.
+**Category**: reliability · providers, jobs
+
+## Images — the header is checked before anything decodes
+
+**Symptom**: 26 Nov 2026 release review: the share card decoded a photo's
+pixels with no check on its size; an upload's width and height come from
+the browser.
+**Fix**: `common/image-size.ts` reads the size from the file's header
+(PNG, JPEG, WebP, GIF) and the card draws its tile for an image past the
+byte or pixel limit, as for one it can't read.
+**Rule**: a decode in the API checks the file's own header first. Tested
+with header-only images made in `image-size.spec.ts`.
+**Category**: performance · `share-posts`
+
+## Validation — a body nested too deeply is a 400
+
+**Symptom**: 26 Nov 2026 release review: a JSON body nested very deeply
+made validation run out of stack, and the API answered 500.
+**Fix**: `BodyDepthPipe` (`common/pipes/body-depth.pipe.ts`), first of the
+global pipes, refuses a body nested past a fixed depth with a 400 before
+validation; its own walk uses a list, not recursion.
+**Rule**: anything that walks a caller's value walks it without recursion,
+or after its depth is bounded. Tested in `body-depth.pipe.spec.ts`.
+**Category**: security · validation
+
+## Validation — every whole number a DTO takes has an upper bound
+
+**Symptom**: 26 Nov 2026 release review: a merchant order line's quantity
+had a lower bound only; a value past what the column holds passed
+validation and failed in the database as a 500.
+**Fix**: order and refund lines take the invoice line's bound, stock
+fields the stock screens', and an amount in minor units or a revision
+with nothing smaller takes `INT_COLUMN_MAX` (`common/validation.ts`).
+**Rule**: a DTO's whole number has `@Max` (or `@IsIn`) beside its `@Min`.
+Enforced by `src/common/dto-number-bounds.spec.ts`, which reads every
+`*dto.ts` file's validation metadata.
+**Category**: correctness · DTOs
+
+## Limits — a signed-in call counts the person, not the address
+
+**Symptom**: 26 Nov 2026 release review: coupon tries on Plan & billing
+counted per address, and the workspace calls the API from its own
+servers, so every merchant shared one count.
+**Fix**: coupon tries count per business and per signed-in person
+(`billing/checkout.service.ts`). The Book page's timetable read keeps its
+per-visitor count in Redis.
+**Rule**: a limit on a route only signed-in people reach keys on the
+person or the business, never on the address. Tested in
+`billing/coupon-tries.spec.ts`.
+**Category**: limits · `billing`, `bookings`
+
+## Capabilities — only a write that succeeded forgets module lists
+
+**Symptom**: 26 Nov 2026 release review: any write outside a business's
+own path, answered or not, forgot every business's module lists.
+**Fix**: `modules-cache.middleware.ts` forgets only after a 2xx or 3xx: a
+business's path or the business its guard proved forgets that business's
+lists; the admin console, billing and payment webhooks and MCP forget
+them all; anything else forgets nothing.
+**Rule**: a cache is cleared by the writes that can change it, after they
+succeed. Tested in `module-availability.service.spec.ts`.
+**Category**: performance · `capabilities`
