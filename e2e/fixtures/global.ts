@@ -99,7 +99,7 @@ export async function rollOut(
             const res = await staff.request.put(
                 `${urls.API_URL}/admin/flags/${flag}/organizations/${b.id}`,
                 {
-                    headers: { origin: urls.APP_URL },
+                    headers: { origin: urls.ADMIN_URL },
                     data: {
                         enabled: true,
                         reason: "Browser test of a business's own",

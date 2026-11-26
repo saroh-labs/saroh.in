@@ -58,6 +58,7 @@ real ones, and set:
 | `REDIS_URL`                                  | your Redis                                                                                        |
 | `API_REPLICAS`, `DB_POOL_MAX`                | as production will run them (unset: 1 and pg's 10)                                                |
 | `CORS_ORIGIN`, `BETTER_AUTH_TRUSTED_ORIGINS` | include the origin `setup.mjs` signs in from (`LOAD_APP_ORIGIN`)                                  |
+| `ADMIN_URL`                                  | `LOAD_APP_ORIGIN` too: staff's `/admin` writes are taken only from the admin console's origin     |
 
 Let it run a minute before measuring: the start-up sweeps and the first
 requests (cold caches, JIT) are not the steady state.

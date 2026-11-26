@@ -39,7 +39,7 @@ async function rollOut(browser: Browser, orgId: string, testInfo: TestInfo) {
             const res = await staff.request.put(
                 `${urls.API_URL}/admin/flags/MODULE_${key}/organizations/${orgId}`,
                 {
-                    headers: { origin: urls.APP_URL },
+                    headers: { origin: urls.ADMIN_URL },
                     data: {
                         enabled: true,
                         reason: "Booking page browser test (DEC-175)",

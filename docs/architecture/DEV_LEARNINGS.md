@@ -7186,3 +7186,60 @@ page's customers. The app's one caller now asks for a single email.
 **Rule**: a list read that grows with a business's activity has a page size
 and a hard maximum (`store-list-query.spec.ts`).
 **Category**: performance · `orders`, `customers`
+
+## Sign-in — a wrong password answers the same for every account
+
+**Symptom**: 26 Nov 2026 release review: the per-address code-mail cap was
+asked before the password was checked, so the answer to a wrong password
+depended on what kind of account the address had.
+**Fix**: a password sign-in asks the cap only after Better Auth has checked
+the password and answered `EMAIL_NOT_VERIFIED`; the code is then mailed by
+`signInCodeMailHook` (`@saroh/auth`), and `emailVerification.sendOnSignIn`
+is off. A wrong password asks nothing and mails nothing.
+**Rule**: a check that depends on the account runs after the credential is
+proven; before it, every address gets the same status, body, headers and
+work. Tested in `packages/auth/src/sign-in-code.test.ts`.
+**Category**: security · `packages/auth`
+
+## Site sign-in — every address takes the same code path
+
+**Symptom**: 26 Nov 2026 release review: with email sign-in off, a code
+request for an address that may sign in by email did more work than one
+for any other address.
+**Fix**: every request takes the same limits and writes a code row; an
+address that may not sign in by email gets a decoy row no code matches,
+and the one real send goes in the background
+(`sign-in-codes.service.ts`).
+**Rule**: a public sign-in step answers alike, and in the same time, for
+every address, whichever ways the site offers.
+**Category**: security · `site-accounts`
+
+## Admin — writes come from the admin console only
+
+**Symptom**: 26 Nov 2026 release review: `/admin` writes were taken from
+any trusted Saroh origin, and an address that belongs to no edition left
+the edition check out.
+**Fix**: an `/admin` write's Origin or Referer must be one of
+`adminOrigins()` (`ADMIN_URL`, else each edition's console beside
+`BETTER_AUTH_URL`); in production an address with no edition serves no
+console. The CI and prepush browser stacks set `ADMIN_URL`.
+**Rule**: a control plane takes writes from its own app's origin, not from
+every first-party one. `admin-session.ts`, `platform-admin.guard.spec.ts`.
+**Category**: security · admin
+
+## Admin and Social — small consistency fixes
+
+**Symptom**: 26 Nov 2026 release review: an Owner change could be confirmed
+by the person it was about; an upload's files were deleted before its
+ledger rows; disconnecting Facebook or Instagram left Saroh's grant at
+Meta; Social's consent state could be used twice; the Channels list read
+token columns; a published Our team page carried internal ids.
+**Fix**: the confirmer is neither the requester nor the subject (DENIED row
+otherwise); objects are deleted after the ledger transaction commits;
+disconnect revokes at Meta when it's the person's last channel, logging a
+failure; the state's nonce is spent once, as Calendar's; the list selects
+its fields; the live team read drops `staffId`.
+**Rule**: a two-person check names both people it excludes; files go after
+their record; a disconnect revokes at the provider where it can; secret
+models are read with a `select`.
+**Category**: security · admin, social, sites
