@@ -4,18 +4,18 @@ import { MEET_ACCESS_WORDS } from "@/lib/google-calendar/words";
  * side panel holds, its title and sentence, More details' rows on a new
  * service and the three cards of a saved one, and how its own hours read
  * in a row. Pure and client-safe; the words around the questions and the
- * live line are `service-form.ts`'s.
+ * live line are `form.ts`'s.
  */
 
 import { formatClockRange } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 
-import type { ServiceDraft, ServiceField } from "./service-editor";
-import { draftVisits, toMinor } from "./service-editor";
-import { freeTimeOf, listWords } from "./service-form";
-import type { HoursRow } from "./service-hours-draft";
-import { timeToMinutes } from "./service-hours-draft";
+import type { ServiceDraft, ServiceField } from "./editor";
+import { draftVisits, toMinor } from "./editor";
+import { freeTimeOf, listWords } from "./form";
+import type { HoursRow } from "./hours-draft";
+import { timeToMinutes } from "./hours-draft";
 
 // ---------------------------------------------------------------------
 // More details (new) and the group cards (edit)

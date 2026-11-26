@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { FACT_DOT } from "@/lib/format/join";
 
-import type { WhoFields } from "./service-cards";
+import type { WhoFields } from "./cards";
 import {
     isTaking,
     nobodyTakesLine,
@@ -15,7 +15,7 @@ import {
     weekLine,
     whoCanBook,
     whoPatch,
-} from "./service-cards";
+} from "./cards";
 
 const who = (over: Partial<WhoFields> = {}): WhoFields => ({
     status: "ACTIVE",

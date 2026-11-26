@@ -5,7 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ChevronRight, Pencil } from "lucide-react";
 import { useId } from "react";
 
-import type { Card, DetailRow, PanelKey } from "@/lib/services/service-panels";
+import type { Card, DetailRow, PanelKey } from "@/lib/services/panels";
 
 /** Shown at a phone's width only, and at a desk's only. */
 export const PHONE = "min-[760px]:hidden";

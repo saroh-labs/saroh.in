@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { Service } from "./service";
 import {
     businessModeFor,
     changedSections,
@@ -9,7 +8,8 @@ import {
     draftOf,
     gstGoesOnTop,
     serviceInput,
-} from "./service-editor";
+} from "./editor";
+import type { Service } from "./service";
 
 /**
  * "GST on this price" in the Service Editor (12 Oct 2026): a service's own

@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { keepAllSamples, keepService } from "@/lib/services/actions";
-import { keptToast } from "@/lib/services/service-cards";
+import { keptToast } from "@/lib/services/cards";
 import { useServiceSave } from "@/lib/services/use-services";
 
 /** Which keep is saving: a service's id, or every sample. */

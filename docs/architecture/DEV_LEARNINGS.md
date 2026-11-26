@@ -1948,7 +1948,7 @@ storefront first." to say location would have silently moved the app's
 inline note under Time into a generic error toast.
 **Root cause**: `components/services/service-editor/service-editor.tsx`
 decides where to show the refusal with `error === TREATMENT_NEEDS_STOREFRONT`,
-a copy of the API's sentence kept in `lib/services/service-editor.ts`. The
+a copy of the API's sentence kept in `lib/services/editor.ts`. The
 API already sends `details.reason: "no-storefront"`, but the app's save path
 passes only the message on.
 **Fix**: the app's constant changed in the same commit as the API's words.

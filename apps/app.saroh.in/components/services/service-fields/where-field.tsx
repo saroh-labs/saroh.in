@@ -6,8 +6,8 @@ import { useId } from "react";
 import { Eyebrow } from "@/components/bookings/calendar/parts";
 import { MeetAccessChoice } from "@/components/shared/google-meet/meet-access-choice";
 import type { MeetAccess, MeetSetup } from "@/lib/google-calendar/types";
+import { needsMeetingLink, whereNote } from "@/lib/services/editor";
 import type { LocationType, MeetingLink } from "@/lib/services/service";
-import { needsMeetingLink, whereNote } from "@/lib/services/service-editor";
 
 import { HELP } from "@/components/services/service-editor/fields";
 import { ChipGroup, RadioCards } from "@saroh/ui/choice-group";

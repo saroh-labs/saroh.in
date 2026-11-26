@@ -123,6 +123,8 @@ export const RQ_DOMAINS: readonly string[] = [
     "data-export",
     "webhooks",
     "qr",
+    "services",
+    "sites",
 ];
 
 /** Whether `pathname` is one of {@link RQ_ROUTES}. */

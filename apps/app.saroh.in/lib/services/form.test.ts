@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { ServiceDraft } from "./service-editor";
-import { draftOf } from "./service-editor";
+import type { ServiceDraft } from "./editor";
+import { draftOf } from "./editor";
 import {
     addedMessage,
     bookersOf,
@@ -17,8 +17,8 @@ import {
     sameNameAs,
     takingLine,
     withSameName,
-} from "./service-form";
-import { daysWords, detailRows, editCards } from "./service-panels";
+} from "./form";
+import { daysWords, detailRows, editCards } from "./panels";
 
 const draft = (over: Partial<ServiceDraft> = {}): ServiceDraft => ({
     ...draftOf(null, [], "Asia/Kolkata"),

@@ -6,14 +6,10 @@ import { useId } from "react";
 
 import type { PlanLock } from "@/lib/billing/access";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
+import type { ServiceCharged } from "@/lib/services/editor";
+import { draftVisits, gstGoesOnTop, toMinor } from "@/lib/services/editor";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
-import type { ServiceCharged } from "@/lib/services/service-editor";
-import {
-    draftVisits,
-    gstGoesOnTop,
-    toMinor,
-} from "@/lib/services/service-editor";
 import type { BookingPaymentView } from "@/lib/staff/types";
 
 import type { Edit } from "@/components/services/service-editor/fields";

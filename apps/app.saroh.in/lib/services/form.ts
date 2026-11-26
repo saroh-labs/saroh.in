@@ -6,21 +6,21 @@
  * paused), the More details rows, the edit page's group cards and which
  * fields each side panel holds. Pure and client-safe, so the screens and
  * their tests agree. The draft, its problems and what Save sends are
- * `service-editor.ts`'s.
+ * `editor.ts`'s.
  */
 
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 
-import type { WhoCanBook, WhoFields } from "./service-cards";
-import { pauseToast } from "./service-cards";
+import type { WhoCanBook, WhoFields } from "./cards";
+import { pauseToast } from "./cards";
 import type {
     ServiceDraft,
     ServiceField,
     ServiceKind,
     ServiceProblem,
-} from "./service-editor";
-import { hasBookableHours, toMinor } from "./service-editor";
+} from "./editor";
+import { hasBookableHours, toMinor } from "./editor";
 
 /** "a, b, and c": the board's own list, with the comma before "and". */
 export function listWords(items: readonly string[]): string {

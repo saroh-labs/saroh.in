@@ -4,8 +4,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useId } from "react";
 
 import { WhoTag } from "@/components/services/list/services-rows";
-import type { Bookers } from "@/lib/services/service-form";
-import { bookerWords, mixOf, WHO_CAN_BOOK } from "@/lib/services/service-form";
+import type { Bookers } from "@/lib/services/form";
+import { bookerWords, mixOf, WHO_CAN_BOOK } from "@/lib/services/form";
 import { CheckRow } from "@saroh/ui/check-row";
 
 /**

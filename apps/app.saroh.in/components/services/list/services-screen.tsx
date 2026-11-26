@@ -24,10 +24,7 @@ import type { ModuleView } from "@/lib/modules/schema";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import type { BookingLinkView } from "@/lib/services/booking-link";
 import { callName } from "@/lib/services/call-name";
-import { onlineBookingProblem } from "@/lib/services/online-booking";
-import type { ServicePerson } from "@/lib/services/queries";
-import type { Service } from "@/lib/services/service";
-import type { WhoFields } from "@/lib/services/service-cards";
+import type { WhoFields } from "@/lib/services/cards";
 import {
     nobodyTakesLine,
     samplesLine,
@@ -37,7 +34,10 @@ import {
     TAKING_LABEL,
     weekLine,
     whoCanBook,
-} from "@/lib/services/service-cards";
+} from "@/lib/services/cards";
+import { onlineBookingProblem } from "@/lib/services/online-booking";
+import type { ServicePerson } from "@/lib/services/queries";
+import type { Service } from "@/lib/services/service";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { ShareSetup } from "@/lib/share-item/share";
 import type { BookingPaymentView } from "@/lib/staff/types";

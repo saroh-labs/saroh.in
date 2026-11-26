@@ -1,6 +1,6 @@
 "use client";
 
-import { TREATMENT_NEEDS_STOREFRONT } from "@/lib/services/service-editor";
+import { TREATMENT_NEEDS_STOREFRONT } from "@/lib/services/editor";
 
 import { HELP, NumberField } from "@/components/services/service-editor/fields";
 import { TextLink } from "@saroh/ui/text-link";

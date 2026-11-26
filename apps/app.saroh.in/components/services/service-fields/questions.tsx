@@ -12,10 +12,10 @@ import type { ReactNode } from "react";
 import { useId } from "react";
 
 import { Face } from "@/components/bookings/availability/face";
+import { AVAILABILITY_HREF } from "@/lib/services/cards";
+import type { ServiceKind } from "@/lib/services/editor";
+import { sameNameLine } from "@/lib/services/form";
 import type { ServicePerson } from "@/lib/services/queries";
-import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
-import type { ServiceKind } from "@/lib/services/service-editor";
-import { sameNameLine } from "@/lib/services/service-form";
 import { CheckRow } from "@saroh/ui/check-row";
 import { FailedRead } from "@saroh/ui/failed-read";
 
