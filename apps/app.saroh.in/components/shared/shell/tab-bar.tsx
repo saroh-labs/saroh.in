@@ -41,7 +41,10 @@ export function TabBar({
     stockTracked = null,
     kind,
     pending = false,
+    userId,
 }: {
+    /** Whose menu: the More sheet's folds are this person's (DEC-279). */
+    userId?: string;
     /** The modules aren't read yet: the tabs are skeleton pieces. */
     pending?: boolean;
     /** What is being set up (DEC-070); see `navFor`. */
@@ -102,6 +105,7 @@ export function TabBar({
                 <TabBarSheet
                     groups={nav.groups}
                     note={nav.note}
+                    userId={userId}
                     trigger={(open) => (
                         // While the sheet is open, More takes the current
                         // style: it is where you are.
