@@ -404,7 +404,9 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
             page.getByRole("heading", { name: "At a glance" }),
         ).toBeVisible();
         await expect(
-            page.getByRole("link", { name: "Membership plans", exact: true }),
+            page
+                .getByRole("navigation", { name: "Breadcrumb" })
+                .getByRole("link", { name: "Membership plans", exact: true }),
         ).toHaveAttribute("href", "/billing/subscriptions?tab=plans");
 
         await page.getByRole("tab", { name: /^Subscribers/ }).click();

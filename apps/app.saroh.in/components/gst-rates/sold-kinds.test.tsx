@@ -132,8 +132,12 @@ beforeEach(() => {
     saveGstRates.mockResolvedValue({ ok: true, data: { saved: 1 } });
 });
 
-afterEach(() => {
+afterEach(async () => {
     act(() => root.unmount());
+    // A closing dialog's focus scope hands focus back on a 0 ms timer. Let
+    // it run while this file's window still exists: fired after the file
+    // ends, it throws in another file's window and fails the whole run.
+    await new Promise((done) => setTimeout(done, 0));
     host.remove();
     document.body.innerHTML = "";
 });
