@@ -78,6 +78,27 @@ async function overlappingControls(page: Page) {
                 'nav[aria-label="Main"], button[aria-label="New"]',
             ),
         ];
+        // What of a control is drawn: its box, cut to every scrolling or
+        // clipping box around it.
+        const shown = (el: HTMLElement) => {
+            const r = el.getBoundingClientRect();
+            let { left, right, top, bottom } = r;
+            for (let p = el.parentElement; p; p = p.parentElement) {
+                const o = getComputedStyle(p);
+                if (
+                    !/(auto|scroll|hidden|clip)/.test(o.overflowX + o.overflowY)
+                )
+                    continue;
+                const c = p.getBoundingClientRect();
+                left = Math.max(left, c.left);
+                right = Math.min(right, c.right);
+                top = Math.max(top, c.top);
+                bottom = Math.min(bottom, c.bottom);
+            }
+            return right - left > 1 && bottom - top > 1
+                ? { left, right, top, bottom }
+                : null;
+        };
         const hits: string[] = [];
         for (let i = 0; i < els.length; i++) {
             for (let j = i + 1; j < els.length; j++) {
@@ -93,8 +114,11 @@ async function overlappingControls(page: Page) {
                 const floats = (el: HTMLElement) =>
                     getComputedStyle(el).position === "fixed";
                 if (floats(a) !== floats(b)) continue;
-                const ra = a.getBoundingClientRect();
-                const rb = b.getBoundingClientRect();
+                const ra = shown(a);
+                const rb = shown(b);
+                // Scrolled out of its own box (a long menu's lower rows):
+                // not drawn, so it shares no pixels with anything.
+                if (!ra || !rb) continue;
                 if (
                     ra.left < rb.right - 1 &&
                     rb.left < ra.right - 1 &&
