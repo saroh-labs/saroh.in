@@ -68,7 +68,7 @@ export function assertAdminWriteOrigin(
     headers: IncomingHttpHeaders | undefined,
 ): void {
     if (!isMutating(method)) return;
-    const claimed = headers?.origin || headers?.referer;
+    const claimed = [headers?.origin, headers?.referer].find(Boolean);
     if (claimed) {
         let origin: string | null = null;
         try {
