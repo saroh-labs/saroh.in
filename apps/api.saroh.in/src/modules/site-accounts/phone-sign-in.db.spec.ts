@@ -65,6 +65,8 @@ const transport = new FakeMessagingProvider();
 const verification = new VerificationService();
 const wallet = new WalletService();
 const emails: { to: string; code: string }[] = [];
+/** Told when an email goes, for a send made in the background. */
+const mailWaiters: (() => void)[] = [];
 
 const send = new VerificationSendService(
     verification,
@@ -82,6 +84,7 @@ const codes = new SignInCodesService(
         alerts,
         (to, details) => {
             emails.push({ to, code: details.code });
+            for (const told of mailWaiters.splice(0)) told();
             return Promise.resolve("sent");
         },
         [0, 0],
@@ -770,8 +773,8 @@ describe("site sign-in by WhatsApp code (DEC-196)", () => {
 
             /** The send goes in the background: wait for it. */
             async function mailed(count: number) {
-                for (let i = 0; i < 100 && emails.length < count; i++)
-                    await new Promise((resolve) => setTimeout(resolve, 20));
+                while (emails.length < count)
+                    await new Promise<void>((told) => mailWaiters.push(told));
                 return emails.length;
             }
 
