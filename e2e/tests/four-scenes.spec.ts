@@ -88,6 +88,11 @@ async function overlappingControls(page: Page) {
                 if (fixed.some((f) => f.contains(a) !== f.contains(b))) {
                     continue;
                 }
+                // Any other floating button (Bookings' New booking on a
+                // phone) is the same design: the page scrolls beneath it.
+                const floats = (el: HTMLElement) =>
+                    getComputedStyle(el).position === "fixed";
+                if (floats(a) !== floats(b)) continue;
                 const ra = a.getBoundingClientRect();
                 const rb = b.getBoundingClientRect();
                 if (
