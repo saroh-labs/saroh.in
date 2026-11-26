@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { runAction } from "@/lib/api/run-action";
 import { initials } from "@/lib/names";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import {
     createComment,
     deleteComment,
@@ -65,6 +66,7 @@ export function BlockFeedback({
     reviewer?: boolean;
 }) {
     const zone = useBusinessZone();
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [reply, setReply] = useState("");
     /** Your own note being rewritten, and the words so far. */
     const [editing, setEditing] = useState<{ id: string; body: string } | null>(
@@ -86,7 +88,12 @@ export function BlockFeedback({
     /** Settle a note, or reopen a settled one. */
     async function setSettled(comment: SiteCommentView, settled: boolean) {
         setBusy((prev) => new Set(prev).add(comment.id));
-        const res = await setCommentResolved(siteId, comment.id, settled);
+        const res = await setCommentResolved(
+            siteId,
+            comment.id,
+            settled,
+            orgId,
+        );
         setBusy((prev) => {
             const next = new Set(prev);
             next.delete(comment.id);
@@ -106,7 +113,7 @@ export function BlockFeedback({
         const body = editing.body.trim();
         if (!body) return;
         const res = await runAction(
-            () => updateCommentBody(siteId, editing.id, body),
+            () => updateCommentBody(siteId, editing.id, body, orgId),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -123,7 +130,7 @@ export function BlockFeedback({
         const body = reply.trim();
         if (!body || sectionKey === undefined) return;
         const res = await runAction(
-            () => createComment(siteId, { pageId, sectionKey, body }),
+            () => createComment(siteId, { pageId, sectionKey, body }, orgId),
             { setBusy: setSending },
         );
         if (!res) return;
@@ -417,7 +424,7 @@ export function BlockFeedback({
                 keepLabel="Keep note"
                 onConfirm={async () => {
                     if (!deleting) return;
-                    const res = await deleteComment(siteId, deleting.id);
+                    const res = await deleteComment(siteId, deleting.id, orgId);
                     if (!res.ok) return res;
                     setDeleting(null);
                     showSuccess("Note deleted.");

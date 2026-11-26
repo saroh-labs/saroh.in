@@ -73,8 +73,8 @@ import { readTemplatePreviewDetails } from "./template-preview-read";
  * components call these — never the api or the database directly.
  */
 
-export async function createSite(input: CreateSiteInput) {
-    return createSiteApi(input);
+export async function createSite(input: CreateSiteInput, orgId?: string) {
+    return writeAsOrgIfSent(orgId, () => createSiteApi(input));
 }
 
 export async function saveDraftSections(
@@ -118,8 +118,9 @@ export async function createComment(
     siteId: string,
     /** A page's section, or a post (DEC-200 U8). */
     input: Parameters<typeof createCommentApi>[1],
+    orgId?: string,
 ) {
-    return createCommentApi(siteId, input);
+    return writeAsOrgIfSent(orgId, () => createCommentApi(siteId, input));
 }
 
 /**
@@ -132,8 +133,11 @@ export async function createApproval(
     testReleaseId?: string,
     /** What needs changing, with CHANGES_REQUESTED (UX-043). */
     reason?: string,
+    orgId?: string,
 ) {
-    return createApprovalApi(siteId, outcome, testReleaseId, reason);
+    return writeAsOrgIfSent(orgId, () =>
+        createApprovalApi(siteId, outcome, testReleaseId, reason),
+    );
 }
 
 /** Approve, or ask for changes on, waiting changes (DEC-226, U9). */
@@ -147,13 +151,19 @@ export async function recordChangeVerdict(
 }
 
 /** Take back the draft's open review request (UX-068). */
-export async function withdrawReview(siteId: string) {
-    return withdrawReviewApi(siteId);
+export async function withdrawReview(siteId: string, orgId?: string) {
+    return writeAsOrgIfSent(orgId, () => withdrawReviewApi(siteId));
 }
 
 /** Ask for a review (#278), of the draft or of a test release (T12). */
-export async function requestReview(siteId: string, testReleaseId?: string) {
-    return requestReviewApi(siteId, testReleaseId);
+export async function requestReview(
+    siteId: string,
+    testReleaseId?: string,
+    orgId?: string,
+) {
+    return writeAsOrgIfSent(orgId, () =>
+        requestReviewApi(siteId, testReleaseId),
+    );
 }
 
 /**
@@ -333,8 +343,11 @@ export async function setCommentResolved(
     siteId: string,
     commentId: string,
     resolved: boolean,
+    orgId?: string,
 ) {
-    return setCommentResolvedApi(siteId, commentId, resolved);
+    return writeAsOrgIfSent(orgId, () =>
+        setCommentResolvedApi(siteId, commentId, resolved),
+    );
 }
 
 /** Rewrite your own open note (DEC-200 U3). */
@@ -342,13 +355,20 @@ export async function updateCommentBody(
     siteId: string,
     commentId: string,
     body: string,
+    orgId?: string,
 ) {
-    return updateCommentBodyApi(siteId, commentId, body);
+    return writeAsOrgIfSent(orgId, () =>
+        updateCommentBodyApi(siteId, commentId, body),
+    );
 }
 
 /** Delete your own open note (DEC-200 U3). */
-export async function deleteComment(siteId: string, commentId: string) {
-    return deleteCommentApi(siteId, commentId);
+export async function deleteComment(
+    siteId: string,
+    commentId: string,
+    orgId?: string,
+) {
+    return writeAsOrgIfSent(orgId, () => deleteCommentApi(siteId, commentId));
 }
 
 export async function listPreviewLinks(siteId: string) {

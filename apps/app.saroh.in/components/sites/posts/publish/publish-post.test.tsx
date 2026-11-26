@@ -546,11 +546,15 @@ describe("the reviewer's view (U17, DEC-200)", () => {
             box.dispatchEvent(new Event("input", { bubbles: true }));
         });
         await settle(() => named("Add note")?.click());
-        expect(createComment).toHaveBeenCalledWith("s1", {
-            postId: "p1",
-            body: "Say how long.",
-            quote: "A trial is a rehearsal.",
-        });
+        expect(createComment).toHaveBeenCalledWith(
+            "s1",
+            {
+                postId: "p1",
+                body: "Say how long.",
+                quote: "A trial is a rehearsal.",
+            },
+            undefined,
+        );
     });
 
     it("ignores a selection outside the post", () => {

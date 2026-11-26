@@ -9,6 +9,7 @@ import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { runAction } from "@/lib/api/run-action";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import {
     createApproval,
     requestReview,
@@ -93,6 +94,7 @@ export function ReviewPanel({
     settledOnly?: boolean;
     onShowAll?: () => void;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [busy, setBusy] = useState<string | null>(null);
     const [showResolved, setShowResolved] = useState(false);
     const [recording, setRecording] = useState(false);
@@ -111,7 +113,7 @@ export function ReviewPanel({
         reason?: string,
     ): Promise<boolean> {
         const res = await runAction(
-            () => createApproval(siteId, outcome, release?.id, reason),
+            () => createApproval(siteId, outcome, release?.id, reason, orgId),
             { setBusy: setRecording },
         );
         if (!res) return false;
@@ -130,7 +132,7 @@ export function ReviewPanel({
 
     /** Take the draft's request back (UX-068): it no longer reads In review. */
     async function withdraw() {
-        const res = await runAction(() => withdrawReview(siteId), {
+        const res = await runAction(() => withdrawReview(siteId, orgId), {
             setBusy: setAsking,
         });
         if (!res) return;
@@ -151,9 +153,12 @@ export function ReviewPanel({
      * still works, and is recorded as a bypass.
      */
     async function ask() {
-        const res = await runAction(() => requestReview(siteId, release?.id), {
-            setBusy: setAsking,
-        });
+        const res = await runAction(
+            () => requestReview(siteId, release?.id, orgId),
+            {
+                setBusy: setAsking,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);
@@ -262,6 +267,7 @@ export function ReviewPanel({
                     siteId,
                     comment.id,
                     comment.resolvedAt === null,
+                    orgId,
                 ),
             { setBusy: (on) => setBusy(on ? comment.id : null) },
         );

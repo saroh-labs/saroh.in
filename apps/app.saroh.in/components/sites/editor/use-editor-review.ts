@@ -2,6 +2,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import {
     createApproval,
     getReviewState,
@@ -39,6 +40,7 @@ export function useEditorReview({
     const [comments, setComments] =
         useState<SiteCommentView[]>(initialComments);
     const [review, setReview] = useState<ReviewState>(initialReview);
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [asking, setAsking] = useState(false);
     const [recording, setRecording] = useState(false);
     /**
@@ -116,7 +118,7 @@ export function useEditorReview({
         reason?: string,
     ): Promise<boolean> {
         const res = await runAction(
-            () => createApproval(siteId, outcome, undefined, reason),
+            () => createApproval(siteId, outcome, undefined, reason, orgId),
             { setBusy: setRecording },
         );
         if (!res) return false;
@@ -141,7 +143,7 @@ export function useEditorReview({
     async function askForReview() {
         setAsking(true);
         try {
-            const res = await requestReview(siteId);
+            const res = await requestReview(siteId, undefined, orgId);
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -164,7 +166,7 @@ export function useEditorReview({
     async function withdraw() {
         setAsking(true);
         try {
-            const res = await withdrawReview(siteId);
+            const res = await withdrawReview(siteId, orgId);
             if (!res.ok) {
                 showError(res.error);
                 return;

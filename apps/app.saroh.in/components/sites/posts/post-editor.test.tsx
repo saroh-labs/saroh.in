@@ -306,13 +306,14 @@ describe("PostEditor read-only, for a Reviewer (DEC-200 U8)", () => {
         if (!box) throw new Error("no note box");
         act(() => type(box, "Add the Sunday hours."));
         await settle(() => press("Add note"));
-        expect(createComment).toHaveBeenCalledWith("s1", {
-            postId: "p1",
-            body: "Add the Sunday hours.",
-        });
+        expect(createComment).toHaveBeenCalledWith(
+            "s1",
+            { postId: "p1", body: "Add the Sunday hours." },
+            undefined,
+        );
 
         await settle(() => press("Delete"));
-        expect(deleteComment).toHaveBeenCalledWith("s1", "n2");
+        expect(deleteComment).toHaveBeenCalledWith("s1", "n2", undefined);
         expect(router.refresh).toHaveBeenCalled();
     });
 
@@ -335,7 +336,12 @@ describe("PostEditor read-only, for a Reviewer (DEC-200 U8)", () => {
         expect(buttons()).toContain("Publish");
         act(() => press("Feedback · 1"));
         await settle(() => press("Mark settled"));
-        expect(setCommentResolved).toHaveBeenCalledWith("s1", "n1", true);
+        expect(setCommentResolved).toHaveBeenCalledWith(
+            "s1",
+            "n1",
+            true,
+            undefined,
+        );
     });
 });
 

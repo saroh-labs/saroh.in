@@ -115,11 +115,11 @@ export function SitePublish({
                         : null
                 }
                 onAsk={(name) =>
-                    void runAction(() => requestReview(data.siteId)).then(
-                        (res) => {
-                            if (res?.ok) showSuccess(`Asked ${name} to look`);
-                        },
-                    )
+                    void runAction(() =>
+                        requestReview(data.siteId, undefined, save.orgId),
+                    ).then((res) => {
+                        if (res?.ok) showSuccess(`Asked ${name} to look`);
+                    })
                 }
                 onFlagsChanged={() => void publish.refreshFlags()}
                 onAddressSaved={(host) => {
