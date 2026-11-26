@@ -85,6 +85,7 @@ function build(options: { addressLimit?: number; verifyLimit?: number } = {}) {
         {
             assertOffered: () => Promise.resolve(),
             emailAllowed: () => Promise.resolve(true),
+            effective: () => Promise.resolve(["EMAIL"]),
             view: () =>
                 Promise.resolve({
                     effective: ["EMAIL"],
