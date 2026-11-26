@@ -26,6 +26,8 @@ import type { EmailHolder } from "@/lib/customer-workspace/service";
 import { trimmedOr } from "@/lib/forms/values";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { phoneSchema } from "@/lib/organizations/business-phone";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { TextLink } from "@saroh/ui/text-link";
 import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
@@ -49,6 +51,7 @@ type FormValues = z.infer<typeof formSchema>;
  * holds says who, with the way to them.
  */
 export function AddCustomerForm() {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const router = useRouter();
     const [holder, setHolder] = useState<EmailHolder | null>(null);
     const form = useForm<FormValues>({
@@ -70,7 +73,7 @@ export function AddCustomerForm() {
             ...optional("lastName", values.lastName),
             ...optional("phone", values.phone),
         };
-        const res = await addCustomerAction(input);
+        const res = await addCustomerAction(input, ...asOrg(orgId));
         if (!res.ok) {
             if (res.holder) setHolder(res.holder);
             if (res.field === "email" || res.holder) {

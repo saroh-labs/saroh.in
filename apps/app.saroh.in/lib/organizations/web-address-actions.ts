@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { writeAsOrgIfSent } from "@/lib/api/assert-active-org";
+
 import type { WebAddressAvailability, WebAddressRead } from "./web-address";
 import type { ChangeWebAddressResult } from "./web-address-service";
 import {
@@ -34,8 +36,12 @@ export async function checkWebAddress(
  */
 export async function saveWebAddress(
     address: string,
+    /** The tab's business (DEC-259): a moved tab is refused. */
+    orgId?: string,
 ): Promise<ChangeWebAddressResult> {
-    const result = await changeWebAddressApi(address);
+    const result = await writeAsOrgIfSent(orgId, () =>
+        changeWebAddressApi(address),
+    );
     if (result.ok) {
         revalidatePath("/settings/organization");
         revalidatePath("/", "layout");

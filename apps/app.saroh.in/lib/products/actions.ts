@@ -1,6 +1,6 @@
 "use server";
 
-import { writeAsOrg } from "@/lib/api/assert-active-org";
+import { writeAsOrg, writeAsOrgIfSent } from "@/lib/api/assert-active-org";
 
 import {
     listProductAt as listProductAtApi,
@@ -54,8 +54,9 @@ export async function deleteProduct(productId: string, orgId?: string) {
 }
 
 /** A category of the business (#529), made from any storefront's product. */
-export async function createCategory(input: CategoryInput) {
-    return createCategoryApi(input);
+/** From the product editor: the tab's business last (DEC-259). */
+export async function createCategory(input: CategoryInput, orgId?: string) {
+    return writeAsOrgIfSent(orgId, () => createCategoryApi(input));
 }
 
 export async function updateCategory(categoryId: string, input: CategoryInput) {

@@ -29,6 +29,8 @@ import {
     saveOrganizationSettingsInPlace,
 } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 
 import { CustomerBlock } from "../new-invoice/customer-block";
 import { DueStrip } from "../new-invoice/due-strip";
@@ -119,6 +121,7 @@ export function PaperEditor({
         opened: number;
     } | null>(null);
     const [savingDefault, setSavingDefault] = useState(false);
+    const orgId = useOrgIdOrNull() ?? undefined;
     const values = useWatch({ control: form.control }) as InvoiceFormValues;
     const fallback = business?.paper ?? {
         style: paper.style,
@@ -180,9 +183,10 @@ export function PaperEditor({
         const res = await runAction(
             async () => {
                 await flush();
-                return saveOrganizationSettingsInPlace({
-                    invoicePaper: paperLook,
-                });
+                return saveOrganizationSettingsInPlace(
+                    { invoicePaper: paperLook },
+                    ...asOrg(orgId),
+                );
             },
             { setBusy: setSavingDefault },
         );

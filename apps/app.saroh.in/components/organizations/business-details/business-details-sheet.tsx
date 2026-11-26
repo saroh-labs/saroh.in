@@ -36,6 +36,8 @@ import {
     readBusinessDetails,
     saveOrganizationSettings,
 } from "@/lib/organizations/settings-actions";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { RegisteredAddressFields } from "./registered-address-fields";
 import { registeredAddressShape } from "./registered-address-shape";
@@ -176,6 +178,7 @@ function DetailsForm({
     onDone: (saved: boolean) => void;
     save: typeof saveOrganizationSettings;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [refusal, setRefusal] = useState<string | null>(null);
     const schema = z
         .object({
@@ -205,7 +208,7 @@ function DetailsForm({
 
     async function onSubmit(values: BusinessDetailsValues) {
         setRefusal(null);
-        const res = await save(detailsInput(values, initial));
+        const res = await save(detailsInput(values, initial), ...asOrg(orgId));
         if (!res.ok) {
             const field = FIELDS.find((f) => f === res.field);
             if (field) {

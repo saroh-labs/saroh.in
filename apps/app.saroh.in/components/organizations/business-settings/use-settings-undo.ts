@@ -22,6 +22,7 @@ import type {
 } from "@/lib/organizations/settings-service";
 import { logoUndo, settingsUndo } from "@/lib/organizations/settings-undo";
 import { invalidateOrganizations } from "@/lib/query/invalidate";
+import { asOrg } from "@/lib/settings/use-settings";
 
 /** What an Undo's save said: done, or refused with a sentence to show. */
 export type UndoOutcome = { ok: true } | { ok: false; error: string };
@@ -115,10 +116,13 @@ export function cardUndo(
     after: OrganizationSettings,
     sent: OrganizationSettingsInput,
     apply: Apply,
+    /** The tab's business (DEC-259): an Undo in a moved tab is refused. */
+    orgId?: string,
 ): (() => Promise<UndoOutcome>) | null {
     const undo = settingsUndo(before, after, sent);
     if (!undo) return null;
-    return async () => outcome(await undoOrganizationSettings(undo), apply);
+    return async () =>
+        outcome(await undoOrganizationSettings(undo, ...asOrg(orgId)), apply);
 }
 
 /** The Undo for a logo set or taken off, or `null` (`logoUndo`). */
@@ -126,8 +130,10 @@ export function logoCardUndo(
     before: OrganizationSettings,
     after: OrganizationSettings,
     apply: Apply,
+    orgId?: string,
 ): (() => Promise<UndoOutcome>) | null {
     const undo = logoUndo(before, after);
     if (!undo) return null;
-    return async () => outcome(await undoBusinessLogo(undo), apply);
+    return async () =>
+        outcome(await undoBusinessLogo(undo, ...asOrg(orgId)), apply);
 }

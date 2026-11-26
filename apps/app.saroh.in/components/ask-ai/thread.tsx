@@ -36,7 +36,9 @@ import { useCanChangePlan } from "@/components/billing/plan-way";
 import { runAction } from "@/lib/api/run-action";
 import { askForMoreQuestions } from "@/lib/ask-ai/panel-actions";
 import { upgradeHref } from "@/lib/billing/access";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { asOrg } from "@/lib/settings/use-settings";
 import { AnswerCard } from "./answer-cards";
 import { DraftCard } from "./draft-card";
 import { QuestionImages } from "./question-images";
@@ -517,11 +519,17 @@ function AtLimit({
     const [busy, setBusy] = useState(false);
     const [sent, setSent] = useState(false);
     const canChangePlan = useCanChangePlan();
+    const orgId = useOrgIdOrNull() ?? undefined;
     const reset = refusal.resetsAt
         ? resetDay(refusal.resetsAt, ctx.zone)
         : null;
     const ask = async () => {
-        const res = await runAction(askForMoreQuestions, { setBusy });
+        const res = await runAction(
+            () => askForMoreQuestions(...asOrg(orgId)),
+            {
+                setBusy,
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             reportFailure(res);
