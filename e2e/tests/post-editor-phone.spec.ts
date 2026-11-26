@@ -133,8 +133,9 @@ for (const size of SIZES) {
                 // Details: every field, one Save.
                 await bar.getByRole("button", { name: "Details" }).click();
                 const details = page.getByRole("dialog", { name: "Details" });
+                // "Saved" only follows a real save (editor audit, 21 Nov).
                 await expect(details).toContainText(
-                    "Saved · goes live when you publish",
+                    "Goes live when you publish",
                 );
                 await expect(details).toContainText("Search and sharing");
                 const words = "Ninety minutes, two weeks before.";

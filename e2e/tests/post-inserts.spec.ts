@@ -59,7 +59,9 @@ test("Add: the / menu's new blocks save, Find opens, search and sharing in the c
             "Gallery",
             "Button",
         ]) {
-            await expect(menu.getByRole("option", { name })).toBeVisible();
+            await expect(
+                menu.getByRole("option", { name, exact: true }),
+            ).toBeVisible();
         }
         await expect(menu.getByRole("option", { name: /Video/ })).toHaveCount(
             0,

@@ -114,7 +114,8 @@ for (const size of [
             await bar
                 .getByRole("button", { name: "Publish post", exact: true })
                 .click();
-            await expect(page.getByRole("alert")).toContainText(
+            // Next's route announcer is an alert too: name the field's.
+            await expect(page.locator("#post-title-error")).toContainText(
                 "A post needs a title.",
             );
 
