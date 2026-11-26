@@ -1,5 +1,5 @@
 import { isFreeBooking, shownPaidWith } from "../bookings/booking-money";
-import { paidWords } from "./calendar.service";
+import { paidWords, payOf } from "./calendar.service";
 
 /**
  * How a booking was paid, in the Business calendar's day panel, and the one
@@ -27,14 +27,23 @@ describe("a free booking's payment words (DEC-261)", () => {
 
     it("says Free on the Business calendar, never At the desk", () => {
         const at = (paidWith: string | null, snapshot: unknown) =>
-            paidWords({
-                paidWith,
-                snapshot,
-                service: { priceCents: null },
-            });
+            paidWords(
+                payOf(
+                    {
+                        status: "CONFIRMED",
+                        outcome: null,
+                        endAt: new Date("2030-01-01T10:00:00Z"),
+                        paidWith,
+                        snapshot,
+                        service: { priceCents: null },
+                        invoices: [],
+                    },
+                    new Date("2029-12-31T10:00:00Z"),
+                ),
+            );
         expect(at("DESK", FREE)).toBe("Free");
         expect(at(null, FREE)).toBe("Free");
-        expect(at("DESK", PAID)).toBe("At the desk");
+        expect(at("DESK", PAID)).toBe("Pays at the visit");
         expect(at(null, null)).toBeNull();
     });
 });

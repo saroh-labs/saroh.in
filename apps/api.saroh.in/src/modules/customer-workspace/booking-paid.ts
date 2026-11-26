@@ -1,6 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
-import { BOOKING_PAPER } from "../bookings/desk-take";
+import { BOOKING_PAPER, BOOKING_PAPER_PAYMENTS } from "../bookings/desk-take";
 import { fromCents, toCents } from "../invoices/totals";
 
 /**
@@ -16,16 +16,23 @@ import { fromCents, toCents } from "../invoices/totals";
 
 /** The select for a booking's paper, as {@link bookingPaid} reads it. */
 export const BOOKING_PAID_INVOICES = {
-    where: { ...BOOKING_PAPER, status: "PAID" },
+    where: BOOKING_PAPER,
     select: {
+        kind: true,
+        status: true,
         total: true,
         currency: true,
         paymentMethod: true,
         paidAt: true,
+        // The one money answer reads the whole paper (DEC-272).
+        paidCents: true,
+        paymentIntents: BOOKING_PAPER_PAYMENTS,
     },
 } satisfies Prisma.Booking$invoicesArgs;
 
 export interface BookingPaidRow {
+    /** Absent reads as PAID (a row the caller already picked). */
+    status?: string;
     total: { toString(): string };
     currency: string;
     paymentMethod: string | null;
@@ -49,8 +56,9 @@ export function bookingPaid(
     rows: readonly BookingPaidRow[],
     seesMoney = true,
 ): BookingPaid | null {
-    if (rows.length === 0) return null;
-    const sorted = [...rows].sort(
+    const paidRows = rows.filter((r) => (r.status ?? "PAID") === "PAID");
+    if (paidRows.length === 0) return null;
+    const sorted = [...paidRows].sort(
         (a, b) => (a.paidAt?.getTime() ?? 0) - (b.paidAt?.getTime() ?? 0),
     );
     const cents = sorted.reduce((n, r) => n + toCents(r.total.toString()), 0);

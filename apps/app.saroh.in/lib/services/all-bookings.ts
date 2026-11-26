@@ -23,6 +23,7 @@ import {
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { LocalDate } from "@/lib/services/diary";
 import { addDays, localDateOf, whoFor } from "@/lib/services/diary";
+import { owes, payText } from "@/lib/services/money-answer";
 
 // ── Views: the chips ───────────────────────────────────────────────────────
 
@@ -92,7 +93,9 @@ function inTime(
         case "outcome":
             return needsOutcome(b, now);
         case "unconfirmed":
-            return b.status === "PENDING";
+            // Anyone who still has to pay (DEC-273): a hold, a pay link out,
+            // or a visit that has ended with money still to take.
+            return b.status === "PENDING" || owes(b.pay);
         case "today":
             return (
                 localDateOf(b.startAt, zone) ===
@@ -134,7 +137,7 @@ export function emptyView(
         case "unconfirmed":
             return {
                 title: `Nothing ${BOOKING_WORDS.awaitingPayment.toLowerCase()}`,
-                line: "Nobody owes you for a booking. Anyone sent a payment link shows here until they pay.",
+                line: "Nobody owes you for a booking. Anyone who still has to pay, at the desk or by link, shows here.",
             };
         case "outcome":
             return {
@@ -356,10 +359,26 @@ export const ROW_STATUS: Record<
     didnt: { label: BOOKING_WORDS.didntCome, tone: "error" },
     cancelled: { label: "Cancelled", tone: "neutral" },
     unmarked: { label: BOOKING_WORDS.notMarked, tone: "neutral" },
-    // Money still to take at the visit: the one payment word (DEC-257),
-    // as the calendar's block says it; the Money line says how.
-    atVisit: { label: BOOKING_WORDS.awaitingPayment, tone: "warning" },
+    // Paid at the visit, which is still to come (DEC-273): once it has
+    // ended unpaid it is Awaiting payment, beside how it went.
+    atVisit: { label: BOOKING_WORDS.paysAtVisit, tone: "active" },
 };
+
+/**
+ * The payment word a row wears beside how it went (DEC-273): "Awaiting
+ * payment" while money is still owed — after the visit, or with a pay link
+ * out. Null when its status already says it (a hold) or nothing is owed.
+ * Attendance stays its own fact: "Came" and "Awaiting payment" side by side.
+ */
+export function payBadge(
+    b: Pick<DiaryBooking, "pay">,
+    status: RowStatus,
+): { label: string; tone: StatusTone } | null {
+    if (status === "pending" || status === "cancelled") return null;
+    return owes(b.pay)
+        ? { label: BOOKING_WORDS.awaitingPayment, tone: "warning" }
+        : null;
+}
 
 /**
  * The word on a row's badge: how it went once marked, "Not marked yet"
@@ -369,7 +388,7 @@ export const ROW_STATUS: Record<
 export function rowStatus(
     b: Pick<
         DiaryBooking,
-        "status" | "outcome" | "endAt" | "paidWith" | "paidAtDesk"
+        "status" | "outcome" | "endAt" | "paidWith" | "paidAtDesk" | "pay"
     >,
     now: number,
 ): RowStatus {
@@ -378,8 +397,11 @@ export function rowStatus(
     if (b.outcome === "NO_SHOW") return "didnt";
     if (b.status === "PENDING") return "pending";
     if (hasEnded(b, now)) return "unmarked";
-    if (b.paidWith === "DESK" && !b.paidAtDesk) return "atVisit";
-    return "booked";
+    // The one answer (DEC-272); an older API's record of how it is paid.
+    const atVisit = b.pay
+        ? b.pay.word === "PAYS_AT_VISIT"
+        : b.paidWith === "DESK" && !b.paidAtDesk;
+    return atVisit ? "atVisit" : "booked";
 }
 
 /** What the viewer may do from a row (permissions, never role names). */
@@ -459,45 +481,42 @@ export interface MoneyCell {
 }
 
 /**
- * The Money column (owners and admins only: the caller leaves it out for
- * anyone without `payment:read`, DEC-098, and a booking's price isn't even
- * sent to them). One payment word: "Awaiting payment".
+ * The Money column, for whoever reads money (`payment:read`, or taking
+ * payment at the desk: DEC-098, DEC-274; nobody else is sent an amount).
+ * It says the one money answer (DEC-272): the amount that matters — still
+ * to take while something is owed, else the price — and the payment word.
  */
 export function moneyCell(b: DiaryBooking): MoneyCell {
     const currency = b.service.currency ?? null;
+    const pay = b.pay;
+    const word = payText(pay, b.packName);
     if (b.status === "CANCELLED") {
-        // What the read knows: whether money was taken online. Whether it
-        // went back is on the booking, which the note points to.
-        const price = b.service.priceCents;
-        return b.paidWith === "PAID" && price
+        // Whether it went back is on the booking, which the note points to.
+        const paid = pay?.paidCents ?? 0;
+        return pay?.word === "PAID" && paid > 0
             ? {
-                  amount: formatMoney(price, currency),
-                  note: "Paid online · refund on the booking",
+                  amount: formatMoney(paid, currency),
+                  note: `${word} · refund on the booking`,
               }
             : { amount: null, note: "Nothing was paid" };
     }
-    // Free (DEC-261): the one payment word says so, and nothing is owed.
-    // Said in the amount's place, alone: never "—" over "Free".
-    if (b.free) return { amount: BOOKING_WORDS.free, note: null };
-    const cents = b.take?.cents ?? b.service.priceCents ?? null;
+    // Free (DEC-261): said in the amount's place, alone: never "—" over it.
+    if (pay?.word === "FREE" || (!pay && b.free)) {
+        return { amount: BOOKING_WORDS.free, note: null };
+    }
+    // A pack, a membership, a treatment's order, a course: no amount.
+    if (pay && (pay.dueCents ?? null) === null && pay.word !== "PAID") {
+        return { amount: null, note: word };
+    }
+    const owed = pay?.dueCents ?? b.take?.cents ?? 0;
+    const cents =
+        owed > 0 && pay?.word !== "PAID"
+            ? owed
+            : (b.service.priceCents ?? null);
     const amount =
         cents !== null && cents > 0 ? formatMoney(cents, currency) : null;
-    if (b.status === "PENDING") {
-        return { amount, note: BOOKING_WORDS.awaitingPayment };
-    }
-    if (b.take) {
-        return {
-            amount,
-            note:
-                b.paidWith === "DESK"
-                    ? BOOKING_WORDS.paysAtVisit
-                    : BOOKING_WORDS.awaitingPayment,
-        };
-    }
-    if (b.paidWith === "DESK" && !b.paidAtDesk) {
-        return { amount, note: BOOKING_WORDS.paysAtVisit };
-    }
-    return amount ? { amount, note: "Paid" } : { amount: null, note: null };
+    if (!amount && !word) return { amount: null, note: null };
+    return { amount, note: word };
 }
 
 /** "2 cancelled", "1 cancelled". */

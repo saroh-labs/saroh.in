@@ -1,8 +1,15 @@
-import { bookingPrice, isFreeBooking, shownPaidWith } from "./booking-money";
+import type { BookingPay } from "./booking-money";
+import {
+    bookingPay,
+    bookingPrice,
+    howPaid,
+    isFreeBooking,
+    payWords,
+    shownPaidWith,
+} from "./booking-money";
 import type { DeskTake } from "./desk-take";
 import { chargingOnly, deskTake, paidAtDesk } from "./desk-take";
 import type { PaidWith } from "./dto";
-import { PAID_WITH } from "./dto";
 import type { TreatmentRow, TreatmentView } from "./treatment-view";
 import { treatmentOf } from "./treatment-view";
 
@@ -74,6 +81,8 @@ export interface DiaryRow {
         status: string;
         paymentMethod: string | null;
         total: { toString(): string };
+        /** What its ledger holds as paid (DEC-173); absent reads as none. */
+        paidCents?: number;
         paidAt: Date | null;
         paymentIntents: { status: string; amountCents: number }[];
     }[];
@@ -138,6 +147,13 @@ export interface DiaryBooking {
      */
     paidAtDesk: { method: string | null } | null;
     /**
+     * The one money answer (DEC-272, `bookingPay`): its payment word and
+     * how, for everyone who reads bookings; what was paid and what is
+     * still to take only for a viewer who reads money (DEC-098).
+     */
+    pay: Pick<BookingPay, "word" | "how"> &
+        Partial<Pick<BookingPay, "paidCents" | "dueCents">>;
+    /**
      * What "Take ₹X" takes now (P2); null when there is nothing to take.
      * Money only — absent for a viewer who reads no money.
      */
@@ -175,18 +191,8 @@ export interface PersonDiary {
     classes: ClassSession[];
 }
 
-/** How a booking was paid, from what it records (U3) and what it holds. */
-export function howPaid(row: {
-    paidWith: string | null;
-    packRedemption: { reversedAt: Date | null } | null;
-    subscriptionId: string | null;
-}): PaidWith | null {
-    if (row.paidWith && (PAID_WITH as readonly string[]).includes(row.paidWith))
-        return row.paidWith as PaidWith;
-    if (row.packRedemption?.reversedAt === null) return "PACK";
-    if (row.subscriptionId) return "MEMBERSHIP";
-    return null;
-}
+// How a booking was paid lives with its money (DEC-272).
+export { howPaid } from "./booking-money";
 
 /** A class is a service more than one person books at once. */
 export function isClass(service: { capacity: number }): boolean {
@@ -232,12 +238,28 @@ function deskOf(row: DiaryRow): {
     };
 }
 
-export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
+export function diaryBooking(
+    row: DiaryRow,
+    money: boolean,
+    now: Date = new Date(),
+): DiaryBooking {
     const pack = row.packRedemption;
     const desk = deskOf(row);
     // Booked at a price of 0 (DEC-261). One booked before free services
     // were told apart says "at the desk"; there is nothing to pay there.
     const free = isFreeBooking(row.snapshot, row.service.priceCents);
+    const paidWith = shownPaidWith(howPaid(row), free);
+    const pay = bookingPay(
+        {
+            ...row,
+            paidWith,
+            free,
+            priceCents:
+                bookingPrice(row.snapshot).priceCents ?? row.service.priceCents,
+            paper: row.invoices ?? [],
+        },
+        now,
+    );
     return {
         id: row.id,
         serviceId: row.serviceId,
@@ -255,7 +277,7 @@ export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
         service: serviceView(row, money),
         contact: row.contact,
         staff: row.staff,
-        paidWith: shownPaidWith(howPaid(row), free),
+        paidWith,
         free,
         packName:
             pack !== null && pack.reversedAt === null
@@ -264,6 +286,7 @@ export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
         subscriptionId: row.subscriptionId,
         treatment: treatmentOf(row),
         paidAtDesk: desk.paid,
+        pay: money ? pay : payWords(pay),
         ...(money ? { take: desk.take } : { toTake: desk.take !== null }),
     };
 }
@@ -280,6 +303,7 @@ export function groupDiaries(
     rows: DiaryRow[],
     people: DiaryPerson[],
     money: boolean,
+    now: Date = new Date(),
 ): PersonDiary[] {
     const diaries = new Map<string | null, PersonDiary>();
     for (const person of people) {
@@ -303,7 +327,7 @@ export function groupDiaries(
 
     const sessions = new Map<string, ClassSession>();
     for (const row of rows) {
-        const booking = diaryBooking(row, money);
+        const booking = diaryBooking(row, money, now);
         if (!isClass(row.service)) {
             diaryOf(row.staff).bookings.push(booking);
             continue;

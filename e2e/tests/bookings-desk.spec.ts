@@ -212,7 +212,7 @@ test.describe("the desk's money and attendance (#1016)", () => {
             await page.goto(`/bookings/${bookingId}`);
             const money = page.getByRole("region", { name: "Money" });
             await expect(money).toContainText(/paid at the desk · UPI/);
-            await expect(money).toContainText("Nothing, it's paid");
+            await expect(money).toContainText("Nothing left to take");
         } finally {
             await tidy(page.request, service, [bookingId]);
         }

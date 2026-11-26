@@ -76,7 +76,13 @@ describe("businessDay", () => {
 describe("bookingItems", () => {
     it("gives a one-to-one booking its own row, in the business's clock", () => {
         const [item] = bookingItems(
-            [booking({ paidWith: "DESK", startAt: at("23:30") })],
+            [
+                booking({
+                    paidWith: "DESK",
+                    startAt: at("23:30"),
+                    snapshot: { service: { priceCents: 80_000 } },
+                }),
+            ],
             VIEW,
         );
         expect(item).toMatchObject({
@@ -84,13 +90,29 @@ describe("bookingItems", () => {
             kind: "BOOKING",
             time: "23:30",
             what: "Cleaning · Farah Khan",
-            who: "With Dr. Arun · pays at the desk",
+            who: "With Dr. Arun · pays at the visit",
             person: "Farah Khan",
             outcome: null,
             outcomeTime: null,
             href: "/bookings/bk_1",
             markable: true,
         });
+    });
+
+    it("says awaiting payment once a visit has ended unpaid, as the List does (DEC-273)", () => {
+        const [item] = bookingItems(
+            [
+                booking({
+                    paidWith: "DESK",
+                    outcome: "ATTENDED",
+                    startAt: at("08:00"),
+                    endAt: at("09:00"),
+                    snapshot: { service: { priceCents: 80_000 } },
+                }),
+            ],
+            { ...VIEW, now: NOW },
+        );
+        expect(item?.who).toBe("With Dr. Arun · awaiting payment");
     });
 
     it("says a free booking is free, never that it pays at the desk (DEC-261)", () => {

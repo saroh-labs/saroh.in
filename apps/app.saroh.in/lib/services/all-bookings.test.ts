@@ -19,6 +19,7 @@ import {
     moreCount,
     NO_MORE,
     ordered,
+    payBadge,
     personLabel,
     readView,
     rowMenu,
@@ -125,7 +126,7 @@ describe("views", () => {
     it("says what an empty view means, never 'No bookings yet'", () => {
         expect(emptyView("unconfirmed", 42)).toEqual({
             title: "Nothing awaiting payment",
-            line: "Nobody owes you for a booking. Anyone sent a payment link shows here until they pay.",
+            line: "Nobody owes you for a booking. Anyone who still has to pay, at the desk or by link, shows here.",
         });
         expect(emptyView("outcome", 1).line).toContain("1 booking in all.");
         expect(emptyView("upcoming", 3).title).toBe("Nothing coming up");
@@ -271,28 +272,96 @@ describe("Status gains how it went (BLHB)", () => {
     });
 });
 
-describe("the Money column (DEC-098: only for those who read money)", () => {
+describe("the Money column says the one money answer (DEC-272)", () => {
+    const pay = (
+        word: NonNullable<DiaryBooking["pay"]>["word"],
+        more: Partial<NonNullable<DiaryBooking["pay"]>> = {},
+    ): DiaryBooking["pay"] => ({ word, how: null, paidCents: 0, ...more });
+
     it("says an amount and where it stands, with one payment word", () => {
-        expect(moneyCell(booking(20, { status: "PENDING" }))).toEqual({
+        expect(
+            moneyCell(
+                booking(20, {
+                    status: "PENDING",
+                    pay: pay("AWAITING_PAYMENT", { dueCents: 80000 }),
+                }),
+            ),
+        ).toEqual({ amount: "₹800", note: "Awaiting payment" });
+        expect(
+            moneyCell(
+                booking(-20, {
+                    paidWith: "PAID",
+                    pay: pay("PAID", {
+                        how: "ONLINE",
+                        paidCents: 80000,
+                        dueCents: 0,
+                    }),
+                }),
+            ),
+        ).toEqual({ amount: "₹800", note: "Paid online" });
+        expect(
+            moneyCell(
+                booking(20, {
+                    paidWith: "DESK",
+                    pay: pay("PAYS_AT_VISIT", { dueCents: 80000 }),
+                }),
+            ),
+        ).toEqual({ amount: "₹800", note: "Pays at the visit" });
+        // A deposit paid: what is still to take, not the price.
+        expect(
+            moneyCell(
+                booking(20, {
+                    pay: pay("PAYS_AT_VISIT", {
+                        how: "ONLINE",
+                        paidCents: 40000,
+                        dueCents: 40000,
+                    }),
+                }),
+            ),
+        ).toEqual({ amount: "₹400", note: "Pays at the visit" });
+    });
+
+    it("says Awaiting payment after the visit, beside Came, and counts it (DEC-273)", () => {
+        const owed = booking(-3, {
+            outcome: "ATTENDED",
+            paidWith: "DESK",
+            pay: pay("AWAITING_PAYMENT", { dueCents: 80000 }),
+        });
+        expect(moneyCell(owed)).toEqual({
             amount: "₹800",
             note: "Awaiting payment",
         });
-        expect(moneyCell(booking(20))).toEqual({
-            amount: "₹800",
-            note: "Paid",
+        expect(rowStatus(owed, NOW)).toBe("came");
+        expect(payBadge(owed, "came")?.label).toBe("Awaiting payment");
+        expect(inView("unconfirmed", owed, NOW, ZONE)).toBe(true);
+        // Before the visit it isn't owed yet: Pays at the visit, not counted.
+        const ahead = booking(3, {
+            paidWith: "DESK",
+            pay: pay("PAYS_AT_VISIT", { dueCents: 80000 }),
         });
-        expect(moneyCell(booking(20, { paidWith: "DESK" }))).toEqual({
-            amount: "₹800",
-            note: "Pays at the visit",
-        });
+        expect(rowStatus(ahead, NOW)).toBe("atVisit");
+        expect(payBadge(ahead, "atVisit")).toBeNull();
+        expect(inView("unconfirmed", ahead, NOW, ZONE)).toBe(false);
+    });
+
+    it("a pack or membership says so, with no amount", () => {
         expect(
             moneyCell(
-                booking(2, {
-                    paidWith: null,
-                    take: { cents: 40000, byLink: false },
+                booking(-3, {
+                    paidWith: "PACK",
+                    packName: "10 classes",
+                    pay: pay("PACK", { dueCents: null }),
                 }),
             ),
-        ).toEqual({ amount: "₹400", note: "Awaiting payment" });
+        ).toEqual({ amount: null, note: "Pack · 10 classes" });
+        expect(
+            moneyCell(
+                booking(-3, {
+                    paidWith: "MEMBERSHIP",
+                    pay: pay("MEMBERSHIP", { dueCents: null }),
+                }),
+            ),
+        ).toEqual({ amount: null, note: "Membership" });
     });
 
     it('says "Free" for a free booking, and never that it owes (DEC-261)', () => {
@@ -300,6 +369,7 @@ describe("the Money column (DEC-098: only for those who read money)", () => {
             paidWith: null,
             free: true,
             take: null,
+            pay: pay("FREE", { dueCents: 0 }),
         });
         free.service.priceCents = 0;
         expect(moneyCell(free)).toEqual({ amount: "Free", note: null });
@@ -307,12 +377,29 @@ describe("the Money column (DEC-098: only for those who read money)", () => {
     });
 
     it("says what a cancelled booking's money was, not that it was refunded", () => {
-        expect(moneyCell(booking(2, { status: "CANCELLED" }))).toEqual({
+        expect(
+            moneyCell(
+                booking(2, {
+                    status: "CANCELLED",
+                    pay: pay("PAID", {
+                        how: "ONLINE",
+                        paidCents: 80000,
+                        dueCents: null,
+                    }),
+                }),
+            ),
+        ).toEqual({
             amount: "₹800",
             note: "Paid online · refund on the booking",
         });
         expect(
-            moneyCell(booking(2, { status: "CANCELLED", paidWith: null })),
+            moneyCell(
+                booking(2, {
+                    status: "CANCELLED",
+                    paidWith: null,
+                    pay: pay("NOTHING_TO_PAY", { dueCents: null }),
+                }),
+            ),
         ).toEqual({ amount: null, note: "Nothing was paid" });
         // A Member's read carries no price (DEC-020): nothing to show.
         const noPrice = booking(2);

@@ -11,7 +11,13 @@ import { DateTime } from "luxon";
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { howPaid } from "../bookings/booking-calendar";
-import { isFreeBooking, shownPaidWith } from "../bookings/booking-money";
+import type { PayWord } from "../bookings/booking-money";
+import {
+    bookingPay,
+    bookingPrice,
+    isFreeBooking,
+    shownPaidWith,
+} from "../bookings/booking-money";
 import type { PaidWith } from "../bookings/dto";
 import { businessTimezone, fallbackZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -212,6 +218,8 @@ export interface DetailBooking {
     cancelledLate: boolean;
     /** What has been paid for it, once anything has (UX-049). */
     paid: BookingPaid | null;
+    /** The one payment word for it (DEC-272), as Bookings says it. */
+    payWord: PayWord | null;
 }
 
 export interface DetailSubscription {
@@ -1087,6 +1095,8 @@ export class CustomerDetailService {
             paidWith: true,
             snapshot: true,
             subscriptionId: true,
+            orderId: true,
+            courseEnrollmentId: true,
             cancelledLate: true,
             invoices: BOOKING_PAID_INVOICES,
             service: {
@@ -1134,6 +1144,19 @@ export class CustomerDetailService {
             ]);
         const view = (b: (typeof upcoming)[number]): DetailBooking => {
             const free = isFreeBooking(b.snapshot, b.service.priceCents);
+            const paidWith = shownPaidWith(howPaid(b), free);
+            const pay = bookingPay(
+                {
+                    ...b,
+                    paidWith,
+                    free,
+                    priceCents:
+                        bookingPrice(b.snapshot).priceCents ??
+                        b.service.priceCents,
+                    paper: b.invoices,
+                },
+                now,
+            );
             return {
                 id: b.id,
                 startAt: b.startAt.toISOString(),
@@ -1147,7 +1170,7 @@ export class CustomerDetailService {
                 paidWithPack:
                     b.packRedemption !== null &&
                     b.packRedemption.reversedAt === null,
-                paidWith: shownPaidWith(howPaid(b), free),
+                paidWith,
                 free,
                 packName:
                     b.packRedemption?.reversedAt === null
@@ -1155,6 +1178,7 @@ export class CustomerDetailService {
                         : null,
                 cancelledLate: b.cancelledLate,
                 paid: bookingPaid(b.invoices, seesMoney),
+                payWord: pay.word,
             };
         };
         return {

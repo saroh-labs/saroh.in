@@ -123,7 +123,7 @@ export interface AllBookingsCan extends RowAbilities {
     refund: boolean;
     /** `order:read`: a treatment's visit links to its order. */
     readOrder: boolean;
-    /** `payment:read`: the Money column (never for a Member or Reviewer). */
+    /** Reads money (DEC-098, DEC-274): the Money column. */
     money: boolean;
     /** A payment link may be sent from Take ₹X. */
     link: boolean;
@@ -630,6 +630,7 @@ export function BookingsView({
                                                     bookings={item.bookings}
                                                     zone={timezone}
                                                     showMoney={can.money}
+                                                    now={now}
                                                 >
                                                     {item.bookings.map(
                                                         renderRow,

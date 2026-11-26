@@ -95,3 +95,47 @@ export function countItems(items: readonly ListItem[]): Counted {
         }),
     );
 }
+
+/**
+ * How a finished class went (DEC-274): who came, who didn't, who still has
+ * to pay (the one payment word, DEC-273), and who nobody marked. Cancelled
+ * places aren't counted. The List's class row and the diary's block both
+ * say it, in {@link classCloseWords}.
+ */
+export interface ClassClose {
+    came: number;
+    didnt: number;
+    toPay: number;
+    unmarked: number;
+}
+
+export function classClose(bookings: readonly DiaryBooking[]): ClassClose {
+    const live = bookings.filter((b) => b.status !== "CANCELLED");
+    return {
+        came: live.filter((b) => b.outcome === "ATTENDED").length,
+        didnt: live.filter((b) => b.outcome === "NO_SHOW").length,
+        toPay: live.filter((b) => b.pay?.word === "AWAITING_PAYMENT").length,
+        unmarked: live.filter((b) => b.outcome === null).length,
+    };
+}
+
+/**
+ * "8 came", "1 didn't", "3 to pay", as separate words for separate badges,
+ * and "Not marked" while nobody has marked anyone.
+ */
+export function classCloseWords(
+    c: ClassClose,
+): { label: string; tone: "success" | "error" | "warning" | "neutral" }[] {
+    const words: {
+        label: string;
+        tone: "success" | "error" | "warning" | "neutral";
+    }[] = [];
+    if (c.came > 0) words.push({ label: `${c.came} came`, tone: "success" });
+    if (c.didnt > 0) words.push({ label: `${c.didnt} didn't`, tone: "error" });
+    if (c.toPay > 0)
+        words.push({ label: `${c.toPay} to pay`, tone: "warning" });
+    if (c.came === 0 && c.didnt === 0) {
+        words.unshift({ label: "Not marked", tone: "neutral" });
+    }
+    return words;
+}

@@ -121,6 +121,13 @@ function kabir(over: Partial<DiaryBooking> = {}): DiaryBooking {
         subscriptionId: null,
         paidAtDesk: null,
         take: { cents: 50_000, byLink: true },
+        // The one money answer (DEC-272): a pay link is out for it.
+        pay: {
+            word: "AWAITING_PAYMENT",
+            how: "LINK",
+            paidCents: 0,
+            dueCents: 50_000,
+        },
         ...over,
     };
 }
@@ -405,7 +412,7 @@ describe.each([
         expect(text()).toContain("Awaiting payment");
         expect(text()).toContain("Today · 11:30 am to 12:15 pm");
         expect(text()).toContain("Physio assessment with Meera Iyer");
-        expect(text()).toContain("₹500 · Awaiting payment");
+        expect(text()).toContain("Awaiting payment ₹500");
         expect(text()).toContain("Needs attention.");
         expect(text()).toContain("Allergy: Latex");
         expect(text()).toContain("+91");
@@ -448,7 +455,7 @@ describe.each([
         await press("Mark Kabir arrived");
         expect(act$.checkIn).toHaveBeenCalledOnce();
         expect(text()).toContain("Came");
-        expect(text()).toContain("₹500 · Awaiting payment");
+        expect(text()).toContain("Awaiting payment ₹500");
         expect(button("Take ₹500")).toBeDefined();
         expect(text()).toContain("Book their next visit?");
         expect(button(/Move or cancel/)).toBeUndefined();

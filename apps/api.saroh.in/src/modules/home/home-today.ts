@@ -3,7 +3,18 @@ import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingEventType } from "../bookings/booking-event-type";
-import { isFreeBooking, shownPaidWith } from "../bookings/booking-money";
+import type { PayFacts, PayWord } from "../bookings/booking-money";
+import {
+    bookingPay,
+    bookingPrice,
+    isFreeBooking,
+    shownPaidWith,
+} from "../bookings/booking-money";
+import {
+    BOOKING_PAPER,
+    BOOKING_PAPER_PAYMENTS,
+    BOOKING_PAPER_SELECT,
+} from "../bookings/desk-take";
 import { attentionFor } from "../customer-workspace/attention-read";
 import {
     DEFAULT_LATE_THRESHOLDS,
@@ -98,6 +109,12 @@ export interface TodayBookingRow {
     paidWith: string | null;
     /** The terms it was booked at: a price of 0 is free (DEC-261). */
     snapshot?: unknown;
+    /** For the one money answer (DEC-272); absent reads as still to come. */
+    endAt?: Date;
+    status?: string;
+    orderId?: string | null;
+    courseEnrollmentId?: string | null;
+    invoices?: PayFacts["paper"];
     contactId: string | null;
     bookerName: string | null;
     bookerEmail: string | null;
@@ -149,17 +166,21 @@ function filled(text: string | null | undefined): string | null {
 }
 
 /** "With Priya", "With Priya · pays at the desk", "Pays at the desk", or null. */
-function withWhom(
-    staff: string | null,
-    paysAtDesk: boolean,
-    free = false,
-): string | null {
+function withWhom(staff: string | null, word: PayWord | null): string | null {
     const parts = [staff ? `With ${staff}` : null];
-    if (paysAtDesk) parts.push(staff ? "pays at the desk" : "Pays at the desk");
-    else if (free) parts.push(staff ? "free" : "Free");
+    // The one payment word (DEC-272): what the List and the diary say.
+    const said = word ? HOME_PAY_WORD[word] : undefined;
+    if (said) parts.push(staff ? said : said[0].toUpperCase() + said.slice(1));
     const out = parts.filter((p): p is string => p !== null).join(" · ");
     return out.length > 0 ? out : null;
 }
+
+/** The payment words a Today line says; the rest it leaves to the row. */
+const HOME_PAY_WORD: Partial<Record<PayWord, string>> = {
+    PAYS_AT_VISIT: "pays at the visit",
+    AWAITING_PAYMENT: "awaiting payment",
+    FREE: "free",
+};
 
 /** "Morning Yoga class", unless the service already says it is one. */
 function className(name: string): string {
@@ -177,6 +198,7 @@ export function bookingItems(
         zone: string;
         canMark: boolean;
         flags: ReadonlyMap<string, string[]>;
+        now?: Date;
     },
 ): HomeTodayItem[] {
     const items: HomeTodayItem[] = [];
@@ -225,17 +247,30 @@ export function bookingItems(
             ? row.events.find((e) => e.type === OUTCOME_EVENT[outcome])
             : undefined;
         const free = isFreeBooking(row.snapshot, row.service.priceCents);
+        const pay = bookingPay(
+            {
+                status: row.status ?? "CONFIRMED",
+                outcome: row.outcome,
+                endAt: row.endAt ?? new Date(8.64e15),
+                paidWith: shownPaidWith(row.paidWith, free),
+                free,
+                orderId: row.orderId,
+                courseEnrollmentId: row.courseEnrollmentId,
+                priceCents:
+                    bookingPrice(row.snapshot).priceCents ??
+                    row.service.priceCents ??
+                    null,
+                paper: row.invoices ?? [],
+            },
+            view.now ?? new Date(),
+        );
         items.push({
             id: row.id,
             kind: "BOOKING",
             startAt: row.startAt.toISOString(),
             time: clockIn(row.startAt, view.zone),
             what: who ? `${row.service.name} · ${who}` : row.service.name,
-            who: withWhom(
-                staff,
-                shownPaidWith(row.paidWith, free) === "DESK",
-                free,
-            ),
+            who: withWhom(staff, pay.word),
             person: who,
             outcome,
             outcomeTime: said ? clockIn(said.createdAt, view.zone) : null,
@@ -437,6 +472,18 @@ export async function readToday(
                       outcome: true,
                       paidWith: true,
                       snapshot: true,
+                      // The one money answer (DEC-272): its own paper.
+                      endAt: true,
+                      status: true,
+                      orderId: true,
+                      courseEnrollmentId: true,
+                      invoices: {
+                          where: BOOKING_PAPER,
+                          select: {
+                              ...BOOKING_PAPER_SELECT,
+                              paymentIntents: BOOKING_PAPER_PAYMENTS,
+                          },
+                      },
                       contactId: true,
                       bookerName: true,
                       bookerEmail: true,
@@ -493,6 +540,7 @@ export async function readToday(
             zone: at.zone,
             canMark: scope.canMark,
             flags,
+            now: at.now,
         }),
         ...pickUpItems(orderRows, day, at.zone),
     ]

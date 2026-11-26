@@ -28,6 +28,7 @@ import type { Block, DiaryState } from "@/lib/services/diary";
 import { bookingState, localDateOf, whoFor } from "@/lib/services/diary";
 import { blockStatus } from "@/lib/services/diary-view";
 import type { PeekPerson } from "@/lib/services/peek";
+import { visitText } from "@/lib/services/peek";
 import { useNarrow } from "@saroh/ui/lib/use-narrow";
 
 import { STATE_TONE } from "@/components/bookings/calendar/parts";
@@ -121,7 +122,7 @@ export function BookingQuickLook({
     };
 
     const one = shown?.kind === "one" ? shown.booking : null;
-    const person = usePerson(one?.contact?.id ?? null);
+    const person = usePerson(one?.contact?.id ?? null, one?.id ?? null);
     const tall = step === "move" || step === "who" || step === "next";
 
     return (
@@ -367,6 +368,11 @@ function Steps({
                 <>
                     <LookHead
                         title={whoFor(b)}
+                        visit={
+                            person.state === "ready"
+                                ? visitText(person.person?.visits, ctx.timezone)
+                                : null
+                        }
                         when={when}
                         what={what}
                         badge={blockStatus({ ...block, booking: b, state })}
@@ -394,9 +400,12 @@ function LookHead({
     what,
     badge,
     isClass = false,
+    visit = null,
     onClose,
 }: {
     title: string;
+    /** "First visit", "4th visit · last 12 Sep" (DEC-274). */
+    visit?: string | null;
     when: string;
     what: string;
     badge: { label: string; state: DiaryState };
@@ -430,6 +439,14 @@ function LookHead({
                 </div>
                 <SheetDescription asChild>
                     <div>
+                        {visit ? (
+                            <span
+                                data-visit-line=""
+                                className="mt-0.5 block text-[12.5px] text-muted-foreground min-[760px]:text-[13px]"
+                            >
+                                {visit}
+                            </span>
+                        ) : null}
                         <span className="mt-0.5 block text-[13.5px] font-medium tabular-nums text-foreground min-[760px]:mt-1.5 min-[760px]:font-display min-[760px]:text-[17px] min-[760px]:font-semibold">
                             {when}
                         </span>
@@ -452,7 +469,10 @@ function LookHead({
  * change reaches them), read when the quick look opens, with Try again
  * when it can't be read.
  */
-function usePerson(contactId: string | null): PersonRead {
+function usePerson(
+    contactId: string | null,
+    bookingId: string | null,
+): PersonRead {
     const [attempt, setAttempt] = useState(0);
     const [read, setRead] = useState<{
         key: string;
@@ -464,7 +484,7 @@ function usePerson(contactId: string | null): PersonRead {
     useEffect(() => {
         if (!contactId || !key) return;
         let live = true;
-        void readBookingPerson(contactId)
+        void readBookingPerson(contactId, bookingId ?? undefined)
             // Null is a role that may not read them: not a failure, the
             // rows then say they don't know ("—").
             .then((person) => ({ person, failed: false }))
@@ -475,7 +495,7 @@ function usePerson(contactId: string | null): PersonRead {
         return () => {
             live = false;
         };
-    }, [contactId, key]);
+    }, [contactId, bookingId, key]);
     if (!contactId) return { state: "none" };
     if (read?.key !== key) return { state: "loading" };
     return read.failed

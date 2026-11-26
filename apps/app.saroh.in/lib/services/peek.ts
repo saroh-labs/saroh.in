@@ -9,10 +9,13 @@
  * than "No phone yet".
  */
 
+import { formatDay } from "@/lib/format/datetime";
 import { plural } from "@/lib/format/plural";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import { absentText } from "@saroh/ui/lib/absent";
+
+import { localDateOf } from "./diary";
 
 export type AttentionKind = "ALLERGY" | "MEDICAL" | "ACCESS" | "OTHER";
 
@@ -51,6 +54,29 @@ export interface PeekPerson {
     reach?: NoticeReach | null;
     /** The address it is emailed to (DEC-174 D1); null when it isn't. */
     emailTo?: string | null;
+    /**
+     * Which visit this booking is for them (DEC-274): the visits they came
+     * to here before it, and the last one's start. Null when it couldn't be
+     * read or there is no booking; absent from an older read.
+     */
+    visits?: { before: number; lastAt: string | null } | null;
+}
+
+const ordinal = (n: number) =>
+    `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th")}`;
+
+/**
+ * The line under their name (DEC-274): "First visit", or "4th visit · last
+ * 12 Sep". Null when it isn't known, so nothing is said.
+ */
+export function visitText(
+    visits: PeekPerson["visits"],
+    zone: string,
+): string | null {
+    if (!visits) return null;
+    if (visits.before === 0 || !visits.lastAt) return "First visit";
+    const last = formatDay(localDateOf(visits.lastAt, zone), { year: "never" });
+    return `${ordinal(visits.before + 1)} visit · last ${last}`;
 }
 
 const KIND_WORD: Record<AttentionKind, string> = {
