@@ -8,7 +8,6 @@ import { submitOnModEnter } from "@saroh/ui/lib/keyboard-save";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
@@ -70,6 +69,7 @@ export function SectionReview({
     canComment,
     variables,
     testReleaseId,
+    onChanged,
 }: {
     siteId: string;
     pageId: string;
@@ -82,6 +82,8 @@ export function SectionReview({
     variables?: Record<string, string> | null;
     /** The test release these sections are from; notes go to it. */
     testReleaseId?: string;
+    /** After a note was added: the notes are read again. */
+    onChanged: () => Promise<void>;
 }) {
     // The merchant faces the editor loaded, for the site's typeface.
     const faces = useSiteFaces();
@@ -158,6 +160,7 @@ export function SectionReview({
                                 )
                             }
                             onClose={() => setOpenFor(null)}
+                            onChanged={onChanged}
                         />
                     ))}
                 </div>
@@ -176,6 +179,7 @@ function SectionSlot({
     open,
     onOpen,
     onClose,
+    onChanged,
 }: {
     siteId: string;
     pageId: string;
@@ -186,9 +190,9 @@ function SectionSlot({
     open: boolean;
     onOpen: () => void;
     onClose: () => void;
+    onChanged: () => Promise<void>;
 }) {
     const zone = useBusinessZone();
-    const router = useRouter();
     const [body, setBody] = useState("");
     const [saving, setSaving] = useState(false);
 
@@ -216,7 +220,7 @@ function SectionSlot({
         setBody("");
         onClose();
         showSuccess("Note added.");
-        router.refresh();
+        await onChanged();
     }
 
     return (

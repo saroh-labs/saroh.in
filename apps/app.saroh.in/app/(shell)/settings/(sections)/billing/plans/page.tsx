@@ -1,20 +1,11 @@
-import { Button } from "@saroh/ui/button";
-import { PermissionDeniedState } from "@saroh/ui/data-state";
-import { IntentLink } from "@saroh/ui/intent-link";
 import { notFound } from "next/navigation";
 
 import {
-    SettingsPanel,
-    SettingsPanelHeader,
-} from "@/components/settings/page/settings-panel";
-import { CheckoutPending } from "@/components/settings/plan-billing/checkout-pending";
-import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
-import { BILLING_HREF } from "@/components/settings/plan-billing/styles";
-import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
-import { whoCanChange } from "@/components/shared/states/who-can-change";
+    ChangePlanDenied,
+    ChangePlanScreen,
+} from "@/components/settings/plan-billing/change-plan-screen";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
-import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { readPlanBasics, readPlanCards } from "@/lib/saroh-billing/plan-reads";
+import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { plansOpen } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
@@ -36,71 +27,23 @@ import { requireSession } from "@/lib/session";
  *
  * Not found while plans aren't shown (DEC-136): the section's layout
  * answers first, and the page says so too.
+ *
+ * On React Query (DEC-259): the page checks the session, the switch and the
+ * role, and refuses a role without `billing:read` in its own words (the
+ * route's 403 would only draw a generic denial, DEV_LEARNINGS 25 Nov); the
+ * plans load in the browser (`/api/settings/billing/plans`). It is drawn in
+ * a `SettingsPanel` either way.
  */
 export const metadata = { title: "Change plan · Settings" };
-
-const PARENT = { label: "Plan and billing", href: BILLING_HREF };
 
 export default async function ChangePlanPage() {
     if (!(await plansOpen())) notFound();
     await requireSession();
-    const org = await resolveActiveOrganization();
+    const org = await activeOrganizationOnce();
     // Unknown (no business resolved) opens, and the API decides.
-    const mayOpen = org === null || mayOpenPlan(org);
     const canChange = org === null || mayChangePlan(org);
-
-    const header = (
-        <SettingsPanelHeader
-            title={canChange ? "Change plan" : "Saroh's plans"}
-            parent={PARENT}
-            actions={
-                <Button asChild variant="outline">
-                    <IntentLink href={BILLING_HREF}>
-                        Back to Plan and billing
-                    </IntentLink>
-                </Button>
-            }
-        />
-    );
-    const denied = (
-        <SettingsPanel header={header}>
-            <PermissionDeniedState
-                {...whoCanChange({ thing: "Plan and billing" })}
-            />
-        </SettingsPanel>
-    );
-    if (!mayOpen) return denied;
-
-    const basics = await readPlanBasics();
-    if (basics === null) return denied;
-    const cards = await readPlanCards(basics, { quotes: true });
-    const open = basics.checkouts?.open ?? null;
-
-    return (
-        <SettingsPanel header={header}>
-            <div className="grid gap-4">
-                {canChange ? null : (
-                    <ReadOnlyNote className="mb-0" ownerOnly>
-                        Your role can read the plans but not change the plan.
-                    </ReadOnlyNote>
-                )}
-                {open && canChange ? (
-                    <CheckoutPending
-                        pending={{
-                            planName: open.plan.name,
-                            expiresAt: open.expiresAt,
-                            handoff: open.handoff ?? null,
-                        }}
-                    />
-                ) : null}
-                <PlanChooser
-                    rows={cards.rows}
-                    yearly={cards.yearly}
-                    initialCycle={cards.cycle}
-                    currentPlan={cards.currentPlan}
-                    canChange={canChange}
-                />
-            </div>
-        </SettingsPanel>
-    );
+    if (org !== null && !mayOpenPlan(org)) {
+        return <ChangePlanDenied canChange={canChange} />;
+    }
+    return <ChangePlanScreen canChange={canChange} />;
 }

@@ -2,10 +2,12 @@
 
 import { FailedState, LoadingState } from "@saroh/ui/data-state";
 import { FormSheet } from "@saroh/ui/form-sheet";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import { AddressGroup } from "@/components/sites/contact/address-group";
 import { ContactSocialGroup } from "@/components/sites/contact/contact-social-group";
+import { SettingsSavedProvider } from "@/components/sites/settings/settings-saved";
 import { useSettingsSave } from "@/components/sites/settings/use-settings-save";
 import type {
     FindAddressRead,
@@ -37,19 +39,43 @@ const WORDS: Record<FindSettings, { title: string; description: string }> = {
  * address, read afresh on opening and edited in their own sheets, so
  * nothing takes the merchant out of the editor.
  */
-export function FindSettingsSheet({
-    siteId,
-    which,
-    canEdit,
-    onClose,
-}: {
+/**
+ * The editor isn't on React Query: a save there draws the editor's page
+ * again, as the rows always did.
+ */
+export function FindSettingsSheet(props: FindSettingsSheetProps) {
+    const router = useRouter();
+    const saved = useMemo(
+        () => ({
+            saved: () => {
+                router.refresh();
+                return Promise.resolve();
+            },
+        }),
+        [router],
+    );
+    return (
+        <SettingsSavedProvider value={saved}>
+            <FindSettingsSheetBody {...props} />
+        </SettingsSavedProvider>
+    );
+}
+
+interface FindSettingsSheetProps {
     siteId: string;
     /** The settings to show; null: the sheet is closed. */
     which: FindSettings | null;
     /** May change the site (`site:update`); otherwise the rows only read. */
     canEdit: boolean;
     onClose: () => void;
-}) {
+}
+
+function FindSettingsSheetBody({
+    siteId,
+    which,
+    canEdit,
+    onClose,
+}: FindSettingsSheetProps) {
     const [shown, setShown] = useState<FindSettings>("contact");
     const [read, setRead] = useState<
         | { state: "loading" }

@@ -27,8 +27,8 @@ import {
     plansOpen,
 } from "@/lib/saroh-billing/service";
 
-import type { BillingScreen } from "./queries";
-import { billingRead } from "./queries";
+import type { BillingScreen, PlansScreen } from "./queries";
+import { billingRead, plansRead } from "./queries";
 
 /**
  * Plan and billing: whoever may open the plan (`billing:read`), and on an
@@ -39,6 +39,15 @@ export async function mayReadBilling(): Promise<boolean> {
     if (!org) return false;
     if (!(await plansOpen())) return freeNoteShown();
     return mayOpenPlan(org);
+}
+
+/**
+ * Change plan: whoever may open the plan (`billing:read`) while plans are
+ * shown. The page refuses the role first, in its own words.
+ */
+export async function mayReadPlans(): Promise<boolean> {
+    const org = await activeOrganizationOnce();
+    return !!org && (await plansOpen()) && mayOpenPlan(org);
 }
 
 /** A side read: its value, or null when it couldn't be had (said on the page). */
@@ -198,6 +207,39 @@ export const billingServer: ServerRead<
                     : null,
             invoices: invoices?.status === "ok" ? invoices.data : null,
             partial: missing.length === 0 ? null : missing.join(" and "),
+        };
+    },
+};
+
+export const plansServer: ServerRead<
+    Parameters<typeof plansRead.options>[1],
+    PlansScreen
+> = {
+    read: plansRead,
+    service: async () => {
+        // Not shown at all while plans aren't (DEC-136): the page's 404.
+        if (!(await plansOpen())) return null;
+        const org = await activeOrganizationOnce();
+        const canChange = org === null || mayChangePlan(org);
+        const basics = await readPlanBasics();
+        if (basics === null) return { kind: "denied" };
+        const cards = await readPlanCards(basics, { quotes: true });
+        const open = basics.checkouts?.open ?? null;
+        return {
+            kind: "plans",
+            rows: cards.rows,
+            yearly: cards.yearly,
+            cycle: cards.cycle,
+            currentPlan: cards.currentPlan,
+            // A waiting payment's window is the owner's: never sent to a reader.
+            pending:
+                open && canChange
+                    ? {
+                          planName: open.plan.name,
+                          expiresAt: open.expiresAt,
+                          handoff: open.handoff ?? null,
+                      }
+                    : null,
         };
     },
 };

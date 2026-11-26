@@ -62,6 +62,7 @@ export function MenuFooterGroup({
                 updateSiteNavigation(
                     site.id,
                     menu.length ? { items: menu } : null,
+                    state.orgId,
                 ),
             menu.length
                 ? "Menu saved. Publish to make it public."
@@ -72,7 +73,7 @@ export function MenuFooterGroup({
 
     function saveFooter(footer: SiteFooter | null) {
         run(
-            () => updateSiteFooter(site.id, footer),
+            () => updateSiteFooter(site.id, footer, state.orgId),
             footer === null
                 ? "Footer removed. Publish to take it off the site."
                 : "Footer saved. Publish to make it public.",
@@ -83,9 +84,11 @@ export function MenuFooterGroup({
     function savePostsPath(postsPrefix: string) {
         run(
             () =>
-                updateSiteSettings(site.id, {
-                    postsPrefix: postsPrefix || null,
-                }),
+                updateSiteSettings(
+                    site.id,
+                    { postsPrefix: postsPrefix || null },
+                    state.orgId,
+                ),
             "Posts path saved. Publish to make it public.",
             () => setSaved((s) => ({ ...s, postsPrefix: postsPrefix || null })),
         );

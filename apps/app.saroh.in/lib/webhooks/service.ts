@@ -9,13 +9,13 @@ import type {
 } from "@saroh/api-contract";
 
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
+import { destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * Settings › API and AI apps › Notifications to your systems (webhooks):
  * `organizations/:org/webhooks`. Server-only. The list is the tab's
  * required read (a failure throws to `error.tsx`); an address's delivery
- * log is read when its sheet opens.
+ * log is read when its sheet opens (its own read route).
  */
 
 const path = (id: string) => `/webhooks/${encodeURIComponent(id)}`;
@@ -27,20 +27,20 @@ export async function listWebhooks(): Promise<WebhookEndpointView[]> {
     return list?.data ?? [];
 }
 
-/** The latest messages to one address; null when it couldn't be read. */
+/**
+ * The latest messages to one address; null when it isn't this business's
+ * (the API's 404). Any other failure throws: the read route's 503, which the
+ * sheet says in place.
+ */
 export async function listDeliveries(
     id: string,
 ): Promise<WebhookDeliveryView[] | null> {
-    // Not `getJson`: a sheet's read says it couldn't, it never leaves the page.
-    try {
-        const base = await orgBase();
-        if (!base) return null;
-        const res = await apiFetch(`${base}${path(id)}/deliveries`);
-        if (!res.ok) return null;
-        return ((await res.json()) as WebhookDeliveryList).data;
-    } catch {
-        return null;
-    }
+    const base = await orgBase();
+    if (!base) return null;
+    const list = await getJson<WebhookDeliveryList>(
+        `${base}${path(id)}/deliveries`,
+    );
+    return list?.data ?? null;
 }
 
 export function createWebhook(

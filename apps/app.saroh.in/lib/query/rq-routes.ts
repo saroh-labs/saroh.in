@@ -77,14 +77,22 @@ export const RQ_ROUTES: readonly string[] = [
     "/services",
     "/services/new",
     "/services/[serviceId]",
+    "/sites",
+    "/sites/new",
     "/sites/[siteId]/overview",
     "/sites/[siteId]/pages",
     "/sites/[siteId]/posts",
     "/sites/[siteId]/writing",
+    "/sites/[siteId]/settings",
     "/sites/[siteId]/forms",
+    "/sites/[siteId]/forms/[formId]",
     "/sites/[siteId]/reach/links",
     "/sites/[siteId]/versions",
+    "/sites/[siteId]/versions/[publicationId]",
+    "/sites/[siteId]/releases/[releaseId]",
     "/sites/[siteId]/publish-requests/[requestId]",
+    "/settings/billing/plans",
+    "/settings/integrations/google-calendar",
 ];
 
 export const RQ_DOMAINS: readonly string[] = [

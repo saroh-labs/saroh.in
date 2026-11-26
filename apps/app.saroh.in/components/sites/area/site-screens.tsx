@@ -8,11 +8,14 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { ListCard, ListRow } from "@saroh/ui/list-card";
 import { Notice } from "@saroh/ui/notice";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Inbox, Plug } from "lucide-react";
+import { ArrowLeft, Inbox, Plug } from "lucide-react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { PageContainer } from "@/components/shared/page/page-container";
-import { PageLoading } from "@/components/shared/page/page-loading";
+import {
+    FigureLoading,
+    PageLoading,
+} from "@/components/shared/page/page-loading";
 import { Overview } from "@/components/sites/overview/overview";
 import { PagesArea } from "@/components/sites/pages-area/pages-area";
 import { PublishRequestScreen } from "@/components/sites/publish-request/publish-request-screen";
@@ -23,9 +26,11 @@ import { siteGroups } from "@/components/sites/shell/group-map";
 import { SiteHome } from "@/components/sites/shell/site-home-phone";
 import { SiteVersions as LegacySiteVersions } from "@/components/sites/versions/legacy/site-versions";
 import { SiteVersions } from "@/components/sites/versions/site-versions";
+import { personHref } from "@/lib/contacts/person-href";
 import { count } from "@/lib/format/plural";
 import { ReadFailed } from "@/lib/query/client";
 import {
+    useFormEntries,
     usePublishRequestView,
     useSiteForms,
     useSiteLinks,
@@ -245,6 +250,135 @@ export function SiteFormsContainer({ siteId }: { siteId: string }) {
                 </li>
             ))}
         </ListCard>
+    );
+}
+
+/**
+ * One form's entries, newest first (#385): the place a merchant comes back
+ * to when they want to know exactly what someone asked for. "All forms" at
+ * once; the form's name, its count and the entries when they land. Each
+ * entry names who it came from and links to the contact and the lead it
+ * opened; a deleted contact leaves "no longer in your contacts".
+ */
+export function FormEntriesContainer({
+    siteId,
+    formId,
+}: {
+    siteId: string;
+    formId: string;
+}) {
+    const read = useFormEntries(siteId, formId);
+    const form = read.data;
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="min-w-0">
+                <Button
+                    asChild
+                    variant="ghost"
+                    size="xs"
+                    className="-ml-2 mb-1 text-muted-foreground"
+                >
+                    <IntentLink href={`/sites/${siteId}/forms`}>
+                        <ArrowLeft className="mr-1 size-3.5" />
+                        All forms
+                    </IntentLink>
+                </Button>
+                <h2 className="font-display text-[19px] font-semibold tracking-[-0.02em]">
+                    {form ? form.name : <FigureLoading className="w-40" />}
+                </h2>
+                <p className="text-[12.5px] text-muted-foreground">
+                    {form ? (
+                        <>
+                            {count(form.total, "entry", "entries")}
+                            {form.active
+                                ? ", newest first"
+                                : " · no longer taking entries"}
+                        </>
+                    ) : (
+                        <FigureLoading className="w-24" />
+                    )}
+                </p>
+            </div>
+            {!form ? (
+                <Region read={read} what="the entries" />
+            ) : form.entries.length === 0 ? (
+                <EmptyState
+                    icon={<Inbox />}
+                    title="No entries yet"
+                    description="When someone fills this form in on your live site, what they sent shows here."
+                />
+            ) : (
+                <ul className="flex flex-col gap-3">
+                    {form.entries.map((entry) => (
+                        <li
+                            key={entry.id}
+                            className="overflow-hidden rounded-[12px] border border-border bg-card"
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-muted px-4 py-3">
+                                <div className="min-w-0">
+                                    <p className="truncate text-[13.5px] font-medium">
+                                        {entry.contact ? (
+                                            <IntentLink
+                                                href={personHref(
+                                                    entry.contact.id,
+                                                )}
+                                                className="hover:underline"
+                                            >
+                                                {entry.contact.name}
+                                            </IntentLink>
+                                        ) : (
+                                            entry.who
+                                        )}
+                                    </p>
+                                    <p className="text-[11.5px] text-muted-foreground">
+                                        <ViewerDate
+                                            iso={entry.createdAt}
+                                            variant="datetime"
+                                        />
+                                        {entry.contact
+                                            ? null
+                                            : " · no longer in your contacts"}
+                                    </p>
+                                </div>
+                                {entry.leadId ? (
+                                    <Button asChild variant="outline" size="sm">
+                                        <IntentLink
+                                            href={`/leads/${entry.leadId}`}
+                                        >
+                                            Open lead
+                                        </IntentLink>
+                                    </Button>
+                                ) : null}
+                            </div>
+                            <dl className="grid gap-x-6 gap-y-3 p-4 text-[13px] sm:grid-cols-2">
+                                {entry.rows.map((row) => (
+                                    <div
+                                        key={row.label}
+                                        className={
+                                            row.long
+                                                ? "min-w-0 sm:col-span-2"
+                                                : "min-w-0"
+                                        }
+                                    >
+                                        <dt className="text-[11.5px] text-muted-foreground">
+                                            {row.label}
+                                        </dt>
+                                        <dd className="whitespace-pre-line text-pretty break-words">
+                                            {row.value}
+                                        </dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {form && form.total > form.entries.length ? (
+                <p className="text-[12px] text-muted-foreground">
+                    Showing the latest {form.entries.length} of {form.total}.
+                </p>
+            ) : null}
+        </div>
     );
 }
 

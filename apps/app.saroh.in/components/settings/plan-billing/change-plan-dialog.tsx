@@ -16,7 +16,6 @@ import { Notice } from "@saroh/ui/notice";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { LoaderCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
@@ -127,19 +126,15 @@ export function ChangePlanDialog({
     /** The coupon couldn't be used: the Coupon card shows why. */
     onCouponRefused: (error: string) => void;
     onClose: () => void;
-    /**
-     * A change was made, or a payment for one started: where to show how
-     * it stands. Left out, the page it was opened on is read again.
-     */
-    onChanged?: () => void;
+    /** A change was made, or a payment for one started: where to show how it stands. */
+    onChanged: () => void;
     /** The address the browser's Back returns to from the provider's page. */
     returnTo?: string;
 }) {
-    const router = useRouter();
     // A new plan changes the rail's locks and the plan banners.
     const changed = () => {
         afterSettingsSave();
-        (onChanged ?? (() => router.refresh()))();
+        onChanged();
     };
     // Paying: hidden while Razorpay's window is up (a dialog over it would
     // trap its focus), then back to say it's confirming.
@@ -324,7 +319,7 @@ export function ChangePlanDialog({
                     if (state !== "waiting") {
                         setPaying("no");
                         onClose();
-                        onChanged?.();
+                        onChanged();
                     }
                     return;
                 }

@@ -112,6 +112,7 @@ async function open(q: unknown) {
                 currentPlan="Plan B"
                 onCouponRefused={vi.fn()}
                 onClose={vi.fn()}
+                onChanged={vi.fn()}
             />,
         );
         await Promise.resolve();

@@ -105,7 +105,13 @@ export function CreateSiteForm({
     kind,
     modules = null,
     canSetTrade = false,
+    onRetry,
+    onCreated,
 }: {
+    /** Read the catalogue again (its own read, not the page's). */
+    onRetry?: () => void;
+    /** After the site was made: the Website reads are stale. */
+    onCreated?: () => void;
     /** `org:update`: with no trade, the picker offers to set it (DEC-216). */
     canSetTrade?: boolean;
     /** The catalogue; null when it could not be read (said, not hidden). */
@@ -176,6 +182,7 @@ export function CreateSiteForm({
         }
         // The command menu's sites.
         afterSettingsSave();
+        onCreated?.();
         router.push(`/sites/${res.data.siteId}`);
     }
 
@@ -299,7 +306,7 @@ export function CreateSiteForm({
                 ) : choice ? (
                     <NoTemplates
                         failed={templates === null}
-                        onRetry={() => router.refresh()}
+                        onRetry={() => onRetry?.()}
                     />
                 ) : (
                     <p className="text-sm text-muted-foreground">

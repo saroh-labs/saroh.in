@@ -1,19 +1,11 @@
-import { count } from "@/lib/format/plural";
-import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
-import { IntentLink } from "@saroh/ui/intent-link";
-import { ArrowLeft, Inbox } from "lucide-react";
-import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { personHref } from "@/lib/contacts/person-href";
-import type { FormField, Submission } from "@/lib/forms/service";
-import { getForm, listSubmissions } from "@/lib/forms/service";
+import { FormEntriesContainer } from "@/components/sites/area/site-screens";
+import { getForm } from "@/lib/forms/service";
 import { recordTitle } from "@/lib/page-title";
 import { requireSession } from "@/lib/session";
 
-// One read for the tab's title and the page.
+// The tab's title reads the form once.
 const readForm = cache((formId: string) => getForm(formId));
 
 /**
@@ -34,45 +26,11 @@ export async function generateMetadata({
     );
 }
 
-/** What a value reads as: a string as typed, anything else as JSON. */
-function show(value: unknown): string {
-    if (typeof value === "string") return value.trim();
-    if (value === null || value === undefined) return "";
-    return JSON.stringify(value);
-}
-
 /**
- * The entry's rows, in the form's own order, then anything it carries that
- * the form no longer asks for (a field removed since) under its raw name —
- * what someone typed is never hidden because the form changed later. A value
- * that only repeats the name already heading the entry is left out.
- */
-function rows(
-    submission: Submission,
-    fields: FormField[],
-    heading: string,
-): { label: string; value: string; long: boolean }[] {
-    const known = new Set(fields.map((f) => f.name));
-    const out = fields.map((f) => ({
-        label: f.label,
-        value: show(submission.data[f.name]),
-        long: f.type === "textarea",
-    }));
-    for (const [key, value] of Object.entries(submission.data)) {
-        if (!known.has(key))
-            out.push({ label: key, value: show(value), long: false });
-    }
-    return out.filter((r) => r.value !== "" && r.value !== heading);
-}
-
-/**
- * One form's entries, newest first (#385) — a page, because it is revisited:
- * the place a merchant comes back to when they want to know exactly what
- * someone asked for.
- *
- * Each entry names who it came from and links to the contact and the lead it
- * opened. The entry outlives both: a deleted contact leaves "no longer in your
- * contacts" and the words they typed.
+ * One form's entries, newest first (#385). On React Query (DEC-259): the
+ * entries load in the browser, `form:read` asked by the route; a form of
+ * another site (or business) is the not-found page, a role without
+ * `form:read` the no-access page, as before.
  */
 export default async function FormEntriesPage({
     params,
@@ -81,130 +39,5 @@ export default async function FormEntriesPage({
 }) {
     const { siteId, formId } = await params;
     await requireSession();
-    const [form, page] = await Promise.all([
-        readForm(formId),
-        listSubmissions(formId),
-    ]);
-    if (form?.siteId !== siteId || !page) notFound();
-
-    return (
-        <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                    <Button
-                        asChild
-                        variant="ghost"
-                        size="xs"
-                        className="-ml-2 mb-1 text-muted-foreground"
-                    >
-                        <IntentLink href={`/sites/${siteId}/forms`}>
-                            <ArrowLeft className="mr-1 size-3.5" />
-                            All forms
-                        </IntentLink>
-                    </Button>
-                    <h2 className="font-display text-[19px] font-semibold tracking-[-0.02em]">
-                        {form.name}
-                    </h2>
-                    <p className="text-[12.5px] text-muted-foreground">
-                        {count(page.total, "entry", "entries")}
-                        {form.status === "ACTIVE"
-                            ? ", newest first"
-                            : " · no longer taking entries"}
-                    </p>
-                </div>
-            </div>
-
-            {page.items.length === 0 ? (
-                <EmptyState
-                    icon={<Inbox />}
-                    title="No entries yet"
-                    description="When someone fills this form in on your live site, what they sent shows here."
-                />
-            ) : (
-                <ul className="flex flex-col gap-3">
-                    {page.items.map((entry) => {
-                        const who =
-                            entry.contact?.name ??
-                            (show(entry.data.name) ||
-                                show(entry.data.email) ||
-                                "Someone");
-                        return (
-                            <li
-                                key={entry.id}
-                                className="overflow-hidden rounded-[12px] border border-border bg-card"
-                            >
-                                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-muted px-4 py-3">
-                                    <div className="min-w-0">
-                                        <p className="truncate text-[13.5px] font-medium">
-                                            {entry.contact ? (
-                                                <IntentLink
-                                                    href={personHref(
-                                                        entry.contact.id,
-                                                    )}
-                                                    className="hover:underline"
-                                                >
-                                                    {entry.contact.name}
-                                                </IntentLink>
-                                            ) : (
-                                                who
-                                            )}
-                                        </p>
-                                        <p className="text-[11.5px] text-muted-foreground">
-                                            <ViewerDate
-                                                iso={entry.createdAt}
-                                                variant="datetime"
-                                            />
-                                            {entry.contact
-                                                ? null
-                                                : " · no longer in your contacts"}
-                                        </p>
-                                    </div>
-                                    {entry.leadId ? (
-                                        <Button
-                                            asChild
-                                            variant="outline"
-                                            size="sm"
-                                        >
-                                            <IntentLink
-                                                href={`/leads/${entry.leadId}`}
-                                            >
-                                                Open lead
-                                            </IntentLink>
-                                        </Button>
-                                    ) : null}
-                                </div>
-                                <dl className="grid gap-x-6 gap-y-3 p-4 text-[13px] sm:grid-cols-2">
-                                    {rows(entry, form.fields, who).map(
-                                        (row) => (
-                                            <div
-                                                key={row.label}
-                                                className={
-                                                    row.long
-                                                        ? "min-w-0 sm:col-span-2"
-                                                        : "min-w-0"
-                                                }
-                                            >
-                                                <dt className="text-[11.5px] text-muted-foreground">
-                                                    {row.label}
-                                                </dt>
-                                                <dd className="whitespace-pre-line text-pretty break-words">
-                                                    {row.value}
-                                                </dd>
-                                            </div>
-                                        ),
-                                    )}
-                                </dl>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-
-            {page.total > page.items.length ? (
-                <p className="text-[12px] text-muted-foreground">
-                    Showing the latest {page.items.length} of {page.total}.
-                </p>
-            ) : null}
-        </div>
-    );
+    return <FormEntriesContainer siteId={siteId} formId={formId} />;
 }

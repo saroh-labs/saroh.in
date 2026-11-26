@@ -4,7 +4,7 @@ import type {
 } from "@saroh/api-contract";
 
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, destroy, getList, mutate, orgBase } from "@/lib/api/http";
+import { destroy, getJson, getList, mutate, orgBase } from "@/lib/api/http";
 
 import type { AiConnection } from "./types";
 
@@ -31,23 +31,18 @@ const path = (id: string) => `/ai-connections/${encodeURIComponent(id)}`;
 
 /**
  * What one connection changed here, a page at a time, and the website
- * drafts it can roll back; null when it couldn't be read. Read when its
- * sheet opens, so a failure says so in the sheet and never leaves the page.
+ * drafts it can roll back; null when it isn't this business's (the API's
+ * 404). Read by its sheet's own read route: any other failure throws there
+ * (a 503), said in the sheet, never leaving the page.
  */
 export async function readAiActivity(
     id: string,
     cursor?: string,
 ): Promise<AiConnectionActivity | null> {
-    try {
-        const base = await orgBase();
-        if (!base) return null;
-        const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-        const res = await apiFetch(`${base}${path(id)}/activity${query}`);
-        if (!res.ok) return null;
-        return (await res.json()) as AiConnectionActivity;
-    } catch {
-        return null;
-    }
+    const base = await orgBase();
+    if (!base) return null;
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    return getJson<AiConnectionActivity>(`${base}${path(id)}/activity${query}`);
 }
 
 /** Puts a website's draft back to before the connection's latest session. */

@@ -3,7 +3,6 @@
 import { CheckRow } from "@saroh/ui/check-row";
 import { RadioCards } from "@saroh/ui/choice-group";
 import { FormSheet } from "@saroh/ui/form-sheet";
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -17,6 +16,7 @@ import type {
     GoogleCalendarOption,
 } from "@/lib/google-calendar/types";
 import type { OutcomeMessage } from "@/lib/google-calendar/words";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 
 /** Drawn only while open, so each opening starts from what is saved. */
 export function BookingsSheet(props: {
@@ -45,7 +45,7 @@ function OpenBookingsSheet({
     onClose: () => void;
     onSaid: (message: OutcomeMessage) => void;
 }) {
-    const router = useRouter();
+    const settings = useSettingsSave();
     const labelId = useId();
     const accounts = status.accounts.filter((a) => a.state === "CONNECTED");
     const [lists, setLists] = useState<
@@ -102,23 +102,30 @@ function OpenBookingsSheet({
         if (choice !== current) {
             const res = await runAction(
                 () =>
-                    saveAccountCalendars(accountId, {
-                        writeTo: calendarId,
-                        checkBusy: account.calendars
-                            .filter((c) => c.checkBusy)
-                            .map((c) => c.id),
-                    }),
+                    saveAccountCalendars(
+                        accountId,
+                        {
+                            writeTo: calendarId,
+                            checkBusy: account.calendars
+                                .filter((c) => c.checkBusy)
+                                .map((c) => c.id),
+                        },
+                        ...asOrg(settings.orgId),
+                    ),
                 { setBusy: setPending, onUnreached: setError, quiet: true },
             );
             if (!res) return;
             if (!res.ok) return setError(res.error);
         }
         if (move) {
-            const moved = await runAction(() => moveMyBookings(), {
-                setBusy: setPending,
-                onUnreached: setError,
-                quiet: true,
-            });
+            const moved = await runAction(
+                () => moveMyBookings(...asOrg(settings.orgId)),
+                {
+                    setBusy: setPending,
+                    onUnreached: setError,
+                    quiet: true,
+                },
+            );
             if (!moved) return;
             if (!moved.ok) return setError(moved.error);
             onSaid({
@@ -128,7 +135,7 @@ function OpenBookingsSheet({
             });
         }
         onClose();
-        router.refresh();
+        settings.saved();
     }
 
     return (

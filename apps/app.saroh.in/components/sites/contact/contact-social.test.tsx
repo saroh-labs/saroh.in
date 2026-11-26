@@ -21,6 +21,18 @@ import type { SiteDetail } from "@/lib/sites/service";
 import type { SiteAddress } from "@/lib/sites/share-links";
 
 const refresh = vi.fn();
+vi.mock("@/components/sites/settings/settings-saved", () => ({
+    // The Settings tab's container provides it: the tab's business, and
+    // the site's reads again after a landed save (here, a spy).
+    useSettingsSaved: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+    SettingsSavedProvider: ({ children }: { children: unknown }) => children,
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh }),
     useSearchParams: () => new URLSearchParams(window.location.search),

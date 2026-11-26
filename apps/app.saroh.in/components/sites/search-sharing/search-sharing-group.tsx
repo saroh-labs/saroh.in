@@ -62,7 +62,7 @@ export function SearchSharingGroup({
         next: Partial<SearchSharingSaved>,
     ) =>
         run(
-            () => updateSiteSettings(site.id, input),
+            () => updateSiteSettings(site.id, input, state.orgId),
             `${label} saved. Publish to make it public.`,
             () => setSaved((s) => ({ ...s, ...next })),
         );
