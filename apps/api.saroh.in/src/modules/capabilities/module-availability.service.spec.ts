@@ -1,10 +1,12 @@
+import { EventEmitter } from "node:events";
+
 import { correlationStorage } from "../../common/logging/request-context";
 import type { OrgRole } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { ModuleAvailabilityService } from "./module-availability.service";
 import { forgetModuleLists } from "./module-lists-cache";
-import { forgetFor } from "./modules-cache.middleware";
+import { forgetFor, modulesCacheMiddleware } from "./modules-cache.middleware";
 import type { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
 function build(opts: {
@@ -277,17 +279,66 @@ describe("ModuleAvailabilityService — an invented role", () => {
                 await read();
                 expect([write, calls()]).toEqual([write, before + 1]);
             }
-            // Another business's write, or a customer's on a site: kept.
+            // A store's or the public API's write, for the business its
+            // guard proved.
+            let before = calls();
+            forgetFor("/stores/store_1/products", "org_cache");
+            await read();
+            expect(calls()).toBe(before + 1);
+            // Another business's write, a customer's on a site, a sign-in,
+            // or a path nothing answers: kept.
             for (const write of [
                 "/organizations/org_other/products",
                 "/public/sites/northwind/orders",
                 "/api/auth/sign-in/email",
+                "/x",
+                "/stores/store_2/products",
             ]) {
-                const before = calls();
-                forgetFor(write);
+                before = calls();
+                forgetFor(
+                    write,
+                    write.startsWith("/stores") ? "org_other" : undefined,
+                );
                 await read();
                 expect([write, calls()]).toEqual([write, before]);
             }
+        });
+
+        it("forgets only after a write that succeeded", async () => {
+            const { service, db } = build({});
+            const read = () => inGet(() => service.listViews(owner));
+            const calls = () =>
+                db.organizationModule.findMany.mock.calls.length;
+            await read();
+            const write = (status: number) => {
+                const res = new EventEmitter() as EventEmitter & {
+                    statusCode: number;
+                };
+                res.statusCode = status;
+                modulesCacheMiddleware(
+                    {
+                        method: "POST",
+                        originalUrl: "/admin/flags/x",
+                    } as unknown as Parameters<
+                        typeof modulesCacheMiddleware
+                    >[0],
+                    res as unknown as Parameters<
+                        typeof modulesCacheMiddleware
+                    >[1],
+                    () => undefined,
+                );
+                res.emit("finish");
+            };
+            for (const refused of [400, 403, 404, 500]) {
+                const before = calls();
+                write(refused);
+                await read();
+                expect([refused, calls()]).toEqual([refused, before]);
+            }
+            const before = calls();
+            write(201);
+            await read();
+            expect(calls()).toBe(before + 1);
         });
     });
 });

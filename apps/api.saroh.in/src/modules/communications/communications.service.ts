@@ -20,6 +20,7 @@ import {
     attentionOf,
     NO_ATTENTION,
 } from "../../common/providers/provider-attention";
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { isReservedContactEmail } from "../contacts/contact-email";
@@ -989,7 +990,8 @@ export class CommunicationsService {
 
     /**
      * List the org's messages (+ their deliveries), optionally scoped to a Lead
-     * or Contact — the auditable lifecycle view. `message:read`.
+     * or Contact — the auditable lifecycle view. The newest `LIST_LIMIT`.
+     * `message:read`.
      */
     async listMessages(
         ctx: OrganizationContext,
@@ -1004,6 +1006,7 @@ export class CommunicationsService {
             },
             include: { deliveries: { orderBy: { createdAt: "asc" } } },
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
     }
 

@@ -67,7 +67,13 @@ export default async function EditInvoicePage({
                     ],
                     title: "Edit the draft",
                 }}
-                contacts={contacts}
+                // The draft's person, though older than the recent few.
+                contacts={
+                    invoice.contact &&
+                    !contacts.some((c) => c.id === invoice.contact?.id)
+                        ? [invoice.contact, ...contacts]
+                        : contacts
+                }
                 defaultCurrency={invoice.currency}
                 draft={invoice}
                 registered={

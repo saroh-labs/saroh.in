@@ -14,6 +14,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import { INT_COLUMN_MAX } from "../../common/validation";
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -32,6 +34,7 @@ export class UploadVariantDto {
 
     @IsInt({ message: "contentLength must be an integer number of bytes" })
     @Min(1, { message: "contentLength must be at least 1 byte" })
+    @Max(INT_COLUMN_MAX)
     contentLength!: number;
 }
 
@@ -51,6 +54,7 @@ export class CreateUploadDto {
     // Exact byte length the client will upload; the port caps it before signing.
     @IsInt({ message: "contentLength must be an integer number of bytes" })
     @Min(1, { message: "contentLength must be at least 1 byte" })
+    @Max(INT_COLUMN_MAX)
     contentLength!: number;
 
     @Transform(trim)

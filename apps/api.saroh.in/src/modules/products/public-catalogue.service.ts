@@ -808,9 +808,10 @@ export class PublicCatalogueService {
             status: "PUBLISHED",
         };
         const [ratings, latest] = await Promise.all([
-            prisma.productReview.findMany({
+            prisma.productReview.groupBy({
+                by: ["rating"],
                 where: published,
-                select: { rating: true },
+                _count: { _all: true },
             }),
             prisma.productReview.findMany({
                 where: published,
@@ -827,7 +828,7 @@ export class PublicCatalogueService {
                 },
             }),
         ]);
-        const summary = ratingSummary(ratings.map((r) => r.rating));
+        const summary = ratingSummary(ratings);
         const titles = new Map(variants.map((v) => [v.id, v.title]));
         return {
             rating:

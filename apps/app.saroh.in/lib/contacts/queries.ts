@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
 import type { EnquiryEntry } from "@/lib/crm/enquiries";
 import { defineRead } from "@/lib/query/define-read";
 import type { DomainKey } from "@/lib/query/keys";
@@ -23,6 +24,33 @@ export const contactsListRead = defineRead<ContactListItem[]>()({
     route: { path: "/api/contacts", params: {} },
     tier: "records",
 });
+
+/** How many a contact picker lists before anything is typed: the search's most. */
+export const PICKER_RECENT = 20;
+
+/**
+ * The contact pickers' search (invoices, subscriptions, courses, packs,
+ * leads): the most recent first, or those a typed `q` finds by name, email
+ * or phone, through the API's contact search; or the one `id` a form
+ * already holds, so a person older than the recent few still shows by
+ * name.
+ */
+export const contactSearchRead = defineRead<ContactOption[]>()({
+    key: (orgId, ask) => domainKey("contacts", orgId, "search", ask),
+    route: {
+        path: "/api/contacts/search",
+        params: {
+            q: z.string().max(100).optional(),
+            id: z
+                .string()
+                .regex(/^[\w-]{1,64}$/)
+                .optional(),
+        },
+    },
+    tier: "records",
+});
+
+export type ContactSearchAsk = Parameters<typeof contactSearchRead.options>[1];
 
 /**
  * A person's Leads and Enquiries tabs (`/contacts/<id>`, #869), where CRM

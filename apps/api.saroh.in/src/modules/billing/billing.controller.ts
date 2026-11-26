@@ -14,8 +14,6 @@ import type { Plan } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { sarohSells } from "./saroh-bills";
 
-import { hashClientIp } from "../../common/client-ip";
-import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
@@ -117,17 +115,14 @@ export class BillingController {
      * change, the recurring charge with GST, anything charged now, and when
      * it starts. `billing:read`. The site's `?plan=&cycle=` lands here.
      * With `coupon=`, the coupon checked and its discount shown (U16),
-     * rate-limited per business and per address.
+     * rate-limited per business and per signed-in person.
      */
     @Get("change-plan")
     quoteChange(
         @OrgContext() ctx: OrganizationContext,
         @Query() query: ChangePlanQuery,
-        @ClientAddress() ip: string,
     ): Promise<ChangePlanQuoteView> {
-        return this.checkouts.quote(ctx, query, new Date(), {
-            addressKey: hashClientIp(ip),
-        });
+        return this.checkouts.quote(ctx, query);
     }
 
     /**
@@ -142,11 +137,8 @@ export class BillingController {
     changePlan(
         @OrgContext() ctx: OrganizationContext,
         @Body() dto: ChangePlanDto,
-        @ClientAddress() ip: string,
     ): Promise<ChangePlanResult> {
-        return this.checkouts.changePlan(ctx, dto, new Date(), {
-            addressKey: hashClientIp(ip),
-        });
+        return this.checkouts.changePlan(ctx, dto);
     }
 
     /** The add-ons the business's plan offers, and what it holds (U16). */

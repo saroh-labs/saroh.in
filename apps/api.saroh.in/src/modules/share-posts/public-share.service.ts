@@ -8,6 +8,7 @@ import {
 import { prisma } from "@saroh/database";
 import { sanitizeSegment } from "@saroh/object-storage";
 
+import { IMAGE_MAX_BYTES } from "../../common/image-size";
 import {
     dayWords,
     moneyWords,
@@ -71,7 +72,7 @@ export function drawnHost(host: string): string {
 const RENDERS_PER_WINDOW = 60;
 const RENDER_WINDOW_MS = 60_000;
 /** The most of a photo read; one larger draws the tile. */
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const MAX_PHOTO_BYTES = IMAGE_MAX_BYTES;
 
 export const SHARE_KINDS = [
     "product",

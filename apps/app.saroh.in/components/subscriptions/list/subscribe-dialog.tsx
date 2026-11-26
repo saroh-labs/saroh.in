@@ -76,7 +76,11 @@ export function SubscribeDialog({
     });
 
     const plan = active.find((p) => p.id === planId);
-    const person = contacts.find((c) => c.id === contactId);
+    // Found by a search, or read by id: not among the recent few.
+    const [found, setFound] = useState<ContactOption | null>(null);
+    const person =
+        contacts.find((c) => c.id === contactId) ??
+        (found?.id === contactId ? found : undefined);
     // "₹2,000 + ₹360 GST (18%) = ₹2,360 to pay", the API's own sum.
     const toPay = plan ? addedSum(plan.gst, plan.currency) : null;
     const startsLater = start ? ymd(start) > ymd(new Date()) : false;
@@ -157,6 +161,7 @@ export function SubscribeDialog({
                                 contacts={contacts}
                                 value={contactId}
                                 onValueChange={setContactId}
+                                onContact={setFound}
                             />
                         </div>
                         <div className="grid gap-1.5">

@@ -7,6 +7,7 @@ import {
 import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { BookingEventType } from "../bookings/booking-event-type";
@@ -149,6 +150,8 @@ export class ContactsService {
                 removedAt: null,
             },
             orderBy: { createdAt: "desc" },
+            // The newest LIST_LIMIT; the paged Customers list holds everyone.
+            take: LIST_LIMIT,
             include: {
                 customerAccounts: {
                     where: { status: "ACTIVE" },
