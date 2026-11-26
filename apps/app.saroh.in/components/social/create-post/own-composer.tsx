@@ -43,6 +43,8 @@ import {
 import { useCardImage } from "@/components/shared/share-item/use-card-image";
 import { useSettled } from "@/components/shared/share-item/use-share-state";
 import { SocialPostPanel } from "@/components/social/saroh/composer/social-post-panel";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import type {
     CardSize,
     CardStyle,
@@ -124,6 +126,7 @@ export function OwnComposer({
     /** Saroh Social, when it is on for the business (board BSocialDesk). */
     social?: SocialCompose | null;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const id = useId();
     const router = useRouter();
     const stale = useSocialStale();
@@ -176,7 +179,11 @@ export function OwnComposer({
         chain.current = chain.current.then(async () => {
             setStatus("saving");
             try {
-                const res = await saveOwnPost(postId.current, body);
+                const res = await saveOwnPost(
+                    postId.current,
+                    body,
+                    ...asOrg(orgId),
+                );
                 if (res.ok) {
                     stale();
                     postId.current = res.data.id;

@@ -1,4 +1,6 @@
+import { getServerSession } from "@saroh/auth/next";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
 import { EditorAskAiProvider } from "@/components/ask-ai/editor-ask-ai";
@@ -49,14 +51,17 @@ export default async function EditorLayout({
     // to another plan only to someone who may and says who can to anyone
     // else (`PlanWay`). A business that couldn't be read says nothing, and
     // the page a link opens decides.
-    const [organization, websiteArea, organizations] = await Promise.all([
-        activeOrganizationOnce().catch(() => undefined),
-        // The Website area switch, as the api holds it (DEC-240).
-        websiteAreaOn(),
-        // For React Query, as the shell holds it (DEC-259): the editors'
-        // pickers read through it.
-        organizationsOnce().catch(() => []),
-    ]);
+    const [organization, websiteArea, organizations, session] =
+        await Promise.all([
+            activeOrganizationOnce().catch(() => undefined),
+            // The Website area switch, as the api holds it (DEC-240).
+            websiteAreaOn(),
+            // For React Query, as the shell holds it (DEC-259): the editors'
+            // pickers read through it.
+            organizationsOnce().catch(() => []),
+            // Whose cache it is: another person's is dropped (`QueryProvider`).
+            headers().then(getServerSession),
+        ]);
     // Ask AI, as the shell mounts it (`app-shell.tsx`): the editors' Ask AI
     // buttons open it by event, and without a host here nothing opened.
     const askAiShown =
@@ -98,7 +103,12 @@ export default async function EditorLayout({
     // provider around the mounted editor, which stays one editor across
     // `?page=`. Leaving marks the Website area's reads stale.
     return (
-        <QueryProvider orgId={organization.id} organizations={organizations}>
+        <QueryProvider
+            orgId={organization.id}
+            // None only on the way to sign-in (the pages' `requireSession`).
+            userId={session?.user.id ?? ""}
+            organizations={organizations}
+        >
             <SitesStaleOnLeave />
             {planned}
         </QueryProvider>

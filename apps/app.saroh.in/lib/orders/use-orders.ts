@@ -8,10 +8,12 @@ import {
 } from "@tanstack/react-query";
 import { useCallback } from "react";
 
+import { customersKeys } from "@/lib/customers/queries";
 import { homeKeys } from "@/lib/home/queries";
 import { invoicesKeys } from "@/lib/invoices/queries";
 import { productsKeys } from "@/lib/products/queries";
 import { useOrgId } from "@/lib/query/org";
+import { stockKeys } from "@/lib/stock/queries";
 
 import type {
     OrderAsk,
@@ -75,6 +77,9 @@ export function ordersSaved(qc: QueryClient, orgId: string): Promise<void> {
         qc.invalidateQueries({ queryKey: homeKeys(orgId), ...later }),
         qc.invalidateQueries({ queryKey: productsKeys(orgId), ...later }),
         qc.invalidateQueries({ queryKey: invoicesKeys(orgId), ...later }),
+        // Cancelled or restocked: stock levels and what a customer owes.
+        qc.invalidateQueries({ queryKey: stockKeys(orgId), ...later }),
+        qc.invalidateQueries({ queryKey: customersKeys(orgId), ...later }),
     ]).then(
         () => undefined,
         () => undefined,

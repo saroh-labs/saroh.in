@@ -20,6 +20,8 @@ import { z } from "zod";
 import { trimmedOr } from "@/lib/forms/values";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { afterSettingsSave } from "@/lib/query/invalidate";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { createStore } from "@/lib/stores/actions";
 import { storefrontHref } from "@/lib/stores/links";
 import { lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
@@ -32,6 +34,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export function CreateStoreForm() {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const router = useRouter();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -45,10 +48,13 @@ export function CreateStoreForm() {
     const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("location") });
 
     async function onSubmit(values: FormValues) {
-        const res = await createStore({
-            name: values.name,
-            description: trimmedOr(values.description, undefined),
-        });
+        const res = await createStore(
+            {
+                name: values.name,
+                description: trimmedOr(values.description, undefined),
+            },
+            ...asOrg(orgId),
+        );
         if (!res.ok) {
             if (res.field === "name") {
                 form.setError(res.field, { message: res.error });

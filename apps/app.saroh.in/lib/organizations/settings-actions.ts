@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { writeAsOrgIfSent } from "@/lib/api/assert-active-org";
 import { readOverMrpIfAdded } from "@/lib/gst-rates/service";
 import type { OpeningHoursDay } from "@/lib/stores/storefronts";
 import {
@@ -39,8 +40,12 @@ import {
  */
 export async function saveOrganizationSettings(
     input: OrganizationSettingsInput,
+    /** The tab's business (DEC-259): a moved tab is refused, never written into another. */
+    orgId?: string,
 ): Promise<SettingsResult<OrganizationSettings>> {
-    const result = await updateOrganizationSettings(input);
+    const result = await writeAsOrgIfSent(orgId, () =>
+        updateOrganizationSettings(input),
+    );
     if (result.ok) {
         revalidatePath("/settings/organization");
         // Website settings shows what the site says of how to reach the
@@ -80,8 +85,9 @@ export async function saveOrganizationSettings(
  */
 export async function saveOrganizationSettingsInPlace(
     input: OrganizationSettingsInput,
+    orgId?: string,
 ): Promise<SettingsResult<OrganizationSettings>> {
-    return updateOrganizationSettings(input);
+    return writeAsOrgIfSent(orgId, () => updateOrganizationSettings(input));
 }
 
 /**
@@ -108,8 +114,11 @@ export async function readBusinessDetails() {
  */
 export async function saveBusinessLogo(
     mediaId: string | null,
+    orgId?: string,
 ): Promise<SettingsResult<OrganizationSettings>> {
-    const result = await updateBusinessLogo(mediaId);
+    const result = await writeAsOrgIfSent(orgId, () =>
+        updateBusinessLogo(mediaId),
+    );
     // Invoices print it at the top.
     if (result.ok) revalidatePath("/settings/organization");
     return result;
@@ -118,8 +127,9 @@ export async function saveBusinessLogo(
 /** The logo, set from the invoice editor: nothing revalidated (review #15). */
 export async function saveBusinessLogoInPlace(
     mediaId: string | null,
+    orgId?: string,
 ): Promise<SettingsResult<OrganizationSettings>> {
-    return updateBusinessLogo(mediaId);
+    return writeAsOrgIfSent(orgId, () => updateBusinessLogo(mediaId));
 }
 
 /*
@@ -135,7 +145,10 @@ const UNREAD = "Couldn't check what's saved now, so nothing was undone";
 
 export async function undoOrganizationSettings(
     undo: SettingsUndo,
+    orgId?: string,
 ): Promise<SettingsResult<OrganizationSettings>> {
+    if (orgId)
+        return writeAsOrgIfSent(orgId, () => undoOrganizationSettings(undo));
     const current = await getOrganizationSettings().catch(() => null);
     if (!current) return { ok: false, error: UNREAD };
     const refusal = undoRefusal(undo, current);
@@ -145,7 +158,9 @@ export async function undoOrganizationSettings(
 
 export async function undoBusinessLogo(
     undo: LogoUndo,
+    orgId?: string,
 ): Promise<SettingsResult<OrganizationSettings>> {
+    if (orgId) return writeAsOrgIfSent(orgId, () => undoBusinessLogo(undo));
     const current = await getOrganizationSettings().catch(() => null);
     if (!current) return { ok: false, error: UNREAD };
     const refusal = logoUndoRefusal(undo, current);
@@ -159,7 +174,10 @@ export async function undoBusinessLogo(
  */
 export async function undoStorefrontHours(
     entries: HoursUndoEntry[],
+    orgId?: string,
 ): Promise<SettingsResult<{ id: string; openingHours: OpeningHoursDay[] }[]>> {
+    if (orgId)
+        return writeAsOrgIfSent(orgId, () => undoStorefrontHours(entries));
     const read = await listStorefrontHours();
     if (read.state !== "ok") return { ok: false, error: UNREAD };
     const refusal = hoursUndoRefusal(entries, read.storefronts);

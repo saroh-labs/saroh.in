@@ -9,6 +9,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { completeUpload, createUpload } from "@/lib/media/actions";
 import { mediaSrc } from "@/lib/media/media-src";
 import { preparePhoto } from "@/lib/media/prepare-photo";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 
 import { ProgressBar } from "@saroh/ui/progress-bar";
 import { pickedSizes, uploadWords } from "./picked-image";
@@ -86,6 +88,7 @@ export function useImageUpload(
         allowVideo?: boolean;
     } = {},
 ) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [busy, setBusy] = useState(false);
     const [preparing, setPreparing] = useState(false);
     const [progress, setProgress] = useState<number | null>(null);
@@ -216,28 +219,31 @@ export function useImageUpload(
             : await readDimensions(file);
         // A picture only Ask AI reads has no page to be sharp on: no smaller copies.
         const copies = purpose === "ask-ai" ? [] : (prepared?.variants ?? []);
-        const ticket = await createUpload({
-            contentType: photo.type,
-            contentLength: photo.size,
-            filename: photo.name,
-            purpose,
-            ...(prepared
-                ? {
-                      ...dims,
-                      ...(prepared.placeholder
-                          ? { placeholder: prepared.placeholder }
-                          : {}),
-                      ...(copies.length > 0
-                          ? {
-                                variants: copies.map((c) => ({
-                                    width: c.width,
-                                    contentLength: c.blob.size,
-                                })),
-                            }
-                          : {}),
-                  }
-                : {}),
-        });
+        const ticket = await createUpload(
+            {
+                contentType: photo.type,
+                contentLength: photo.size,
+                filename: photo.name,
+                purpose,
+                ...(prepared
+                    ? {
+                          ...dims,
+                          ...(prepared.placeholder
+                              ? { placeholder: prepared.placeholder }
+                              : {}),
+                          ...(copies.length > 0
+                              ? {
+                                    variants: copies.map((c) => ({
+                                        width: c.width,
+                                        contentLength: c.blob.size,
+                                    })),
+                                }
+                              : {}),
+                      }
+                    : {}),
+            },
+            ...asOrg(orgId),
+        );
         if (!ticket.ok) throw new Error(ticket.error);
 
         const total = copies.reduce((n, c) => n + c.blob.size, photo.size);
@@ -340,12 +346,15 @@ export function useImageUpload(
         purpose: "product-video",
         onProgress?: (pct: number) => void,
     ): Promise<{ mediaId: string; url: string }> {
-        const ticket = await createUpload({
-            contentType: file.type,
-            contentLength: file.size,
-            filename: file.name,
-            purpose,
-        });
+        const ticket = await createUpload(
+            {
+                contentType: file.type,
+                contentLength: file.size,
+                filename: file.name,
+                purpose,
+            },
+            ...asOrg(orgId),
+        );
         if (!ticket.ok) throw new Error(ticket.error);
         await putWithProgress(
             ticket.data.uploadUrl,

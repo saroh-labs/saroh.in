@@ -33,6 +33,8 @@ import type {
 } from "@/lib/organizations/settings-service";
 import { offeredZone } from "@/lib/organizations/time-zones";
 import { invalidateOrganizations } from "@/lib/query/invalidate";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import type { FormValues } from "./business-form";
 import {
@@ -85,6 +87,7 @@ export function BusinessFieldSheet({
         sent: OrganizationSettingsInput,
     ) => void;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const saved = valuesOf(settings);
     const zoneSaved = Boolean(settings.profile?.timezone);
     // A registered business needs its registered address. When the saved
@@ -176,7 +179,7 @@ export function BusinessFieldSheet({
             return;
         }
         const sent = settingsPatch(values, dirtyFields);
-        const result = await saveOrganizationSettings(sent);
+        const result = await saveOrganizationSettings(sent, ...asOrg(orgId));
         if (!result.ok) {
             const field = result.field ? FIELD_OF[result.field] : undefined;
             if (field && here(field)) {

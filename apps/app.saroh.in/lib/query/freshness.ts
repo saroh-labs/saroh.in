@@ -38,6 +38,17 @@ export const FRESHNESS: Readonly<Record<Tier, Freshness>> = {
     live: { staleTime: 30_000 },
 };
 
+/**
+ * Whether a cached query is a read others change (`records` or `live`):
+ * what coming back to the tab reads again on a React Query page not in
+ * `LIVE_QUERY_ROUTES`. Settings are read again only when told.
+ */
+export function isChangingQuery(q: {
+    meta?: Record<string, unknown>;
+}): boolean {
+    return q.meta?.tier === "records" || q.meta?.tier === "live";
+}
+
 /** Whether a cached query is a settings read (its `meta.tier`). */
 export function isSettingsQuery(q: {
     meta?: Record<string, unknown>;

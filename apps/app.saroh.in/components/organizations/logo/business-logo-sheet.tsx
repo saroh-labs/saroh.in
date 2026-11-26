@@ -10,6 +10,8 @@ import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import { saveBusinessLogo } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 /**
@@ -44,6 +46,7 @@ export function BusinessLogoSheet({
     save?: typeof saveBusinessLogo;
 }) {
     const saved: LogoValue | null = settings.logo ?? null;
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [logo, setLogo] = useState(saved);
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -57,9 +60,12 @@ export function BusinessLogoSheet({
             return;
         }
         setRefusal(null);
-        const result = await runAction(() => save(logo?.mediaId ?? null), {
-            setBusy: setSaving,
-        });
+        const result = await runAction(
+            () => save(logo?.mediaId ?? null, ...asOrg(orgId)),
+            {
+                setBusy: setSaving,
+            },
+        );
         if (!result) return;
         if (!result.ok) {
             setRefusal(result.error);

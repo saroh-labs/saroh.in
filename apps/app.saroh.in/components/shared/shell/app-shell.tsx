@@ -163,6 +163,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <ShellFrame
             canChangePlan={mayChangePlan(activeOrg)}
             orgId={activeOrg.id}
+            userId={session.user.id}
             organizations={organizations}
             seed={seed}
         >
@@ -322,12 +323,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 function ShellFrame({
     canChangePlan,
     orgId,
+    userId,
     organizations,
     seed,
     children,
 }: {
     canChangePlan: boolean;
     orgId: string;
+    userId: string;
     organizations: Organization[];
     seed: ShellSeedData | null;
     children: React.ReactNode;
@@ -335,7 +338,11 @@ function ShellFrame({
     return (
         // React Query, once for the app (DEC-259), with the list this
         // render already read.
-        <QueryProvider orgId={orgId} organizations={organizations}>
+        <QueryProvider
+            orgId={orgId}
+            userId={userId}
+            organizations={organizations}
+        >
             {/* Before the shell's readers mount: they join its reads. */}
             {seed ? <ShellSeed orgId={orgId} seed={seed} /> : null}
             <PlanAccessProvider canChangePlan={canChangePlan}>

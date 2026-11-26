@@ -118,7 +118,7 @@ export function BusinessHoursSheet({
                 : `Hours saved for all ${stores.length} locations.`,
             back &&
                 (async () => {
-                    const undone = await undoStorefrontHours(back);
+                    const undone = await undoStorefrontHours(back, orgId);
                     if (!undone.ok) return undone;
                     const weeks = new Map(
                         undone.data.map((s) => [s.id, s.openingHours]),

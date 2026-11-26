@@ -1,5 +1,6 @@
 "use client";
 
+import type { Query } from "@tanstack/react-query";
 import { QueryClientContext } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -19,9 +20,11 @@ import {
     titleWithUnread,
 } from "@/lib/live/refresh";
 import { isChromeRefresh } from "@/lib/query/chrome-refresh";
+import { isChangingQuery } from "@/lib/query/freshness";
 import { isOrgKey } from "@/lib/query/keys";
 import { liveDomains } from "@/lib/query/live-routes";
 import { useOrgIdOrNull } from "@/lib/query/org";
+import { isRqRoute } from "@/lib/query/rq-routes";
 import { shellLiveRead } from "@/lib/shell/queries";
 
 /** Two refreshes are never closer together than this. */
@@ -53,6 +56,12 @@ const MIN_GAP_MS = 2_000;
  * (`chrome-refresh.ts`), `router.refresh()` instead, whose render
  * prefetches and hydrates those queries, so each is read once. There it also waits
  * while those queries are still reading or a save is on its way.
+ *
+ * Any other React Query page (`isRqRoute`) reads again, on the same
+ * triggers and guards, the open business's shown queries whose tier is
+ * `records` or `live` (`meta.tier`): a payment taken online or a new
+ * booking appears without a page that lists its domains here. Its render
+ * sends no rows, so it never `router.refresh()`es.
  */
 export function useLiveRefresh({
     intervalMs = LIVE_INTERVAL_MS,
@@ -90,6 +99,7 @@ export function useLiveRefresh({
             orgId: org,
         } = page.current;
         const domains = client && org ? liveDomains(path) : null;
+        const onQueries = !!client && !!org && (!!domains || isRqRoute(path));
         // The bell and the rail's badges read again on every refresh, on
         // every page (`/api/shell/live`), and are never what waits.
         const shellLive = () => {
@@ -99,10 +109,17 @@ export function useLiveRefresh({
                 });
             }
         };
-        if (client && org && domains) {
-            const predicate = (q: { queryKey: readonly unknown[] }) =>
-                domains.includes(q.queryKey[0] as string) &&
-                isOrgKey(q.queryKey, org);
+        if (client && org && onQueries) {
+            const predicate = domains
+                ? (q: { queryKey: readonly unknown[] }) =>
+                      domains.includes(q.queryKey[0] as string) &&
+                      isOrgKey(q.queryKey, org)
+                : (q: Query) =>
+                      // The shell's bell is read below, and never waits.
+                      q.queryKey[0] !== "shell" &&
+                      isOrgKey(q.queryKey, org) &&
+                      q.isActive() &&
+                      isChangingQuery(q);
             if (client.isFetching({ predicate }) > 0) return;
             if (client.isMutating() > 0) return;
             startedAt.current = Date.now();

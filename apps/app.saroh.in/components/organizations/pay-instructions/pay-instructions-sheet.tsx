@@ -37,6 +37,8 @@ import {
 } from "@/lib/organizations/pay-instructions";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { PayPreview } from "./pay-preview";
 
@@ -175,6 +177,7 @@ export function PayInstructionsSheet({
      */
     save?: typeof saveOrganizationSettings;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const edition = saved?.edition;
     const country = saved?.country;
     const values = payValuesOf(saved);
@@ -191,7 +194,7 @@ export function PayInstructionsSheet({
             onClose();
             return;
         }
-        const res = await save({ payInstructions: input });
+        const res = await save({ payInstructions: input }, ...asOrg(orgId));
         if (!res.ok) {
             if (
                 res.field &&
