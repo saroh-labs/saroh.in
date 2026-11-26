@@ -28,6 +28,7 @@ import {
     organizationsOnce,
 } from "@/lib/organizations/service";
 import { tradeOf } from "@/lib/organizations/trade";
+import { startShellSeed } from "@/lib/shell/access";
 import { usageSharingOrNull } from "@/lib/usage-sharing/service";
 import { Button } from "@saroh/ui/button";
 import { PausedState } from "@saroh/ui/data-state";
@@ -44,6 +45,8 @@ import {
     ShellTabBar,
     ShellWebsiteArea,
 } from "./shell-reads";
+import type { ShellSeedData } from "./shell-seed";
+import { ShellSeed } from "./shell-seed";
 import { recordingSwitchedOn, UsageRecording } from "./usage-recording";
 
 /**
@@ -59,7 +62,8 @@ import { recordingSwitchedOn, UsageRecording } from "./usage-recording";
  * no session we render the page bare (no chrome).
  */
 export async function AppShell({ children }: { children: React.ReactNode }) {
-    const session = await getServerSession(await headers());
+    const requestHeaders = await headers();
+    const session = await getServerSession(requestHeaders);
     if (!session) return <>{children}</>;
 
     // Read once for the request: the layout's tab title uses the same two.
@@ -112,6 +116,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         );
     }
 
+    // The shell's own reads, started now and streamed after the frame on a
+    // full load (`ShellSeed`): never awaited here, so the page isn't held.
+    const seed = startShellSeed(requestHeaders);
+
     // Whether session recording is switched on for this environment
     // (DEC-125): a PostHog key and the replay switch. Off, nothing is read.
     const recordingOn = recordingSwitchedOn();
@@ -156,6 +164,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             canChangePlan={mayChangePlan(activeOrg)}
             orgId={activeOrg.id}
             organizations={organizations}
+            seed={seed}
         >
             {/*
              * Without this, reaching the page content by keyboard means tabbing
@@ -314,17 +323,21 @@ function ShellFrame({
     canChangePlan,
     orgId,
     organizations,
+    seed,
     children,
 }: {
     canChangePlan: boolean;
     orgId: string;
     organizations: Organization[];
+    seed: ShellSeedData | null;
     children: React.ReactNode;
 }) {
     return (
         // React Query, once for the app (DEC-259), with the list this
         // render already read.
         <QueryProvider orgId={orgId} organizations={organizations}>
+            {/* Before the shell's readers mount: they join its reads. */}
+            {seed ? <ShellSeed orgId={orgId} seed={seed} /> : null}
             <PlanAccessProvider canChangePlan={canChangePlan}>
                 <ShellWebsiteArea>
                     <div className="flex min-h-screen flex-col">{children}</div>

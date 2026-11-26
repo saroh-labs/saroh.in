@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
 
@@ -39,7 +38,10 @@ export function RestoreVersion({
     revision,
     onRestored,
     icon,
+    orgId,
 }: {
+    /** The tab's business, sent last on a React Query screen (DEC-259). */
+    orgId?: string;
     siteId: string;
     publicationId: string;
     publishedAt: string | Date;
@@ -48,12 +50,11 @@ export function RestoreVersion({
     /** The editor's open page and the draft revision it holds (stale: 409). */
     pageId?: string;
     revision?: number;
-    /** After the draft changed (the editor's History reloads); else refresh. */
-    onRestored?: () => void;
+    /** After the draft changed: the editor's History reloads, the version's page reads the site again. */
+    onRestored: () => void;
     /** Drawn before the label (History's Compare: the history icon, D3). */
     icon?: ReactNode;
 }) {
-    const router = useRouter();
     const zone = useBusinessZone();
     const [confirming, setConfirming] = useState(false);
     const [pending, startTransition] = useTransition();
@@ -64,10 +65,18 @@ export function RestoreVersion({
     function restore() {
         startTransition(async () => {
             const res = await runAction(() =>
-                restoreVersionAsDraft(siteId, publicationId, {
-                    pageId,
-                    revision,
-                }),
+                // The editor's History sends no business: it isn't on React Query.
+                orgId
+                    ? restoreVersionAsDraft(
+                          siteId,
+                          publicationId,
+                          { pageId, revision },
+                          orgId,
+                      )
+                    : restoreVersionAsDraft(siteId, publicationId, {
+                          pageId,
+                          revision,
+                      }),
             );
             if (!res) return;
             if (!res.ok) {
@@ -78,12 +87,7 @@ export function RestoreVersion({
             showSuccess(
                 "That version is your draft now. It goes live when you publish.",
             );
-            if (onRestored) {
-                onRestored();
-                return;
-            }
-            // rq-refresh-ok: only a version's own page (not on React Query) restores here; Version history imports this file's words.
-            router.refresh();
+            onRestored();
         });
     }
 

@@ -1,10 +1,6 @@
 "use client";
 
-import type {
-    WebhookDeliveryView,
-    WebhookEndpointView,
-    WebhookEvent,
-} from "@saroh/api-contract";
+import type { WebhookEndpointView, WebhookEvent } from "@saroh/api-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { CheckRow } from "@saroh/ui/check-row";
@@ -19,7 +15,7 @@ import { listTable, ListTable, ListTableHead } from "@saroh/ui/list-table";
 import { Notice } from "@saroh/ui/notice";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronRight, Plus, Send } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
@@ -27,7 +23,6 @@ import { relativeWhen } from "@/lib/notifications/when";
 import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import {
     createWebhook,
-    readDeliveries,
     removeWebhook,
     resendDelivery,
     rollWebhookSecret,
@@ -40,6 +35,8 @@ import {
     EVENT_WORDS,
     eventLabel,
 } from "@/lib/webhooks/events";
+import type { WebhookDelivery } from "@/lib/webhooks/queries";
+import { useWebhookDeliveries } from "@/lib/webhooks/use-webhooks";
 import { SecretOnce } from "./secret-once";
 
 export interface WebhooksProps {
@@ -487,28 +484,19 @@ function EndpointFields({
     const [testing, setTesting] = useState(false);
     const [rolling, setRolling] = useState(false);
     const [removing, setRemoving] = useState(false);
-    const [log, setLog] = useState<WebhookDeliveryView[] | null | "loading">(
-        "loading",
-    );
+    // Read once when the sheet opens on this address, held for the visit.
+    const deliveries = useWebhookDeliveries(e.id);
+    const log = deliveries.data
+        ? deliveries.data.deliveries
+        : deliveries.isError
+          ? null
+          : "loading";
     const turnedOff = endpointState(e) === "turned-off";
     const now = new Date();
 
     async function load() {
-        setLog("loading");
-        setLog(await readDeliveries(e.id).catch(() => null));
+        await deliveries.refetch();
     }
-    // Read once, when the sheet opens on this address.
-    useEffect(() => {
-        let live = true;
-        void readDeliveries(e.id)
-            .catch(() => null)
-            .then((rows) => {
-                if (live) setLog(rows);
-            });
-        return () => {
-            live = false;
-        };
-    }, [e.id]);
 
     async function submit() {
         setError(null);
@@ -771,7 +759,7 @@ function EndpointFields({
     );
 }
 
-function deliveryWords(d: WebhookDeliveryView): string {
+function deliveryWords(d: WebhookDelivery): string {
     if (d.status === "DELIVERED") return "Delivered";
     if (d.status === "PENDING")
         return d.attempts > 0

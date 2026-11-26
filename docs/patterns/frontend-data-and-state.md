@@ -80,8 +80,8 @@ There is no global client store. React Query holds server state only, in
 - **Security, unchanged.** Every read goes through a read route (`readRoute`:
   session, `x-organization-id` = the active business or 409, same origin, GET
   only, `private,no-store`, generic errors); the API checks membership,
-  paused seats and permission on every call; no query's data is in the
-  page's HTML; the middleware sends a signed-out request for a page to
+  paused seats and permission on every call; no screen's data is in the
+  page's HTML (the shell's own seed is, on a full load: see below); the middleware sends a signed-out request for a page to
   sign-in and a read route answers it 401; the cache is per business key and
   cleared on sign-out in every tab.
 - **Keys.** `[domain, orgId, kind, ...params]`, built only through
@@ -201,6 +201,23 @@ decides how often the browser asks.
   refresh reads again on every page (`shell-reads.tsx`). Until the settings
   land the frame is drawn with skeleton rows in the rail and tab bar; a
   badge, a count and a plan banner appear when their read does.
+- **On a full load the layout seeds the shell's two reads** (owner,
+  25 Nov 2026): a document request (`sec-fetch-dest: document`) makes
+  `AppShell` start `readShellSettings()` and `readShellLive()` without
+  awaiting them (`startShellSeed`) and hand the promises to `ShellSeed`,
+  which fills `['shell', orgId, 'settings' | 'live']` from them in a layout
+  effect, after hydration and before the readers subscribe, so they join
+  that read and neither `/api/shell` nor `/api/shell/live` is asked. The
+  frame streams at once and the answers follow later in the same response
+  (the HTML carries only the shell's own fields, as the route sends them,
+  `toWire`; never a screen's data). A seed that failed asks its route once;
+  every later read of the key is the route's (a save's
+  `afterSettingsSave()`, the live refresh, a 403, another tab). A client
+  render (`router.refresh()`, a Server Action, a switch) starts nothing:
+  Next strips its `RSC` headers, so the check is the browser's
+  `sec-fetch-dest`. Keyed by the business like every key; a switch never
+  clears another's. Its gates and the seed share the request's `cache()`d
+  reads (`activeOrganizationOnce`, `modulesForRequest`, `stockTrackingOnce`).
 - **A save that changes a shell setting calls `afterSettingsSave()`** after
   it worked: a module on or off, a plan, an add-on or checkout, Ask AI on or
   off, a new site or web address, a storefront made or closed, Track stock.

@@ -1,15 +1,23 @@
 "use client";
 
 import type { QueryClient } from "@tanstack/react-query";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+    QueryClientContext,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
 import { forbidden, notFound } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
 
 import { homeKeys } from "@/lib/home/queries";
-import { ReadFailed } from "@/lib/query/client";
+import { makeQueryClient, ReadFailed } from "@/lib/query/client";
 import { useOrgId, useOrgIdOrNull } from "@/lib/query/org";
 
+import type { PostCategory } from "@/lib/content/service";
 import {
+    allSitesRead,
+    formEntriesRead,
+    newSiteRead,
     postCategoriesRead,
     publishRequestRead,
     siteFormsRead,
@@ -19,7 +27,11 @@ import {
     siteOverviewRead,
     sitePagesRead,
     sitePostsRead,
+    siteReleaseRead,
+    siteSettingsRead,
     sitesKeys,
+    siteTrackingRead,
+    siteVersionRead,
     siteVersionsRead,
 } from "./queries";
 
@@ -33,6 +45,16 @@ export function whenRefused(error: unknown): void {
     if (!(error instanceof ReadFailed)) return;
     if (error.status === 404) notFound();
     if (error.status === 403) forbidden();
+}
+
+/** All sites, the rail's Website. */
+export function useAllSites() {
+    return useQuery(allSitesRead.options(useOrgId(), {}));
+}
+
+/** New site's catalogue, suggested address and modules. */
+export function useNewSite() {
+    return useQuery(newSiteRead.options(useOrgId(), {}));
 }
 
 /** The site header over every tab. */
@@ -60,8 +82,63 @@ export function usePostCategories(siteId: string, enabled: boolean) {
     });
 }
 
+export function useSiteSettings(siteId: string) {
+    return useQuery(siteSettingsRead.options(useOrgId(), { siteId }));
+}
+
+export function useSiteTracking(siteId: string) {
+    return useQuery(siteTrackingRead.options(useOrgId(), { siteId }));
+}
+
+/** A client for a header drawn with no React Query above it (a test): its query is off. */
+let standby: QueryClient | undefined;
+const standbyClient = () => (standby ??= makeQueryClient());
+
+/**
+ * The area-off header's Categories sheet (the Posts tab): the layout's
+ * list until the sheet's own read lands, and a change reads it again,
+ * with the site's other reads. Drawn with no React Query above it (a
+ * test), the layout's list and nothing after a change.
+ */
+export function useHeaderCategories(
+    siteId: string,
+    enabled: boolean,
+): {
+    data: PostCategory[] | null | undefined;
+    retry: () => void;
+    save: SiteSave;
+} {
+    const provided = useContext(QueryClientContext);
+    const orgId = useOrgIdOrNull();
+    const cached = Boolean(provided && orgId);
+    const client = provided ?? standbyClient();
+    const query = useQuery(
+        {
+            ...postCategoriesRead.options(orgId ?? "standby", { siteId }),
+            enabled: cached && enabled,
+        },
+        client,
+    );
+    const saved = useCallback(
+        () =>
+            provided && orgId
+                ? siteSaved(provided, orgId, siteId)
+                : Promise.resolve(),
+        [provided, orgId, siteId],
+    );
+    return {
+        data: query.data,
+        retry: () => void query.refetch(),
+        save: { orgId: orgId ?? "", saved },
+    };
+}
+
 export function useSiteForms(siteId: string) {
     return useQuery(siteFormsRead.options(useOrgId(), { siteId }));
+}
+
+export function useFormEntries(siteId: string, formId: string) {
+    return useQuery(formEntriesRead.options(useOrgId(), { siteId, formId }));
 }
 
 export function useSiteLinks(siteId: string) {
@@ -70,6 +147,16 @@ export function useSiteLinks(siteId: string) {
 
 export function useSiteVersions(siteId: string) {
     return useQuery(siteVersionsRead.options(useOrgId(), { siteId }));
+}
+
+export function useSiteVersion(siteId: string, publicationId: string) {
+    return useQuery(
+        siteVersionRead.options(useOrgId(), { siteId, publicationId }),
+    );
+}
+
+export function useSiteRelease(siteId: string, releaseId: string) {
+    return useQuery(siteReleaseRead.options(useOrgId(), { siteId, releaseId }));
 }
 
 export function usePublishRequestView(siteId: string, requestId: string) {

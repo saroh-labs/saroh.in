@@ -1,7 +1,7 @@
 "use client";
 
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { SELLS_FROM_ANCHOR } from "@/lib/sites/sells-from";
@@ -12,6 +12,7 @@ import {
 } from "@/lib/sites/settings-edit";
 
 import { runAction } from "@/lib/api/run-action";
+import { useSettingsSaved } from "./settings-saved";
 import type { SheetControl } from "./settings-sheet";
 
 /**
@@ -27,7 +28,7 @@ export function useSettingsSave(
     /** The sheet a request really opens, or none (no shop to choose for). */
     resolve: (which: SettingsSheet) => SettingsSheet | null = (which) => which,
 ) {
-    const router = useRouter();
+    const { saved, orgId } = useSettingsSaved();
     const asked = settingsSheetFromParam(
         useSearchParams().get(SETTINGS_EDIT_PARAM),
     );
@@ -78,9 +79,9 @@ export function useSettingsSave(
             }
             onSaved?.();
             close();
-            // Refresh so the server props (and the publish bar's count)
-            // agree with what the row now says.
-            router.refresh();
+            // The site read again, so its rows (and the publish bar's
+            // count) agree with what the row now says.
+            await saved();
             showSuccess(said);
         });
     }
@@ -96,7 +97,7 @@ export function useSettingsSave(
         };
     }
 
-    return { editing, open, close, pending, run, control };
+    return { editing, open, close, pending, run, control, orgId };
 }
 
 export type SettingsSave = ReturnType<typeof useSettingsSave>;

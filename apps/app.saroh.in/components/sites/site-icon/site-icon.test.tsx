@@ -18,6 +18,18 @@ import { SiteSettings } from "@/components/sites/settings/site-settings";
 import { SiteSettingsRead } from "@/components/sites/settings/site-settings-read";
 
 const refresh = vi.fn();
+vi.mock("@/components/sites/settings/settings-saved", () => ({
+    // The Settings tab's container provides it: the tab's business, and
+    // the site's reads again after a landed save (here, a spy).
+    useSettingsSaved: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+    SettingsSavedProvider: ({ children }: { children: unknown }) => children,
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh }),
     useSearchParams: () => new URLSearchParams(window.location.search),
@@ -321,7 +333,7 @@ describe("the Site icon sheet", () => {
 
         await press(item("Save"));
         expect(saveIcon).toHaveBeenCalledTimes(1);
-        expect(saveIcon).toHaveBeenCalledWith("site_rye", "media_9");
+        expect(saveIcon).toHaveBeenCalledWith("site_rye", "media_9", "org_1");
         expect(showSuccess).toHaveBeenCalledWith(
             "Site icon saved. Publish to make it public.",
         );
@@ -363,7 +375,11 @@ describe("the Site icon sheet", () => {
             "This image isn't square, so it will look squashed in a tab. A square one works best.",
         );
         await press(item("Save"));
-        expect(saveIcon).toHaveBeenCalledWith("site_rye", "media_wide");
+        expect(saveIcon).toHaveBeenCalledWith(
+            "site_rye",
+            "media_wide",
+            "org_1",
+        );
     });
 
     it("removes it there: back to the business logo", async () => {
@@ -383,7 +399,7 @@ describe("the Site icon sheet", () => {
         expect(saveIcon).not.toHaveBeenCalled();
 
         await press(item("Save"));
-        expect(saveIcon).toHaveBeenCalledWith("site_rye", null);
+        expect(saveIcon).toHaveBeenCalledWith("site_rye", null, "org_1");
         expect(showSuccess).toHaveBeenCalledWith(
             "Site icon removed. Publish to make it public.",
         );
@@ -403,7 +419,7 @@ describe("the Site icon sheet", () => {
         await press(item("Use the plain icon"));
         expect(preview("phone")).toMatch(/^data:image\/svg\+xml,/);
         await press(item("Save"));
-        expect(saveIcon).toHaveBeenCalledWith("site_rye", null);
+        expect(saveIcon).toHaveBeenCalledWith("site_rye", null, "org_1");
         expect(row()?.textContent).toContain("A plain icon with your initial");
     });
 

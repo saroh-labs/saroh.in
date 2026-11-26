@@ -7,7 +7,7 @@ import { ListSearch } from "@saroh/ui/list-search";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, FilePlus, LayoutGrid, LayoutTemplate } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useOpenPageId } from "../page-switch";
 
 import type { BusinessTileProps } from "@/components/sites/blocks/add-block-panel";
@@ -34,12 +34,15 @@ import {
     addPageOffers,
     pageKind,
 } from "@/lib/sites/page-menu";
+import type { AddCountsPick, ReviewsPick } from "@/lib/sites/queries";
 import type {
     ModulePageKind,
     SectionType,
     SitePage,
 } from "@/lib/sites/service";
 import { resolveStyleVariables } from "@/lib/sites/style";
+import type { PickFailed } from "@/lib/sites/use-picker";
+import { usePickerRead } from "@/lib/sites/use-picker";
 
 import {
     SECTION_HINTS,
@@ -63,6 +66,16 @@ import {
     suggestedSections,
 } from "./suggestions";
 import { useCanvasDrop } from "./use-canvas-drop";
+
+/** Without React Query above (a test): the Server Actions Add always used. */
+const legacyCounts = async (): Promise<AddCountsPick> => ({
+    ok: true,
+    counts: await readAddBusiness(),
+});
+const legacyReviews = async (): Promise<ReviewsPick> => ({
+    ok: true,
+    reviews: await readReviewsForPicker(),
+});
 
 export interface AddPanelProps {
     model: EditorModel;
@@ -104,30 +117,28 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
               : { ok: false };
     // Storage throws on the server and in a private window: no Recent.
     const [recent] = useState<SectionType[]>(readRecent);
-    const [counts, setCounts] = useState<AddBusinessCounts | null>(null);
+    // The business's counts and its reviews: the pickers' cached reads
+    // (U18), each its domain's, so Add opens from them.
+    const countsLoad = usePickerRead<AddCountsPick | PickFailed>(
+        "add-counts",
+        legacyCounts,
+    );
+    const counts: AddBusinessCounts | null =
+        countsLoad.read !== "loading" && countsLoad.read.ok
+            ? countsLoad.read.counts
+            : null;
     // A review (round 3, EBReviewPicker): undefined while read, null unread.
-    const [reviews, setReviews] = useState<PickerReview[] | null>();
+    const reviewsLoad = usePickerRead<ReviewsPick | PickFailed>(
+        "reviews",
+        legacyReviews,
+    );
+    const reviews: PickerReview[] | null | undefined =
+        reviewsLoad.read === "loading"
+            ? undefined
+            : reviewsLoad.read.ok
+              ? reviewsLoad.read.reviews
+              : null;
     const [reviewing, setReviewing] = useState(false);
-
-    useEffect(() => {
-        let live = true;
-        readReviewsForPicker()
-            .then((r) => live && setReviews(r))
-            .catch(() => live && setReviews(null));
-        return () => {
-            live = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        let live = true;
-        readAddBusiness()
-            .then((c) => live && setCounts(c))
-            .catch(() => undefined);
-        return () => {
-            live = false;
-        };
-    }, []);
 
     const pick = (type: SectionType, looks: number) => {
         rememberRecent(type);
@@ -237,11 +248,7 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
                 targets={testimonials}
                 below={below}
                 onBack={() => setReviewing(false)}
-                onRetry={() => {
-                    readReviewsForPicker()
-                        .then(setReviews)
-                        .catch(() => setReviews(null));
-                }}
+                onRetry={reviewsLoad.retry}
                 onAdd={addReview}
             />
         );

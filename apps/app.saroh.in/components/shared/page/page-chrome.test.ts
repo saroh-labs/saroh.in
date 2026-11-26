@@ -104,6 +104,10 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     // The post editor owns its viewport.
     "sites/[siteId]/posts/[postId]": "full",
     "sites/[siteId]/posts/new": "full",
+    sites: "full", // `AllSitesScreen`
+    "sites/[siteId]/(tabs)/settings": "full", // the tabs' layout; `SiteSettingsScreen`
+    "sites/[siteId]/versions/[publicationId]": "default", // `SiteVersionScreen`
+    "sites/[siteId]/releases/[releaseId]": "default", // `ReleaseScreen`
 };
 
 /** The two arrival screens: a centred card, not a screen of the workspace. */

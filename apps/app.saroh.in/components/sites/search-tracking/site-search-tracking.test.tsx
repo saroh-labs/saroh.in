@@ -37,6 +37,18 @@ vi.mock("@/lib/sites/actions", () => ({
         saveSearchTracking(...args) as unknown,
 }));
 const refresh = vi.fn();
+vi.mock("@/components/sites/settings/settings-saved", () => ({
+    // The Settings tab's container provides it: the tab's business, and
+    // the site's reads again after a landed save (here, a spy).
+    useSettingsSaved: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+    SettingsSavedProvider: ({ children }: { children: unknown }) => children,
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
 }));
@@ -332,9 +344,13 @@ describe("connecting a tracker", () => {
         await click(buttonIn(dialog, "Add to your site"));
 
         expect(saveSearchTracking).toHaveBeenCalledTimes(1);
-        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
-            trackers: { ga4: { id: GA4 } },
-        });
+        expect(saveSearchTracking).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                trackers: { ga4: { id: GA4 } },
+            },
+            "org_1",
+        );
         // Nothing of the snippet but the id left the page.
         expect(JSON.stringify(saveSearchTracking.mock.calls)).not.toMatch(
             /script|gtag|dataLayer/,
@@ -433,9 +449,13 @@ describe("verification codes", () => {
 
         await pressInSheet("Save");
 
-        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
-            verifications: { google: GOOGLE_CODE },
-        });
+        expect(saveSearchTracking).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                verifications: { google: GOOGLE_CODE },
+            },
+            "org_1",
+        );
         expect(sheet()).toBe(null);
         expect(row.textContent).toContain(GOOGLE_CODE);
         expect(row.textContent).toContain(
@@ -505,9 +525,13 @@ describe("verification codes", () => {
         expect(sheet()?.textContent).toContain("Clear the box to remove it.");
         typeInto(input, "");
         await pressInSheet("Save");
-        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
-            verifications: { google: null },
-        });
+        expect(saveSearchTracking).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                verifications: { google: null },
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "Google Search Console code removed from your live site.",
         );
@@ -576,9 +600,13 @@ describe("the privacy page", () => {
 
         typeInto(input, PAGE);
         await pressInSheet("Save");
-        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
-            privacyUrl: PAGE,
-        });
+        expect(saveSearchTracking).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                privacyUrl: PAGE,
+            },
+            "org_1",
+        );
         expect(sheet()).toBe(null);
         expect(row.textContent).toContain(PAGE);
         expect(buttonIn(row, "Edit")).toBeDefined();
@@ -595,9 +623,13 @@ describe("the privacy page", () => {
 
         typeInto(await openSheet(row, "Edit"), "");
         await pressInSheet("Save");
-        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
-            privacyUrl: null,
-        });
+        expect(saveSearchTracking).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                privacyUrl: null,
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "Privacy page removed. Visitors see the notice we write.",
         );
@@ -720,9 +752,13 @@ describe("states", () => {
                 '[role="switch"]',
             ) ?? undefined,
         );
-        expect(saveSearchTracking).toHaveBeenCalledWith("site_rye", {
-            trackers: { ga4: { id: GA4, enabled: false } },
-        });
+        expect(saveSearchTracking).toHaveBeenCalledWith(
+            "site_rye",
+            {
+                trackers: { ga4: { id: GA4, enabled: false } },
+            },
+            "org_1",
+        );
         expect(within('[data-tracker="ga4"]').textContent).toContain("Off");
     });
 });

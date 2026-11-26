@@ -13,7 +13,6 @@ import {
     Video,
     X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { PlanWay } from "@/components/billing/plan-way";
@@ -37,6 +36,7 @@ import {
     pausedWords,
     roomForAnother,
 } from "@/lib/google-calendar/words";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import { AccountSheet } from "./account-sheet";
@@ -420,7 +420,7 @@ function AddAccountRow({ onFailed }: { onFailed: (error: string) => void }) {
 
 /** The business's own "Who can join", for whoever may change services. */
 function MeetDefault({ value }: { value: MeetAccess }) {
-    const router = useRouter();
+    const settings = useSettingsSave();
     const [open, setOpen] = useState(false);
     const [draft, setDraft] = useState<MeetAccess>(value);
     const [pending, setPending] = useState(false);
@@ -428,15 +428,18 @@ function MeetDefault({ value }: { value: MeetAccess }) {
 
     async function save() {
         setError(null);
-        const res = await runAction(() => saveBusinessMeetAccess(draft), {
-            setBusy: setPending,
-            onUnreached: setError,
-            quiet: true,
-        });
+        const res = await runAction(
+            () => saveBusinessMeetAccess(draft, ...asOrg(settings.orgId)),
+            {
+                setBusy: setPending,
+                onUnreached: setError,
+                quiet: true,
+            },
+        );
         if (!res) return;
         if (!res.ok) return setError(res.error);
         setOpen(false);
-        router.refresh();
+        settings.saved();
     }
 
     return (

@@ -97,32 +97,17 @@ export function asOrg(orgId: string | undefined): [] | [string] {
 }
 
 /**
- * After a save from a part shared with a screen still drawn on the server
- * (Plan and billing's parts on Change plan, Try again on Developers): on a
- * React Query tab the Settings tabs read again; elsewhere the server draws
- * the page again, as before.
- */
-export function useSettingsRefresh(): () => void {
-    const server = useServerRefresh();
-    const pathname = usePathname();
-    const save = useSettingsSave();
-    return useCallback(() => {
-        if (isRqRoute(pathname)) save.saved();
-        else server();
-    }, [pathname, save, server]);
-}
-
-/**
  * The server's half of a save already told to the queries
- * (`afterSettingsSave()`): a screen still drawn on the server (Change
- * plan) is drawn again; a React Query route is left alone.
+ * (`afterSettingsSave()`): a screen still drawn on the server (a module's
+ * page behind its guard, when a module is turned on there) is drawn again;
+ * a React Query route is left alone.
  */
 export function useServerRefresh(): () => void {
     const router = useRouter();
     const pathname = usePathname();
     return useCallback(() => {
         if (isRqRoute(pathname)) return;
-        // rq-refresh-ok: only off React Query routes (Change plan, Developers draw on the server).
+        // rq-refresh-ok: only off React Query routes (a server-drawn page whose module guard changed).
         router.refresh();
     }, [pathname, router]);
 }

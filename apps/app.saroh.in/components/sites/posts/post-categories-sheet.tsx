@@ -3,7 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { NameDialog } from "@/components/shared/forms/name-dialog";
@@ -45,20 +45,16 @@ export function PostCategoriesSheet({
     /** The button that opens it; the post editor's left panel has its own. */
     trigger?: React.ReactElement;
     /**
-     * On a React Query screen (the Website area): each write takes the
-     * tab's business last, and the list is read again; elsewhere (the post
-     * editor) the page is refreshed.
+     * What a landed write does: on a React Query screen (the Website area)
+     * each write takes the tab's business last and the list is read again;
+     * the post editor and the area-off header draw their page again.
      */
-    save?: { orgId: string; saved: () => Promise<void> };
-    onRetry?: () => void;
+    save: { orgId?: string; saved: () => Promise<void> };
+    /** Read the list again, after it couldn't be read. */
+    onRetry: () => void;
 }) {
-    const router = useRouter();
-    const orgId = save?.orgId;
-    const after = () =>
-        save
-            ? void save.saved()
-            : // rq-refresh-ok: only the post editor (not on React Query) passes no `save`.
-              router.refresh();
+    const orgId = save.orgId;
+    const after = () => void save.saved();
     const arriving = useSearchParams().get(CATEGORIES_PARAM) === "1";
     const [open, setOpen] = useState(arriving);
     const [wasArriving, setWasArriving] = useState(arriving);
@@ -148,11 +144,7 @@ export function PostCategoriesSheet({
                 <FailedState
                     size="panel"
                     title={couldntLoad("categories")}
-                    onRetry={
-                        onRetry ??
-                        // rq-refresh-ok: only the post editor (not on React Query) passes no `onRetry`.
-                        (() => router.refresh())
-                    }
+                    onRetry={onRetry}
                 />
             ) : categories.length === 0 ? (
                 <EmptyState

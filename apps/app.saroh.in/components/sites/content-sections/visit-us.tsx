@@ -1,7 +1,7 @@
 "use client";
 
 import { Field } from "@saroh/ui/field";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -17,7 +17,10 @@ import { Skeleton } from "@saroh/ui/skeleton";
 import { Switch } from "@saroh/ui/switch";
 
 import { listVisitPlacesForPicker } from "@/lib/sites/actions";
+import type { VisitPlacesPick } from "@/lib/sites/queries";
 import type { VisitUsContent } from "@/lib/sites/service";
+import type { PickFailed } from "@/lib/sites/use-picker";
+import { usePickerRead } from "@/lib/sites/use-picker";
 import { visitPlaceChoice } from "@/lib/sites/visit-place";
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 
@@ -26,6 +29,12 @@ import { TextLink } from "@saroh/ui/text-link";
 
 const LOCATIONS = "/commerce/locations";
 const HOURS = "/settings/organization?section=hours";
+
+/** Without React Query above (a test): the Server Action it always used. */
+const legacyPlaces = async (): Promise<VisitPlacesPick> => ({
+    ok: true,
+    places: await listVisitPlacesForPicker(),
+});
 
 /**
  * The `visitUs` section's editor fields (G8).
@@ -46,21 +55,17 @@ export function VisitUsFields({
     const patch = (next: Partial<VisitUsContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
 
-    const [read, setRead] = useState<VisitPlacesRead | "loading">("loading");
-    const [attempt, setAttempt] = useState(0);
-    useEffect(() => {
-        let active = true;
-        listVisitPlacesForPicker()
-            .then((next) => {
-                if (active) setRead(next);
-            })
-            .catch(() => {
-                if (active) setRead({ state: "failed", forbidden: false });
-            });
-        return () => {
-            active = false;
-        };
-    }, [attempt]);
+    // The open locations: one cached read under `stores` (U18).
+    const load = usePickerRead<VisitPlacesPick | PickFailed>(
+        "visit-places",
+        legacyPlaces,
+    );
+    const read: VisitPlacesRead | "loading" =
+        load.read === "loading"
+            ? "loading"
+            : load.read.ok
+              ? load.read.places
+              : { state: "failed", forbidden: load.read.forbidden };
 
     const choice = visitPlaceChoice(read, c.storeId);
 
@@ -111,10 +116,7 @@ export function VisitUsFields({
                                 variant="outline"
                                 size="sm"
                                 className="w-fit"
-                                onClick={() => {
-                                    setRead("loading");
-                                    setAttempt((n) => n + 1);
-                                }}
+                                onClick={load.retry}
                             >
                                 Try again
                             </Button>
