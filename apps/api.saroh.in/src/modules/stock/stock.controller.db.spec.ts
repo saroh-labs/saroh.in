@@ -435,6 +435,20 @@ describe("Stock API (DB)", () => {
                 ),
             ).toBe(true);
             expect(needs.needsYou).toBe(needs.rows.length);
+            expect(needs.needsShown).toBe(true);
+            // Asked "auto" (DEC-266): what needs someone, since something does.
+            const auto = await api.levels(owner(), { needs: "auto" });
+            expect(auto.needsShown).toBe(true);
+            expect(auto.rows.map((r) => r.productId)).toEqual(
+                needs.rows.map((r) => r.productId),
+            );
+            // Sorted by need, the needing products come before the rest.
+            const sorted = await api.levels(owner(), { sort: "need" });
+            const needing = new Set(needs.rows.map((r) => r.productId));
+            const flags = sorted.rows.map((r) => needing.has(r.productId));
+            expect(flags.indexOf(false)).toBeGreaterThanOrEqual(
+                flags.lastIndexOf(true),
+            );
             // The last change says who, for a role that reads the audit trail.
             const [row] = found.rows;
             expect(row.lastChange).toMatchObject({

@@ -107,6 +107,34 @@ export const NEED_RANK: Record<ShelfNeed, number> = {
     low: 2,
 };
 
+/** The most urgent need on any of the rows' cells; past every need when none. */
+function needRank(
+    rows: readonly { cells: readonly { need: ShelfNeed | null }[] }[],
+): number {
+    let rank = Object.keys(NEED_RANK).length;
+    for (const row of rows) {
+        for (const cell of row.cells) {
+            if (cell.need) rank = Math.min(rank, NEED_RANK[cell.need]);
+        }
+    }
+    return rank;
+}
+
+/**
+ * Products by their most urgent need (DEC-266): short, then out, then
+ * low, then the rest. A stable sort, so each keeps the name order it came in.
+ */
+export function byNeed<
+    G extends {
+        rows: readonly { cells: readonly { need: ShelfNeed | null }[] }[];
+    },
+>(groups: readonly G[]): G[] {
+    return groups
+        .map((g) => ({ g, rank: needRank(g.rows) }))
+        .sort((a, b) => a.rank - b.rank)
+        .map(({ g }) => g);
+}
+
 /**
  * Whether one shelf, where it is sold, needs someone — the one rule behind
  * the Stock screen's "Needs you" and the Products list's (#527, #519):
