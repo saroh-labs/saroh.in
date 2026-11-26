@@ -82,8 +82,11 @@ export function changeLine(
 ): string | null {
     const { before, after } = change;
     if (!isPriceField(change.field) || before === after) return null;
+    // A price of 0 is free (DEC-261): "Free", never "₹0".
     const money = (amount: string) =>
-        formatMoneyMajor(amount, context.currency);
+        change.field === "price" && Number(amount) === 0
+            ? "Free"
+            : formatMoneyMajor(amount, context.currency);
     switch (change.field) {
         case "price":
         case "mrp": {
@@ -92,6 +95,18 @@ export function changeLine(
                 return context.option
                     ? `${label} now the same as the product`
                     : `${label} removed`;
+            }
+            // Free and back (DEC-261): one word, "Free", never "₹0".
+            if (change.field === "price") {
+                const toFree = Number(after) === 0;
+                if (toFree) {
+                    return before === null
+                        ? "Set to Free"
+                        : `Changed from ${money(before)} to Free`;
+                }
+                if (before !== null && Number(before) === 0) {
+                    return `Price set at ${money(after)}`;
+                }
             }
             if (before === null) {
                 return context.first && change.field === "price"

@@ -224,6 +224,8 @@ test.describe("a free session (DEC-261)", () => {
             await expect(
                 look.getByText(/Awaiting payment|Pays at/),
             ).toHaveCount(0);
+            // Its slide-in finished, so the picture shows it whole.
+            await expect(look).toBeInViewport({ ratio: 0.95 });
             await shot("quick-look.png", owner.page);
             await owner.page.keyboard.press("Escape");
 
@@ -249,6 +251,15 @@ test.describe("a free session (DEC-261)", () => {
 
             // The service's Money: Free, and the choice behind Edit.
             await owner.page.goto(`/services/${made.id}`);
+            // Its price history says Free too, never "₹0".
+            const history = owner.page
+                .getByText("Set to Free", { exact: true })
+                .filter({ visible: true })
+                .first();
+            await expect(history).toBeVisible({ timeout: 15_000 });
+            await history.scrollIntoViewIfNeeded();
+            await expect(owner.page.getByText(/set at ₹0/)).toHaveCount(0);
+            await shot("price-history.png", owner.page);
             const edit = owner.page
                 .getByRole("button", {
                     name: /^(Edit Money|Price: Free\. Change)$/,
@@ -264,9 +275,13 @@ test.describe("a free session (DEC-261)", () => {
             await expect(
                 panel.getByText(/Customers book it straight away/),
             ).toBeVisible();
+            await expect(panel).toBeInViewport({ ratio: 0.95 });
             await shot("service-free.png", owner.page);
             await panel.getByRole("radio", { name: "Paid" }).click();
             await expect(panel.getByLabel("Price")).toBeVisible();
+            await expect(
+                panel.getByRole("radio", { name: "Paid" }),
+            ).toHaveAttribute("aria-checked", "true");
             await shot("service-paid.png", owner.page);
         } finally {
             await nw.delete(`/services/${made.id}`);

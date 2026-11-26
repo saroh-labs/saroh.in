@@ -302,7 +302,7 @@ describe("the Money column (DEC-098: only for those who read money)", () => {
             take: null,
         });
         free.service.priceCents = 0;
-        expect(moneyCell(free)).toEqual({ amount: null, note: "Free" });
+        expect(moneyCell(free)).toEqual({ amount: "Free", note: null });
         expect(rowStatus(free, NOW)).toBe("booked");
     });
 

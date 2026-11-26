@@ -477,7 +477,8 @@ export function moneyCell(b: DiaryBooking): MoneyCell {
             : { amount: null, note: "Nothing was paid" };
     }
     // Free (DEC-261): the one payment word says so, and nothing is owed.
-    if (b.free) return { amount: null, note: BOOKING_WORDS.free };
+    // Said in the amount's place, alone: never "—" over "Free".
+    if (b.free) return { amount: BOOKING_WORDS.free, note: null };
     const cents = b.take?.cents ?? b.service.priceCents ?? null;
     const amount =
         cents !== null && cents > 0 ? formatMoney(cents, currency) : null;

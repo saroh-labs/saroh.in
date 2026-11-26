@@ -88,7 +88,8 @@ export function PriceFields({
         : null;
     return (
         <>
-            {charge}
+            {/* Room between the choice and the price's label. */}
+            <div className="mb-3">{charge}</div>
             {/* A GST-registered business answers the rate where the price
                 is (12 Oct 2026): the price includes it, and a priced
                 service can't be saved without one. */}
