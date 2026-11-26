@@ -528,6 +528,15 @@ export class SocialMetaClient implements SocialMetaPort {
         return id ? { id, permalink: str(hit?.[link]) } : null;
     }
 
+    async revoke(kind: PageKind, platformUserId: string): Promise<void> {
+        const app = this.login(kind);
+        await metaCall(
+            this.fetchFn,
+            `${this.bases.facebookGraph}/${platformUserId}/permissions`,
+            { method: "DELETE", token: `${app.appId}|${app.appSecret}` },
+        );
+    }
+
     /** The versioned API an account's calls go to. */
     private api(kind: ChannelKind): string {
         return kind === "THREADS"

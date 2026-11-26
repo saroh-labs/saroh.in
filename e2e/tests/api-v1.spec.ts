@@ -25,7 +25,7 @@ async function switchOn(browser: Browser, idempotency: string) {
         const res = await staff.request.put(
             `${urls.API_URL}/admin/flags/API_SECRET/organizations/${NORTHWIND_ORG}`,
             {
-                headers: { origin: urls.APP_URL },
+                headers: { origin: urls.ADMIN_URL },
                 data: {
                     enabled: true,
                     reason: "Browser test of the secret API",

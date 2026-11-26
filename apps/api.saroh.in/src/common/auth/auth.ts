@@ -25,7 +25,7 @@ import {
     githubKeysOf,
     otherAuthAddress,
 } from "./auth-address";
-import { claimCodeMail, mailsOnPasswordSignIn } from "./code-mail-limits";
+import { claimCodeMail } from "./code-mail-limits";
 import { refusedCodeMail } from "./code-mail-origin";
 import { clearStaffVerification } from "./email-verification";
 import { passwordTries } from "./password-tries";
@@ -75,14 +75,12 @@ const authServices: Parameters<typeof createAuth>[0] = {
     rateLimitStorage: authLimitStorage(sharedRedis()),
     // Per address too, not only per caller: many callers can't flood one
     // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
-    // A password sign-in mails only an unproven account (03-M9): any other
-    // sign-in is not a code mail and is never counted or refused here.
+    // A password sign-in asks only once the password is right and the
+    // address unproven, so a wrong password is never counted or refused here.
     // Wrong passwords per account, from any address (A-03).
     passwordTries: passwordTries(),
-    mayMailCode: async (email, { turnstileToken, path, host }) =>
-        path === "/sign-in/email" && !(await mailsOnPasswordSignIn(email))
-            ? null
-            : claimCodeMail(email, turnstileToken, undefined, undefined, host),
+    mayMailCode: (email, { turnstileToken, host }) =>
+        claimCodeMail(email, turnstileToken, undefined, undefined, host),
 };
 
 const githubWarned = new Set<Edition>();

@@ -38,7 +38,7 @@ async function setSwitch(
         const res = await staff.request.put(
             `${urls.API_URL}/admin/flags/GOOGLE_CALENDAR/organizations/${NORTHWIND_ORG}`,
             {
-                headers: { origin: urls.APP_URL },
+                headers: { origin: urls.ADMIN_URL },
                 data: {
                     enabled,
                     reason: "Browser test of Google Calendar",

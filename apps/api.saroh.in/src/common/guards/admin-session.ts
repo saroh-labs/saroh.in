@@ -7,6 +7,7 @@ import { env } from "../../env";
 import type { AdminAuditInput } from "../../modules/admin/admin-audit.service";
 import { createAdminAuditData } from "../../modules/admin/admin-audit.service";
 import { AdminPermission } from "../../modules/admin/admin-permissions";
+import { adminOrigins } from "../accounts-origins";
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const HOUR_MS = 60 * 60 * 1000;
@@ -57,17 +58,30 @@ export function isMutating(method: string | undefined): boolean {
 }
 
 /**
- * A7: an `/admin` write must say where it came from. `BetterAuthGuard`
- * refuses an untrusted Origin; here a write with none, and no browser
- * same-site marker, is refused too.
+ * A7: an `/admin` write must say where it came from, and that must be the
+ * admin console of this API's environment (`adminOrigins`), never another
+ * Saroh app. A write with no Origin or Referer passes only with a browser
+ * same-site marker.
  */
 export function assertAdminWriteOrigin(
     method: string | undefined,
     headers: IncomingHttpHeaders | undefined,
 ): void {
     if (!isMutating(method)) return;
+    const claimed = [headers?.origin, headers?.referer].find(Boolean);
+    if (claimed) {
+        let origin: string | null = null;
+        try {
+            origin = new URL(claimed).origin;
+        } catch {
+            // Not a URL: refused below.
+        }
+        if (origin && adminOrigins(headers?.host).includes(origin)) return;
+        throw new ForbiddenException(
+            "Admin changes are made from the admin console",
+        );
+    }
     const site = headers?.["sec-fetch-site"];
-    if (headers?.origin || headers?.referer) return;
     if (site === "same-origin" || site === "same-site") return;
     throw new ForbiddenException("Admin changes need a request origin");
 }

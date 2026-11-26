@@ -98,7 +98,7 @@ async function withPayments(
         const res = await staff.request.put(
             `${urls.API_URL}/admin/flags/MODULE_PAYMENTS/organizations/${b.id}`,
             {
-                headers: { origin: urls.APP_URL },
+                headers: { origin: urls.ADMIN_URL },
                 data: {
                     enabled: true,
                     reason: "Customer emails browser test (U10)",

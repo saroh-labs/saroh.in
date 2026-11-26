@@ -184,6 +184,22 @@ describe("connecting a channel", () => {
         );
     });
 
+    it("takes a consent's state once", async () => {
+        const ctx = await socialBusiness();
+        const s = service();
+        const { url } = await s.start(ctx, "THREADS");
+        const state = new URL(url).searchParams.get("state") ?? "";
+        const back = () =>
+            s.callback(
+                "THREADS",
+                { code: "fake-threads", state },
+                ctx.userId,
+                () => Promise.resolve(ctx),
+            );
+        expect(resultOf(await back())).toBe("connected");
+        expect(resultOf(await back())).toBe("expired");
+    });
+
     it("refuses while MODULE_SOCIAL is off, and on a plan without Social", async () => {
         const ctx = await socialBusiness();
         world.flag = false;
@@ -240,6 +256,49 @@ describe("disconnecting", () => {
         expect(await prisma.socialPost.count({ where: { id: post.id } })).toBe(
             1,
         );
+    });
+});
+
+describe("disconnecting at Meta", () => {
+    /** Facebook and Instagram from one Meta person no other test uses. */
+    async function bothFromOnePerson() {
+        const ctx = await socialBusiness();
+        await connectFlow(ctx, "FACEBOOK");
+        await connectFlow(ctx, "INSTAGRAM");
+        const person = `fb-person-${ctx.organizationId}`;
+        await prisma.socialChannel.updateMany({
+            where: { organizationId: ctx.organizationId },
+            data: { platformUserId: person },
+        });
+        return { ctx, person };
+    }
+
+    it("takes Saroh's permissions back once the person's last channel goes", async () => {
+        const { ctx, person } = await bothFromOnePerson();
+        await service().disconnect(ctx, "INSTAGRAM");
+        // Facebook still posts with that person's grant.
+        expect(meta.revoked).toEqual([]);
+        await service().disconnect(ctx, "FACEBOOK");
+        expect(meta.revoked).toEqual([person]);
+        expect(
+            await prisma.socialChannel.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(0);
+    });
+
+    it("still disconnects when Meta refuses", async () => {
+        const { ctx } = await bothFromOnePerson();
+        await service().disconnect(ctx, "INSTAGRAM");
+        meta.failNext("revoke", "retry");
+        await service().disconnect(ctx, "FACEBOOK");
+        expect(meta.calls.filter((c) => c.method === "revoke")).toHaveLength(1);
+        expect(meta.revoked).toEqual([]);
+        expect(
+            await prisma.socialChannel.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(0);
     });
 });
 
