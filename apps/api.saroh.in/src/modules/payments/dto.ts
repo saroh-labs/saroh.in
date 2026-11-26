@@ -8,6 +8,7 @@ import {
     IsOptional,
     IsString,
     Matches,
+    Max,
     MaxLength,
     Min,
     MinLength,
@@ -15,6 +16,7 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import { ORDER_LINE_QUANTITY_MAX } from "../orders/dto";
 import { SUPPORTED_PROVIDERS } from "./providers/provider.port";
 import type { StripeCheckoutStyle } from "./stripe-checkout-style";
 import { STRIPE_CHECKOUT_STYLES } from "./stripe-checkout-style";
@@ -148,6 +150,7 @@ export class RefundLineInput {
 
     @IsInt({ message: "Quantity must be a whole number" })
     @Min(1, { message: "Refund at least one" })
+    @Max(ORDER_LINE_QUANTITY_MAX)
     quantity!: number;
 }
 
@@ -160,6 +163,7 @@ export class RefundPutBackInput {
 
     @IsInt({ message: "Quantity must be a whole number" })
     @Min(1, { message: "Put back at least one" })
+    @Max(ORDER_LINE_QUANTITY_MAX)
     quantity!: number;
 }
 

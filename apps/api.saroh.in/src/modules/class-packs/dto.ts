@@ -16,6 +16,8 @@ import {
     ValidateIf,
 } from "class-validator";
 
+import { INT_COLUMN_MAX } from "../../common/validation";
+
 import type { GstPriceMode } from "../invoices/gst-price";
 import { GST_PRICE_MODES } from "../invoices/gst-price";
 import type { PackKind, PackPaidBy } from "./pack-kind";
@@ -147,6 +149,7 @@ export class ListPacksQueryDto {
 export class PackRevisionDto {
     @IsInt({ message: "Reload the pack and try again" })
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 }
 
@@ -159,6 +162,7 @@ export class PackRevisionDto {
 export class PackDraftDto extends PackInputDto {
     @IsInt({ message: "Reload the pack and try again" })
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 }
 
@@ -167,6 +171,7 @@ export class DeletePackDraftQueryDto {
     @Type(() => Number)
     @IsInt({ message: "Reload the pack and try again" })
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 }
 

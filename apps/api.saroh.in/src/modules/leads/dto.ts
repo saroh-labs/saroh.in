@@ -6,12 +6,14 @@ import {
     IsISO8601,
     IsOptional,
     IsString,
+    Max,
     MaxLength,
     Min,
     MinLength,
     ValidateNested,
 } from "class-validator";
 
+import { INT_COLUMN_MAX } from "../../common/validation";
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -97,6 +99,7 @@ export class CreateLeadDto {
     @IsOptional()
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     value?: number;
 }
 
@@ -116,6 +119,7 @@ export class UpdateLeadDto {
     @IsOptional()
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     value?: number;
 }
 

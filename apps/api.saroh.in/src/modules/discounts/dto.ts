@@ -8,6 +8,7 @@ import {
     IsOptional,
     IsString,
     Matches,
+    Max,
     MaxLength,
     Min,
 } from "class-validator";
@@ -100,5 +101,6 @@ export class DiscountInputDto {
     @Type(() => Number)
     @IsInt()
     @Min(1)
+    @Max(1_000_000)
     usageLimit?: number | null;
 }

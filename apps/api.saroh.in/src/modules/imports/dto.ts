@@ -5,10 +5,13 @@ import {
     IsObject,
     IsOptional,
     IsString,
+    Max,
     MaxLength,
     Min,
     MinLength,
 } from "class-validator";
+
+import { INT_COLUMN_MAX } from "../../common/validation";
 
 import type { DuplicatePolicy } from "./import-plan";
 
@@ -53,5 +56,6 @@ export class ApplyImportDto extends PreviewImportDto {
     @IsOptional()
     @IsInt({ message: "How many to bring in must be a whole number" })
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     createAtMost?: number;
 }

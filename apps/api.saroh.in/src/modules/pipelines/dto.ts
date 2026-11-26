@@ -5,11 +5,14 @@ import {
     IsInt,
     IsOptional,
     IsString,
+    Max,
     MaxLength,
     Min,
     MinLength,
     ValidateNested,
 } from "class-validator";
+
+import { INT_COLUMN_MAX } from "../../common/validation";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -55,6 +58,7 @@ export class CreateStageDto {
     @IsOptional()
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     order?: number;
 }
 
@@ -70,5 +74,6 @@ export class UpdateStageDto {
     @IsOptional()
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     order?: number;
 }

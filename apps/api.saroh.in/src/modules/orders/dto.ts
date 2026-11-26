@@ -172,6 +172,9 @@ export class DeliveryAddressInput {
     country?: string | null;
 }
 
+/** The most of one item on a merchant's order line, as on an invoice line. */
+export const ORDER_LINE_QUANTITY_MAX = 9999;
+
 export class OrderItemInput {
     @Transform(trim)
     @IsString()
@@ -186,6 +189,9 @@ export class OrderItemInput {
     @Type(() => Number)
     @IsInt({ message: "Quantity must be a whole number" })
     @Min(1, { message: "Quantity must be at least 1" })
+    @Max(ORDER_LINE_QUANTITY_MAX, {
+        message: `Quantity is at most ${ORDER_LINE_QUANTITY_MAX}`,
+    })
     quantity!: number;
 }
 
@@ -359,6 +365,9 @@ export class OrderLineChangeInput {
 
     @IsInt({ message: "Quantity must be a whole number" })
     @Min(0, { message: "Quantity cannot be negative" })
+    @Max(ORDER_LINE_QUANTITY_MAX, {
+        message: `Quantity is at most ${ORDER_LINE_QUANTITY_MAX}`,
+    })
     quantity!: number;
 }
 
