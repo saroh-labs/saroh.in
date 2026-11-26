@@ -65,6 +65,7 @@ import {
 import { domainKey } from "@/lib/query/keys";
 import { LIVE_QUERY_ROUTES, liveDomains } from "@/lib/query/live-routes";
 import { OrgProvider } from "@/lib/query/org";
+import { RQ_ROUTES } from "@/lib/query/rq-routes";
 import { makeTestClient } from "@/lib/query/test-utils";
 
 import { useLiveRefresh } from "./use-live-refresh";
@@ -102,18 +103,43 @@ function Page({ orgId }: { orgId: string }) {
     return null;
 }
 
+/** A page off `LIVE_QUERY_ROUTES`: reads by tier, as `defineRead` marks them. */
+function TieredPage({ orgId, domain }: { orgId: string; domain: string }) {
+    useLiveRefresh();
+    useQuery({
+        queryKey: domainKey(domain, orgId, "list"),
+        queryFn: reads.fn,
+        meta: { tier: "records" },
+    });
+    useQuery({
+        queryKey: domainKey("calendar", orgId, "week"),
+        queryFn: reads.fn,
+        meta: { tier: "live" },
+    });
+    useQuery({
+        queryKey: domainKey("settings", orgId, "business"),
+        queryFn: reads.fn,
+        meta: { tier: "settings" },
+    });
+    return null;
+}
+
 let root: Root;
 let host: HTMLDivElement;
 let client: QueryClient;
 let visibility: DocumentVisibilityState = "visible";
 let online = true;
 
-function mount(orgId = "org_1") {
+function mount(orgId = "org_1", domain?: string) {
     act(() =>
         root.render(
             <QueryClientProvider client={client}>
                 <OrgProvider orgId={orgId}>
-                    <Page orgId={orgId} />
+                    {domain ? (
+                        <TieredPage orgId={orgId} domain={domain} />
+                    ) : (
+                        <Page orgId={orgId} />
+                    )}
                 </OrgProvider>
             </QueryClientProvider>,
         ),
@@ -131,8 +157,8 @@ function later() {
 }
 
 /** Mounted, first reads answered, past the gap: ready for a trigger. */
-async function ready(orgId = "org_1") {
-    mount(orgId);
+async function ready(orgId = "org_1", domain?: string) {
+    mount(orgId, domain);
     await reads.settle();
     later();
 }
@@ -316,6 +342,68 @@ describe("useLiveRefresh on a React Query page", () => {
         expect(reads.count("home", "org_2")).toBe(2);
         expect(reads.count("home", "org_1")).toBe(2);
     });
+});
+
+describe("useLiveRefresh on a React Query page not in LIVE_QUERY_ROUTES", () => {
+    beforeEach(() => {
+        h.routes = {};
+        h.chrome = [];
+        h.nav.pathname = "/billing/invoices";
+    });
+
+    it("reads its shown records and live queries again, not its settings, and never the page", async () => {
+        // Held but not on screen: read on its next use, not now.
+        client.setQueryData(domainKey("invoices", "org_1", "old"), "held");
+        await ready("org_1", "invoices");
+        comeBack();
+        expect(reads.count("invoices", "org_1")).toBe(2);
+        expect(reads.count("calendar", "org_1")).toBe(2);
+        expect(reads.count("settings", "org_1")).toBe(1);
+        expect(
+            client.getQueryState(domainKey("invoices", "org_1", "old"))
+                ?.isInvalidated,
+        ).toBe(false);
+        expect(h.refresh).not.toHaveBeenCalled();
+    });
+
+    it("waits while its reads are on their way, and while a save is", async () => {
+        mount("org_1", "invoices");
+        later();
+        comeBack();
+        expect(reads.count("invoices", "org_1")).toBe(1);
+        await reads.settle();
+        act(
+            () =>
+                void client
+                    .getMutationCache()
+                    .build(client, {
+                        mutationFn: () => new Promise(() => undefined),
+                    })
+                    .execute(undefined),
+        );
+        later();
+        comeBack();
+        expect(reads.count("invoices", "org_1")).toBe(1);
+        expect(h.refresh).not.toHaveBeenCalled();
+    });
+
+    // No React Query route can be left out again: each one, as registered,
+    // reads its shown queries on coming back to the tab.
+    it.each(RQ_ROUTES.map((glob) => [glob]))(
+        "%s reads its shown queries again on coming back",
+        async (glob) => {
+            h.routes = { ...LIVE_QUERY_ROUTES };
+            h.chrome = [...CHROME_REFRESH_ROUTES];
+            h.nav.pathname = glob.replace(/\[[^\]]+\]/g, "x_1");
+            const domain = liveDomains(h.nav.pathname)?.[0] ?? "invoices";
+            await ready("org_1", domain);
+            comeBack();
+            expect(reads.count(domain, "org_1")).toBe(2);
+            expect(h.refresh).toHaveBeenCalledTimes(
+                CHROME_REFRESH_ROUTES.includes(glob) ? 1 : 0,
+            );
+        },
+    );
 });
 
 describe("the registries", () => {
