@@ -811,9 +811,10 @@ describe("site sign-in by WhatsApp code (DEC-196)", () => {
                     status: r?.status,
                     reason: r?.details?.reason,
                 });
+                // The visitor's own 30 s resend: a refusal ("limit"), for both.
                 expect(shape(again[0])).toEqual({
                     status: 429,
-                    reason: "wait",
+                    reason: "limit",
                 });
                 expect(shape(again[1])).toEqual(shape(again[0]));
                 // Only the account's code went out, and only it signs in.
