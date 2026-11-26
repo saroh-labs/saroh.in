@@ -69,8 +69,12 @@ describe("product overview arithmetic", () => {
     });
 
     it("summarises ratings: 8×5 + 3×4 + 1×3 is 4.6 from 12", () => {
-        const ratings = [...Array(8).fill(5), 4, 4, 4, 3] as number[];
-        expect(ratingSummary(ratings)).toEqual({
+        const stars = [
+            { rating: 5, _count: { _all: 8 } },
+            { rating: 4, _count: { _all: 3 } },
+            { rating: 3, _count: { _all: 1 } },
+        ];
+        expect(ratingSummary(stars)).toEqual({
             average: 4.6,
             count: 12,
             distribution: [0, 0, 1, 3, 8],

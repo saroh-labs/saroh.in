@@ -22,6 +22,7 @@ jest.mock("../billing/limit-notice-clear", () => ({
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { NotificationsService } from "./notifications.service";
 
@@ -66,6 +67,7 @@ describe("NotificationsService.list", () => {
         expect(findMany).toHaveBeenCalledWith({
             where: seenByAdmin(),
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
     });
 
@@ -106,6 +108,7 @@ describe("NotificationsService.list", () => {
         expect(findMany).toHaveBeenCalledWith({
             where: { ...seenByAdmin(), readAt: null },
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
     });
 
@@ -115,6 +118,7 @@ describe("NotificationsService.list", () => {
         expect(findMany).toHaveBeenCalledWith({
             where: seenByMember(),
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
     });
 
