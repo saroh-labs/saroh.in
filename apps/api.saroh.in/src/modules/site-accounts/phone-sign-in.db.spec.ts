@@ -796,8 +796,10 @@ describe("site sign-in by WhatsApp code (DEC-196)", () => {
                 const { site, email } = await emailOnlyAccount();
                 const stranger = nextEmail();
                 const sentBefore = emails.length;
+                // One visitor: the resend wait is the visitor's own.
+                const visitor = relay(site.host);
                 const ask = (address: string) =>
-                    api.requestCode(relay(site.host), { email: address });
+                    api.requestCode(visitor, { email: address });
                 const first = [await ask(email), await ask(stranger)];
                 expect(first[0]).toEqual(first[1]);
                 // Both wrote a row, so both meet the same resend wait.
