@@ -1,11 +1,13 @@
 // @covers site:/book app:/open app:/bookings/all app:/services api:bookings api:site-accounts pkg:site-blocks
+import { join } from "node:path";
+
 import type { APIRequestContext, Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
-import { asNewVisitor, nameThenBook, signInOnSheet } from "./site-codes";
+import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
  * A free session end to end (DEC-261): a service set to Free is booked on
@@ -24,6 +26,11 @@ function siteFor(subdomain: string): string {
     return `${renderer.protocol}//${subdomain}.${renderer.host}`;
 }
 const NORTHWIND = siteFor("northwind");
+
+/** Where to keep the screenshots, for a review; else the test's own folder. */
+const SHOTS =
+    // eslint-disable-next-line turbo/no-undeclared-env-vars -- a local review's folder, read only here; not a build input
+    process.env.FREE_SESSION_SHOTS_DIR ?? null;
 
 /** "2026-10-27" and "11:00" for an instant, in Kolkata. */
 function inKolkata(iso: string): { date: string; time: string } {
@@ -86,7 +93,12 @@ test.describe("a free session (DEC-261)", () => {
             bookableByTeam: true,
         });
         const shot = (file: string, on: Page = page) =>
-            on.screenshot({ path: testInfo.outputPath(file), fullPage: false });
+            on.screenshot({
+                path: SHOTS
+                    ? join(SHOTS, `${testInfo.project.name}-${file}`)
+                    : testInfo.outputPath(file),
+                fullPage: false,
+            });
         try {
             await nw.put(`/services/${made.id}/rules`, {
                 rules: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
@@ -121,7 +133,23 @@ test.describe("a free session (DEC-261)", () => {
                 page.getByRole("radio", { name: /Pay at the desk|Pay ₹/ }),
             ).toHaveCount(0);
             await expect(page.getByText(/₹0/)).toHaveCount(0);
-            await shot(`booking-page-${testInfo.project.name}.png`);
+            await shot("booking-page.png");
+            // A phone at 390 and 320: nothing runs off the side.
+            if (testInfo.project.name.startsWith("phone")) {
+                const was = page.viewportSize();
+                for (const width of [390, 320]) {
+                    await page.setViewportSize({ width, height: 844 });
+                    await expect
+                        .poll(() =>
+                            page.evaluate(
+                                () => document.documentElement.scrollWidth,
+                            ),
+                        )
+                        .toBeLessThanOrEqual(width);
+                    await shot(`booking-page-${width}.png`);
+                }
+                if (was) await page.setViewportSize(was);
+            }
 
             // Signed in at the last step, named, booked: nothing to pay.
             await page
@@ -130,7 +158,17 @@ test.describe("a free session (DEC-261)", () => {
                 .first()
                 .click();
             await signInOnSheet(page, `free-${own}@example.com`.toLowerCase());
-            await nameThenBook(page, `Tara ${own}`);
+            // A new account is asked its name; then the button says Book.
+            const nameField = page.getByLabel("Name");
+            await expect(nameField).toBeVisible({ timeout: 15_000 });
+            await nameField.fill(`Tara ${own}`);
+            const bookButton = page
+                .getByRole("button", { name: "Book", exact: true })
+                .filter({ visible: true })
+                .first();
+            await expect(bookButton).toBeVisible();
+            await shot("summary-book.png");
+            await bookButton.click();
             await expect(
                 page.getByRole("heading", { name: /You're booked/ }),
             ).toBeVisible({ timeout: 30_000 });
@@ -140,7 +178,7 @@ test.describe("a free session (DEC-261)", () => {
             await expect(
                 page.getByText(/front desk|pay at the|pay later/i),
             ).toHaveCount(0);
-            await shot(`confirmation-${testInfo.project.name}.png`);
+            await shot("confirmation.png");
 
             // The team's List: Free, never owing.
             await owner.page.goto(`/open/${NORTHWIND_ORG}`);
@@ -168,10 +206,46 @@ test.describe("a free session (DEC-261)", () => {
                         .filter({ visible: true }),
                 ).toHaveCount(0);
             }
-            await shot(
-                `bookings-list-${testInfo.project.name}.png`,
-                owner.page,
-            );
+            await shot("bookings-list.png", owner.page);
+
+            // Quick look, from the row: Free too.
+            await owner.page
+                .getByText(`Tara ${own}`)
+                .filter({ visible: true })
+                .first()
+                .click();
+            const look = owner.page.getByRole("dialog");
+            await expect(
+                look
+                    .getByText(/\bFree\b/)
+                    .filter({ visible: true })
+                    .first(),
+            ).toBeVisible({ timeout: 15_000 });
+            await expect(
+                look.getByText(/Awaiting payment|Pays at/),
+            ).toHaveCount(0);
+            await shot("quick-look.png", owner.page);
+            await owner.page.keyboard.press("Escape");
+
+            // The booking's own page: its Money says Free.
+            const from = new Date(Date.now() - 86_400_000).toISOString();
+            const to = new Date(Date.now() + 5 * 86_400_000).toISOString();
+            const calendar = await nw.get<{
+                diaries: { bookings: { id: string; serviceId: string }[] }[];
+            }>(`/services/bookings?from=${from}&to=${to}`);
+            const booked = calendar.diaries
+                .flatMap((d) => d.bookings)
+                .find((b) => b.serviceId === made.id);
+            expect(booked, "the free booking is on the diary").toBeTruthy();
+            await owner.page.goto(`/bookings/${booked?.id ?? ""}`);
+            await expect(
+                owner.page
+                    .locator("main")
+                    .getByText("Free", { exact: true })
+                    .filter({ visible: true })
+                    .first(),
+            ).toBeVisible({ timeout: 15_000 });
+            await shot("booking-detail.png", owner.page);
 
             // The service's Money: Free, and the choice behind Edit.
             await owner.page.goto(`/services/${made.id}`);
@@ -190,10 +264,10 @@ test.describe("a free session (DEC-261)", () => {
             await expect(
                 panel.getByText(/Customers book it straight away/),
             ).toBeVisible();
-            await shot(`service-free-${testInfo.project.name}.png`, owner.page);
+            await shot("service-free.png", owner.page);
             await panel.getByRole("radio", { name: "Paid" }).click();
             await expect(panel.getByLabel("Price")).toBeVisible();
-            await shot(`service-paid-${testInfo.project.name}.png`, owner.page);
+            await shot("service-paid.png", owner.page);
         } finally {
             await nw.delete(`/services/${made.id}`);
             await owner.close();
