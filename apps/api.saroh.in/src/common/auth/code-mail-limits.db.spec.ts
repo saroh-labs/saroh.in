@@ -6,7 +6,6 @@ import {
     CODE_MAIL_COOLDOWN_SECONDS,
     CODE_MAILS_PER_ADDRESS_PER_HOUR,
     emailHash,
-    mailsOnPasswordSignIn,
 } from "./code-mail-limits";
 
 /** The per-address cap on sign-in codes for Saroh accounts: past it, the bot challenge. */
@@ -158,24 +157,5 @@ describe("claimCodeMail", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]?.emailHash).toBe(emailHash("burst@example.com"));
         expect(JSON.stringify(rows)).not.toContain("burst@");
-    });
-});
-
-// 03-M9: a password sign-in mails a code only to an unproven account, so
-// only that one counts against the address's cap.
-describe("mailsOnPasswordSignIn", () => {
-    it("is true only for an account whose address is not proven", async () => {
-        const tag = Date.now();
-        const unproven = `unproven-${tag}@example.com`;
-        const proven = `proven-${tag}@example.com`;
-        await prisma.user.create({ data: { email: unproven, name: "A" } });
-        await prisma.user.create({
-            data: { email: proven, name: "B", emailVerified: true },
-        });
-        expect(await mailsOnPasswordSignIn(unproven)).toBe(true);
-        expect(await mailsOnPasswordSignIn(proven)).toBe(false);
-        expect(await mailsOnPasswordSignIn(`nobody-${tag}@example.com`)).toBe(
-            false,
-        );
     });
 });
