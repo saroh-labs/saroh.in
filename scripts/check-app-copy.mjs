@@ -58,7 +58,7 @@ const ALLOWED = [
         why: "the mark for a value that isn't there (owner, 11 Oct): the only place the dash is written. Everything else draws it through AbsentValue or absentText()",
     },
     {
-        file: "lib/services/service-editor.ts",
+        file: "lib/services/editor.ts",
         rule: "em dash",
         why: "the API's own refusal, compared with === to tell it apart. Reword both sides together",
     },
