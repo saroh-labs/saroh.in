@@ -21,7 +21,7 @@ import type { BulkRemindersDto } from "./invoice-share.dto";
 import { BULK_REMINDER_MAX } from "./invoice-share.dto";
 import { leftToPayCents } from "./invoice-state";
 import type { LastHeard } from "./overdue-bills";
-import { daysAgo, heardWords, lastHeardFrom } from "./overdue-bills";
+import { daysLate, heardWords, lastHeardFrom } from "./overdue-bills";
 import { fromCents } from "./totals";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -333,10 +333,7 @@ export class InvoiceRemindersService {
             leftToPay: fromCents(leftToPayCents(row)),
             currency: row.currency,
             dueAt: row.dueAt?.toISOString() ?? null,
-            lateDays:
-                row.dueAt && row.dueAt < now
-                    ? Math.max(1, daysAgo(row.dueAt, now, zone))
-                    : 0,
+            lateDays: daysLate(row.dueAt, now, zone),
         };
         const none = (reason: ReminderReason) => ({
             out: { ...base, way: "NONE", reason } satisfies ReminderPreviewRow,

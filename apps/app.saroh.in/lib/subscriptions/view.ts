@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "@/lib/format/datetime";
+import { daysPastDue, formatDate, formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
 import { payOf, setPriceWords } from "@/lib/gst/on-price";
@@ -23,8 +23,6 @@ import type {
 
 export type ListTab = "active" | "failed" | "paused" | "cancelled";
 export type Tone = "ok" | "accent" | "bad" | "off";
-
-const DAY = 86_400_000;
 
 /** The list tab it sits on. A failed renewal wins over running or paused. */
 export function listTab(
@@ -252,28 +250,26 @@ export function listSummary(
     };
 }
 
-function daysLate(dueAt: string, now: Date): number {
-    return Math.floor((now.getTime() - Date.parse(dueAt)) / DAY);
-}
-
 /**
  * Why a failed renewal is failed, in words: it is not paid, and how late —
  * or, before its due date, that autopay didn't collect it (D13).
  */
 export function failWhy(
-    sub: Pick<Subscription, "failedCharge" | "currency" | "price">,
+    sub: Pick<Subscription, "failedCharge" | "currency" | "price" | "timezone">,
     now: Date,
 ): string {
     const charge = sub.failedCharge;
-    if (!charge) return "The latest renewal isn't paid and is past due";
+    if (!charge) return "The latest renewal isn't paid and is late";
     const amount = formatMoneyMajor(charge.total, sub.currency);
     if (charge.dueAt && Date.parse(charge.dueAt) > now.getTime()) {
         return `Renewal of ${amount} wasn't collected by autopay`;
     }
-    const late = charge.dueAt ? daysLate(charge.dueAt, now) : 0;
+    const late = charge.dueAt
+        ? daysPastDue(charge.dueAt, now, sub.timezone)
+        : 0;
     return late > 0
-        ? `Renewal of ${amount} isn't paid, ${count(late, "day")} past due`
-        : `Renewal of ${amount} isn't paid, past due`;
+        ? `Renewal of ${amount} isn't paid, ${count(late, "day")} late`
+        : `Renewal of ${amount} isn't paid, late`;
 }
 
 /**

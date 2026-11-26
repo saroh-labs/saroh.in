@@ -364,7 +364,7 @@ export function InvoicesScreen({
     const chequesOn = shownQuery.cheques;
 
     const view = `${shownQuery.tab}|${chip}|${shownQuery.owed}|${shownQuery.cheques}|${shownQuery.paidFrom}|${shownQuery.q}|${shownQuery.date}|${shownQuery.from}|${shownQuery.to}`;
-    const owed = canWrite ? pickRowsOf(rows) : [];
+    const owed = canWrite ? pickRowsOf(rows, new Date(), timeZone) : [];
     const onOverdue = shownQuery.tab === "overdue";
     const tickedIds = ticks.view === view ? ticks.ids : new Set<string>();
     const tickedRows = owed.filter((r) => tickedIds.has(r.invoiceId));

@@ -138,7 +138,7 @@ export function InvoiceDetailsView({
             />
         ) : null;
 
-    const pill = headerPill(i);
+    const pill = headerPill(i, new Date(), zone);
     const badge = (
         <StatusBadge tone={pill.variant} size="default">
             {pill.label}

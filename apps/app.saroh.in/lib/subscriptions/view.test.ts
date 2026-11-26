@@ -257,7 +257,7 @@ describe("rowWhen", () => {
             },
         });
         expect(rowWhen(failed, NOW)).toEqual({
-            text: "Renewal of ₹1,200 isn't paid, 3 days past due",
+            text: "Renewal of ₹1,200 isn't paid, 3 days late",
             danger: true,
         });
     });
@@ -576,7 +576,7 @@ describe("headline", () => {
         expect(h.pill).toEqual({ tone: "bad", label: "Payment failed" });
         expect(h.when).toBe("failed 15 Sep");
         expect(h.line).toBe(
-            "Renewal of ₹1,200 isn't paid, 3 days past due. Nothing is collected until it's paid.",
+            "Renewal of ₹1,200 isn't paid, 3 days late. Nothing is collected until it's paid.",
         );
     });
 

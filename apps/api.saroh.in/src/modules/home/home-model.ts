@@ -1,5 +1,6 @@
 import type { Edition } from "@saroh/edition";
 import type { OrgRole } from "../../common/types/organization-context";
+import { daysLate } from "../invoices/overdue-bills";
 import type { OrgAction } from "../organizations/organization-actions";
 import { can } from "../organizations/organization-policy";
 import type {
@@ -514,14 +515,15 @@ export function personName(person: {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * "Late · 2 days", as the Home design tags it: whole days since `dueAt`, and
- * never "0 days" — something past due by an hour is already late, so it
- * reads "Late · 1 day".
+ * "Late · 2 days", as the Home design tags it, and never "0 days" —
+ * something past due by an hour is already late, so it reads "Late · 1
+ * day". With the business's zone it is a bill's one count (DEC-269,
+ * `daysLate`); without one (a follow-up task, not a bill), whole days
+ * since `dueAt`.
  */
-export function overdueTag(dueAt: Date, now: Date): string {
-    const days = Math.max(
-        1,
-        Math.floor((now.getTime() - dueAt.getTime()) / DAY_MS),
-    );
+export function overdueTag(dueAt: Date, now: Date, zone?: string): string {
+    const days = zone
+        ? Math.max(1, daysLate(dueAt, now, zone))
+        : Math.max(1, Math.floor((now.getTime() - dueAt.getTime()) / DAY_MS));
     return `Late · ${days} day${days === 1 ? "" : "s"}`;
 }
