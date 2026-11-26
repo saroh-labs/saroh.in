@@ -13,7 +13,12 @@ jest.mock("@saroh/database", () => ({
 }));
 
 jest.mock("../../env", () => ({
-    env: { ADMIN_ALLOWLIST: undefined, ADMIN_SESSION_MAX_AGE_MINUTES: 720 },
+    env: {
+        ADMIN_ALLOWLIST: undefined,
+        ADMIN_SESSION_MAX_AGE_MINUTES: 720,
+        BETTER_AUTH_URL: "https://api.saroh.in",
+        NODE_ENV: "test",
+    },
 }));
 
 import { prisma } from "@saroh/database";
@@ -29,7 +34,7 @@ const findUnique = prisma.platformAdmin.findUnique as jest.Mock;
 const findOwner = prisma.platformAdminRoleAssignment.findFirst as jest.Mock;
 const auditSeen = prisma.adminAuditEvent.findFirst as jest.Mock;
 const auditCreate = prisma.adminAuditEvent.create as jest.Mock;
-const mutableEnv = env as { ADMIN_ALLOWLIST?: string };
+const mutableEnv = env as { ADMIN_ALLOWLIST?: string; NODE_ENV?: string };
 
 interface TestRequest {
     method?: string;
@@ -371,6 +376,64 @@ describe("PlatformAdminGuard", () => {
         await expect(write({ origin: "https://admin.saroh.in" })).resolves.toBe(
             true,
         );
+    });
+
+    it("takes an admin write only from the admin console, not another Saroh app (L3)", async () => {
+        mutableEnv.ADMIN_ALLOWLIST = "ops@saroh.in";
+        const write = (headers: Record<string, string>) =>
+            guard.canActivate(
+                contextFor({
+                    method: "POST",
+                    headers: { host: "api.saroh.in", ...headers },
+                    user: { id: "user_4", email: "ops@saroh.in" },
+                }),
+            );
+        for (const origin of [
+            "https://app.saroh.in",
+            "https://accounts.saroh.in",
+            "https://admin.saroh.tech",
+            "https://admin.saroh.in.example.com",
+            "not a url",
+        ]) {
+            await expect(write({ origin })).rejects.toThrow(
+                "Admin changes are made from the admin console",
+            );
+        }
+        await expect(
+            write({ referer: "https://app.saroh.in/settings" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(
+            write({ referer: "https://admin.saroh.in/businesses" }),
+        ).resolves.toBe(true);
+    });
+
+    it("in production, serves no console on an address that isn't an edition's (A9)", async () => {
+        mutableEnv.ADMIN_ALLOWLIST = "ops@saroh.in";
+        mutableEnv.NODE_ENV = "production";
+        try {
+            const read = (host: string) =>
+                guard.canActivate(
+                    contextFor({
+                        headers: { host },
+                        user: { id: "user_4", email: "ops@saroh.in" },
+                    }),
+                );
+            await expect(read("internal.example")).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            await expect(read("api.saroh.in")).resolves.toBe(true);
+        } finally {
+            mutableEnv.NODE_ENV = "test";
+        }
+        // Elsewhere (a local or CI stack on ports) it still opens.
+        await expect(
+            guard.canActivate(
+                contextFor({
+                    headers: { host: "localhost:3333" },
+                    user: { id: "user_4", email: "ops@saroh.in" },
+                }),
+            ),
+        ).resolves.toBe(true);
     });
 
     it("rejects an unauthenticated request (guard misordering)", async () => {
