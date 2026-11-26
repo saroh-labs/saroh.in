@@ -33,6 +33,8 @@ import {
     socialProblems,
     socialSavedWords,
 } from "@/lib/organizations/social-links";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 /** What each field takes, said once under the sheet's title. */
@@ -76,6 +78,7 @@ export function SocialLinksSheet({
     /** Saved: the settings now, and what to say. */
     onSaved: (next: OrganizationSettings, said: string) => void;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [draft, setDraft] = useState<SocialDraft>(() => socialDraftOf(links));
     // A field says what is wrong once it has been left, or Save was tried.
     const [touched, setTouched] = useState<Set<SocialNetwork>>(new Set());
@@ -114,7 +117,11 @@ export function SocialLinksSheet({
         }
         setRefusal(null);
         const result = await runAction(
-            () => saveOrganizationSettings({ socialLinks: patch }),
+            () =>
+                saveOrganizationSettings(
+                    { socialLinks: patch },
+                    ...asOrg(orgId),
+                ),
             { setBusy: setSaving },
         );
         if (!result) return;

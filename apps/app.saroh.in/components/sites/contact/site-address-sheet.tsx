@@ -18,6 +18,8 @@ import type {
     SiteContact,
 } from "@/lib/organizations/settings-service";
 import { afterSettingsSave } from "@/lib/query/invalidate";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { SETTINGS_ROW_ID } from "@/lib/sites/settings-edit";
 import {
     ADDRESS_SHEET,
@@ -352,6 +354,7 @@ function RegisteredAddressChoice({
     onClose: () => void;
     onSaved: (next: OrganizationSettings, said: string) => void;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const savedLink = mapLinkFieldValue(mapUrl);
     const [show, setShow] = useState(chosen);
     const [link, setLink] = useState(savedLink);
@@ -381,9 +384,12 @@ function RegisteredAddressChoice({
             return;
         }
         setRefusal(null);
-        const result = await runAction(() => saveOrganizationSettings(sent), {
-            setBusy: setSaving,
-        });
+        const result = await runAction(
+            () => saveOrganizationSettings(sent, ...asOrg(orgId)),
+            {
+                setBusy: setSaving,
+            },
+        );
         if (!result) return;
         if (!result.ok) {
             if (result.field === "registeredAddressMapUrl") {

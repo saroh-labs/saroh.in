@@ -36,6 +36,23 @@ function isRecent(value: unknown): value is Recent {
     );
 }
 
+/**
+ * Drop every business's recents in this browser: they name customers, and
+ * the next person on this device is someone else (signed out, or another
+ * person signed in).
+ */
+export function forgetRecents(): void {
+    try {
+        const store = window.localStorage;
+        for (let i = store.length - 1; i >= 0; i--) {
+            const k = store.key(i);
+            if (k?.startsWith(key(""))) store.removeItem(k);
+        }
+    } catch {
+        // Storage refused: nothing was kept.
+    }
+}
+
 /** The recents for a business, newest first. Empty when there are none. */
 export function readRecents(scope: string): Recent[] {
     try {

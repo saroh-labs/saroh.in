@@ -206,7 +206,12 @@ export function OrganizationSettingsForm({
                     onSaved={(next, said) => {
                         undo.offer(
                             said,
-                            logoCardUndo(settings, next, setSettings),
+                            logoCardUndo(
+                                settings,
+                                next,
+                                setSettings,
+                                save.orgId,
+                            ),
                         );
                         setSettings(next);
                     }}
@@ -258,7 +263,13 @@ export function OrganizationSettingsForm({
                                 words,
                                 businessModeOf(next.tax?.priceMode),
                             ),
-                            cardUndo(settings, next, sent, applySaved),
+                            cardUndo(
+                                settings,
+                                next,
+                                sent,
+                                applySaved,
+                                save.orgId,
+                            ),
                         );
                         applySaved(next);
                     }}

@@ -9,7 +9,9 @@ import {
 import { useRouter } from "next/navigation";
 import { createContext, createElement, useContext, useMemo } from "react";
 
+import { customersKeys } from "@/lib/customers/queries";
 import { homeKeys } from "@/lib/home/queries";
+import { ordersKeys } from "@/lib/orders/queries";
 import { useOrgId } from "@/lib/query/org";
 
 import type { InvoiceAsk, InvoicesAsk } from "./queries";
@@ -56,10 +58,13 @@ export function useInvoice(ask: InvoiceAsk | null) {
 export function invoicesSaved(qc: QueryClient, orgId: string): Promise<void> {
     return Promise.all([
         qc.invalidateQueries({ queryKey: invoicesKeys(orgId) }),
-        qc.invalidateQueries({
-            queryKey: homeKeys(orgId),
-            refetchType: "none",
-        }),
+        // A payment moves what the customer owes and the order's state.
+        ...[homeKeys, ordersKeys, customersKeys].map((keys) =>
+            qc.invalidateQueries({
+                queryKey: keys(orgId),
+                refetchType: "none",
+            }),
+        ),
     ]).then(
         () => undefined,
         () => undefined,

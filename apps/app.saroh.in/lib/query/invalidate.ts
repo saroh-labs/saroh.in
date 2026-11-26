@@ -5,6 +5,7 @@ import { announce } from "@/lib/query/broadcast";
 import { getBrowserQueryClient } from "@/lib/query/client";
 import { isSettingsQuery } from "@/lib/query/freshness";
 import { isOrgKey, ORGANIZATIONS_KEY } from "@/lib/query/keys";
+import { forgetRecents } from "@/lib/search/recents";
 
 /** Drop everything this tab holds: another business, or no one, is next. */
 export function clearAll(): void {
@@ -25,7 +26,33 @@ export function afterSwitch(): void {
 /** Signed out here: clear, and tell the other tabs. */
 export function afterSignOut(): void {
     clearAll();
+    forgetRecents();
     announce("signout");
+}
+
+/** The person this tab's cache was filled for; null until the first. */
+let cacheUser: string | null = null;
+
+/**
+ * The signed-in person, as this render's server read them. When it isn't
+ * the one the cache was filled for (signed out on accounts and a teammate
+ * signed in, on a shared device), everything held is dropped, the settings
+ * kept for the visit included, and the search recents with it. A switch of
+ * business is not a change of person: it keeps the cache (owner, #1472).
+ * Answers whether it cleared.
+ */
+export function keepForUser(client: QueryClient, userId: string): boolean {
+    const changed = cacheUser !== null && cacheUser !== userId;
+    cacheUser = userId;
+    if (!changed) return false;
+    client.clear();
+    forgetRecents();
+    return true;
+}
+
+/** For tests: forget whose cache it was. */
+export function resetCacheUser(): void {
+    cacheUser = null;
 }
 
 /**

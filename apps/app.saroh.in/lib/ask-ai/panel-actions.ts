@@ -13,6 +13,7 @@ import {
     askAiLanguage,
 } from "@saroh/api-contract";
 
+import { writeAsOrgIfSent } from "@/lib/api/assert-active-org";
 import type { CrmResult } from "@/lib/api/http";
 import type { AskAiReportBody } from "./panel-service";
 import {
@@ -65,19 +66,28 @@ export async function readAskAiConversation(
     return orNull(() => getAskAiConversation(id));
 }
 
-export async function changeAskAiLanguage(language: AskAiLanguage) {
+/*
+ * The business-wide writes take the tab's business last (DEC-259): the
+ * panel is on every page, so a tab left on another business is refused
+ * rather than written into the one the cookie names now.
+ */
+
+export async function changeAskAiLanguage(
+    language: AskAiLanguage,
+    orgId?: string,
+) {
     const parsed = askAiLanguage.safeParse(language);
     if (!parsed.success) return INVALID;
-    return setAskAiLanguage(parsed.data);
+    return writeAsOrgIfSent(orgId, () => setAskAiLanguage(parsed.data));
 }
 
 /** Turn on, from the panel's off state (Owner and Admin; the API checks). */
-export async function turnOnAskAi() {
-    return setAskAiOn(true);
+export async function turnOnAskAi(orgId?: string) {
+    return writeAsOrgIfSent(orgId, () => setAskAiOn(true));
 }
 
-export async function askForMoreQuestions() {
-    return requestMoreAskAi();
+export async function askForMoreQuestions(orgId?: string) {
+    return writeAsOrgIfSent(orgId, () => requestMoreAskAi());
 }
 
 export async function sendAskAiReport(
@@ -100,10 +110,13 @@ export async function confirmDraft(
     fields?: Record<string, unknown>,
     /** The card's Check this ids the person confirmed. */
     confirmed?: string[],
+    orgId?: string,
 ) {
     const parsed = askAiConfirmBody.safeParse({ fields, confirmed });
     if (!parsed.success || !draftId) return INVALID;
-    return confirmAskAiDraft(draftId, parsed.data);
+    return writeAsOrgIfSent(orgId, () =>
+        confirmAskAiDraft(draftId, parsed.data),
+    );
 }
 
 export async function undoDraft(draftId: string) {

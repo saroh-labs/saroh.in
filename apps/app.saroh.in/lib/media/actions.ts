@@ -1,5 +1,7 @@
 "use server";
 
+import { writeAsOrgIfSent } from "@/lib/api/assert-active-org";
+
 import type { UploadSizes } from "./service";
 import {
     completeUpload as completeUploadApi,
@@ -26,8 +28,10 @@ export async function createUpload(
             | "staff-photo"
             | "ask-ai";
     } & UploadSizes,
+    /** The tab's business (DEC-259): a moved tab is refused. */
+    orgId?: string,
 ) {
-    return createUploadApi(input);
+    return writeAsOrgIfSent(orgId, () => createUploadApi(input));
 }
 
 export async function completeUpload(mediaId: string) {

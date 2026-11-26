@@ -18,6 +18,8 @@ import {
     checkWebAddress,
     saveWebAddress,
 } from "@/lib/organizations/web-address-actions";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 
 /** What the Publish sheet needs to offer the web address in place. */
 export interface WebAddressFix {
@@ -45,6 +47,7 @@ export function AddressFix({
     /** The site's host now: "northwind.saroh.app". */
     onSaved: (host: string) => void;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [address, setAddress] = useState(fix.address);
     const [saving, setSaving] = useState(false);
     const [refused, setRefused] = useState<{
@@ -70,7 +73,7 @@ export function AddressFix({
     async function save() {
         setSaving(true);
         try {
-            const res = await saveWebAddress(address);
+            const res = await saveWebAddress(address, ...asOrg(orgId));
             if (!res.ok) {
                 setRefused({
                     message: res.error,

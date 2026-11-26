@@ -1,6 +1,6 @@
 "use server";
 
-import { writeAsOrg } from "@/lib/api/assert-active-org";
+import { writeAsOrg, writeAsOrgIfSent } from "@/lib/api/assert-active-org";
 import { revalidatePath } from "next/cache";
 
 import { setConsent } from "@/lib/messages/service";
@@ -44,8 +44,10 @@ import {
 /** Add customer (DEC-056, C14): a contact only; the list shows them. */
 export async function addCustomerAction(
     input: AddCustomerInput,
+    /** The tab's business (DEC-259): a moved tab is refused. */
+    orgId?: string,
 ): Promise<AddCustomerResult> {
-    const result = await addCustomer(input);
+    const result = await writeAsOrgIfSent(orgId, () => addCustomer(input));
     if (result.ok) revalidatePath("/commerce/customers");
     return result;
 }
