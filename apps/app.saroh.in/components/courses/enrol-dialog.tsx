@@ -87,7 +87,11 @@ export function EnrolDialog({
         continueLabel: "Save and enrol",
     });
     const course = courses.find((c) => c.id === courseId);
-    const person = contacts.find((c) => c.id === contactId);
+    // Found by a search, or read by id: not among the recent few.
+    const [found, setFound] = useState<ContactOption | null>(null);
+    const person =
+        contacts.find((c) => c.id === contactId) ??
+        (found?.id === contactId ? found : undefined);
     const priceOk = /^\d{1,9}(\.\d{1,2})?$/.test(price.trim());
     const choosing = courses.length > 1;
 
@@ -194,6 +198,7 @@ export function EnrolDialog({
                                 contacts={contacts}
                                 value={contactId}
                                 onValueChange={setContactId}
+                                onContact={setFound}
                             />
                         </div>
                         <Field

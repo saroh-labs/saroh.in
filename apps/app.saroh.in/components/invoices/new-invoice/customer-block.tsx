@@ -33,6 +33,7 @@ export function CustomerBlock({
     contacts,
     canAdd,
     onContactAdded,
+    onContactPicked,
     registered,
     businessState,
     buyerOpen,
@@ -45,6 +46,8 @@ export function CustomerBlock({
     /** A new invoice may add someone; a draft keeps who it's for. */
     canAdd: boolean;
     onContactAdded: (c: AddedContact) => void;
+    /** Someone picked or read who isn't among `contacts`: the form names them. */
+    onContactPicked?: (c: ContactOption) => void;
     registered: boolean;
     /** The business's GST state code, for the place of supply. */
     businessState: string | null;
@@ -98,6 +101,7 @@ export function CustomerBlock({
                         contacts={contacts}
                         value={field.value}
                         onValueChange={field.onChange}
+                        onContact={onContactPicked}
                         disabled={disabled}
                         aria-label="Who it's for"
                         aria-describedby={supply ? ids.supply : undefined}

@@ -175,4 +175,4 @@ export const subscriptionSettingsServer: ServerRead<
 export const subscriptionContactsServer: ServerRead<
     Record<string, never>,
     SubscriptionContact[]
-> = { read: subscriptionContactsRead, service: contactPickerOptions };
+> = { read: subscriptionContactsRead, service: () => contactPickerOptions() };
