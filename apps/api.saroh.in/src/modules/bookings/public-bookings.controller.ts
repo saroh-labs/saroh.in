@@ -4,6 +4,7 @@ import {
     Get,
     GoneException,
     Header,
+    Headers,
     HttpCode,
     Param,
     Post,
@@ -18,6 +19,7 @@ import { hashClientIp } from "../../common/client-ip";
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { edgeMayKeep } from "../../common/live-read-headers";
+import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
 import type { AvailableSlot } from "./booking-slots";
@@ -284,11 +286,18 @@ export class PublicBookingPageController {
     async timetableWeek(
         @Param("siteId") siteId: string,
         @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
         @Res({ passthrough: true }) res: Response,
         @Query("services") services?: unknown,
     ): Promise<PublicTimetable> {
         const ids = timetableIds(services);
-        const week = await this.timetable.read(siteId, ids, hashClientIp(ip));
+        // The Book page reads this from saroh.app's server: count the
+        // relayed visitor, not the server every visitor arrives through.
+        const week = await this.timetable.read(
+            siteId,
+            ids,
+            visitorKey(ip, relay),
+        );
         edgeMayKeep(res, this.timetable.secondsLeft(siteId, ids, week));
         return week;
     }

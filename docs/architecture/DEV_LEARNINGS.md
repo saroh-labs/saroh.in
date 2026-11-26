@@ -7136,3 +7136,53 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** the gate memo (`lib/access/gate-memo.ts`) keeps `/me` and `/modules` for 30 s, keyed on the session and the `gate_epoch` cookie. Only the app's own saves bumped the epoch; a write that went straight to the API left it alone. The mock-API suite gives every case the same session cookie.
 - **Fix:** the API sets a new `gate_epoch` on any write a signed-in browser sends it (`apps/api.saroh.in/src/common/gate-epoch.ts`), and the suite's `scenario()` sets one per case.
 - **Rule:** a cache keyed on the browser has to be cleared by every way that browser can change what it keeps, not only by the screens that call it. Writes from somewhere else (another device, MCP, the admin console) wait out the 30 s, and the memo's doc comment says so.
+
+## Limits — a public route the site server calls keys on the relayed visitor
+
+**Symptom**: 26 Nov 2026 release review: the order pay page and the Book
+page's timetable read counted their limits per calling address, not per
+visitor.
+**Cause**: `lib/order-pay.ts` called `public/order-pay` without `withRelay`.
+Invoice pay, written earlier, did it right; order pay copied the shape but
+not the relay. The timetable route ignored a relay saroh.app already sent.
+**Fix**: both order pay calls send the signed relay and the controller keys
+on `visitorKey(ip, relay)`, as invoice pay does; the timetable read too.
+**Rule**: a public route saroh.app calls from its server keys every limit on
+the relayed visitor. Enforced by `src/common/public-limit-keys.spec.ts`: a
+public handler that reads `@ClientAddress()` without the relay fails unless
+it is listed with who calls it (only a browser may).
+**Category**: security · limits
+
+## Messaging — site verification codes take a per-visitor limit
+
+**Symptom**: 26 Nov 2026 release review: the site verification-code route,
+not yet in use, had no Redis limit of its own.
+**Fix**: a `SharedRateLimiter` keyed on business and relayed visitor, taken
+before anything is held or sent. Before the route is switched on, add the
+bot challenge site sign-in asks (`passChallenge`).
+**Rule**: a public route that sends on a business's balance or from Saroh's
+sender takes a per-visitor Redis limit (lens 2). Tested in
+`public-verifications.controller.spec.ts`.
+**Category**: security · messaging
+
+## Middleware — a matcher names what may skip it
+
+**Symptom**: 26 Nov 2026 release review: the site and app middleware matchers
+decided "is a static file" from the path's shape, not from the files.
+**Fix**: the matchers skip only Next's own files and the files that are in
+`public/`, by name or folder. Everything else goes through.
+**Rule**: a middleware matcher names what may skip it. Enforced by
+`apps/saroh.app/middleware.test.ts` and
+`apps/app.saroh.in/lib/middleware-matcher.test.ts`.
+**Category**: security · `apps/*/middleware.ts`
+
+## API — a store's order and customer lists are paged
+
+**Symptom**: 26 Nov 2026 release review: the two oldest store-scoped list
+reads had no page size.
+**Fix**: both take `page` and `size` (10, 25, 50 or 100; anything else is a 400) and answer `{ rows, total, page, pageSize }`, as the workspace lists do
+(`common/store-list-query.ts`). Spend is summed by the database for the
+page's customers. The app's one caller now asks for a single email.
+**Rule**: a list read that grows with a business's activity has a page size
+and a hard maximum (`store-list-query.spec.ts`).
+**Category**: performance · `orders`, `customers`

@@ -131,7 +131,7 @@ describe("store customers access by role (DB)", () => {
     it.each(["OWNER", "ADMIN"])(
         "lets %s read the list, with what each customer spent",
         async (role) => {
-            const list = await customers.list(storeId, users[role]);
+            const { rows: list } = await customers.list(storeId, users[role]);
             expect(list).toHaveLength(1);
             expect(list[0]).toMatchObject({
                 id: customerId,
@@ -146,7 +146,10 @@ describe("store customers access by role (DB)", () => {
     );
 
     it("lets an invented role that was granted order:read in", async () => {
-        const list = await customers.list(storeId, users["counter-lead"]);
+        const { rows: list } = await customers.list(
+            storeId,
+            users["counter-lead"],
+        );
         expect(list.map((c) => c.spent)).toEqual(["1250.00"]);
         const one = await customers.get(
             storeId,

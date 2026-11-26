@@ -7,6 +7,7 @@ import {
     Param,
     Post,
     Put,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 
@@ -17,7 +18,11 @@ import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { CustomersService } from "./customers.service";
-import { CreateCustomerDto, UpdateCustomerDto } from "./dto";
+import {
+    CreateCustomerDto,
+    ListStoreCustomersQueryDto,
+    UpdateCustomerDto,
+} from "./dto";
 
 /**
  * A storefront's customers. Commerce gates adding, changing and removing
@@ -31,8 +36,12 @@ export class CustomersController {
     constructor(private readonly customers: CustomersService) {}
 
     @Get()
-    list(@CurrentUser() user: AuthUser, @Param("storeId") storeId: string) {
-        return this.customers.list(storeId, user.id);
+    list(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Query() query: ListStoreCustomersQueryDto,
+    ) {
+        return this.customers.list(storeId, user.id, query);
     }
 
     @Post()

@@ -7,11 +7,17 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { StorePage } from "../../common/store-list-query";
+import { storePageOf } from "../../common/store-list-query";
 import { ActivationEvents } from "../analytics/activation-events";
 import { isLocationScoped } from "../orders/order-location";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
-import type { CreateCustomerDto, UpdateCustomerDto } from "./dto";
+import type {
+    CreateCustomerDto,
+    ListStoreCustomersQueryDto,
+    UpdateCustomerDto,
+} from "./dto";
 import type { CustomerListItemDto } from "./serialize";
 import { serializeCustomerListItem } from "./serialize";
 
@@ -49,24 +55,54 @@ export class CustomersService {
     async list(
         storeId: string,
         userId: string,
-    ): Promise<CustomerListItemDto[]> {
+        query: ListStoreCustomersQueryDto = {},
+    ): Promise<StorePage<CustomerListItemDto>> {
         await requireOrderRead(this.stores, storeId, userId, "customers");
         await this.refuseLocationTeam(storeId, userId);
-        const customers = await prisma.customer.findMany({
-            where: { storeId },
-            orderBy: { createdAt: "desc" },
-            include: {
-                orders: {
-                    select: {
-                        total: true,
-                        currency: true,
-                        paymentStatus: true,
-                        createdAt: true,
-                    },
-                },
-            },
-        });
-        return customers.map(serializeCustomerListItem);
+        const { page, pageSize, skip, take } = storePageOf(query);
+        const where = {
+            storeId,
+            ...(query.email ? { email: query.email } : {}),
+        };
+        const [customers, total] = await Promise.all([
+            prisma.customer.findMany({
+                where,
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                skip,
+                take,
+            }),
+            prisma.customer.count({ where }),
+        ]);
+        // The page's order figures, summed by the database: never every
+        // order of every customer in memory.
+        const groups = customers.length
+            ? await prisma.order.groupBy({
+                  by: ["customerId", "currency", "paymentStatus"],
+                  where: {
+                      storeId,
+                      customerId: { in: customers.map((c) => c.id) },
+                  },
+                  _count: { _all: true },
+                  _sum: { total: true },
+                  _max: { createdAt: true },
+              })
+            : [];
+        const rows = customers.map((customer) =>
+            serializeCustomerListItem(
+                customer,
+                groups
+                    .filter((g) => g.customerId === customer.id)
+                    .map((g) => ({
+                        currency: g.currency,
+                        paymentStatus: g.paymentStatus,
+                        count: g._count._all,
+                        total: g._sum.total ?? 0,
+                        // A group always holds an order, so it has a newest.
+                        lastAt: g._max.createdAt ?? new Date(0),
+                    })),
+            ),
+        );
+        return { rows, total, page, pageSize };
     }
 
     /** One store customer, with the same rule as the list. */

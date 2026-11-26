@@ -50,27 +50,13 @@ export interface CustomerListItemDto extends CustomerDto {
     lastOrderAt: Date | null;
 }
 
-export interface RawCustomerOrder {
-    total: DecimalLike;
+/** A customer's orders summed by currency and payment status. */
+export interface CustomerOrderGroup {
     currency: string;
     paymentStatus: string;
-    createdAt: Date;
-}
-
-export interface RawCustomer {
-    id: string;
-    storeId: string;
-    email: string;
-    firstName: string | null;
-    lastName: string | null;
-    phone: string | null;
-    country: string | null;
-    state: string | null;
-    city: string | null;
-    zipCode: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    orders: RawCustomerOrder[];
+    count: number;
+    total: DecimalLike;
+    lastAt: Date;
 }
 
 /** "1234.50" → 123450. Digits only, so the cent is never a float. */
@@ -93,29 +79,29 @@ function fromMinor(minor: number): string {
 }
 
 export function serializeCustomerListItem(
-    customer: RawCustomer,
+    customer: CustomerDto,
+    groups: CustomerOrderGroup[],
 ): CustomerListItemDto {
-    const { orders, ...rest } = customer;
     // Newest first, so "last order" and "which currency" are the same
     // question: the one they most recently transacted in.
-    const byNewest = [...orders].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    const byNewest = [...groups].sort(
+        (a, b) => b.lastAt.getTime() - a.lastAt.getTime(),
     );
-    const paid = byNewest.filter((o) => o.paymentStatus === "PAID");
+    const paid = byNewest.filter((g) => g.paymentStatus === "PAID");
     const currency = paid.length > 0 ? paid[0].currency : null;
-    const inCurrency = paid.filter((o) => o.currency === currency);
+    const inCurrency = paid.filter((g) => g.currency === currency);
 
     return {
-        ...rest,
-        orderCount: orders.length,
+        ...customer,
+        orderCount: groups.reduce((n, g) => n + g.count, 0),
         spent:
             currency === null
                 ? null
                 : fromMinor(
-                      inCurrency.reduce((sum, o) => sum + toMinor(o.total), 0),
+                      inCurrency.reduce((sum, g) => sum + toMinor(g.total), 0),
                   ),
         currency,
         mixedCurrency: inCurrency.length !== paid.length,
-        lastOrderAt: byNewest.length > 0 ? byNewest[0].createdAt : null,
+        lastOrderAt: byNewest.length > 0 ? byNewest[0].lastAt : null,
     };
 }

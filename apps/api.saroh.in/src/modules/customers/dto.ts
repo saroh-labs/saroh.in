@@ -1,6 +1,8 @@
 import { Transform } from "class-transformer";
 import { IsEmail, IsOptional, IsString, MaxLength } from "class-validator";
 
+import { StoreListQueryDto } from "../../common/store-list-query";
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 const trimLower = ({ value }: { value: unknown }) =>
@@ -55,3 +57,12 @@ export class CreateCustomerDto {
 }
 
 export class UpdateCustomerDto extends CreateCustomerDto {}
+
+/** A page of a store's customers, or the one with this email. */
+export class ListStoreCustomersQueryDto extends StoreListQueryDto {
+    @IsOptional()
+    @Transform(trimLower)
+    @IsString()
+    @MaxLength(320)
+    email?: string;
+}

@@ -1,4 +1,4 @@
-import type { RawCustomer, RawCustomerOrder } from "./serialize";
+import type { CustomerDto, CustomerOrderGroup } from "./serialize";
 import { serializeCustomerListItem } from "./serialize";
 
 /**
@@ -8,7 +8,7 @@ import { serializeCustomerListItem } from "./serialize";
  * becomes 0.30000000000000004 on a merchant's screen).
  */
 
-const base: Omit<RawCustomer, "orders"> = {
+const base: CustomerDto = {
     id: "cus_1",
     storeId: "store_1",
     email: "priya@example.com",
@@ -23,17 +23,20 @@ const base: Omit<RawCustomer, "orders"> = {
     updatedAt: new Date("2026-01-01T00:00:00Z"),
 };
 
-const order = (o: Partial<RawCustomerOrder>): RawCustomerOrder => ({
-    total: "10.00",
-    currency: "INR",
-    paymentStatus: "PAID",
-    createdAt: new Date("2026-02-01T00:00:00Z"),
-    ...o,
+/** One order as the database's group-by gives it back. */
+const order = (
+    o: Partial<Omit<CustomerOrderGroup, "lastAt">> & { createdAt?: Date },
+): CustomerOrderGroup => ({
+    total: o.total ?? "10.00",
+    currency: o.currency ?? "INR",
+    paymentStatus: o.paymentStatus ?? "PAID",
+    count: o.count ?? 1,
+    lastAt: o.createdAt ?? new Date("2026-02-01T00:00:00Z"),
 });
 
 describe("serializeCustomerListItem", () => {
     it("reports nothing spent for a customer who has never ordered", () => {
-        const row = serializeCustomerListItem({ ...base, orders: [] });
+        const row = serializeCustomerListItem(base, []);
 
         expect(row.orderCount).toBe(0);
         expect(row.spent).toBeNull();
@@ -43,14 +46,11 @@ describe("serializeCustomerListItem", () => {
     });
 
     it("sums only paid orders, but counts every one", () => {
-        const row = serializeCustomerListItem({
-            ...base,
-            orders: [
-                order({ total: "1250.50" }),
-                order({ total: "99.50" }),
-                order({ total: "4000.00", paymentStatus: "UNPAID" }),
-            ],
-        });
+        const row = serializeCustomerListItem(base, [
+            order({ total: "1250.50" }),
+            order({ total: "99.50" }),
+            order({ total: "4000.00", paymentStatus: "UNPAID" }),
+        ]);
 
         expect(row.orderCount).toBe(3);
         expect(row.spent).toBe("1350.00");
@@ -58,45 +58,39 @@ describe("serializeCustomerListItem", () => {
     });
 
     it("sums in cents, so fractions do not drift", () => {
-        const row = serializeCustomerListItem({
-            ...base,
-            orders: [order({ total: "0.10" }), order({ total: "0.20" })],
-        });
+        const row = serializeCustomerListItem(base, [
+            order({ total: "0.10" }),
+            order({ total: "0.20" }),
+        ]);
 
         expect(row.spent).toBe("0.30");
     });
 
     it("takes the last order's date, whether or not it was paid", () => {
-        const row = serializeCustomerListItem({
-            ...base,
-            orders: [
-                order({ createdAt: new Date("2026-03-01T00:00:00Z") }),
-                order({
-                    createdAt: new Date("2026-06-01T00:00:00Z"),
-                    paymentStatus: "UNPAID",
-                }),
-            ],
-        });
+        const row = serializeCustomerListItem(base, [
+            order({ createdAt: new Date("2026-03-01T00:00:00Z") }),
+            order({
+                createdAt: new Date("2026-06-01T00:00:00Z"),
+                paymentStatus: "UNPAID",
+            }),
+        ]);
 
         expect(row.lastOrderAt).toEqual(new Date("2026-06-01T00:00:00Z"));
     });
 
     it("marks a subset rather than adding two currencies together", () => {
-        const row = serializeCustomerListItem({
-            ...base,
-            orders: [
-                order({
-                    total: "500.00",
-                    currency: "INR",
-                    createdAt: new Date("2026-06-01T00:00:00Z"),
-                }),
-                order({
-                    total: "40.00",
-                    currency: "USD",
-                    createdAt: new Date("2026-05-01T00:00:00Z"),
-                }),
-            ],
-        });
+        const row = serializeCustomerListItem(base, [
+            order({
+                total: "500.00",
+                currency: "INR",
+                createdAt: new Date("2026-06-01T00:00:00Z"),
+            }),
+            order({
+                total: "40.00",
+                currency: "USD",
+                createdAt: new Date("2026-05-01T00:00:00Z"),
+            }),
+        ]);
 
         expect(row.currency).toBe("INR");
         expect(row.spent).toBe("500.00");

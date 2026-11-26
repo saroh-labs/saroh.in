@@ -33,6 +33,8 @@ export const config = {
     // The web app manifest too: a browser fetches it without cookies, and
     // a redirect to sign-in there means the app can't be installed.
     matcher: [
-        "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico)$).*)",
+        // Only real files: any other path ending in an image name is a page
+        // and gets the gate and headers (`lib/middleware-matcher.test.ts`).
+        "/((?!_next/static|_next/image|favicon\\.ico$|manifest\\.webmanifest$|(?:templates|demo)/[\\w/-]+\\.(?:png|jpe?g|webp|svg)$|(?:icon-192|icon-512|og-image|empty-state|placeholder|thumbnail)\\.png$|(?:next|vercel)\\.svg$).*)",
     ],
 };
