@@ -22,6 +22,7 @@ import { assertEditionMatchesAddress } from "../../common/edition-address";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ApiKeyGuard } from "../api-keys/api-key.guard";
 import { TOKEN_PATTERN } from "../api-keys/api-keys.service";
+import { countWrongKey } from "../api-keys/wrong-key-limit";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import type { OrgAction } from "../organizations/organization-actions";
@@ -158,7 +159,10 @@ export class McpAuthGuard implements CanActivate {
         const connection = TOKEN_PATTERN.test(token)
             ? await this.keyConnection(token, now)
             : await this.tokenConnection(auth, token, now);
-        if (!connection) throw challenge("invalid_token");
+        if (!connection) {
+            await countWrongKey(req, res);
+            throw challenge("invalid_token");
+        }
 
         req.mcpConnection = connection;
         if (connection.kind === "oauth") this.touch(connection.id, now);
