@@ -121,6 +121,11 @@ export interface DiaryBooking {
     staff: { id: string; name: string } | null;
     /** How the place is paid; null when nobody said (older bookings). */
     paidWith: PaidWith | null;
+    /**
+     * Booked at a price of 0 (DEC-261): nothing to pay, shown as "Free".
+     * Not a money figure, so everyone who reads bookings sees it.
+     */
+    free: boolean;
     /** The pack paying for it, while its class is still spent on it. */
     packName: string | null;
     /** The membership whose monthly classes it uses. */
@@ -230,6 +235,11 @@ function deskOf(row: DiaryRow): {
 export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
     const pack = row.packRedemption;
     const desk = deskOf(row);
+    // Booked at a price of 0 (DEC-261). One booked before free services
+    // were told apart says "at the desk"; there is nothing to pay there.
+    const free =
+        (bookingPrice(row.snapshot).priceCents ?? row.service.priceCents) === 0;
+    const paid = howPaid(row);
     return {
         id: row.id,
         serviceId: row.serviceId,
@@ -247,7 +257,8 @@ export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
         service: serviceView(row, money),
         contact: row.contact,
         staff: row.staff,
-        paidWith: howPaid(row),
+        paidWith: free && paid === "DESK" ? null : paid,
+        free,
         packName:
             pack !== null && pack.reversedAt === null
                 ? pack.purchase.pack.name

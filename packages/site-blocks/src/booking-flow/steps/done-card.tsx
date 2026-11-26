@@ -11,6 +11,7 @@ import {
     changeRules,
     changeText,
     firstVisitText,
+    FREE_BOOKED_TEXT,
     googleCalendarHref,
     MOVE_OR_CANCEL,
     payLaterText,
@@ -77,9 +78,11 @@ export function DoneCard({
         ? phase.rest
             ? `Paid a ${phase.price ?? ""} deposit. The rest (${phase.rest}) is paid at ${business}.`
             : `Paid ${phase.price ?? ""} online.`
-        : phase.price
-          ? payLaterText(phase.price, booking.online, business)
-          : "Nothing to pay in advance.";
+        : phase.free
+          ? FREE_BOOKED_TEXT
+          : phase.price
+            ? payLaterText(phase.price, booking.online, business)
+            : "Nothing to pay in advance.";
     // Paid with a class credit (A10): what it came from and what is left.
     const payText = phase.creditText ?? paidText;
     // To pay at the desk, with something to pay: how to pay ahead, if the

@@ -35,6 +35,7 @@ import {
     NumberField,
 } from "@/components/services/service-editor/fields";
 import { GstFields } from "@/components/services/service-editor/gst-fields";
+import { FREE_NOTE } from "./charge-field";
 import { DepositField } from "./deposit-field";
 import { PriceFields } from "./editor-sections";
 import { HoursField } from "./hours-field";
@@ -166,6 +167,14 @@ function Visits({ edit, setup }: { edit: Edit; setup: PanelSetup }) {
 
 function Pay({ edit, setup }: { edit: Edit; setup: PanelSetup }) {
     const { draft, set } = edit;
+    // Free (DEC-261): nothing is taken at booking, and it says so.
+    if (draft.charge === "FREE") {
+        return (
+            <p data-ph-unmask="" className={cn(HELP, "mt-0")}>
+                {FREE_NOTE}
+            </p>
+        );
+    }
     const problem = draft.showOnBookingPage
         ? onlineBookingProblem(
               { priceCents: toMinor(draft.price), depositMode: draft.deposit },
@@ -404,9 +413,12 @@ export function PanelFields({
                             canEdit={setup.canEdit}
                             businessPriceMode={setup.businessPriceMode}
                             charged={setup.charged(draft)}
+                            wasPaid={
+                                setup.isSaved && setup.saved.charge === "PAID"
+                            }
                         />
                     </div>
-                    {setup.gstAt === "more" ? (
+                    {setup.gstAt === "more" && draft.charge === "PAID" ? (
                         <Gst edit={edit} setup={setup} />
                     ) : null}
                     {draft.kind === "one" ? (

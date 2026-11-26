@@ -269,7 +269,7 @@ export function detailsLine(b: Bookers): string {
 /** Each field as the headline lists it. */
 const GAP_WORDS: Record<ServiceField, string> = {
     name: "a name",
-    price: "a price (0 if it's free)",
+    price: "a price (or choose Free)",
     staffIds: "who does it",
     minutes: "how long it takes",
     places: "how many places",
@@ -285,7 +285,7 @@ const GAP_WORDS: Record<ServiceField, string> = {
 
 /**
  * Said over the form when Add is pressed with gaps: "3 things to fill in
- * before it can be added: a name, a price (0 if it's free), and who does
+ * before it can be added: a name, a price (or choose Free), and who does
  * it." Each is said again at its field.
  */
 export function gapsLine(problems: readonly ServiceProblem[]): string {

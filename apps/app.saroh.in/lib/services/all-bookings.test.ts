@@ -295,6 +295,17 @@ describe("the Money column (DEC-098: only for those who read money)", () => {
         ).toEqual({ amount: "₹400", note: "Awaiting payment" });
     });
 
+    it('says "Free" for a free booking, and never that it owes (DEC-261)', () => {
+        const free = booking(20, {
+            paidWith: null,
+            free: true,
+            take: null,
+        });
+        free.service.priceCents = 0;
+        expect(moneyCell(free)).toEqual({ amount: null, note: "Free" });
+        expect(rowStatus(free, NOW)).toBe("booked");
+    });
+
     it("says what a cancelled booking's money was, not that it was refunded", () => {
         expect(moneyCell(booking(2, { status: "CANCELLED" }))).toEqual({
             amount: "₹800",

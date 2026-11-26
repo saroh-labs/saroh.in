@@ -125,3 +125,37 @@ describe("the price of a booking on the diary", () => {
         ]);
     });
 });
+
+describe("a free booking on the diary (DEC-261)", () => {
+    const FREE = { service: { priceCents: 0, currency: "INR" } };
+
+    it("says it is free to every viewer, and an old 'at the desk' owes nothing", () => {
+        for (const money of [true, false]) {
+            const b = diaryBooking(row({ snapshot: FREE }), money);
+            expect(b.free).toBe(true);
+            expect(b.paidWith).toBeNull();
+        }
+        expect(diaryBooking(row({ snapshot: FREE }), true).take).toBeNull();
+        expect(diaryBooking(row({ snapshot: FREE }), false).toTake).toBe(false);
+    });
+
+    it("keeps a paid booking paid when its service is made free later", () => {
+        const b = diaryBooking(
+            row({
+                snapshot: INCLUDED,
+                service: { ...row().service, priceCents: 0 },
+            }),
+            true,
+        );
+        expect(b.free).toBe(false);
+        expect(b.paidWith).toBe("DESK");
+    });
+
+    it("never calls a service with no price free", () => {
+        const b = diaryBooking(
+            row({ service: { ...row().service, priceCents: null } }),
+            true,
+        );
+        expect(b.free).toBe(false);
+    });
+});
