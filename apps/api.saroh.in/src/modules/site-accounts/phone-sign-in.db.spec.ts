@@ -65,6 +65,8 @@ const transport = new FakeMessagingProvider();
 const verification = new VerificationService();
 const wallet = new WalletService();
 const emails: { to: string; code: string }[] = [];
+/** Told when an email goes, for a send made in the background. */
+const mailWaiters: (() => void)[] = [];
 
 const send = new VerificationSendService(
     verification,
@@ -82,6 +84,7 @@ const codes = new SignInCodesService(
         alerts,
         (to, details) => {
             emails.push({ to, code: details.code });
+            for (const told of mailWaiters.splice(0)) told();
             return Promise.resolve("sent");
         },
         [0, 0],
@@ -768,18 +771,61 @@ describe("site sign-in by WhatsApp code (DEC-196)", () => {
                 return { site, email };
             }
 
+            /** The send goes in the background: wait for it. */
+            async function mailed(count: number) {
+                while (emails.length < count)
+                    await new Promise<void>((told) => mailWaiters.push(told));
+                return emails.length;
+            }
+
             it("signs in an email-only account by email", async () => {
                 const { site, email } = await emailOnlyAccount();
                 const sentBefore = emails.length;
                 await expect(
                     api.requestCode(relay(site.host), { email }),
                 ).resolves.toMatchObject({ sent: true });
-                expect(emails.length).toBe(sentBefore + 1);
+                expect(await mailed(sentBefore + 1)).toBe(sentBefore + 1);
                 const session = await api.verify(relay(site.host), {
                     email,
                     code: emails.at(-1)?.code ?? "",
                 });
                 expect(session.token).toBeTruthy();
+            });
+
+            it("answers an email-only account and an unknown address alike, limits included", async () => {
+                const { site, email } = await emailOnlyAccount();
+                const stranger = nextEmail();
+                const sentBefore = emails.length;
+                // One visitor: the resend wait is the visitor's own.
+                const visitor = relay(site.host);
+                const ask = (address: string) =>
+                    api.requestCode(visitor, { email: address });
+                const first = [await ask(email), await ask(stranger)];
+                expect(first[0]).toEqual(first[1]);
+                // Both wrote a row, so both meet the same resend wait.
+                const again = [
+                    await refusal(ask(email)),
+                    await refusal(ask(stranger)),
+                ];
+                const shape = (r: Awaited<ReturnType<typeof refusal>>) => ({
+                    status: r?.status,
+                    reason: r?.details?.reason,
+                });
+                // The visitor's own 30 s resend: a refusal ("limit"), for both.
+                expect(shape(again[0])).toEqual({
+                    status: 429,
+                    reason: "limit",
+                });
+                expect(shape(again[1])).toEqual(shape(again[0]));
+                // Only the account's code went out, and only it signs in.
+                expect(await mailed(sentBefore + 1)).toBe(sentBefore + 1);
+                const decoy = await prisma.customerSignInCode.findMany({
+                    where: { organizationId: site.organizationId },
+                    select: { codeHash: true },
+                });
+                expect(
+                    decoy.filter((r) => r.codeHash === "decoy"),
+                ).toHaveLength(1);
             });
 
             it("refuses a new email: the same answer, no code, no account", async () => {

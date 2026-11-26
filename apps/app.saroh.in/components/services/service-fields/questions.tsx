@@ -21,6 +21,7 @@ import { FailedRead } from "@saroh/ui/failed-read";
 
 import type { Edit } from "@/components/services/service-editor/fields";
 import { HELP, LABEL } from "@/components/services/service-editor/fields";
+import { ChargeField } from "./charge-field";
 import { LengthField } from "./length-field";
 
 /*
@@ -155,7 +156,7 @@ export function WhoComesQuestion({ draft, set, problem, leave }: Edit) {
     );
 }
 
-/** "Price", in the business's currency; 0 is free. */
+/** Free or Paid, then "Price" in the business's currency for a paid one. */
 export function PriceQuestion({
     draft,
     set,
@@ -168,22 +169,27 @@ export function PriceQuestion({
     /** Beside the price: a registered business's GST fields. */
     children?: ReactNode;
 }) {
+    // Free or Paid first (DEC-261); a free one asks no price.
     return (
-        <div className="flex flex-wrap items-start gap-3">
-            <Field
-                label="Price"
-                className="w-[220px] max-w-full"
-                error={problem("price")}
-                onBlur={() => leave("price")}
-            >
-                <MoneyInput
-                    currency={currency}
-                    value={draft.price}
-                    placeholder="0 if it's free"
-                    onValueChange={(price) => set({ price })}
-                />
-            </Field>
-            {children}
+        <div className="grid gap-3">
+            <ChargeField draft={draft} set={set} />
+            {draft.charge === "PAID" ? (
+                <div className="flex flex-wrap items-start gap-3">
+                    <Field
+                        label="Price"
+                        className="w-[220px] max-w-full"
+                        error={problem("price")}
+                        onBlur={() => leave("price")}
+                    >
+                        <MoneyInput
+                            currency={currency}
+                            value={draft.price}
+                            onValueChange={(price) => set({ price })}
+                        />
+                    </Field>
+                    {children}
+                </div>
+            ) : null}
         </div>
     );
 }

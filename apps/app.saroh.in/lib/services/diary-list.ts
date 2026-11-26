@@ -69,6 +69,7 @@ export function listLine(block: Block): string {
     else if (b.paidWith === "PAID") parts.push("paid");
     else if (b.paidWith === "PACK") parts.push("class pack");
     else if (b.paidWith === "MEMBERSHIP") parts.push("membership");
+    else if (b.free) parts.push(BOOKING_WORDS.free.toLowerCase());
     return parts.join(" · ");
 }
 

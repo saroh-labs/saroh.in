@@ -161,7 +161,11 @@ export const createServiceBody = z.strictObject({
     bufferBeforeMinutes: minutes.optional(),
     bufferAfterMinutes: minutes.optional(),
     capacity: z.number().int().min(1).max(10_000).optional(),
-    price: servicePrice.optional(),
+    price: servicePrice
+        .describe(
+            "An amountMinor of 0 makes it free: booked with nothing to pay, never a deposit or a payment. Left out, it has no price.",
+        )
+        .optional(),
     /** IANA time zone its hours are in; left out, the business's own. */
     timezone: z.string().min(1).max(64).optional(),
 });

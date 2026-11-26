@@ -10,6 +10,7 @@ import { prisma } from "@saroh/database";
 import { editionOfHost } from "@saroh/edition";
 import type { IncomingHttpHeaders } from "node:http";
 
+import { env } from "../../env";
 import { AdminAuditOutcome } from "../../modules/admin/admin-audit.service";
 import {
     AdminPermission,
@@ -82,6 +83,13 @@ export class PlatformAdminGuard implements CanActivate {
         // whether they may have it.
         const host = request.headers?.host;
         const edition = host ? (editionOfHost(host) ?? null) : null;
+        // In production every API address is an edition's: one that isn't
+        // can't say which edition's grant applies, so it serves no console.
+        if (!edition && env.NODE_ENV === "production") {
+            throw new ForbiddenException(
+                "Platform administrator access required",
+            );
+        }
 
         const now = new Date();
         const grant = await prisma.platformAdmin.findUnique({

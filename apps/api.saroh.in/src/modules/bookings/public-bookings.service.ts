@@ -85,7 +85,11 @@ import {
     ownHoldOn,
     reserve,
 } from "./reservation";
-import { depositCents } from "./service-fields";
+import {
+    depositCents,
+    FREE_NOTHING_TO_PAY,
+    isFreeService,
+} from "./service-fields";
 import {
     bookedPriceMode,
     heldAmountCents,
@@ -516,6 +520,16 @@ export class PublicBookingsService {
         // price or deposit, and only for someone signed in: it is their own
         // pack or membership.
         const askedPay = asked.pay;
+        // A free service (DEC-261) is booked with nothing to pay: no way to
+        // pay is asked or recorded. "At the desk" from an older page is
+        // taken as no way at all; paying, a deposit or a credit is refused.
+        const free = isFreeService(service);
+        if (free && askedPay !== undefined && askedPay !== "DESK") {
+            throw new BadRequestException({
+                message: FREE_NOTHING_TO_PAY,
+                field: "pay",
+            });
+        }
         const credit =
             askedPay === "CREDIT" ? creditOf(asked, service, signedIn) : null;
         const bookingRules = await loadBookingRules(
@@ -528,10 +542,11 @@ export class PublicBookingsService {
             (await depositPaidAtDesk(service.organizationId, bookingRules));
         const input: BookInput = {
             ...asked,
-            pay:
-                askedPay === "CREDIT"
-                    ? askedPay
-                    : payAtBooking(service, askedPay, deskForDeposit),
+            pay: free
+                ? undefined
+                : askedPay === "CREDIT"
+                  ? askedPay
+                  : payAtBooking(service, askedPay, deskForDeposit),
         };
         // …and as the business allows it (DEC-088): online, at the desk, or
         // both. Refused before anything is held.

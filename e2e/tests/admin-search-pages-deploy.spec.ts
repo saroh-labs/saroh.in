@@ -37,7 +37,7 @@ async function unstage(page: Page) {
     const off = await page.request.post(
         `${urls.API_URL}/admin/search-pages/actions`,
         {
-            headers: { origin: urls.APP_URL },
+            headers: { origin: urls.ADMIN_URL },
             data: { action: "cancel", paths: [PATH] },
         },
     );

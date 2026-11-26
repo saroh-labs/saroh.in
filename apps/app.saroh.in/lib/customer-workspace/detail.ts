@@ -81,6 +81,8 @@ export interface DetailBooking {
     outcome: string | null;
     paidWithPack: boolean;
     paidWith: PaidWith | null;
+    /** Booked at a price of 0 (DEC-261): "Free". Absent on an older API. */
+    free?: boolean;
     packName: string | null;
     cancelledLate: boolean;
     /**

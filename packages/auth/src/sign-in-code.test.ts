@@ -519,10 +519,9 @@ describe("sign up and sign in with an emailed code", () => {
             expect(tokens.at(-1)).toBe("good");
         });
 
-        // 03-M9: a sign-up (and a password sign-in, which mails an unproven
-        // account a code again) went around the per-address cap, so anyone
+        // 03-M9: a sign-up went around the per-address cap, so anyone
         // could flood a stranger's mailbox from Saroh's sending domain.
-        it("a sign-up and a password sign-in ask the per-address cap too, naming the path", async () => {
+        it("a sign-up asks the per-address cap too, naming the path", async () => {
             const paths: string[] = [];
             const hosts: (string | null)[] = [];
             const s = stack({
@@ -542,14 +541,115 @@ describe("sign up and sign in with an emailed code", () => {
             expect(signUp.status).toBe(429);
             expect(s.sent).toHaveLength(0);
             expect(s.db.user).toHaveLength(0);
-            const signIn = await s.post("/sign-in/email", {
-                email: "meera@example.com",
-                password: "the-squatter's-password",
-            });
-            expect(signIn.status).toBe(429);
-            expect(paths).toEqual(["/sign-up/email", "/sign-in/email"]);
+            expect(paths).toEqual(["/sign-up/email"]);
             // The API address asked, whose edition's Turnstile check it is.
-            expect(hosts).toEqual([new URL(BASE).host, new URL(BASE).host]);
+            expect(hosts).toEqual([new URL(BASE).host]);
+        });
+
+        // A wrong password answers the same for every kind of address: no
+        // cap asked, nothing mailed, the same status, body and headers.
+        it("a wrong password answers alike for an unknown, an unproven and a proven account", async () => {
+            const asked: string[] = [];
+            const s = stack({
+                hooks: {
+                    mayMailCode: (email, { path }) => {
+                        asked.push(`${path} ${email}`);
+                        return Promise.resolve(null);
+                    },
+                },
+            });
+            await s.post("/sign-up/email", {
+                name: "Unproven",
+                email: "unproven@example.com",
+                password: "a-long-password",
+            });
+            await s.post("/sign-up/email", {
+                name: "Proven",
+                email: "proven@example.com",
+                password: "a-long-password",
+            });
+            await s.post("/email-otp/verify-email", {
+                email: "proven@example.com",
+                otp: s.lastCode(),
+            });
+            asked.length = 0;
+            const sentBefore = s.sent.length;
+            const shape = async (email: string) => {
+                const out = [];
+                for (let i = 0; i < 3; i++) {
+                    const r = await s.post(
+                        "/sign-in/email",
+                        { email, password: "wrong-guess" },
+                        `198.51.100.${i}`,
+                    );
+                    out.push({
+                        status: r.status,
+                        body: r.body,
+                        retry: r.headers.get("x-retry-after"),
+                    });
+                }
+                return out;
+            };
+            const unknown = await shape("nobody@example.com");
+            expect(unknown[0].status).toBe(401);
+            expect(await shape("unproven@example.com")).toEqual(unknown);
+            expect(await shape("proven@example.com")).toEqual(unknown);
+            expect(asked).toEqual([]);
+            expect(s.sent).toHaveLength(sentBefore);
+        });
+
+        it("the right password on an unproven account asks the cap, mails a code and answers EMAIL_NOT_VERIFIED", async () => {
+            const asked: string[] = [];
+            let wait: { retryAfterSeconds: number } | null = null;
+            const s = stack({
+                hooks: {
+                    mayMailCode: (email, { path }) => {
+                        asked.push(`${path} ${email}`);
+                        return Promise.resolve(wait);
+                    },
+                },
+            });
+            await s.post("/sign-up/email", {
+                name: "Meera",
+                email: "meera@example.com",
+                password: "a-long-password",
+            });
+            asked.length = 0;
+            const sentBefore = s.sent.length;
+            const right = await s.post("/sign-in/email", {
+                email: "Meera@example.com",
+                password: "a-long-password",
+            });
+            expect(right.status).toBe(403);
+            expect(right.body?.code).toBe("EMAIL_NOT_VERIFIED");
+            expect(asked).toEqual(["/sign-in/email meera@example.com"]);
+            expect(s.sent).toHaveLength(sentBefore + 1);
+            expect(s.sent.at(-1)).toMatchObject({
+                to: "meera@example.com",
+                type: "email-verification",
+            });
+            // The mailed code proves the address and signs in.
+            const verified = await s.post("/email-otp/verify-email", {
+                email: "meera@example.com",
+                otp: s.lastCode(),
+            });
+            expect(verified.status).toBe(200);
+
+            // Past the cap: the wait, and nothing mailed.
+            await s.post("/sign-up/email", {
+                name: "Asha",
+                email: "asha@example.com",
+                password: "a-long-password",
+            });
+            wait = { retryAfterSeconds: 30 };
+            const sentNow = s.sent.length;
+            const held = await s.post("/sign-in/email", {
+                email: "asha@example.com",
+                password: "a-long-password",
+            });
+            expect(held.status).toBe(429);
+            expect(held.headers.get("x-retry-after")).toBe("30");
+            expect(s.sent).toHaveLength(sentNow);
         });
 
         it("the screen's Resend wait lets one resend through", () => {

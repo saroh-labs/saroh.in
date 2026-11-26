@@ -28,7 +28,7 @@ export async function grantNorthwindApi(
     const context = await browser.newContext({ ignoreHTTPSErrors });
     const page = await context.newPage();
     await useSession(page, "staff");
-    const headers = { origin: urls.APP_URL };
+    const headers = { origin: urls.ADMIN_URL };
     const overrides = `${urls.API_URL}/admin/organizations/${NORTHWIND_ORG}/overrides`;
     const ids: string[] = [];
     const restore = async () => {
@@ -79,7 +79,7 @@ export async function switchOnNorthwind(
         const res = await staff.request.put(
             `${urls.API_URL}/admin/flags/${flag}/organizations/${NORTHWIND_ORG}`,
             {
-                headers: { origin: urls.APP_URL },
+                headers: { origin: urls.ADMIN_URL },
                 data: {
                     enabled: true,
                     reason: "Browser test of the public API",

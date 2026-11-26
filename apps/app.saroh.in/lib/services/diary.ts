@@ -563,6 +563,7 @@ export function whoFor(b: DiaryBooking): string {
 /** How a place was paid, in words. */
 export function paidText(b: DiaryBooking): string {
     if (b.paidAtDesk) return paidAtDeskText(b.paidAtDesk.method);
+    if (b.free) return BOOKING_WORDS.free;
     switch (b.paidWith) {
         case "MEMBERSHIP":
             return "Membership";
@@ -602,7 +603,9 @@ export function blockLine(block: Block, withTeacher = true): string {
             ? " · pack"
             : b.paidWith === "MEMBERSHIP"
               ? " · membership"
-              : "";
+              : b.free
+                ? " · free"
+                : "";
     return `${b.service.name}${pay}`;
 }
 

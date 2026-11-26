@@ -186,6 +186,13 @@ export interface SocialMetaPort {
         token: string,
         ref: string,
     ): Promise<PlatformPost | null>;
+    /**
+     * Facebook or Instagram: take back the permissions the person who
+     * signed in gave Saroh's app (`DELETE /{user-id}/permissions`, with the
+     * app's own token). Every Page and Instagram account they connected
+     * through it loses Saroh's access. Threads has no such call.
+     */
+    revoke(kind: PageKind, platformUserId: string): Promise<void>;
 }
 
 /** The scopes each login asks for: only what posting needs. */
