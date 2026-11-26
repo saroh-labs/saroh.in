@@ -23,7 +23,7 @@ export async function createStore(
     const res = await createStoreApi(input);
     // A second storefront brings pickers and "Storefronts" into the whole
     // workspace, so every page is read again.
-    // rq-revalidate-ok: from New location, which is server-rendered.
+    // rq-revalidate-ok: from New location (/commerce/locations/new), not a React Query route.
     if (res.ok) revalidatePath("/", "layout");
     return res;
 }

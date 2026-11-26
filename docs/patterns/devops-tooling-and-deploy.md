@@ -63,19 +63,19 @@
 
 ## Invariant checks — **Current**
 
-| Script                | Guards                                                                                                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check:routes`        | Every emitted destination and static link resolves to a route                                                                                                             |
-| `check:blocks`        | G2 and G6: merchant sites stay merchant-coloured; one renderer                                                                                                            |
-| `check:site-motion`   | Site blocks move for 200 ms or less: no loop, no overshoot, nothing on scroll (DEC-172); delays are not durations                                                         |
-| `check:cycles`        | No circular imports across workspaces                                                                                                                                     |
-| `check:deploy-env`    | Every Worker's environment marker is set and its deploy build passes next.config's required-variables check                                                               |
-| `check:media-headers` | `media.saroh.in` and `media.saroh.io` answer with the sandbox CSP and `nosniff` (live; deploy-api `media-headers` job, not prepush)                                       |
-| `check:query-keys`    | React Query keys come from `domainKey` in `lib/<domain>/queries.ts`; fetchers are `defineRead`'s (the org from the key); no server QueryClient in a client file (DEC-259) |
-| `check:rq-routes`     | Every workspace `app/api/**/route.ts` outside the shrinking allowlist is `dynamic` + `GET = readRoute(…)` + `NOT_ALLOWED`, nothing else (DEC-259)                         |
-| `check:rq-refresh`    | A route in `lib/query/rq-routes.ts` reaches no `router.refresh()` but a chrome entry (at most 6); its domains' `revalidatePath` are listed (DEC-259)                      |
-| `check:titles`        | Every page of the workspace, accounts and the console names its tab; each root layout says noindex                                                                        |
-| `check:draft-words`   | A production-like saroh.in build holds no word or file of a GST page, guide or download that isn't live (`prepush --int/--e2e`, whole build)                              |
+| Script                | Guards                                                                                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check:routes`        | Every emitted destination and static link resolves to a route                                                                                                                   |
+| `check:blocks`        | G2 and G6: merchant sites stay merchant-coloured; one renderer                                                                                                                  |
+| `check:site-motion`   | Site blocks move for 200 ms or less: no loop, no overshoot, nothing on scroll (DEC-172); delays are not durations                                                               |
+| `check:cycles`        | No circular imports across workspaces                                                                                                                                           |
+| `check:deploy-env`    | Every Worker's environment marker is set and its deploy build passes next.config's required-variables check                                                                     |
+| `check:media-headers` | `media.saroh.in` and `media.saroh.io` answer with the sandbox CSP and `nosniff` (live; deploy-api `media-headers` job, not prepush)                                             |
+| `check:query-keys`    | React Query keys come from `domainKey` in `lib/<domain>/queries.ts`; fetchers are `defineRead`'s (the org from the key); no server QueryClient in a client file (DEC-259)       |
+| `check:rq-routes`     | Every workspace `app/api/**/route.ts` outside the shrinking allowlist is `dynamic` + `GET = readRoute(…)` + `NOT_ALLOWED`, nothing else (DEC-259)                               |
+| `check:rq-refresh`    | A route in `lib/query/rq-routes.ts` reaches no `router.refresh()` but a chrome entry (at most 6); its domains' `revalidatePath` fail unless marked `rq-revalidate-ok` (DEC-259) |
+| `check:titles`        | Every page of the workspace, accounts and the console names its tab; each root layout says noindex                                                                              |
+| `check:draft-words`   | A production-like saroh.in build holds no word or file of a GST page, guide or download that isn't live (`prepush --int/--e2e`, whole build)                                    |
 
 **Adopted** — a repo-wide rule that a lint rule cannot express becomes a
 `scripts/check-*.mjs` wired into CI and AGENTS.md → Before you finish, not a

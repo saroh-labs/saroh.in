@@ -252,6 +252,7 @@ describe("Also sell", () => {
         expect(setModuleStatusAction).toHaveBeenCalledWith(
             "COURSES",
             "DISABLED",
+            undefined,
         );
     });
 });

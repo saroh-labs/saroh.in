@@ -44,6 +44,7 @@ export async function enableModuleAction(
         return "fields" in res || res.ok ? res : { ...res, fields: {} };
     }
     const result = await enableModule(key, setup);
+    // rq-revalidate-ok: off React Query routes only (`use-turn-on.ts`): a page behind its module's server guard.
     if (result.ok) revalidatePath("/", "layout");
     return result;
 }

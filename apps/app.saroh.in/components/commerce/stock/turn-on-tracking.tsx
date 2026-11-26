@@ -20,8 +20,8 @@ import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
  * it is counted.
  *
  * Once on, Stock and Products are marked stale (every shelf is now 0) and
- * the page is drawn once more: the gate that showed this state and the
- * rail's Stock row are the server's.
+ * the page is drawn once more: the gate that showed this state is the
+ * server's (the rail's Stock row follows `afterSettingsSave()`).
  */
 export function TurnOnTracking() {
     const router = useRouter();
@@ -66,7 +66,7 @@ export function TurnOnTracking() {
                             ...stale,
                         }),
                     ]);
-                    // rq-refresh-ok: the tracking gate and the rail's Stock row are server-rendered chrome; this draws the screen once.
+                    // rq-refresh-ok: Track stock off is the Stock page's server gate; this draws the page once past it.
                     router.refresh();
                 }}
             />

@@ -26,7 +26,7 @@ import * as api from "./service";
 type Path = [path: string, type?: "layout" | "page"];
 
 function revalidate(paths: Path[]) {
-    // rq-revalidate-ok: reached only by a write without orgId, from a server-rendered screen.
+    // rq-revalidate-ok: a write without orgId; no caller today (Invoices, a person's page and Home all send it).
     for (const [path, type] of paths) revalidatePath(path, type);
 }
 
