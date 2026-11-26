@@ -2719,11 +2719,7 @@ export class SubscriptionsService {
                   }
                 : null,
             paymentFailed: failed !== null,
-            chargeFailed:
-                failed !== null &&
-                failed.issuedAt !== null &&
-                invoices?.declinedAt != null &&
-                invoices.declinedAt >= failed.issuedAt,
+            chargeFailed: declinedSince(failed, invoices?.declinedAt ?? null),
             failedCharge: failed
                 ? {
                       id: failed.id,
@@ -2787,6 +2783,15 @@ export class SubscriptionsService {
                     : [],
         };
     }
+}
+
+/** A charge was declined on this renewal since it was issued (DEC-270). */
+function declinedSince(
+    failed: InvoiceRowLite | null,
+    declinedAt: Date | null,
+): boolean {
+    if (!failed?.issuedAt || !declinedAt) return false;
+    return declinedAt >= failed.issuedAt;
 }
 
 /**

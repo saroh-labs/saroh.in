@@ -25,7 +25,8 @@ import {
 } from "@/lib/invoices/status";
 import { NEXT_REMINDER_AFTER, REMINDED_TODAY } from "@/lib/invoices/words";
 import { invoiceZone } from "@/lib/invoices/zone";
-import { ConnectedPanel } from "./connected-panel";
+import { CallThem } from "./call-them";
+import { ConnectedPanel, SidePanel } from "./connected-panel";
 import { InvoicePaper } from "./invoice-paper";
 import { OfflinePayHint } from "./offline-pay-hint";
 import { PaymentsToRefund } from "./pay-link";
@@ -170,8 +171,19 @@ export function InvoiceDetailsView({
                 "Your role can read this invoice but not change it."}
         </ReadOnlyNote>
     ) : null;
+    // Who to ring while it is owed, beside where it says to (finding 11).
+    const phone = owed ? i.contact?.phone : null;
     const side = (
         <>
+            {phone ? (
+                <SidePanel label="Billed to">
+                    <CallThem
+                        name={who}
+                        email={billedTo(i).email}
+                        phone={phone}
+                    />
+                </SidePanel>
+            ) : null}
             <DetailsHistory
                 invoice={i}
                 canWrite={can.write}

@@ -30,6 +30,9 @@ import type { FigureKey, SummaryFilter } from "./summary";
  *
  * Owed, the cheques and Paid this month are one figure at a time, and
  * none of them is a status: picking a status puts them down.
+ *
+ * An address that chooses nothing opens on Overdue when anything is
+ * overdue (`withDefaultView`, DEC-271); All is then `?tab=all`.
  */
 export interface ListQuery extends DateRange {
     tab: InvoiceTab;
@@ -65,6 +68,34 @@ export function listQueryFrom(params: SearchParams): ListQuery {
         q,
         ...readDateRange(params),
     };
+}
+
+/** The keys by which an address chooses what the list shows. */
+const CHOOSING = [
+    "tab",
+    "view",
+    "paidFrom",
+    "q",
+    "date",
+    "since",
+    "pack",
+    "course",
+] as const;
+
+/**
+ * The list's own default (DEC-271): an address that chooses nothing opens
+ * on Overdue when any invoice on hand is overdue, the tile it marks, newest
+ * first within it. The address always wins: any choice in it is kept.
+ */
+export function withDefaultView(
+    query: ListQuery,
+    params: SearchParams,
+    invoices: readonly Pick<Invoice, "standing" | "kind">[] | null,
+): ListQuery {
+    if (CHOOSING.some((k) => params[k] !== undefined)) return query;
+    return invoices?.some((i) => inTab(i, "overdue"))
+        ? { ...query, tab: "overdue" }
+        : query;
 }
 
 /** The query needs the API to answer it: the newest page can't. */
@@ -115,7 +146,8 @@ const FIGURE_KEYS = ["tab", "view", "paidFrom", "since"] as const;
 
 /**
  * The address with `filter` as the list's one figure, or with none
- * (`null`): the search, the source and a pack's or course's scope stay.
+ * (`null`, every invoice: `?tab=all`, so the Overdue default gives way):
+ * the search, the source and a pack's or course's scope stay.
  */
 export function withFigure(
     params: URLSearchParams,
@@ -123,7 +155,10 @@ export function withFigure(
 ): URLSearchParams {
     const next = new URLSearchParams(params.toString());
     for (const key of FIGURE_KEYS) next.delete(key);
-    if (!filter) return next;
+    if (!filter) {
+        next.set("tab", "all");
+        return next;
+    }
     if (filter.paidFrom) next.set("paidFrom", filter.paidFrom);
     switch (filter.view) {
         case "owed":
@@ -150,10 +185,12 @@ export function withTab(
     tab: InvoiceTab,
 ): URLSearchParams {
     const next = withFigure(params, null);
+    next.delete("tab");
     // Home's "Last 24 hours" stays under a status, as before.
     const since = params.get("since");
     if (since) next.set("since", since);
-    if (tab !== "all") next.set("tab", tab);
+    // All is said, so the Overdue default gives way (DEC-271).
+    next.set("tab", tab);
     return next;
 }
 

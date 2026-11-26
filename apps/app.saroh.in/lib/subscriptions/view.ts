@@ -35,10 +35,24 @@ export function listTab(
 
 export const TAB_LABEL: Record<ListTab, string> = {
     active: "Active",
-    failed: "Payment failed",
+    failed: "Not paid",
     paused: "Paused",
     cancelled: "Cancelled",
 };
+
+/**
+ * Where it stands, in a word: "Payment failed" only when a charge was
+ * really tried and declined; a renewal that simply isn't paid is "Not paid"
+ * (DEC-270).
+ */
+export function statusLabel(
+    sub: Pick<Subscription, "status" | "paymentFailed" | "chargeFailed">,
+): string {
+    const tab = listTab(sub);
+    return tab === "failed" && sub.chargeFailed
+        ? "Payment failed"
+        : TAB_LABEL[tab];
+}
 
 export const TAB_TONE: Record<ListTab, Tone> = {
     active: "ok",
@@ -532,7 +546,7 @@ export function headline(
     const ending = tab === "active" && sub.endsAt ? sub.endsAt : null;
     const pill = ending
         ? { tone: "accent" as const, label: `Ends ${d(ending)}` }
-        : { tone: TAB_TONE[tab], label: TAB_LABEL[tab] };
+        : { tone: TAB_TONE[tab], label: statusLabel(sub) };
     // The next charge is money expected: what it comes to, GST and all.
     const next = sub.pendingPlan ?? sub;
     const nextPay = formatMoneyMajor(subscriptionPay(next), next.currency);
@@ -545,7 +559,14 @@ export function headline(
                 sub.failedCharge?.total ?? subscriptionPay(sub),
                 sub.currency,
             ),
-            when: due ? `failed ${d(due)}` : "failed",
+            // "failed" only once a charge was declined (DEC-270).
+            when: sub.chargeFailed
+                ? due
+                    ? `failed ${d(due)}`
+                    : "failed"
+                : due
+                  ? `due ${d(due)}`
+                  : "not paid",
             line: charging
                 ? `${charging}. Nothing else can be charged until the bank answers.`
                 : `${failWhy(sub, now)}. Nothing is collected until it's paid.`,

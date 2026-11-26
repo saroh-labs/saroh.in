@@ -296,8 +296,17 @@ export interface Invoice {
     number: string | null;
     status: InvoiceStatus;
     standing: InvoiceStanding;
-    /** Null once the contact is deleted; the bill-to keeps who it was for. */
-    contact: { id: string; name: string; email: string } | null;
+    /**
+     * Null once the contact is deleted; the bill-to keeps who it was for.
+     * `phone` is on the detail read only, for a role that may see contact
+     * details (`contact:read`).
+     */
+    contact: {
+        id: string;
+        name: string;
+        email: string;
+        phone?: string | null;
+    } | null;
     /** Copied on issue; null on a draft. */
     billTo: {
         name: string | null;

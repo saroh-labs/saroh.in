@@ -29,6 +29,7 @@ import {
     retryOffer,
     rowWhen,
     screenTabFromQuery,
+    statusLabel,
     VIEW_LABEL,
     viewFromQuery,
 } from "./view";
@@ -573,8 +574,9 @@ describe("headline", () => {
             null,
             NOW,
         );
-        expect(h.pill).toEqual({ tone: "bad", label: "Payment failed" });
-        expect(h.when).toBe("failed 15 Sep");
+        // Nothing was tried: not paid, not failed (DEC-270).
+        expect(h.pill).toEqual({ tone: "bad", label: "Not paid" });
+        expect(h.when).toBe("due 15 Sep");
         expect(h.line).toBe(
             "Renewal of ₹1,200 isn't paid, 3 days late. Nothing is collected until it's paid.",
         );
@@ -732,5 +734,36 @@ describe("autopay's retry (D13)", () => {
         expect(failWhy(sub({ failedCharge: failed }), NOW)).toBe(
             "Renewal of ₹1,200 wasn't collected by autopay",
         );
+    });
+});
+
+describe("statusLabel (DEC-270)", () => {
+    it("says Not paid for a renewal nobody charged, Payment failed for a declined one", () => {
+        expect(statusLabel(sub({ paymentFailed: true }))).toBe("Not paid");
+        expect(
+            statusLabel(sub({ paymentFailed: true, chargeFailed: true })),
+        ).toBe("Payment failed");
+        expect(statusLabel(sub())).toBe("Active");
+        // A declined charge on a renewal since paid is no longer either.
+        expect(statusLabel(sub({ chargeFailed: true }))).toBe("Active");
+    });
+
+    it("puts the declined one's date as when it failed, the other's as when it was due", () => {
+        const failed = {
+            paymentFailed: true,
+            failedCharge: {
+                id: "i2",
+                number: null,
+                dueAt: "2026-09-15T00:00:00.000Z",
+                total: "1200.00",
+            },
+        };
+        expect(headline(sub(failed), null, NOW).when).toBe("due 15 Sep");
+        expect(
+            headline(sub({ ...failed, chargeFailed: true }), null, NOW),
+        ).toMatchObject({
+            pill: { label: "Payment failed" },
+            when: "failed 15 Sep",
+        });
     });
 });

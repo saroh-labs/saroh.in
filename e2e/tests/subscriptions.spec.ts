@@ -143,7 +143,8 @@ test.describe("subscriptions", () => {
             page
                 .locator("[data-list-table]")
                 .locator("tr, li")
-                .filter({ hasText: "Payment failed" })
+                // "Not paid" unless a charge was declined (DEC-270).
+                .filter({ hasText: /Not paid|Payment failed/ })
                 .filter({ visible: true })
                 .first(),
         ).toContainText(/isn't paid|wasn't collected/);

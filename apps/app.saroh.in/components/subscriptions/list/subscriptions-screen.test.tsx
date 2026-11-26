@@ -302,7 +302,9 @@ describe("Subscribers opens on who needs you", () => {
             "KSKabir Shah",
         ]);
         const row = host.querySelector("tbody tr");
-        expect(row?.textContent).toContain("Payment failed");
+        // Nothing was charged: "Not paid", never "Payment failed" (DEC-270).
+        expect(row?.textContent).toContain("Not paid");
+        expect(row?.textContent).not.toContain("Payment failed");
         expect(row?.textContent).toContain(
             "Renewal of ₹900 isn't paid, 5 days late",
         );

@@ -495,10 +495,17 @@ describe("subscriberRows", () => {
         });
     });
 
-    it("a failed renewal says so", () => {
+    it("an unpaid renewal says Not paid, and a declined charge Payment failed (DEC-270)", () => {
         expect(
             subscriberRows([sub({ paymentFailed: true })], plan(), NOW)[0]
                 .status,
+        ).toEqual({ label: "Not paid", tone: "bad" });
+        expect(
+            subscriberRows(
+                [sub({ paymentFailed: true, chargeFailed: true })],
+                plan(),
+                NOW,
+            )[0].status,
         ).toEqual({ label: "Payment failed", tone: "bad" });
     });
 });
