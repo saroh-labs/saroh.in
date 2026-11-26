@@ -133,7 +133,10 @@ export const serviceItem = z.object({
     service_id: z.string(),
     name: z.string(),
     duration_minutes: z.number(),
-    price: z.string().nullable(),
+    price: z
+        .string()
+        .nullable()
+        .describe('The price, "free" for a free service, null for none.'),
     capacity: z.number().describe("Above 1: a class."),
     status: z.string(),
     timezone: z.string(),
@@ -151,7 +154,11 @@ export const listServicesTool = {
 const serviceFields = {
     name: z.string().max(128),
     duration_minutes: z.number().int().min(1).max(1440),
-    price: priceInput.optional(),
+    price: priceInput
+        .describe(
+            "The price in the business's currency. 0 makes it free: booked with nothing to pay.",
+        )
+        .optional(),
     description: z.string().max(2000).optional(),
     capacity: z.number().int().min(1).max(10_000).optional(),
 };

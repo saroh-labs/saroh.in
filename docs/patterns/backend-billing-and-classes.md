@@ -1655,6 +1655,15 @@ options, items, more }` and a sentence with the count, the first
   merchant's screens read `GET booking-rules/payment` and say why
   (`lib/services/online-booking.ts`). Packs and plans ignore the rule: it
   is about bookings.
+- **A free service is a price of 0, and is never paid** (DEC-261,
+  `isFreeService` in `bookings/service-fields.ts`; null is "no price", not
+  free). `bookOnline` books it with no way to pay (`paidWith` null; an
+  older page's DESK is taken as none) and refuses NOW, DEPOSIT and CREDIT;
+  `bookByHand` refuses a payment, a pack or a membership on it. The diary
+  read sends `free` to every viewer and reads an older free booking stored
+  DESK as none. The words are `isFreeService` / `servicePickPrice` on the
+  page (`site-blocks/booking-flow/model.ts`) and `BOOKING_WORDS.free` in
+  the app.
 - **The free-cancel deadline is fixed at booking** (`Booking.freeCancelUntil`,
   DEC-051), written by `reserveInTx` from the rule of that moment. A move
   never changes it; `isLateCancel` reads it, falling back to the start and

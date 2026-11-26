@@ -654,6 +654,24 @@ export function restAfterDeposit(service: BookingService): string | null {
     return formatMoney(toPay - deposit, service.currency);
 }
 
+// ── Free services ────────────────────────────────────────────────────────
+
+/** The word for a free service, where its price would be (DEC-261). */
+export const FREE = "Free";
+
+/** What the confirmation says about money for a free service. */
+export const FREE_BOOKED_TEXT = "It's free. There's nothing to pay.";
+
+/**
+ * A free service (DEC-261): a price of exactly 0. It is booked straight
+ * away, with no way to pay asked. No price at all (null) is not free.
+ */
+export function isFreeService(
+    service: Pick<BookingService, "priceCents"> | null | undefined,
+): boolean {
+    return service?.priceCents === 0;
+}
+
 // ── GST on the price ─────────────────────────────────────────────────────
 
 /**
@@ -681,6 +699,7 @@ export function serviceGstWords(service: BookingService | null): string | null {
  * typed, with "+ GST" after it when GST comes on top.
  */
 export function servicePickPrice(service: BookingService): string | null {
+    if (isFreeService(service)) return FREE;
     const price = formatMoney(service.priceCents, service.currency);
     return price === null
         ? null

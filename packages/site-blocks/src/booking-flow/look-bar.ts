@@ -97,7 +97,9 @@ export function stepBar({
                 : paying
                   ? [words.dueLabel, flow.whenText].filter(Boolean).join(" · ")
                   : flow.whenText || (service?.name ?? ""),
-        price: paying ? words.due : (words.price ?? ""),
+        price: paying
+            ? words.due
+            : (words.price ?? (words.free ? words.due : "")),
         status: s.message?.tone === "error" ? null : nudge,
         action: {
             label,

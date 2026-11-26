@@ -154,7 +154,7 @@ describe("pressing Add with gaps", () => {
                 { field: "staffIds", message: "" },
             ]),
         ).toBe(
-            "3 things to fill in before it can be added: a name, a price (0 if it's free), and who does it.",
+            "3 things to fill in before it can be added: a name, a price (or choose Free), and who does it.",
         );
         expect(gapsLine([{ field: "name", message: "" }])).toBe(
             "1 thing to fill in before it can be added: a name.",

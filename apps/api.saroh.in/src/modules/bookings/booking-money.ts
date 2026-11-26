@@ -100,6 +100,29 @@ export function bookingPrice(snapshot: unknown): {
 }
 
 /**
+ * Booked at a price of 0 (DEC-261): the price its snapshot froze, or for a
+ * booking from before snapshots its service's. No price at all (null) is
+ * never free. The one rule every read that says how a booking is paid uses.
+ */
+export function isFreeBooking(
+    snapshot: unknown,
+    servicePriceCents: number | null = null,
+): boolean {
+    return (bookingPrice(snapshot).priceCents ?? servicePriceCents) === 0;
+}
+
+/**
+ * How a booking was paid, as a read says it: a free booking stored "at the
+ * desk" before DEC-261 owes nothing, so it reads as no way to pay.
+ */
+export function shownPaidWith<T extends string>(
+    paidWith: T | null,
+    free: boolean,
+): T | null {
+    return free && paidWith === "DESK" ? null : paidWith;
+}
+
+/**
  * What is still due at the visit (default 50): the price less what the
  * booking's paper has been paid, from its ledger (`paidOnPaperCents`,
  * DEC-173: online, at the desk or recorded by hand), while the booking

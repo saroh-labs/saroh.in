@@ -15,6 +15,7 @@ import type { BookingPaymentView } from "@/lib/staff/types";
 import type { Edit } from "@/components/services/service-editor/fields";
 import { Section } from "@/components/services/service-editor/fields";
 import { GstFields } from "@/components/services/service-editor/gst-fields";
+import { ChargeField } from "./charge-field";
 import { DepositField } from "./deposit-field";
 
 /**
@@ -45,6 +46,8 @@ type PriceProps = Edit & {
     paymentsLock?: PlanLock | null;
     /** How people pay when they book (DEC-088); null when unknown. */
     payment: BookingPaymentView | null;
+    /** Saved as paid (DEC-261): making it free keeps bookings made. */
+    wasPaid?: boolean;
 };
 
 export function PriceFields({
@@ -60,8 +63,19 @@ export function PriceFields({
     canEdit = true,
     businessPriceMode = null,
     charged = null,
+    wasPaid = false,
 }: PriceProps) {
     const id = useId();
+    const charge = (
+        <ChargeField
+            draft={draft}
+            set={set}
+            wasPaid={wasPaid}
+            disabled={!canEdit}
+        />
+    );
+    // Free (DEC-261): no price, deposit or GST to ask.
+    if (draft.charge === "FREE") return charge;
     // Only a service on the booking page is booked online at all.
     const problem = draft.showOnBookingPage
         ? onlineBookingProblem(
@@ -74,6 +88,8 @@ export function PriceFields({
         : null;
     return (
         <>
+            {/* Room between the choice and the price's label. */}
+            <div className="mb-3">{charge}</div>
             {/* A GST-registered business answers the rate where the price
                 is (12 Oct 2026): the price includes it, and a priced
                 service can't be saved without one. */}
@@ -88,7 +104,6 @@ export function PriceFields({
                         id={id}
                         currency={currency}
                         value={draft.price}
-                        placeholder="0 if it's free"
                         onValueChange={(price) => set({ price })}
                     />
                 </Field>

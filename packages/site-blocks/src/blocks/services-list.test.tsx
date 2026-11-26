@@ -357,9 +357,9 @@ describe("a Book page's list, fed what the flow offers", () => {
 
 describe("a free service under a look (DEC-172, VD01, VA01)", () => {
     const free = { priceCents: 0, currency: "INR", gst: null };
-    it('says "Free" under a look, and Classic keeps its "₹0"', () => {
+    it('says "Free" under every look, Classic too (DEC-261)', () => {
         expect(lookPriceWords(free, "en-IN")).toBe("Free");
-        expect(servicePriceWords(free, "en-IN")).toBe("₹0");
+        expect(servicePriceWords(free, "en-IN")).toBe("Free");
         // No price is still no price, never "Free".
         expect(lookPriceWords({ ...free, priceCents: null })).toBeNull();
         expect(lookPriceWords({ ...free, priceCents: 60_000 }, "en-IN")).toBe(
