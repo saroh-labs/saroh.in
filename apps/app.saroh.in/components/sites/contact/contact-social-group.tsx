@@ -1,9 +1,9 @@
 "use client";
 
+import { useSettingsSaved } from "@/components/sites/settings/settings-saved";
 import { parseSocialLinks } from "@saroh/block-contract";
 import { FailedState } from "@saroh/ui/data-state";
 import { showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { BusinessFieldSheet } from "@/components/organizations/business-settings/business-field-sheet";
@@ -83,7 +83,7 @@ export function ContactSocialGroup({
     business: OrganizationSettings | null;
     state: SettingsSave | null;
 }) {
-    const router = useRouter();
+    const { saved: readAgain } = useSettingsSaved();
     // What the last save answered, so a row reads it at once.
     const [business, setBusiness] = useState(initial);
     const [locations, setLocations] = useState(initialLocations);
@@ -98,7 +98,7 @@ export function ContactSocialGroup({
                     size="panel"
                     title={CONTACT_UNREAD.title}
                     description={CONTACT_UNREAD.description}
-                    onRetry={() => router.refresh()}
+                    onRetry={() => void readAgain()}
                 />
             </Group>
         );
@@ -131,7 +131,7 @@ export function ContactSocialGroup({
         setBusiness(next);
         showSuccess(said);
         // The address the site shows is the API's to work out.
-        router.refresh();
+        void readAgain();
     };
     const edit = (row: SettingsSheet, set: boolean, what: string) =>
         canEdit ? (
@@ -283,7 +283,7 @@ export function ContactSocialGroup({
                         );
                         showSuccess(said);
                         // The row reads what the website shows.
-                        router.refresh();
+                        void readAgain();
                     }}
                 />
             ) : null}

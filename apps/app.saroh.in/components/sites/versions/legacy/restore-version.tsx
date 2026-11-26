@@ -35,13 +35,19 @@ export function RestoreVersion({
     renderable,
     needsApproval = false,
     canOverride = false,
+    saved,
+    orgId,
 }: {
+    /** The tab's business, sent last (DEC-259). */
+    orgId: string;
     siteId: string;
     publicationId: string;
     isCurrent: boolean;
     renderable: boolean;
     needsApproval?: boolean;
     canOverride?: boolean;
+    /** After a restore or a refusal that changed the rules: the site's reads again. */
+    saved: () => Promise<void>;
 }) {
     const router = useRouter();
     const [confirming, setConfirming] = useState(false);
@@ -57,12 +63,12 @@ export function RestoreVersion({
     function restore() {
         startTransition(async () => {
             const res = await runAction(() =>
-                restorePublication(siteId, publicationId, override),
+                restorePublication(siteId, publicationId, override, orgId),
             );
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
-                if (res.code === "APPROVAL_REQUIRED") router.refresh();
+                if (res.code === "APPROVAL_REQUIRED") await saved();
                 return;
             }
             showSuccess(
@@ -70,8 +76,8 @@ export function RestoreVersion({
                     ? "That version is live again. Going live without approval is recorded in version history."
                     : "That version is live again.",
             );
+            await saved();
             router.push(`/sites/${siteId}/versions`);
-            router.refresh();
         });
     }
 

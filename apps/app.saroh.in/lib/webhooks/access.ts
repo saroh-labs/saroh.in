@@ -7,9 +7,13 @@ import type { ServerRead } from "@/lib/query/route";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import type { NoAsk } from "@/lib/settings/queries";
 
-import type { WebhooksScreen } from "./queries";
-import { webhooksRead } from "./queries";
-import { listWebhooks } from "./service";
+import type {
+    WebhookDeliveriesScreen,
+    WebhookDelivery,
+    WebhooksScreen,
+} from "./queries";
+import { webhookDeliveriesRead, webhooksRead } from "./queries";
+import { listDeliveries, listWebhooks } from "./service";
 
 /** `webhook:manage` (Owners, and whoever they give it), while the API area is on. */
 export async function mayReadWebhooks(): Promise<boolean> {
@@ -42,5 +46,31 @@ export const webhooksServer: ServerRead<NoAsk, WebhooksScreen> = {
     service: async () => {
         // The switch, plan and cap are the page's gate.
         return { endpoints: (await listWebhooks()).map(endpointFacts) };
+    },
+};
+
+/** A message as the sheet's row draws it: never the receiver's answer. */
+export function deliveryFacts(d: WebhookDelivery): WebhookDelivery {
+    return {
+        id: d.id,
+        event: d.event,
+        status: d.status,
+        attempts: d.attempts,
+        lastStatusCode: d.lastStatusCode,
+        lastError: d.lastError,
+        lastAttemptAt: d.lastAttemptAt,
+        createdAt: d.createdAt,
+    };
+}
+
+export const webhookDeliveriesServer: ServerRead<
+    Parameters<typeof webhookDeliveriesRead.options>[1],
+    WebhookDeliveriesScreen
+> = {
+    read: webhookDeliveriesRead,
+    service: async ({ endpoint }) => {
+        // Another business's address, or none: the API's 404, and the route's.
+        const rows = await listDeliveries(endpoint);
+        return rows ? { deliveries: rows.map(deliveryFacts) } : null;
     },
 };

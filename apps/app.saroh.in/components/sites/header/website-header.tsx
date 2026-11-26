@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
+import { useHeaderCategories } from "@/lib/sites/use-sites";
+
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { mayAddWebsite } from "@/lib/business-limits";
 import type { PostCategory } from "@/lib/content/service";
@@ -345,6 +347,9 @@ function TabActions({
     canEdit: boolean;
     postCategories: PostCategory[] | null | undefined;
 }) {
+    // The layout's list until the sheet's own read lands; a change reads
+    // it again (DEC-259), never the page.
+    const categories = useHeaderCategories(siteId, canEdit && tab === "posts");
     if (!canEdit) return null;
     if (tab === "posts") {
         return (
@@ -353,7 +358,9 @@ function TabActions({
                 {postCategories === undefined ? null : (
                     <PostCategoriesSheet
                         siteId={siteId}
-                        categories={postCategories}
+                        categories={categories.data ?? postCategories}
+                        save={categories.save}
+                        onRetry={categories.retry}
                     />
                 )}
                 <Button asChild>

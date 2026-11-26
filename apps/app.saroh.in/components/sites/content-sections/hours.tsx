@@ -1,7 +1,6 @@
 "use client";
 
 import { Field } from "@saroh/ui/field";
-import { useEffect, useState } from "react";
 
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -15,7 +14,10 @@ import {
 import { Switch } from "@saroh/ui/switch";
 
 import { listVisitPlacesForPicker } from "@/lib/sites/actions";
+import type { VisitPlacesPick } from "@/lib/sites/queries";
 import type { HoursContent } from "@/lib/sites/service";
+import type { PickFailed } from "@/lib/sites/use-picker";
+import { usePickerRead } from "@/lib/sites/use-picker";
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 
 import { OptionSwitch } from "@/components/sites/section-fields/option-switch";
@@ -23,6 +25,12 @@ import type { SectionFieldsProps } from "@/components/sites/section-fields/props
 import { TextLink } from "@saroh/ui/text-link";
 
 const HOURS = "/settings/organization?section=hours";
+
+/** Without React Query above (a test): the Server Action it always used. */
+const legacyPlaces = async (): Promise<VisitPlacesPick> => ({
+    ok: true,
+    places: await listVisitPlacesForPicker(),
+});
 
 /** The Select's value for "no shop chosen": the business's own hours. */
 const BUSINESS = "business";
@@ -47,20 +55,17 @@ export function HoursFields({
         onChange({ ...section, content: { ...c, ...next } });
     const id = section.key ?? "hours";
 
-    const [read, setRead] = useState<VisitPlacesRead | "loading">("loading");
-    useEffect(() => {
-        let active = true;
-        listVisitPlacesForPicker()
-            .then((next) => {
-                if (active) setRead(next);
-            })
-            .catch(() => {
-                if (active) setRead({ state: "failed", forbidden: false });
-            });
-        return () => {
-            active = false;
-        };
-    }, []);
+    // The open locations: one cached read under `stores` (U18).
+    const load = usePickerRead<VisitPlacesPick | PickFailed>(
+        "visit-places",
+        legacyPlaces,
+    );
+    const read: VisitPlacesRead | "loading" =
+        load.read === "loading"
+            ? "loading"
+            : load.read.ok
+              ? load.read.places
+              : { state: "failed", forbidden: load.read.forbidden };
     const places = read !== "loading" && read.state === "ok" ? read.places : [];
     const missing =
         c.storeId !== undefined &&

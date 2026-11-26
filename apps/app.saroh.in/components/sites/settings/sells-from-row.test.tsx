@@ -11,6 +11,18 @@ import type { SellsFrom } from "@/lib/sites/service";
 import { SELLS_FROM_QUESTION, SellsFromRow } from "./sells-from-row";
 
 const refresh = vi.fn();
+vi.mock("@/components/sites/settings/settings-saved", () => ({
+    // The Settings tab's container provides it: the tab's business, and
+    // the site's reads again after a landed save (here, a spy).
+    useSettingsSaved: () => ({
+        orgId: "org_1",
+        saved: () => {
+            refresh();
+            return Promise.resolve();
+        },
+    }),
+    SettingsSavedProvider: ({ children }: { children: unknown }) => children,
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh }),
 }));
@@ -179,9 +191,13 @@ describe("the Sells from sheet", () => {
         expect(says()).toBe("Your online shop sells from Online");
 
         await press(item("Save"));
-        expect(update).toHaveBeenCalledWith("site_1", {
-            storefrontId: "st_2",
-        });
+        expect(update).toHaveBeenCalledWith(
+            "site_1",
+            {
+                storefrontId: "st_2",
+            },
+            "org_1",
+        );
         expect(showSuccess).toHaveBeenCalledWith(
             "Your online shop now sells from Hill Road.",
         );
