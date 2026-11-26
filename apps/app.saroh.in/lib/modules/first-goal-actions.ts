@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { forgetGate } from "@/lib/access/gate-memo";
 import { requireSession } from "@/lib/session";
 
 import type { FirstGoalOutcome } from "./first-goal";
@@ -28,6 +29,9 @@ export async function startWithGoalAction(
         // Checked here too: a server action's argument is anyone's to send.
         trade === "SALON" || trade === "GYM" ? trade : undefined,
     );
-    if (outcome.turnedOn.length > 0) revalidatePath("/", "layout");
+    if (outcome.turnedOn.length > 0) {
+        await forgetGate();
+        revalidatePath("/", "layout");
+    }
     return outcome;
 }

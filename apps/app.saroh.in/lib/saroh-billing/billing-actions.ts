@@ -1,5 +1,6 @@
 "use server";
 
+import { forgetGateAfter } from "@/lib/access/gate-memo";
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 import type { ApiFailure, ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
@@ -239,15 +240,18 @@ export async function changePlanAction(
             field: "gstin",
         };
     }
-    const res = await send<{
-        kind: string;
-        effectiveAt?: string;
-        authorisationUrl?: string | null;
-        handoff?: unknown;
-    }>("/billing/change-plan", CHANGE_FAILED, {
-        method: "POST",
-        body: JSON.stringify(c),
-    });
+    // The plan decides modules and limits: the gate reads them again.
+    const res = await forgetGateAfter(
+        await send<{
+            kind: string;
+            effectiveAt?: string;
+            authorisationUrl?: string | null;
+            handoff?: unknown;
+        }>("/billing/change-plan", CHANGE_FAILED, {
+            method: "POST",
+            body: JSON.stringify(c),
+        }),
+    );
     if (!res.ok) return res;
     const d = res.data;
     if (d.kind === "TO_FREE" && typeof d.effectiveAt === "string") {
@@ -291,10 +295,12 @@ const CONFIRM_STATES = new Set([
 export async function confirmCheckoutAction(): Promise<
     ApiResult<ConfirmResult>
 > {
-    const res = await send<ConfirmResult>(
-        "/billing/checkout/confirm",
-        "We couldn't check your payment just now. If you've paid, you don't need to pay again.",
-        { method: "POST" },
+    const res = await forgetGateAfter(
+        await send<ConfirmResult>(
+            "/billing/checkout/confirm",
+            "We couldn't check your payment just now. If you've paid, you don't need to pay again.",
+            { method: "POST" },
+        ),
     );
     if (!res.ok) return res;
     const d = res.data;
@@ -393,10 +399,12 @@ export async function setAddonAction(
     ) {
         return { ok: false, error: ADDON_FAILED };
     }
-    return send<AddonsView>(
-        `/billing/addons/${encodeURIComponent(addonId)}`,
-        ADDON_FAILED,
-        { method: "PUT", body: JSON.stringify({ quantity }) },
+    return forgetGateAfter(
+        await send<AddonsView>(
+            `/billing/addons/${encodeURIComponent(addonId)}`,
+            ADDON_FAILED,
+            { method: "PUT", body: JSON.stringify({ quantity }) },
+        ),
     );
 }
 

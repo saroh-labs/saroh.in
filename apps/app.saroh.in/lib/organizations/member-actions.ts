@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
+import { forgetGateAfter } from "@/lib/access/gate-memo";
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 
@@ -55,9 +56,13 @@ export async function updateMemberRole(
     input: { role: string; siteIds?: string[] },
     orgId?: string,
 ) {
-    if (orgId)
-        return writeAsOrg(orgId, () => updateMemberRoleApi(userId, input));
-    const res = await updateMemberRoleApi(userId, input);
+    if (orgId) {
+        return forgetGateAfter(
+            await writeAsOrg(orgId, () => updateMemberRoleApi(userId, input)),
+            orgId,
+        );
+    }
+    const res = await forgetGateAfter(await updateMemberRoleApi(userId, input));
     if (res.ok) revalidatePath("/", "layout");
     return res;
 }
@@ -72,18 +77,28 @@ export async function setMemberExtraActions(
     orgId?: string,
 ) {
     if (orgId) {
-        return writeAsOrg(orgId, () =>
-            setMemberExtraActionsApi(userId, actions),
+        return forgetGateAfter(
+            await writeAsOrg(orgId, () =>
+                setMemberExtraActionsApi(userId, actions),
+            ),
+            orgId,
         );
     }
-    const res = await setMemberExtraActionsApi(userId, actions);
+    const res = await forgetGateAfter(
+        await setMemberExtraActionsApi(userId, actions),
+    );
     if (res.ok) revalidatePath("/", "layout");
     return res;
 }
 
 export async function removeMember(userId: string, orgId?: string) {
-    if (orgId) return writeAsOrg(orgId, () => removeMemberApi(userId));
-    const res = await removeMemberApi(userId);
+    if (orgId) {
+        return forgetGateAfter(
+            await writeAsOrg(orgId, () => removeMemberApi(userId)),
+            orgId,
+        );
+    }
+    const res = await forgetGateAfter(await removeMemberApi(userId));
     if (res.ok) revalidatePath(TEAM_PATH);
     return res;
 }
@@ -95,7 +110,8 @@ export async function removeMember(userId: string, orgId?: string) {
  * removed them (`left-business.ts`). They left; nobody removed them.
  */
 export async function leaveBusiness() {
-    const res = await leaveBusinessApi();
+    // Read before the cookie naming the business is deleted below.
+    const res = await forgetGateAfter(await leaveBusinessApi());
     if (res.ok) {
         const jar = await cookies();
         jar.delete(ACTIVE_ORG_COOKIE);

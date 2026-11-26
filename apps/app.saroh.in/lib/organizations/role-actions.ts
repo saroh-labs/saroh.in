@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { forgetGateAfter } from "@/lib/access/gate-memo";
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 
 import type { RoleInput } from "./roles";
@@ -24,8 +25,13 @@ import {
  */
 
 export async function createRole(input: RoleInput, orgId?: string) {
-    if (orgId) return writeAsOrg(orgId, () => createRoleApi(input));
-    const res = await createRoleApi(input);
+    if (orgId) {
+        return forgetGateAfter(
+            await writeAsOrg(orgId, () => createRoleApi(input)),
+            orgId,
+        );
+    }
+    const res = await forgetGateAfter(await createRoleApi(input));
     if (res.ok) revalidatePath("/", "layout");
     return res;
 }
@@ -35,15 +41,25 @@ export async function updateRole(
     input: Partial<RoleInput>,
     orgId?: string,
 ) {
-    if (orgId) return writeAsOrg(orgId, () => updateRoleApi(key, input));
-    const res = await updateRoleApi(key, input);
+    if (orgId) {
+        return forgetGateAfter(
+            await writeAsOrg(orgId, () => updateRoleApi(key, input)),
+            orgId,
+        );
+    }
+    const res = await forgetGateAfter(await updateRoleApi(key, input));
     if (res.ok) revalidatePath("/", "layout");
     return res;
 }
 
 export async function deleteRole(key: string, orgId?: string) {
-    if (orgId) return writeAsOrg(orgId, () => deleteRoleApi(key));
-    const res = await deleteRoleApi(key);
+    if (orgId) {
+        return forgetGateAfter(
+            await writeAsOrg(orgId, () => deleteRoleApi(key)),
+            orgId,
+        );
+    }
+    const res = await forgetGateAfter(await deleteRoleApi(key));
     if (res.ok) revalidatePath("/", "layout");
     return res;
 }

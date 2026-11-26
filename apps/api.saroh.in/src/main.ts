@@ -19,7 +19,7 @@ import "./env";
 
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory, Reflector } from "@nestjs/core";
-import { getTrustedOrigins } from "@saroh/auth";
+import { getTrustedOrigins, sessionCookieDomain } from "@saroh/auth";
 import helmet from "helmet";
 
 import { AppModule } from "./app.module";
@@ -28,6 +28,7 @@ import { corsDelegate } from "./common/cors";
 import { onQuietSendFailed } from "./common/email";
 import { emailSendFailed } from "./common/email-send-health";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { gateEpochMiddleware } from "./common/gate-epoch";
 import { globalAccessGate } from "./common/global-access";
 import { OriginGuard } from "./common/guards/origin.guard";
 import { TestHostWriteGuard } from "./common/guards/test-host.guard";
@@ -132,6 +133,13 @@ async function bootstrap() {
 
     // A write forgets the module lists it may have changed (60 s cache).
     app.use(modulesCacheMiddleware);
+    // ...and a browser's own write tells app.saroh.in's gate memo the same.
+    app.use(
+        gateEpochMiddleware(
+            sessionCookieDomain(env.BETTER_AUTH_URL),
+            env.BETTER_AUTH_URL?.startsWith("https:") ?? false,
+        ),
+    );
 
     // Global's addresses only for the saroh.tech sites' key holders until it
     // opens (GLOBAL_API_ACCESS_KEY, owner 16 Nov 2026).

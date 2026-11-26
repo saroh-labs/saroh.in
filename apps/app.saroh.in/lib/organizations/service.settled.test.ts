@@ -5,15 +5,19 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+/** The person's session cookie, when a test signs one in. */
+let session = "";
 vi.mock("next/headers", () => ({
     cookies: () => Promise.resolve({ get: () => ({ value: "org_a" }) }),
-    headers: () => Promise.resolve(new Headers({ cookie: "active_org=org_a" })),
+    headers: () =>
+        Promise.resolve(new Headers({ cookie: `active_org=org_a${session}` })),
 }));
 vi.mock("@/lib/edition", async (actual) => ({
     ...(await actual<object>()),
     EDITION: "INDIA",
 }));
 
+import { clearGateMemo } from "@/lib/access/gate-memo";
 import { inReadScope, setScopedOrg } from "@/lib/api/read-scope";
 import { readRoute } from "@/lib/query/route";
 
@@ -31,19 +35,26 @@ const ROW = {
 const LIST = [ROW, { ...ROW, id: "org_b" }];
 
 let asked: string[];
-let me: () => Response;
+let me: (cookie: string) => Response;
 beforeEach(() => {
     asked = [];
+    session = "";
+    clearGateMemo();
     me = () => Response.json(ROW);
     vi.stubGlobal(
         "fetch",
-        vi.fn((url: string) => {
+        vi.fn((url: string, init?: RequestInit) => {
             const path = new URL(url).pathname;
             asked.push(path);
             if (path === "/organizations") {
                 return Promise.resolve(Response.json(LIST));
             }
-            if (path.endsWith("/me")) return Promise.resolve(me());
+            if (path.endsWith("/me")) {
+                const cookie =
+                    (init?.headers as Record<string, string> | undefined)
+                        ?.cookie ?? "";
+                return Promise.resolve(me(cookie));
+            }
             return Promise.resolve(Response.json({ ok: true }));
         }),
     );
@@ -144,5 +155,69 @@ describe("a read route with a gate", () => {
         expect(res.status).toBe(200);
         expect(asked).not.toContain("/organizations");
         expect(asked).toEqual(["/organizations/org_a/me"]);
+    });
+});
+
+describe("kept a short while per person and business (gate-memo)", () => {
+    const ANN = "; better-auth.session_token=ann";
+    const BOB = "; better-auth.session_token=bob";
+    const gated = () =>
+        readRoute(
+            {
+                read: { params: {} } as never,
+                service: () => Promise.resolve({ ok: true }),
+            },
+            async () =>
+                (await activeOrganizationOnce())?.actions?.includes(
+                    "contact:read",
+                ) ?? false,
+        )(
+            new Request("https://app.example/api/x", {
+                headers: {
+                    "x-organization-id": "org_a",
+                    cookie: "active_org=org_a",
+                },
+            }),
+        );
+    const mes = () => asked.filter((p) => p.endsWith("/me")).length;
+
+    it("a person's reads one after another ask /me once", async () => {
+        session = ANN;
+        expect((await gated()).status).toBe(200);
+        expect((await gated()).status).toBe(200);
+        expect(mes()).toBe(1);
+    });
+
+    it("two sessions on the same business never share an entry", async () => {
+        // Ann may read contacts; Bob, in the same business, may not.
+        me = (cookie) =>
+            Response.json(
+                cookie.includes("session_token=bob")
+                    ? { ...ROW, actions: [] }
+                    : ROW,
+            );
+        session = ANN;
+        expect((await gated()).status).toBe(200);
+        session = BOB;
+        expect((await gated()).status).toBe(403);
+        session = ANN;
+        expect((await gated()).status).toBe(200);
+        expect(mes()).toBe(2);
+    });
+
+    it("a refused /me (403) isn't kept: the next read asks again", async () => {
+        session = ANN;
+        me = () => new Response("{}", { status: 403 });
+        expect((await gated()).status).toBe(403);
+        me = () => Response.json(ROW);
+        expect((await gated()).status).toBe(200);
+        expect(mes()).toBe(2);
+    });
+
+    it("the document's business list fills it: the reads after ask no /me", async () => {
+        session = ANN;
+        await resolveActiveOrganization();
+        expect((await gated()).status).toBe(200);
+        expect(mes()).toBe(0);
     });
 });
