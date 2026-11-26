@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { forgetGateAfter } from "@/lib/access/gate-memo";
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 
 import type { ModuleImpact, ModuleLifecycle } from "./schema";
@@ -31,11 +32,16 @@ export async function setModuleStatusAction(
     // From Modules on React Query: the tab's business, nothing revalidated
     // (`afterSettingsSave()` reads the tab and the shell again).
     if (orgId) {
-        return writeAsOrg(orgId, () =>
-            setStatusApi(moduleKey, status, options),
+        return forgetGateAfter(
+            await writeAsOrg(orgId, () =>
+                setStatusApi(moduleKey, status, options),
+            ),
+            orgId,
         );
     }
-    const result = await setStatusApi(moduleKey, status, options);
+    const result = await forgetGateAfter(
+        await setStatusApi(moduleKey, status, options),
+    );
     // rq-revalidate-ok: a call with no business only (a test); Modules and Services' Also sell send it.
     if (result.ok) revalidatePath(MODULES_PATH);
     return result;

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { forgetGateAfter } from "@/lib/access/gate-memo";
 import { writeAsOrg } from "@/lib/api/assert-active-org";
 
 import { readMyEmailSetup } from "@/lib/communications/email-setup-service";
@@ -39,11 +40,14 @@ export async function enableModuleAction(
     // With the tab's business: nothing revalidated; the sheet reads the
     // settings again (`afterSettingsSave()`) and a server-drawn page again.
     if (orgId) {
-        const res = await writeAsOrg(orgId, () => enableModule(key, setup));
+        const res = await forgetGateAfter(
+            await writeAsOrg(orgId, () => enableModule(key, setup)),
+            orgId,
+        );
         // Refused before the write (another business open): no field said.
         return "fields" in res || res.ok ? res : { ...res, fields: {} };
     }
-    const result = await enableModule(key, setup);
+    const result = await forgetGateAfter(await enableModule(key, setup));
     // rq-revalidate-ok: off React Query routes only (`use-turn-on.ts`): a page behind its module's server guard.
     if (result.ok) revalidatePath("/", "layout");
     return result;

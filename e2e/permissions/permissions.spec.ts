@@ -31,6 +31,15 @@ async function scenario(context: BrowserContext, value: string) {
             path: "/",
             secure: appIsSecure,
         },
+        // Every case shares one session: a new gate epoch keeps the app's
+        // gate memo (lib/access/gate-memo.ts) from answering with the last.
+        {
+            name: "gate_epoch",
+            value: `${value}-${Date.now().toString(36)}`,
+            domain: appHost,
+            path: "/",
+            secure: appIsSecure,
+        },
     ]);
 }
 

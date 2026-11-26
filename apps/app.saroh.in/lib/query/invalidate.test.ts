@@ -19,10 +19,13 @@ import { domainKey, ORGANIZATIONS_KEY } from "@/lib/query/keys";
 
 const announce = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/query/broadcast", () => ({ announce }));
+const bumpGateEpoch = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/access/gate-epoch", () => ({ bumpGateEpoch }));
 
 beforeEach(() => {
     vi.stubGlobal("window", {});
     announce.mockReset();
+    bumpGateEpoch.mockReset();
     const qc = getBrowserQueryClient();
     qc.clear();
     qc.setQueryData(domainKey("orders", "o1", "list"), [1]);
@@ -85,9 +88,27 @@ describe("invalidateOrganizations", () => {
             qc.getQueryState(domainKey("orders", "o1", "list"))?.isInvalidated,
         ).toBe(false);
     });
+
+    it("a role or membership may have changed: a new gate epoch", () => {
+        invalidateOrganizations();
+        expect(bumpGateEpoch).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("afterSettingsSave", () => {
+    it("sets a new gate epoch before the settings are read again", () => {
+        const qc = getBrowserQueryClient();
+        const order: string[] = [];
+        bumpGateEpoch.mockImplementation(() => order.push("epoch"));
+        const spy = vi.spyOn(qc, "invalidateQueries").mockImplementation(() => {
+            order.push("read");
+            return Promise.resolve();
+        });
+        afterSettingsSave();
+        expect(order).toEqual(["epoch", "read"]);
+        spy.mockRestore();
+    });
+
     it("reads this tab's settings again, leaves records alone, tells the other tabs", () => {
         const qc = getBrowserQueryClient();
         const shell = domainKey("shell", "o1", "settings");

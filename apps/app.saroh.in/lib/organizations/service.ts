@@ -3,6 +3,7 @@ import type { Edition } from "@saroh/edition";
 import { EDITION } from "@/lib/edition";
 import { cache } from "react";
 
+import { remembered, seedGate } from "@/lib/access/gate-memo";
 import { ApiError } from "@/lib/api/errors";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId, memberOrganizations } from "@/lib/api/http";
@@ -258,19 +259,28 @@ export async function resolveActiveOrganization(
     if (orgs.length === 0) return null;
     // One whose door is paused for them is passed over while another opens
     // (#800); with every one paused the shell says so.
-    return pickActive(orgs, await getActiveOrgId());
+    const active = pickActive(orgs, await getActiveOrgId());
+    // The document's list holds the row `/me` answers: the page's own
+    // reads that follow find it kept (`gate-memo.ts`).
+    if (active && !active.paused) await seedGate(active.id, "me", active);
+    return active;
 }
 
 /**
  * The person's own row of the business list for the business a read route
  * or a save has settled (`scopedOrg`), from `GET /organizations/:id/me`:
  * the same role, permissions and words, without reading every business
- * they belong to (DEC-259). Once per request (`readOnce`). A refusal (no
+ * they belong to (DEC-259). Once per request (`readOnce`), and kept a short
+ * while per person and business (`remembered`, success only). A refusal (no
  * longer a member, or a paused seat) or a failure throws, so the read
  * route answers 403 or 503 rather than a role's no. Without the endpoint
  * (404/405 during a deploy) the list answers, as before it.
  */
-async function settledMembership(orgId: string): Promise<Organization | null> {
+function settledMembership(orgId: string): Promise<Organization | null> {
+    return remembered(orgId, "me", () => readMembership(orgId));
+}
+
+async function readMembership(orgId: string): Promise<Organization | null> {
     const path = `/organizations/${encodeURIComponent(orgId)}/me`;
     const res = await apiFetch(path);
     // An API not yet deployed with `/me` (the app ships first): this
