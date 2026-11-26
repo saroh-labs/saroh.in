@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
     ForbiddenException,
     Inject,
@@ -31,10 +33,19 @@ import {
 } from "../shared/jobs";
 import { settlePostsInTx } from "../shared/status";
 import type { StateRefusal } from "./connect-state";
-import { signState, verifyState } from "./connect-state";
+import {
+    newNonce,
+    signState,
+    STATE_TTL_MS,
+    verifyState,
+} from "./connect-state";
 import type { ChannelView, PageChoiceView } from "./dto";
 import { CHANNEL_ORDER, channelView, kindPath } from "./dto";
 import { seal, tokenColumns, unseal } from "./sealing";
+
+/** A consent's state is good once: its nonce is kept here until used. */
+const stateKey = (kind: ChannelKind, nonce: string) =>
+    `social-consent-state:${kind}:${nonce}`;
 
 /** How long a Threads grant lasts from a connect, or a refresh that extends it. */
 export const THREADS_GRANT_MS = 90 * 86_400_000;
@@ -96,8 +107,19 @@ export class SocialChannelsService {
     async list(ctx: OrganizationContext): Promise<ChannelView[]> {
         await this.access.assertOn(ctx, "social:read");
         const [rows, waiting] = await Promise.all([
+            // Never the token columns: only what `channelView` shows.
             prisma.socialChannel.findMany({
                 where: { organizationId: ctx.organizationId },
+                select: {
+                    kind: true,
+                    status: true,
+                    handle: true,
+                    avatarUrl: true,
+                    connectedAt: true,
+                    attentionReason: true,
+                    attentionAt: true,
+                    grantExpiresAt: true,
+                },
             }),
             prisma.socialDelivery.groupBy({
                 by: ["kind"],
@@ -139,11 +161,35 @@ export class SocialChannelsService {
     ): Promise<{ url: string }> {
         await this.access.assertOn(ctx, "social:post");
         const meta = this.metaFor(kind);
-        const state = signState({
-            organizationId: ctx.organizationId,
-            userId: ctx.userId,
-            kind,
-        });
+        // One consent at a time per person and channel: an older one is spent.
+        await outsideOrgContext(() =>
+            prisma.verification.deleteMany({
+                where: {
+                    identifier: { startsWith: stateKey(kind, "") },
+                    value: ctx.userId,
+                },
+            }),
+        );
+        const nonce = newNonce();
+        const state = signState(
+            {
+                organizationId: ctx.organizationId,
+                userId: ctx.userId,
+                kind,
+            },
+            new Date(),
+            nonce,
+        );
+        await outsideOrgContext(() =>
+            prisma.verification.create({
+                data: {
+                    id: randomUUID(),
+                    identifier: stateKey(kind, nonce),
+                    value: ctx.userId,
+                    expiresAt: new Date(Date.now() + STATE_TTL_MS),
+                },
+            }),
+        );
         return {
             url: meta.authorizeUrl(kind, {
                 redirectUri: this.redirectUri(ctx.edition ?? null, kind),
@@ -179,6 +225,10 @@ export class SocialChannelsService {
         if (state.userId !== signedInUserId) {
             return this.back(edition, kind, "someone-else");
         }
+        // Good once: a second use of the same state is refused.
+        if (!(await this.useState(kind, state.nonce, signedInUserId))) {
+            return this.back(edition, kind, "expired");
+        }
         if (query.error || !query.code) {
             return this.back(edition, kind, "denied");
         }
@@ -194,6 +244,24 @@ export class SocialChannelsService {
             );
             return this.back(edition, kind, outcomeOf(error));
         }
+    }
+
+    /** Spend a consent state's nonce: true only the first time, for its own person. */
+    private async useState(
+        kind: ChannelKind,
+        nonce: string,
+        userId: string,
+    ): Promise<boolean> {
+        const { count } = await outsideOrgContext(() =>
+            prisma.verification.deleteMany({
+                where: {
+                    identifier: stateKey(kind, nonce),
+                    value: userId,
+                    expiresAt: { gt: new Date() },
+                },
+            }),
+        );
+        return count > 0;
     }
 
     /** Keep Meta's grant: the account and its sealed token, or the Page choice. */

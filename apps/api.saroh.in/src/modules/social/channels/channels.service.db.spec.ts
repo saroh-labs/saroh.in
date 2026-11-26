@@ -184,6 +184,22 @@ describe("connecting a channel", () => {
         );
     });
 
+    it("takes a consent's state once", async () => {
+        const ctx = await socialBusiness();
+        const s = service();
+        const { url } = await s.start(ctx, "THREADS");
+        const state = new URL(url).searchParams.get("state") ?? "";
+        const back = () =>
+            s.callback(
+                "THREADS",
+                { code: "fake-threads", state },
+                ctx.userId,
+                () => Promise.resolve(ctx),
+            );
+        expect(resultOf(await back())).toBe("connected");
+        expect(resultOf(await back())).toBe("expired");
+    });
+
     it("refuses while MODULE_SOCIAL is off, and on a plan without Social", async () => {
         const ctx = await socialBusiness();
         world.flag = false;
