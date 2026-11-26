@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
@@ -37,9 +38,11 @@ test("Publish post: now, Tell people, then later; History shows the live copy", 
     try {
         await page.goto(`/sites/${site.id}/posts/${made.id}`);
         test.skip(
-            !page.url().includes(`/write/${made.id}`),
+            !(await websiteAreaOn(page)),
             "The Website area is off: today's post editor",
         );
+        // A streamed redirect (a loading boundary above): it can land after load.
+        await page.waitForURL((u) => u.href.includes(`/write/${made.id}`));
         const phone = testInfo.project.name.startsWith("phone");
         test.skip(phone, "The phone post editor mounts these sheets (U16).");
 
@@ -49,7 +52,7 @@ test("Publish post: now, Tell people, then later; History shows the live copy", 
         // Now: goes live alone, then Tell people.
         await page
             .locator("[data-post-bar]")
-            .getByRole("button", { name: "Publish post" })
+            .getByRole("button", { name: "Publish post", exact: true })
             .click();
         const sheet = page.getByRole("dialog", { name: "Publish this post" });
         await expect(sheet).toContainText(

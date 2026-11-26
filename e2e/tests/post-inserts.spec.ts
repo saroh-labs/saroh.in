@@ -2,6 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { northwind, stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
@@ -37,16 +38,35 @@ test("Add: the / menu's new blocks save, Find opens, search and sharing in the c
     try {
         await page.goto(`/sites/${site.id}/posts/${made.id}`);
         test.skip(
-            !page.url().includes(`/write/${made.id}`),
+            !(await websiteAreaOn(page)),
             "The Website area is off: today's post editor",
         );
+        // A streamed redirect (a loading boundary above): it can land after load.
+        await page.waitForURL((u) => u.href.includes(`/write/${made.id}`));
 
         // W1: "/" on the empty last line opens the menu, and filters.
         const body = page.locator("[data-writing-surface] .ProseMirror");
-        await body.locator("p").last().click();
-        await page.keyboard.press("/");
         const filter = page.getByRole("textbox", { name: "Type to filter" });
-        await expect(filter).toBeVisible();
+        // The menu listens once the editor's view mounts, after hydration: a
+        // "/" typed before then is only text, so take it back and try again.
+        await expect(async () => {
+            if (!(await filter.isVisible())) {
+                await body.locator("p").last().click();
+                await page.keyboard.press("End");
+                await page.keyboard.press("/");
+            }
+            if (
+                !(await filter
+                    .waitFor({ state: "visible", timeout: 1_000 })
+                    .then(
+                        () => true,
+                        () => false,
+                    ))
+            ) {
+                await page.keyboard.press("Backspace");
+                throw new Error("the / menu didn't open yet");
+            }
+        }).toPass({ timeout: 15_000 });
         const menu = page.getByRole("listbox", { name: "Add to the post" });
         for (const name of [
             "Offer",
@@ -56,7 +76,9 @@ test("Add: the / menu's new blocks save, Find opens, search and sharing in the c
             "Gallery",
             "Button",
         ]) {
-            await expect(menu.getByRole("option", { name })).toBeVisible();
+            await expect(
+                menu.getByRole("option", { name, exact: true }),
+            ).toBeVisible();
         }
         await expect(menu.getByRole("option", { name: /Video/ })).toHaveCount(
             0,

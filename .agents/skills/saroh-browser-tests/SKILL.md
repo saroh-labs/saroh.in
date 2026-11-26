@@ -148,6 +148,10 @@ hyphen is a line break the layout didn't earn), and long names.
   (`[data-site-primary]`).
 - `if ((await x.count()) > 0)` before something has drawn skips the step:
   click it and let it wait.
+- A switch-gated spec skips on what the API says (`websiteAreaOn(page)`),
+  never on `page.url()` right after `goto`: a redirect under a
+  `loading.tsx` is streamed and can land after `load` (DEV_LEARNINGS,
+  25 Nov 2026). Then `waitForURL` the redirect.
 - The seed is not the demo: Northwind has no public phone or place, no
   storefront chosen for its site, online storefronts only and a short home.
   Give it what the test needs and put it back.

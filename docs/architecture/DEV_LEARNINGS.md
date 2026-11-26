@@ -12,6 +12,45 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Website — Approve didn't show the post as live, and post specs skipped themselves at random
+
+**Symptom**: 25 Nov 2026, two local `pnpm prepush --e2e` runs: after the
+owner pressed Approve on a teammate's post, the chip stayed "Not live yet"
+(`post-approval.spec`); Locations' tabs stayed on Payments after Back
+(`storefront-settings.spec`); `post-editor.spec` found two "Publish post"
+buttons. CI on development was green.
+**Cause**: three bugs, none of them new that day.
+
+- The post editor kept `live` in state seeded from the first read
+  (`use-post-draft.ts`). Approve published the post in the API and
+  `router.refresh()` brought the new read, but only `approval` (read from
+  props) moved, so the chip went from "Waiting for approval" to "Not live
+  yet". There since post approval (O7, #1442).
+- `useTabParam` follows `useSearchParams`, but Next can fold a tab's
+  `pushState` and the Back after it into one render, so the hook never saw
+  the address move. Seen since Locations went to React Query (#1501), on
+  desk and phone, not every run.
+- The post specs skipped when `goto(/posts/…)` hadn't landed on `/write/…`
+  yet. With a `loading.tsx` above it the redirect is streamed and can land
+  after `load`, so a spec could skip itself on a stack where the area is on.
+  That hid both the Approve bug and the status chip's aria-label ("Not
+  live yet. Open Publish post", since U15), which a `name: "Publish post"`
+  locator also matches.
+
+Development's CI picks only the specs a PR's changes reach, and #1442's
+CI ran 40 browser tests; no full run has happened since the last release
+on 17 Nov. So none of these specs had run with the area on.
+**Fix**: the draft follows a change in the server's `live`/`liveAt` (unit
+test in `post-shell.test.tsx`); `useTabParam` also listens for `popstate`
+(`use-tab-param.test.tsx`); the post specs ask the API whether the area is
+on (`fixtures/website-area.ts`), then wait for the redirect, and press
+"Publish post" with `exact: true`.
+**Rule**: a spec decides whether to skip from a fact it reads (the API),
+never from where a redirect has got to so far. A skipped spec is a pass
+nobody checked (see "the data-removal specs passed by skipping themselves").
+
+---
+
 ## Accounts — a neutral answer hides failures: alert on the back end
 
 **Symptom**: 19 Nov 2026, the owner: phone sign-in now says "If this number

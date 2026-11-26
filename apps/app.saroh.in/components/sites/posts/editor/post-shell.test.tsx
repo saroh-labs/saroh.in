@@ -286,6 +286,17 @@ describe("the desk post editor (U15)", () => {
         );
     });
 
+    it("follows a re-read that puts the post live (an approver's Approve, O7)", () => {
+        const draft = { ...post, live: false, liveAt: null, liveCopy: null };
+        act(() => root.render(<PostShell data={data()} post={draft} />));
+        expect(el("[data-status-chip]").textContent).toBe("Not live yet");
+        // router.refresh() after Approve: the same post, now live.
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        expect(el("[data-status-chip]").textContent).toBe(
+            "Live · 1 change waiting",
+        );
+    });
+
     it("keeps today's controls: Details rows, search and sharing, the categories, More", () => {
         act(() => root.render(<PostShell data={data()} post={post} />));
         for (const name of [
@@ -592,6 +603,16 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
             "New post",
             "All posts2",
         ]);
+        expect(
+            el('nav[aria-label="Posts"] a[aria-current="page"]').textContent,
+        ).toContain("Bridal trial");
+    });
+
+    it("lists the post being written even when the page's list predates it", () => {
+        draw(
+            <PostShell key="p1" data={{ ...listed, posts: [] }} post={post} />,
+        );
+        act(() => named("Blog post: Bridal trial. Open another post")?.click());
         expect(
             el('nav[aria-label="Posts"] a[aria-current="page"]').textContent,
         ).toContain("Bridal trial");
