@@ -69,6 +69,10 @@ export type HelpTopic = (typeof HELP_TOPICS)[keyof typeof HELP_TOPICS];
  */
 export const HELP_ARTICLES = [
     { slug: "create-your-business", title: "Create your business" },
+    {
+        slug: "where-things-are-in-the-menu",
+        title: "Where things are in the menu",
+    },
     { slug: "add-your-first-product", title: "Add your first product" },
     { slug: "add-sizes-and-options", title: "Add sizes and options" },
     { slug: "count-and-move-stock", title: "Count and move stock" },
@@ -124,7 +128,7 @@ export type HelpArticle = (typeof HELP_ARTICLES)[number]["slug"];
  */
 export const TOPIC_ARTICLE: Record<HelpTopic, HelpArticle | null> = {
     "getting-started": "create-your-business",
-    "finding-your-way-around": null,
+    "finding-your-way-around": "where-things-are-in-the-menu",
     customers: null,
     selling: "add-your-first-product",
     bookings: "set-your-teams-hours",

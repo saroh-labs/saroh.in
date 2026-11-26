@@ -52,7 +52,8 @@ describe("a list: Customers", () => {
         );
         isPageHeader(html);
         expect(html).toMatch(/data-slot="page-count"[^>]*>12 customers</);
-        expect(html).toContain("Sell");
+        // The crumb is the row's own name, not a section (DEC-262).
+        expect(html).not.toContain("Sell");
     });
 
     it("draws no count when there is none to say", () => {

@@ -11,8 +11,11 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/commerce/orders" }));
 describe("the route fade plays only on a move to another section", () => {
     it("reads an address's section from the rail", () => {
         expect(routeSection("/")).toBe("/");
-        expect(routeSection("/commerce/orders/ord_1")).toBe("/commerce");
-        expect(routeSection("/commerce/products")).toBe("/commerce");
+        expect(routeSection("/commerce/orders/ord_1")).toBe("/commerce/orders");
+        expect(routeSection("/commerce/products")).toBe("/commerce/products");
+        expect(routeSection("/bookings/availability")).toBe(
+            "/bookings/availability",
+        );
         expect(routeSection("/settings/team")).toBe("/settings");
     });
 
@@ -30,17 +33,14 @@ describe("the route fade plays only on a move to another section", () => {
     });
 
     it("not on a move within one section", () => {
-        expect(fadesIn("/commerce/orders", "/commerce/products", false)).toBe(
-            false,
-        );
         expect(
             fadesIn("/commerce/orders", "/commerce/orders/ord_1", false),
         ).toBe(false);
         expect(fadesIn("/settings/team", "/settings/profile", false)).toBe(
             false,
         );
-        // Bookings' pages don't all live under its address.
-        expect(fadesIn("/bookings", "/services", false)).toBe(false);
+        // Each row is its own section since the regroup (DEC-262).
+        expect(fadesIn("/bookings", "/services", false)).toBe(true);
     });
 });
 

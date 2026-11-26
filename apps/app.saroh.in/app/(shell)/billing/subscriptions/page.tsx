@@ -11,7 +11,9 @@ import { requireSession } from "@/lib/session";
 import { getAutopayOffer } from "@/lib/subscriptions/service";
 import { screenTabFromQuery } from "@/lib/subscriptions/view";
 
-export const metadata = { title: "Subscriptions" };
+// The menu's word for the page (DEC-264); the columns and emails keep
+// "Subscriptions" until the owner decides the word everywhere.
+export const metadata = { title: "Memberships" };
 
 /**
  * Payments → Subscriptions (plan 2026-09-23-003, U12), with Plans as its

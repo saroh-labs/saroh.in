@@ -8,13 +8,12 @@ export default function Loading() {
             shape="detail"
             width="full"
             breadcrumb={[
-                "Payments",
                 <IntentLink
                     data-ph-unmask=""
                     key="1"
                     href="/billing/subscriptions"
                 >
-                    Subscriptions
+                    Memberships
                 </IntentLink>,
             ]}
             label="Loading the subscription"

@@ -26,7 +26,6 @@ export function ProductPageBar() {
         <div className="px-4 pt-5 sm:px-[22px]">
             <PageHeader
                 breadcrumb={[
-                    "Sell",
                     <IntentLink
                         data-ph-unmask=""
                         key="list"

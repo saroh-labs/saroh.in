@@ -78,7 +78,6 @@ export default async function ImportCustomersPage({
             <PageHeader
                 holdsData="description"
                 breadcrumb={[
-                    "Sell",
                     <IntentLink
                         data-ph-unmask=""
                         key="customers"

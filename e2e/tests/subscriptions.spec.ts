@@ -121,7 +121,8 @@ test.describe("subscriptions", () => {
     }) => {
         await page.goto("/billing/subscriptions");
         await expect(
-            page.getByRole("heading", { name: "Subscriptions" }),
+            // The menu's word for the page (DEC-264).
+            page.getByRole("heading", { name: "Memberships" }),
         ).toBeVisible();
         // Where each subscription stands is a dropdown in the toolbar; the
         // tabs above it are the two views, Subscribers and Plans.
@@ -404,7 +405,9 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
             page.getByRole("heading", { name: "At a glance" }),
         ).toBeVisible();
         await expect(
-            page.getByRole("link", { name: "Plans", exact: true }),
+            page
+                .getByRole("navigation", { name: "Breadcrumb" })
+                .getByRole("link", { name: "Membership plans", exact: true }),
         ).toHaveAttribute("href", "/billing/subscriptions?tab=plans");
 
         await page.getByRole("tab", { name: /^Subscribers/ }).click();

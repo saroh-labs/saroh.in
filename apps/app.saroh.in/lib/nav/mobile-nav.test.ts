@@ -2,17 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { navFor } from "@/components/shared/navigation/nav-items";
 
-import {
-    buildMobileNav,
-    MANAGE_HEADING,
-    seatPreference,
-    TAB_SEATS,
-} from "./mobile-nav";
+import { buildMobileNav, TAB_SEATS } from "./mobile-nav";
 
 /**
- * The phone's tab bar and its sheet (the "Saroh Tab Bar" design). Built from
- * `navFor`, as the rail is, so each test starts from what an actor is offered
- * there.
+ * The phone's tab bar and its sheet (the "Saroh Tab Bar" design, DEC-263).
+ * Built from `navFor`, as the rail is, so each test starts from what an
+ * actor is offered there.
  */
 
 const EVERYTHING = [
@@ -32,28 +27,48 @@ const ownerNav = (moduleKeys: string[] | null = EVERYTHING) =>
 const labels = (tabs: { label: string }[]) => tabs.map((t) => t.label);
 
 describe("seats", () => {
-    it("seats Home, Sell, Calendar and Insights by default", () => {
-        // Notifications is in the top bar (2026-09-25); Calendar has its seat.
+    it("seats Home, Calendar, Orders and Insights, in the rail's order", () => {
         const nav = buildMobileNav({ groups: ownerNav(), pathname: "/" });
         expect(labels(nav.tabs)).toEqual([
             "Home",
-            "Sell",
             "Calendar",
+            "Orders",
             "Insights",
         ]);
         expect(nav.tabs).toHaveLength(TAB_SEATS);
     });
 
-    it("gives the section you are in the second seat", () => {
+    it("keeps one order on every page (DEC-263)", () => {
+        for (const pathname of [
+            "/",
+            "/billing/invoices/inv_1",
+            "/commerce/orders",
+            "/calendar",
+            "/services",
+            "/settings/people",
+        ]) {
+            const nav = buildMobileNav({ groups: ownerNav(), pathname });
+            expect(labels(nav.tabs)).toEqual([
+                "Home",
+                "Calendar",
+                "Orders",
+                "Insights",
+            ]);
+        }
+    });
+
+    it("leaves out a tab a gate removes, and the rest keep their order", () => {
+        // Sell off: no Orders. Its seat goes to the rail's next row, and
+        // the bar is still drawn in the rail's order.
         const nav = buildMobileNav({
-            groups: ownerNav(),
-            pathname: "/billing/invoices/inv_1",
+            groups: ownerNav(EVERYTHING.filter((k) => k !== "COMMERCE")),
+            pathname: "/bookings",
         });
         expect(labels(nav.tabs)).toEqual([
             "Home",
-            "Payments",
-            "Sell",
             "Calendar",
+            "Bookings",
+            "Insights",
         ]);
     });
 
@@ -64,8 +79,8 @@ describe("seats", () => {
             pathname: "/",
         });
         expect(labels(home.tabs)).not.toContain("Invoices");
-        const sheet = home.groups.flatMap((g) => g.rows);
-        expect(sheet.map((r) => r.href)).toContain("/billing/invoices");
+        const money = home.groups.find((g) => g.label === "Money");
+        expect(money?.rows.map((r) => r.href)).toEqual(["/billing/invoices"]);
         const on = buildMobileNav({
             groups: ownerNav(withoutPayments),
             pathname: "/billing/invoices/inv_1",
@@ -76,41 +91,8 @@ describe("seats", () => {
         expect(row?.current).toBe(true);
     });
 
-    it("keeps Sell seated when you are in it, without seating it twice", () => {
-        expect(seatPreference("Sell")).toEqual([
-            "Home",
-            "Sell",
-            "Business calendar",
-            "Insights",
-        ]);
-        const nav = buildMobileNav({
-            groups: ownerNav(),
-            pathname: "/commerce/orders",
-        });
-        const tabs = labels(nav.tabs);
-        expect(tabs).toEqual(["Home", "Sell", "Calendar", "Insights"]);
-        expect(new Set(tabs).size).toBe(tabs.length);
-        expect(tabs).toHaveLength(TAB_SEATS);
-    });
-
-    it("seats Calendar second while you are on it, then Sell", () => {
-        const nav = buildMobileNav({
-            groups: ownerNav(),
-            pathname: "/calendar",
-        });
-        expect(labels(nav.tabs)).toEqual([
-            "Home",
-            "Calendar",
-            "Sell",
-            "Insights",
-        ]);
-        expect(nav.tabs.find((t) => t.label === "Calendar")?.current).toBe(
-            true,
-        );
-    });
-
-    it("fills a seat the preference cannot, in rail order, skipping sections", () => {
-        // A member has no Notifications and no Insights here.
+    it("fills a seat the preference cannot, in rail order", () => {
+        // A member has no Insights here.
         const nav = buildMobileNav({
             groups: navFor({
                 role: "MEMBER",
@@ -120,38 +102,10 @@ describe("seats", () => {
         });
         expect(labels(nav.tabs)).toEqual([
             "Home",
-            "Sell",
             "Calendar",
-            "Website",
+            "Orders",
+            "Bookings",
         ]);
-    });
-
-    it("lets a section tab open its first page", () => {
-        const nav = buildMobileNav({ groups: ownerNav(), pathname: "/" });
-        const sell = nav.tabs.find((t) => t.label === "Sell");
-        expect(sell?.section).toBe(true);
-        expect(sell?.href).toBe("/commerce/orders");
-        // A Member moves orders through the kitchen (DEC-024), so Sell opens
-        // on Orders for them too; a role that can do neither lands on
-        // Products.
-        const member = buildMobileNav({
-            groups: navFor({ role: "MEMBER", moduleKeys: ["COMMERCE"] }),
-            pathname: "/",
-        });
-        expect(member.tabs.find((t) => t.label === "Sell")?.href).toBe(
-            "/commerce/orders",
-        );
-        const shelves = buildMobileNav({
-            groups: navFor({
-                role: "MEMBER",
-                actions: ["store:read"],
-                moduleKeys: ["COMMERCE"],
-            }),
-            pathname: "/",
-        });
-        expect(shelves.tabs.find((t) => t.label === "Sell")?.href).toBe(
-            "/commerce/products",
-        );
     });
 
     it("gives a reviewer their two rows and no More", () => {
@@ -166,53 +120,42 @@ describe("seats", () => {
 });
 
 describe("the sheet", () => {
-    it("lists every section, seated or not, then Manage", () => {
+    it("lists the rail's groups in its order, without the seated rows", () => {
         const nav = buildMobileNav({ groups: ownerNav(), pathname: "/" });
         expect(nav.groups.map((g) => g.label)).toEqual([
-            "Sell",
-            "Bookings",
-            "Payments",
-            MANAGE_HEADING,
+            "Today",
+            "People",
+            "Money",
+            "What you offer",
+            "Online",
+            "Setup",
         ]);
-        const sell = nav.groups.find((g) => g.label === "Sell");
-        expect(sell?.rows.map((r) => r.href)).toContain("/commerce/orders");
-    });
-
-    it("draws a section's pages with the section's icon", () => {
-        const groups = ownerNav();
-        const bookingsIcon = groups
-            .flatMap((g) => g.items)
-            .find((i) => i.label === "Bookings")?.icon;
-        const nav = buildMobileNav({ groups, pathname: "/" });
-        const bookings = nav.groups.find((g) => g.label === "Bookings");
-        expect(bookings?.rows.map((r) => r.label)).toEqual([
-            "Bookings",
-            "Services",
-            "Hours and time off",
-            "Courses",
-            "Class packs",
-        ]);
-        for (const row of bookings?.rows ?? []) {
-            expect(row.icon).toBe(bookingsIcon);
+        expect(
+            nav.groups
+                .find((g) => g.label === "Today")
+                ?.rows.map((r) => r.label),
+        ).toEqual(["Bookings"]);
+        const all = nav.groups.flatMap((g) => g.rows.map((r) => r.label));
+        for (const seated of [
+            "Home",
+            "Business calendar",
+            "Orders",
+            "Insights",
+        ]) {
+            expect(all).not.toContain(seated);
         }
     });
 
-    it("puts under Manage only the plain rows without a seat, each with its own icon", () => {
+    it("draws each row with its own icon", () => {
         const groups = ownerNav();
         const nav = buildMobileNav({ groups, pathname: "/" });
-        const manage = nav.groups.find((g) => g.label === MANAGE_HEADING);
-        const rowLabels = manage?.rows.map((r) => r.label) ?? [];
-        expect(rowLabels).toContain("Website");
-        expect(rowLabels).toContain("Settings");
-        for (const seated of labels(nav.tabs)) {
-            expect(rowLabels).not.toContain(seated);
-        }
         const settings = groups
             .flatMap((g) => g.items)
             .find((i) => i.label === "Settings");
-        expect(manage?.rows.find((r) => r.label === "Settings")?.icon).toBe(
-            settings?.icon,
-        );
+        const row = nav.groups
+            .find((g) => g.label === "Setup")
+            ?.rows.find((r) => r.label === "Settings");
+        expect(row?.icon).toBe(settings?.icon);
     });
 
     it("says how many tabs the bar holds", () => {
@@ -221,37 +164,26 @@ describe("the sheet", () => {
             "Everything a role reaches is here. The bar holds the 4 opened most.",
         );
     });
-
-    it("hides a page whose module is off, and a section left with none", () => {
-        const nav = buildMobileNav({
-            groups: ownerNav(["COMMERCE", "COURSES"]),
-            pathname: "/",
-        });
-        const bookings = nav.groups.find((g) => g.label === "Bookings");
-        expect(bookings?.rows.map((r) => r.href)).toEqual(["/courses"]);
-        expect(nav.groups.map((g) => g.label)).not.toContain("Payments");
-    });
 });
 
 describe("where you are", () => {
-    it("marks the section's tab and the page's row", () => {
+    it("marks the row you are on", () => {
         const nav = buildMobileNav({
             groups: ownerNav(),
             pathname: "/services",
         });
-        const current = nav.tabs.filter((t) => t.current);
-        expect(labels(current)).toEqual(["Bookings"]);
+        expect(labels(nav.tabs.filter((t) => t.current))).toEqual([]);
         const rows = nav.groups.flatMap((g) => g.rows).filter((r) => r.current);
         expect(rows.map((r) => r.href)).toEqual(["/services"]);
     });
 
-    it("marks only the deepest page", () => {
+    it("marks only the deepest row: Hours and time off, not Bookings", () => {
         const nav = buildMobileNav({
             groups: ownerNav(),
-            pathname: "/bookings",
+            pathname: "/bookings/availability",
         });
         const rows = nav.groups.flatMap((g) => g.rows).filter((r) => r.current);
-        expect(rows.map((r) => r.label)).toEqual(["Bookings"]);
+        expect(rows.map((r) => r.label)).toEqual(["Hours and time off"]);
     });
 
     it("marks Home only on Home", () => {
@@ -264,15 +196,15 @@ describe("where you are", () => {
 });
 
 describe("counts", () => {
-    it("badges a tab with what is waiting, and a section with its pages' sum", () => {
+    it("badges a tab with what is waiting", () => {
         const nav = buildMobileNav({
             groups: ownerNav(),
             pathname: "/",
             counts: { "/commerce/orders": 3, "/commerce/products": 1 },
             unread: 5,
         });
-        expect(nav.tabs.find((t) => t.label === "Sell")?.count).toBe(4);
-        // Unread rides on the top bar's bell now, not on a tab.
+        expect(nav.tabs.find((t) => t.label === "Orders")?.count).toBe(3);
+        // Unread rides on the top bar's bell, not on a tab.
         expect(
             nav.tabs.find((t) => t.label === "Notifications"),
         ).toBeUndefined();
@@ -282,7 +214,6 @@ describe("counts", () => {
         const nav = buildMobileNav({
             groups: ownerNav(),
             pathname: "/",
-            // Orders is seated with Sell; Leads and Invoices are not.
             counts: {
                 "/commerce/orders": 3,
                 "/leads": 2,
@@ -290,9 +221,5 @@ describe("counts", () => {
             },
         });
         expect(nav.more?.count).toBe(6);
-        const orders = nav.groups
-            .flatMap((g) => g.rows)
-            .find((r) => r.href === "/commerce/orders");
-        expect(orders?.count).toBe(3);
     });
 });

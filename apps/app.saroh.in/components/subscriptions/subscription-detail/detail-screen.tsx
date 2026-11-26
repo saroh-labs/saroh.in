@@ -273,13 +273,12 @@ export function SubscriptionDetail({
                     holdsData
                     className="mb-0"
                     breadcrumb={[
-                        "Payments",
                         <IntentLink
                             data-ph-unmask=""
                             key="list"
                             href="/billing/subscriptions"
                         >
-                            Subscriptions
+                            Memberships
                         </IntentLink>,
                         name,
                     ]}

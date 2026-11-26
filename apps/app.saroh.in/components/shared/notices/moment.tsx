@@ -6,7 +6,7 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { showError } from "@saroh/ui/toast";
-import { Megaphone, Plug, Sparkles, X } from "lucide-react";
+import { Compass, Megaphone, Plug, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
@@ -15,6 +15,7 @@ import type { MomentKey, MomentView } from "@/lib/moments/keys";
 
 /** A new feature's glyph: the one its own screen and nav use. */
 export const NEWS_GLYPH: Partial<Record<MomentKey, typeof Plug>> = {
+    "new-menu": Compass,
     "new-ai-apps": Plug,
     "new-share": Megaphone,
     "new-ask-ai": Sparkles,

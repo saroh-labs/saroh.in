@@ -134,10 +134,10 @@ const SCREENS: Screen[] = [
         ready: h1("Invoices"),
     },
     {
-        name: "Subscriptions",
+        name: "Memberships",
         org: PULSE,
         path: "/billing/subscriptions",
-        ready: h1("Subscriptions"),
+        ready: h1("Memberships"),
     },
     {
         name: "Settings: business",

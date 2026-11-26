@@ -5,7 +5,7 @@ export default function Loading() {
         <PageLoading
             shape="settings"
             width="full"
-            breadcrumb={["Sell", "Location"]}
+            breadcrumb={["Location"]}
             label="Loading the location"
         />
     );

@@ -201,8 +201,8 @@ export function SubscriptionsScreen({
         <>
             <PageHeader
                 className="mb-4"
-                breadcrumb={["Payments", "Subscriptions"]}
-                title="Subscriptions"
+                breadcrumb={["Memberships"]}
+                title="Memberships"
                 count={
                     loading ? (
                         <FigureLoading />

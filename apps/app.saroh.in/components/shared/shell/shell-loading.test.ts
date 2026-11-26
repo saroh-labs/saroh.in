@@ -13,7 +13,7 @@ describe("the shell's loader names the page being opened", () => {
 
     it("names a section's page by the menu's own words", () => {
         expect(shellLoadingWords("/commerce/orders")).toMatchObject({
-            breadcrumb: ["Sell", "Orders"],
+            breadcrumb: ["Orders"],
             title: "Orders",
             // The header only: Orders' own loader draws the body.
             shape: "none",
@@ -23,16 +23,16 @@ describe("the shell's loader names the page being opened", () => {
             breadcrumb: ["Leads"],
             title: "Leads",
         });
-        // Bookings' pages don't live under its address.
-        expect(shellLoadingWords("/services").breadcrumb).toEqual([
-            "Bookings",
-            "Services",
+        // Each row is its own (DEC-262): the deepest one names the page.
+        expect(shellLoadingWords("/services").breadcrumb).toEqual(["Services"]);
+        expect(shellLoadingWords("/bookings/availability").breadcrumb).toEqual([
+            "Hours and time off",
         ]);
     });
 
     it("leaves a record's title as a bar, under its section", () => {
         const words = shellLoadingWords("/commerce/orders/ord_1");
-        expect(words.breadcrumb).toEqual(["Sell", "Orders"]);
+        expect(words.breadcrumb).toEqual(["Orders"]);
         expect(words.title).toBeUndefined();
         expect(words.shape).toBe("none");
     });

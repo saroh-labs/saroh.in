@@ -1,5 +1,6 @@
 import { formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { helpArticleUrl } from "@/lib/help/links";
 import type { HomeModel } from "@/lib/home/service";
 import type { OrderListPage, OrderRow } from "@/lib/orders/business-service";
 import { orderHref } from "@/lib/orders/links";
@@ -189,6 +190,18 @@ export function unseen(
  * action it names is a real MCP tool or Share step (claims ledger).
  */
 export const NEW_FEATURE_MOMENTS = [
+    // First: everyone who knew the old menu meets the new one at once
+    // (DEC-262). Put away or followed, it is gone for the business.
+    {
+        key: "new-menu",
+        title: "The menu has moved",
+        fact: "Pages are grouped by what you came to do now, and every link still works.",
+        action: {
+            label: "See where things went",
+            href: helpArticleUrl("where-things-are-in-the-menu"),
+        },
+        news: true,
+    },
     {
         key: "new-ai-apps",
         title: "Use Saroh from Claude or ChatGPT",
@@ -215,7 +228,8 @@ export const NEW_FEATURE_MOMENTS = [
     },
 ] as const satisfies readonly (MomentView & { key: NewFeatureKey })[];
 
-export type NewFeatureKey = "new-ai-apps" | "new-share" | "new-ask-ai";
+export type NewFeatureKey =
+    "new-menu" | "new-ai-apps" | "new-share" | "new-ask-ai";
 
 /**
  * The one "New" card to show: the first, in order, that is switched on

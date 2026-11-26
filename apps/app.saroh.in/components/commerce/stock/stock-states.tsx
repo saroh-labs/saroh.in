@@ -39,7 +39,7 @@ export function StockTrackingOff({
 }) {
     return (
         <PageContainer width="full">
-            <PageHeader breadcrumb={["Sell", "Stock"]} title="Stock" />
+            <PageHeader breadcrumb={["Stock"]} title="Stock" />
             <div className="px-0 py-10 sm:py-[60px]">
                 <ModuleOffState
                     className="mx-auto max-w-[560px]"

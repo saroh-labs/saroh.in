@@ -8,7 +8,7 @@ import { canPickProducts } from "@/lib/invoices/can-pick-products";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { newInvoiceBusiness } from "@/lib/invoices/new-invoice-business";
 import { mayUpdateBusiness } from "@/lib/invoices/paper-access";
-import { payLinkPossible, paymentsModuleOn } from "@/lib/invoices/payments-on";
+import { payLinkPossible } from "@/lib/invoices/payments-on";
 import { getInvoice } from "@/lib/invoices/service";
 import { detailsOnFileOf } from "@/lib/organizations/business-details";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -55,7 +55,6 @@ export default async function EditInvoicePage({
             <InvoiceForm
                 header={{
                     breadcrumb: [
-                        ...((await paymentsModuleOn()) ? ["Payments"] : []),
                         <IntentLink
                             data-ph-unmask=""
                             key="list"

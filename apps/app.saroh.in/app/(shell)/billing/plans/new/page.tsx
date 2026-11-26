@@ -55,13 +55,12 @@ export default async function NewPlanPage() {
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={[
-                        "Payments",
                         <IntentLink
                             data-ph-unmask=""
                             key="plans"
                             href={PLANS_HREF}
                         >
-                            Plans
+                            Membership plans
                         </IntentLink>,
                         "New plan",
                     ]}

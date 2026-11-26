@@ -248,7 +248,6 @@ export function InvoiceDetailsView({
                 className="mb-4 print:hidden"
                 breadcrumb={[
                     // Invoices sit under Payments only while it is on (DEC-070).
-                    ...(details.paymentsOn ? ["Payments"] : []),
                     <IntentLink
                         data-ph-unmask=""
                         key="list"

@@ -94,7 +94,6 @@ export function SarohSocialPage({
                 breadcrumb={
                     onChannels
                         ? [
-                              "Grow",
                               <IntentLink
                                   key="social"
                                   href="/social"
@@ -103,7 +102,7 @@ export function SarohSocialPage({
                                   {SOCIAL_WORDS.social}
                               </IntentLink>,
                           ]
-                        : ["Grow", SOCIAL_WORDS.social]
+                        : [SOCIAL_WORDS.social]
                 }
                 title={onChannels ? SOCIAL_WORDS.channels : SOCIAL_WORDS.social}
                 description={
