@@ -25,8 +25,8 @@ import {
     readOrderQuickView,
 } from "./kitchen-service";
 import {
+    defaultOrdersTab,
     orderListParams,
-    ordersEmptyCopy,
     readOrdersQuery,
 } from "./list-query";
 import type {
@@ -80,19 +80,31 @@ export async function readOrdersList(ask: OrdersAsk): Promise<OrdersListView> {
         listOrderRows(orderListParams(query)),
         activeOrganizationOnce(),
     ]);
-    const unnarrowed = ordersEmptyCopy(query, null).kind === "first-run";
+    // Nothing narrows it: Open or All with no search, filter or fold open.
+    const unnarrowed =
+        defaultOrdersTab(query) === "open" &&
+        !query.older &&
+        (query.tab === "open" || query.tab === "all");
     const [moment, share] = await Promise.all([
-        ordersListMoment(page, {
-            plain: unnarrowed && !query.storefront && query.page === 1,
-            viewer,
-        }),
-        page.rows.length === 0 && unnarrowed
+        ordersListMoment(
+            // The newest order first, whatever order the view sorts by.
+            { counts: page.counts, rows: newestFirst(page.rows) },
+            {
+                plain: unnarrowed && !query.storefront && query.page === 1,
+                viewer,
+            },
+        ),
+        page.counts.all === 0 && unnarrowed
             ? readWebAddressLinks().then((links) =>
                   shareLink(links, ORDERS_FIRST_RUN),
               )
             : null,
     ]);
     return { ...page, moment, share };
+}
+
+function newestFirst<R extends { placedAt: string }>(rows: R[]): R[] {
+    return [...rows].sort((a, b) => b.placedAt.localeCompare(a.placedAt));
 }
 
 /** The filter bar's choices and the storefront menu's open counts. */

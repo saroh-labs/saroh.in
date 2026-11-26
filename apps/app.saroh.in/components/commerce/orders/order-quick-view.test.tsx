@@ -55,6 +55,11 @@ const row = {
     store: { id: "s1", name: "Hill Road" },
     customer: { id: "c1", name: "Priya Raman" },
     fulfilmentLabel: "Pick-up",
+    standing: "UNFULFILLED",
+    steps: [],
+    stepIndex: 0,
+    ageMinutes: 5,
+    late: false,
 } as unknown as OrderRow;
 
 function order(over: Partial<OrderRead> = {}): OrderRead {
@@ -173,5 +178,38 @@ describe("QuickViewBody — the money (UX-061, UX-010)", () => {
         expect(html).toContain("Payment");
         expect(html).toContain("Paid");
         expect(html).not.toContain("₹");
+    });
+});
+
+describe("QuickViewBody — what the row says, and how to reach them (finding 15)", () => {
+    it("keeps the Late chip, and says why the next step is blocked", () => {
+        const html = renderToStaticMarkup(
+            <QuickViewBody
+                order={order()}
+                late="Late · 2 h"
+                blocked="Mark it paid first, then start preparing."
+            />,
+        );
+        expect(html).toContain("Late · 2 h");
+        expect(html).toContain("Mark it paid first, then start preparing.");
+    });
+
+    it("offers Call when the API sent a phone, and nothing when it didn't", () => {
+        const customer = {
+            id: "c1",
+            name: "Priya Raman",
+            phone: "+91 98765 43210",
+            contactId: "ct_1",
+            orderCount: 2,
+            firstOrderAt: null,
+        };
+        const html = renderToStaticMarkup(
+            <QuickViewBody order={order({ customer })} />,
+        );
+        expect(html).toContain('href="tel:+919876543210"');
+        expect(html).toContain(">Call<");
+        expect(
+            renderToStaticMarkup(<QuickViewBody order={order()} />),
+        ).not.toContain("tel:");
     });
 });

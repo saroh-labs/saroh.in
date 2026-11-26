@@ -125,7 +125,8 @@ export default async function OrdersPage({
             notices={
                 <>
                     {/* B17: storefronts still on the 2-hour Pick-up
-                            default. */}
+                            default, in one notice, for whoever can change
+                            it (finding 9). */}
                     <LateRuleNotice />
                     <PlanLimitNotice moduleId="orders" className="mb-4" />
                 </>
@@ -138,6 +139,7 @@ export default async function OrdersPage({
             // A Member reaches the list through `order:stage` alone
             // (DEC-024) and gets the kitchen's view of it.
             kitchen={!access.money}
+            searchContacts={may("contact:read")}
             newOrder={
                 sellsSomething
                     ? {

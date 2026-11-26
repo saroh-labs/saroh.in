@@ -8,9 +8,11 @@ import { storedValuesOf } from "./fulfilment";
 import {
     computedConditions,
     dayRange,
+    dueSql,
     lateSettingsJoin,
     lateSql,
     listRange,
+    olderCondition,
     orderConditions,
     paymentStandingOf,
     presetRange,
@@ -130,6 +132,13 @@ describe("the search", () => {
     it("drops a leading # and takes % and _ literally", () => {
         const s = searchSql("#10_4%", { contact: false });
         expect(s.values[0]).toBe("%10\\_4\\%%");
+    });
+
+    it("finds a product or service on the order's lines, for any role", () => {
+        const s = searchSql("red dress", { contact: false });
+        expect(text(s)).toContain(`FROM "OrderItem" oi`);
+        expect(text(s)).toContain(`oi."orderId" = o.id`);
+        expect(text(s)).toContain("COALESCE(p.name, sv.name) ILIKE");
     });
 
     it("never matches a phone on fewer than three digits", () => {
@@ -496,5 +505,24 @@ describe("listRange — every list's date filter (Orders, Invoices, All bookings
         expect(() =>
             listRange({ from: "2026-08-02", to: "2026-08-01" }, "UTC", now),
         ).toThrow(BadRequestException);
+    });
+});
+
+describe("when an order turns late, and month-old ones (DEC-265)", () => {
+    const text = (s: { sql: string }) => s.sql.replace(/\s+/g, " ");
+    const now = new Date("2026-09-01T00:00:00.000Z");
+
+    it("is placed plus its threshold, only while it can still be late", () => {
+        const s = text(dueSql());
+        expect(s).toContain(`o."createdAt" + make_interval(mins =>`);
+        expect(s).toContain(`o."paymentStatus" <> 'REFUNDED'`);
+        expect(s).toMatch(/END\)$/);
+    });
+
+    it("folds open orders a month old, or lists only them", () => {
+        expect(olderCondition(undefined, now).sql).toBe("TRUE");
+        expect(text(olderCondition("hide", now))).toMatch(/^NOT \(m\.open AND/);
+        expect(text(olderCondition("only", now))).toMatch(/^\(m\.open AND/);
+        expect(olderCondition("only", now).values).toContain(30);
     });
 });

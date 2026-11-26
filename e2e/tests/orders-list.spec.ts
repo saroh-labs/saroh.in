@@ -44,7 +44,7 @@ interface Row {
 }
 interface ListPage {
     rows: Row[];
-    counts: { all: number; open: number; refunded: number };
+    counts: { all: number; open: number; refunded: number; stale: number };
     nextCursor: string | null;
 }
 
@@ -61,6 +61,12 @@ async function memberPage(browser: Browser): Promise<Page> {
     await signIn(page, member);
     return page;
 }
+
+/**
+ * The query the bare list asks (DEC-265): Open, soonest late first, open
+ * orders placed a month ago or more folded under one line.
+ */
+const OPEN_VIEW = "&tab=open&sort=due&older=hide";
 
 /** One page of the list, as the screen asks for it. */
 async function list(page: Page, org: string, query = ""): Promise<ListPage> {
@@ -147,9 +153,11 @@ test.describe("orders list", () => {
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
         const all = await list(page, LISTS);
-        const open = await list(page, LISTS, "&tab=open");
+        // What the Open view asks (DEC-265): soonest late first, with the
+        // month-old ones folded under one line.
+        const open = await list(page, LISTS, OPEN_VIEW);
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         await expect(status(page)).toContainText("All orders");
         // Open, each option says how many it holds.
         await status(page).click();
@@ -162,7 +170,8 @@ test.describe("orders list", () => {
         }
 
         await statusOption(page, "Open").click();
-        await expect(page).toHaveURL(/tab=open/);
+        // Open is what the bare address opens on: nothing to write.
+        await expect(page).not.toHaveURL(/tab=/);
         await expect(status(page)).toContainText("Open");
         const shown = orders(page).getByRole("listitem");
         if (open.rows.length === 0) {
@@ -179,6 +188,44 @@ test.describe("orders list", () => {
         await expect(shown.first()).toContainText(
             `#${open.rows.at(0)?.orderId}`,
         );
+    });
+
+    test("opens on Open, soonest late first, with month-old orders folded (DEC-265)", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${LISTS}`);
+        const open = await list(page, LISTS, OPEN_VIEW);
+
+        await page.goto("/commerce/orders");
+        await expect(status(page)).toContainText("Open");
+        await expect(
+            page.getByRole("combobox", { name: "Sort orders" }),
+        ).toContainText("Due soonest first");
+        const first = open.rows.at(0);
+        if (first) {
+            await expect(
+                orders(page).getByRole("listitem").first(),
+            ).toContainText(`#${first.orderId}`);
+        }
+        const fold = page.getByRole("button", {
+            name: /^(Close|See) them$/,
+        });
+        if (open.counts.stale === 0) {
+            await expect(fold).toHaveCount(0);
+            return;
+        }
+        await expect(
+            page.getByText(
+                `${chipCount(open.counts.stale)} ${open.counts.stale === 1 ? "order" : "orders"} open over a month`,
+            ),
+        ).toBeVisible();
+        await fold.click();
+        await expect(page).toHaveURL(/older=1/);
+        await expect(page.getByText("Orders open over a month.")).toBeVisible();
+        // Read only (a film set): nothing is moved here, only shown.
+        await page.getByRole("button", { name: "Back to open orders" }).click();
+        await expect(page).not.toHaveURL(/older=/);
     });
 
     test("a search that finds nothing is empty for the search, not failed", async ({
@@ -248,7 +295,7 @@ test.describe("orders list", () => {
         const first = await list(page, LISTS);
         test.skip(!first.nextCursor, "Fewer than one page of orders here.");
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         await expect(
             page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
@@ -279,7 +326,7 @@ test.describe("orders list", () => {
         const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         const filter = page.getByRole("combobox", { name: "Location" });
         const row = orders(page).getByRole("listitem").first();
         // Counting the filter before the list is drawn counts nothing.
@@ -304,7 +351,7 @@ test.describe("orders list", () => {
         const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         const card = orders(page).getByRole("listitem").first();
         await expect(card).toBeVisible();
         const doc = await page.evaluate(() => ({
@@ -345,7 +392,7 @@ test.describe("orders list", () => {
         await page.setViewportSize({ width: 390, height: 844 });
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         // The list's own toolbar first: before it is drawn, "no filter
         // menus" holds on an empty page.
         await expect(
@@ -396,7 +443,7 @@ test.describe("orders list", () => {
     }) => {
         const page = await memberPage(browser);
         await page.goto(`/open/${RYE}`);
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         await expect(
             page.getByRole("heading", { name: "Orders" }),
         ).toBeVisible();
@@ -405,12 +452,12 @@ test.describe("orders list", () => {
         await expect(page.getByRole("button", { name: "Export" })).toHaveCount(
             0,
         );
-        const { rows } = await list(page, RYE, "&tab=open");
+        const { rows } = await list(page, RYE, OPEN_VIEW);
         if (rows.length > 0) {
             // Money is left out by the API, not hidden by the screen.
             expect(rows.every((r) => r.total === undefined)).toBe(true);
             await pickStatus(page, "Open");
-            await expect(page).toHaveURL(/tab=open/);
+            await expect(page).not.toHaveURL(/tab=/);
             // The pill says the step in words on either layout; the desk
             // grid adds the bar, itself said in words.
             const top = rows.at(0);
@@ -461,7 +508,7 @@ test.describe("a treatment's next visit on the row (B14)", () => {
     }) => {
         await signIn(page);
         await page.goto(`/open/${KAVI}`);
-        const { rows } = await list(page, KAVI, "&tab=open");
+        const { rows } = await list(page, KAVI, OPEN_VIEW);
         const treatments = (
             rows as (Row & {
                 nextVisit?: { startAt: string; timezone: string } | null;
@@ -473,7 +520,7 @@ test.describe("a treatment's next visit on the row (B14)", () => {
         );
         test.skip(treatments.length === 0, "No open treatments on Kavi.");
 
-        await page.goto("/commerce/orders?tab=open");
+        await page.goto("/commerce/orders");
         for (const t of treatments.slice(0, 3)) {
             const row = orders(page)
                 .getByRole("listitem")
@@ -496,7 +543,7 @@ test.describe("a treatment's next visit on the row (B14)", () => {
         // "Handed to courier" pill: the longest words the column holds.
         for (const org of [KAVI, RYE]) {
             await page.goto(`/open/${org}`);
-            await page.goto("/commerce/orders");
+            await page.goto("/commerce/orders?tab=all");
             await expect(
                 orders(page).getByRole("listitem").first(),
             ).toBeVisible();
@@ -612,7 +659,7 @@ test.describe("orders list filters (B4)", () => {
     }) => {
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         const bar = await filterBar(page);
         const late = bar.getByRole("combobox", { name: "Late" });
         await expect(late).toContainText("On time and late");
@@ -691,7 +738,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         test.skip(!top, "No orders here.");
         if (!top) return;
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         const opener = openerOf(page, top.orderId);
         await opener.focus();
         await page.keyboard.press("Enter");
@@ -733,7 +780,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         test.skip(!top, "No orders here.");
         if (!top) return;
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         const trigger = rowOf(page, top.orderId).getByRole("button", {
             name: `More actions for order #${top.orderId}`,
         });
@@ -759,7 +806,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         // Preparing list drops the row, and its quick view with it.
         const target = await makeOrder(page.request, { stage: "PREPARING" });
 
-        await page.goto("/commerce/orders?tab=open");
+        await page.goto("/commerce/orders?tab=open&sort=placed");
         await openerOf(page, target.orderId).click();
         const panel = quickView(page);
         await panel.getByRole("button", { name: "Mark ready" }).click();
@@ -785,7 +832,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         test.skip(!top, "No orders here.");
         if (!top) return;
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         // The read goes through a Server Action: fail every one of them.
         await page.route("**/commerce/orders*", async (route) => {
             if (route.request().headers()["next-action"]) {
@@ -812,7 +859,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         const { rows } = await list(page, RYE);
         const top = rows.at(0);
         if (top) {
-            await page.goto("/commerce/orders");
+            await page.goto("/commerce/orders?tab=all");
             await rowOf(page, top.orderId)
                 .getByRole("button", {
                     name: `More actions for order #${top.orderId}`,
@@ -870,7 +917,7 @@ test.describe("orders quick view and row menu (B5)", () => {
         const old = ((await first.json()) as { url: string }).url;
         const oldToken = old.split("/").at(-1) ?? "";
 
-        await page.goto("/commerce/orders?tab=open&payment=unpaid");
+        await page.goto("/commerce/orders?tab=open&payment=unpaid&sort=placed");
         await rowOf(page, target.orderId)
             .getByRole("button", {
                 name: `More actions for order #${target.orderId}`,
@@ -928,7 +975,7 @@ test.describe("orders bulk kitchen moves (B6)", () => {
             await makeOrder(page.request, { stage: "PREPARING" }),
         ];
 
-        await page.goto("/commerce/orders?tab=open&step=preparing");
+        await page.goto("/commerce/orders?tab=open&step=preparing&sort=placed");
         for (const r of picked) {
             await rowOf(page, r.orderId)
                 .getByRole("checkbox", {
@@ -971,7 +1018,7 @@ test.describe("orders bulk kitchen moves (B6)", () => {
             .slice(0, 2);
         test.skip(picked.length < 2, "Needs two orders with a ticket.");
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         for (const r of picked) {
             await rowOf(page, r.orderId)
                 .getByRole("checkbox", {
@@ -1028,7 +1075,7 @@ test.describe("orders bulk kitchen moves (B6)", () => {
         const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
-        await page.goto("/commerce/orders");
+        await page.goto("/commerce/orders?tab=all");
         const all = page.getByRole("checkbox", {
             name: "Select every order in this view",
         });

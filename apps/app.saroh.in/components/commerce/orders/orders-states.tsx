@@ -169,8 +169,11 @@ export function OrdersEmpty({
     go,
     share = null,
     onNew,
+    everything = null,
 }: {
     query: OrdersQuery;
+    /** Every order the business has: none is the first run, in any view. */
+    everything?: number | null;
     storeName: string | null;
     /** The filter bar's words, to say which filters found nothing (B4). */
     options?: OrderFilterOptions | null;
@@ -189,7 +192,7 @@ export function OrdersEmpty({
      */
     onNew?: () => void;
 }) {
-    const copy = ordersEmptyCopy(query, storeName, options);
+    const copy = ordersEmptyCopy(query, storeName, options, everything);
     const offer = copy.kind === "first-run" ? share : null;
     const Icon =
         copy.kind === "search"
@@ -212,8 +215,16 @@ export function OrdersEmpty({
               : copy.action === "clear-since"
                 ? { label: "Show all orders", patch: { since: null } }
                 : copy.action === "show-all"
-                  ? { label: "Show all orders", patch: { tab: "all" as const } }
-                  : null;
+                  ? {
+                        label:
+                            copy.kind === "search"
+                                ? "Search every order"
+                                : "Show all orders",
+                        patch: { tab: "all" as const },
+                    }
+                  : copy.action === "show-open"
+                    ? { label: "Back to open orders", patch: { older: false } }
+                    : null;
     return (
         <EmptyState
             data-ph-mask=""

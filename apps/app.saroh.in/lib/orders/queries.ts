@@ -68,6 +68,8 @@ export const ordersListRead = defineRead<OrdersListView>()({
             late: word,
             page: word,
             size: word,
+            sort: word,
+            older: word,
         },
     },
     tier: "live",
