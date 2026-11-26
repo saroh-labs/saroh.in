@@ -58,30 +58,22 @@ export async function asOwner(
     return { request: page.request, close: () => context.close() };
 }
 
-/** A page of a section: Sell's Orders, Bookings' Services. */
-export interface MenuPage {
+/** One row of the menu (DEC-262: every row is its own, in its group). */
+export interface MenuRow {
     label: string;
     href: string;
     /**
-     * Drawn only in a state the test doesn't own (Sell › Stock, while the
-     * business tracks stock): allowed, never required.
+     * Drawn only in a state the test doesn't own (Stock, while the business
+     * tracks stock): allowed, never required.
      */
     optional?: boolean;
-}
-
-/** One row of the menu. With `pages`, it is a section. */
-export interface MenuRow {
-    label: string;
-    /** Where the row itself goes: a section lands on its first page. */
-    href: string;
-    pages?: readonly MenuPage[];
 }
 
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * A row by its name. A row's accessible name carries on after its label
- * ("Orders 3 waiting", "Sell, current"), and "Location" reads "Locations"
+ * ("Orders 3 waiting", "Orders, current"), and "Location" reads "Locations"
  * for a business with several, so the label is where the name starts.
  */
 const named = (label: string) => new RegExp(`^${escaped(label)}`);
@@ -90,14 +82,13 @@ const hrefsOf = (links: Locator) =>
     links.evaluateAll((els) => els.map((el) => el.getAttribute("href") ?? ""));
 
 /**
- * The menu holds exactly `rows`, and each section exactly its pages: no
- * row is missing and none is there that the role can't open.
+ * The menu holds exactly `rows`, in this order: no row is missing and none
+ * is there that the role can't open.
  *
- * At the desk it is the rail: every row on Home, and a section's pages
- * under it once you are in it (the rail opens the section you are in). On a
- * phone it is the bottom bar and the "More" sheet, which between them hold
- * every row once: a section's pages under its name, and the rows with no
- * seat on the bar under Manage.
+ * At the desk it is the rail. On a phone it is the bottom bar and the
+ * "More" sheet, which between them hold every row once, each in the rail's
+ * order (DEC-263): the bar its four, the sheet the rest under the rail's
+ * group names.
  */
 export async function expectMenu(
     page: Page,
@@ -107,116 +98,62 @@ export async function expectMenu(
     else await expectRail(page, rows);
 }
 
+/** The links drawn, less the optional rows. */
+const required = (rows: readonly MenuRow[]) => {
+    const optional = new Set(rows.filter((r) => r.optional).map((r) => r.href));
+    return (hrefs: string[]) => hrefs.filter((h) => !optional.has(h));
+};
+
 async function expectRail(page: Page, rows: readonly MenuRow[]) {
     const rail = page.getByRole("navigation", { name: "Primary" });
-    const optional = new Set(
-        rows.flatMap((r) =>
-            (r.pages ?? []).filter((p) => p.optional).map((p) => p.href),
-        ),
-    );
-    const drawn = async () =>
-        (await hrefsOf(rail.getByRole("link"))).filter((h) => !optional.has(h));
-
+    const only = required(rows);
     await page.goto("/");
-    await expect.poll(drawn).toEqual(rows.map((r) => r.href));
-    for (const row of rows) {
+    await expect
+        .poll(async () => only(await hrefsOf(rail.getByRole("link"))))
+        .toEqual(only(rows.map((r) => r.href)));
+    for (const row of rows.filter((r) => !r.optional)) {
         await expect(
             rail.getByRole("link", { name: named(row.label) }).first(),
         ).toBeVisible();
-    }
-
-    for (const section of rows.filter((r) => r.pages)) {
-        const pages = (section.pages ?? []).filter((p) => !p.optional);
-        await page.goto(pages[0]?.href ?? section.href);
-        await expect
-            .poll(drawn)
-            .toEqual(
-                rows.flatMap((r) =>
-                    r === section
-                        ? [r.href, ...pages.map((p) => p.href)]
-                        : [r.href],
-                ),
-            );
-        for (const p of pages) {
-            await expect(
-                rail.getByRole("link", { name: named(p.label) }).last(),
-            ).toBeVisible();
-        }
     }
 }
 
 async function expectPhoneMenu(page: Page, rows: readonly MenuRow[]) {
     const bar = page.getByRole("navigation", { name: "Main" });
-    const sections = rows.filter((r) => r.pages);
-    const plain = rows.filter((r) => !r.pages).map((r) => r.href);
-    // A section's seat opens its first page.
-    const sectionSeats = sections.map((s) => s.pages?.[0]?.href ?? s.href);
+    const only = required(rows);
+    const all = rows.map((r) => r.href);
 
     await page.goto("/");
     await expect(
         bar.getByRole("link", { name: named("Home") }).first(),
     ).toBeVisible();
     // The bar is drawn whole, so once Home is there every seat is. It holds
-    // four at most, and nothing that isn't one of the role's rows.
-    const offered = [...plain, ...sectionSeats];
+    // four at most, only the role's rows, in the rail's order.
     await expect
         .poll(async () =>
             (await hrefsOf(bar.getByRole("link"))).filter(
-                (h) => !offered.includes(h),
+                (h) => !all.includes(h),
             ),
         )
         .toEqual([]);
     const tabs = await hrefsOf(bar.getByRole("link"));
     expect(tabs.length).toBeLessThanOrEqual(4);
-    const seatedPlain = tabs.filter((h) => plain.includes(h));
-    const unseated = plain.filter((h) => !seatedPlain.includes(h));
+    expect(tabs).toEqual(all.filter((h) => tabs.includes(h)));
+    const rest = all.filter((h) => !tabs.includes(h));
 
     const more = bar.getByRole("button", { name: /^More/ });
-    if (sections.length === 0 && unseated.length === 0) {
+    if (only(rest).length === 0) {
         // Everything fits on the bar, so there is no sheet to hold the rest.
-        await expect(more).toHaveCount(0);
+        if (rest.length === 0) await expect(more).toHaveCount(0);
         return;
     }
 
     await more.click();
     const sheet = page.getByRole("dialog", { name: "Everything else" });
     await expect(sheet).toBeVisible();
-    await expect(sheet.getByRole("group")).toHaveCount(
-        sections.length + (unseated.length > 0 ? 1 : 0),
-    );
-    for (const section of sections) {
-        const pages = section.pages ?? [];
-        const optional = new Set(
-            pages.filter((p) => p.optional).map((p) => p.href),
-        );
-        const group = sheet.getByRole("group", {
-            name: section.label,
-            exact: true,
-        });
-        await expect
-            .poll(async () =>
-                (await hrefsOf(group.getByRole("link"))).filter(
-                    (h) => !optional.has(h),
-                ),
-            )
-            .toEqual(pages.filter((p) => !p.optional).map((p) => p.href));
-        for (const p of pages.filter((x) => !x.optional)) {
-            await expect(
-                group.getByRole("link", { name: named(p.label) }),
-            ).toBeVisible();
-        }
-    }
-    const manage = sheet.getByRole("group", {
-        name: "Manage",
-        exact: true,
-    });
-    if (unseated.length > 0) {
-        await expect
-            .poll(() => hrefsOf(manage.getByRole("link")))
-            .toEqual(unseated);
-    } else {
-        await expect(manage).toHaveCount(0);
-    }
+    await expect
+        .poll(async () => only(await hrefsOf(sheet.getByRole("link"))))
+        .toEqual(only(rest));
     await sheet.getByRole("button", { name: "Close" }).click();
     await expect(sheet).toBeHidden();
 }

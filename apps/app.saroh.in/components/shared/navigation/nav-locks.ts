@@ -4,6 +4,9 @@ import type { ModuleView } from "@/lib/modules/schema";
 
 import { NAV_GROUPS } from "./nav-items";
 
+/** Invoices needs no module (DEC-070): no plan lock on a module locks it. */
+const INVOICES = "/billing/invoices";
+
 /**
  * The rail's plan locks (plans catalogue U14). A module shut only by the
  * plan (its one blocker `ENTITLEMENT_REQUIRED`) is locked, not off: it stays
@@ -34,9 +37,27 @@ export function lockedNavHrefs(
     const out = new Set<string>();
     for (const group of NAV_GROUPS) {
         for (const item of group.items) {
+            if (item.href === INVOICES) continue;
             if (item.moduleKey && keys.has(item.moduleKey)) out.add(item.href);
         }
     }
-    for (const lock of planLocks(access)) out.add(lock.href);
+    for (const lock of planLocks(access)) {
+        out.add(lock.href);
+        // A lock on a former section (Sell's `/commerce`, Payments'
+        // `/billing`) locks the rows that were its pages (DEC-262). Not
+        // Invoices, which needs no module (DEC-070), nor a row any of
+        // several modules opens (Customers).
+        for (const group of NAV_GROUPS) {
+            for (const item of group.items) {
+                if (
+                    item.href.startsWith(`${lock.href}/`) &&
+                    item.href !== INVOICES &&
+                    !item.anyModule
+                ) {
+                    out.add(item.href);
+                }
+            }
+        }
+    }
     return Array.from(out);
 }

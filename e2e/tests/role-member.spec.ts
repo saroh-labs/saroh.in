@@ -44,34 +44,22 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) for a Member's
  * permissions and the modules they reach: Payments (`payment:read`),
  * Insights (`analytics:read`), Courses and Class packs are out of reach, and
- * so are Leads, Pipeline, Discount codes and Invoices by their own reads.
- * Sell › Stock is drawn only while the business tracks stock.
+ * so are Leads, Discount codes and Invoices by their own reads. In the
+ * rail's order (DEC-262). Stock is drawn only while the business tracks stock.
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
     { label: "Business calendar", href: "/calendar" },
-    { label: "Website", href: "/sites" },
-    {
-        label: "Sell",
-        href: "/commerce",
-        pages: [
-            { label: "Orders", href: "/commerce/orders" },
-            { label: "Products", href: "/commerce/products" },
-            { label: "Stock", href: "/commerce/stock", optional: true },
-            { label: "Customers", href: "/commerce/customers" },
-            { label: "Location", href: "/commerce/locations" },
-        ],
-    },
-    {
-        label: "Bookings",
-        href: "/bookings",
-        pages: [
-            { label: "Bookings", href: "/bookings" },
-            { label: "Services", href: "/services" },
-            { label: "Hours and time off", href: "/bookings/availability" },
-        ],
-    },
+    { label: "Orders", href: "/commerce/orders" },
+    { label: "Bookings", href: "/bookings" },
+    { label: "Customers", href: "/commerce/customers" },
     { label: "Contacts", href: "/contacts" },
+    { label: "Products", href: "/commerce/products" },
+    { label: "Stock", href: "/commerce/stock", optional: true },
+    { label: "Services", href: "/services" },
+    { label: "Website", href: "/sites" },
+    { label: "Location", href: "/commerce/locations" },
+    { label: "Hours and time off", href: "/bookings/availability" },
     { label: "Settings", href: "/settings" },
 ];
 

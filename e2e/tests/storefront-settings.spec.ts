@@ -220,7 +220,7 @@ test.describe("Locations (DEC-069)", () => {
         await page.goto("/commerce/locations");
 
         if (testInfo.project.name.startsWith("phone")) {
-            // The phone keeps Sell's rows in More.
+            // The phone keeps Location in More, under Setup.
             const more = page
                 .getByRole("navigation", { name: "Main" })
                 .getByRole("button", { name: /^More/ });

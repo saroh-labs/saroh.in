@@ -5,9 +5,9 @@ export default function Loading() {
         <PageLoading
             shape="list"
             width="full"
-            breadcrumb={["Payments", "Subscriptions"]}
-            title="Subscriptions"
-            label="Loading subscriptions"
+            breadcrumb={["Memberships"]}
+            title="Memberships"
+            label="Loading memberships"
         />
     );
 }

@@ -6,7 +6,7 @@ export default function Loading() {
         <PageLoading
             shape="list"
             width="full"
-            breadcrumb={["Sell", "Orders"]}
+            breadcrumb={["Orders"]}
             title="Orders"
             label="Loading orders"
             tabs={ORDERS_TABS.map((t) => t.label)}

@@ -6,20 +6,27 @@ import {
     Calendar,
     CalendarClock,
     Clock,
+    ConciergeBell,
     CreditCard,
     Download,
     Globe,
+    GraduationCap,
     Home,
-    KanbanSquare,
+    Layers,
     LayoutGrid,
     Link2,
+    MapPin,
     Megaphone,
+    Package,
     Plug,
     QrCode,
     ReceiptText,
+    Repeat,
+    ShoppingBag,
     SlidersHorizontal,
-    Store,
+    Tag,
     Target,
+    Ticket,
     UserRound,
     Users,
 } from "lucide-react";
@@ -33,7 +40,7 @@ import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import { sharePostsOn } from "@/lib/share-item/share-posts-switch";
 
-/** Grow › Social: Your posts and Create post, while Share is switched on (DEC-217). */
+/** Online › Social: Your posts and Create post, while Share is switched on (DEC-217). */
 export const SOCIAL_HREF = "/social";
 
 /**
@@ -352,11 +359,10 @@ export interface NavItem {
     /**
      * The capability this destination belongs to (ADR-003).
      *
-     * Gating moved from the group to the item when the rail was regrouped by
-     * PURPOSE rather than by module: "Run the business" holds Commerce,
-     * Appointments and CRM destinations at once, so one key per group can no
-     * longer describe it. A group with no surviving items is dropped whole, so
-     * a merchant never meets an empty heading.
+     * Gating is on the item, not the group: a group holds destinations of
+     * several modules (What you offer has Products, Services and Courses).
+     * A group with no surviving items is dropped whole, so a merchant never
+     * meets an empty heading.
      */
     moduleKey?: string;
     /**
@@ -367,6 +373,14 @@ export interface NavItem {
      * own section is shown, so this row isn't.
      */
     unlessModule?: string;
+    /**
+     * Offered while ANY of these modules is available (or availability is
+     * unknown): Customers, for a business that takes money in any way
+     * (DEC-264).
+     */
+    anyModule?: readonly string[];
+    /** Offered only while the business tracks stock (#527): Stock. */
+    whenTracking?: boolean;
 }
 
 export interface NavGroup {
@@ -400,50 +414,69 @@ export interface NavGroup {
  * twice, and "WEBSITE" above "Sites" spent a line to say less than the item
  * already did.
  *
- * Regrouping by PURPOSE inverts it. "Presence" above "Website" and "Grow" above
- * "Insights" both add the thing the item cannot say — why it is here and what
- * it sits beside. Worse, suppressing them does not merely lose a heading: the
- * orphaned item is read under whichever heading precedes it, so a hidden "Grow"
- * filed Insights under "Run the business", which is a different claim about
- * what Insights is for.
+ * Grouping by the merchant's question (DEC-262) inverts it. "Online" above
+ * "Website" adds the thing the item cannot say — why it is here and what it
+ * sits beside. Worse, suppressing a heading does not merely lose it: the
+ * orphaned item is read under whichever heading precedes it. "Insights" over
+ * Insights alone repeats the word, and is kept for the same reason.
  */
 export function showsGroupLabel(group: NavGroup): boolean {
     return Boolean(group.label);
 }
 
 /**
- * Navigation, named for what the merchant came to do.
+ * Navigation, grouped by the question the merchant is asking (DEC-262,
+ * 26 Nov 2026): what needs me today, who are they, who paid, what do I
+ * offer, how do people find me, how is it going, and what did I set once.
  *
- * Onboarding asks "What does your business need to do?" and the merchant answers
- * in outcomes — *Sell products*, *Take bookings*, *Show up online*. The shell
- * then discarded that vocabulary entirely and handed back module and entity
- * names — Commerce, Sites, Analytics — that nobody chose and nothing taught.
- * These labels are the onboarding answer, carried forward.
+ * One home per thing: every destination is one row in one group, whatever
+ * module built it, and daily work comes before setup. The groups used to
+ * be modules wearing purpose names ("Run the business" held Sell, Bookings
+ * and Payments as sections), so Orders sat beside Location and Bookings
+ * beside Hours and time off, and a gym with Sell off had no customer list.
  *
- * Presentation only. No route, module key or schema changes: the same
- * capability gating applies, and every URL is untouched.
+ * The same menu for every business: rows leave it only by the gates that
+ * already existed (module, role, plan, edition, switch). Grouping by trade
+ * is deferred by the owner (26 Nov 2026).
  *
- * Commerce leads, per the product decision of 2026-08-02 and
- * `information-architecture.md` §2 — Sell sits above Bookings.
+ * Presentation only. No route moved: every address is the one it was, and
+ * each row keeps the gates it had as a section's page.
  *
  * `Contacts` deliberately keeps its name. The unified customer record is not
  * built yet (SEC-005 / ARCH-001 are open), so calling it "All customers" would
- * promise a merge that has not happened — the same over-claim that was removed
- * from the marketing site.
+ * promise a merge that has not happened.
  */
 const STOREFRONTS_HREF = "/commerce/locations";
 const STOCK_HREF = "/commerce/stock";
 const INVOICES_HREF = "/billing/invoices";
+const CUSTOMERS_HREF = "/commerce/customers";
+const LEADS_HREF = "/leads";
+const PIPELINE_HREF = "/pipeline";
+/** Plans are a tab of Memberships (D3); the menu names them on their own. */
+export const MEMBERSHIP_PLANS_HREF = "/billing/subscriptions?tab=plans";
+
+/**
+ * The modules a business takes money with (DEC-264): with any of them on,
+ * People › Customers is offered, Sell or not. The list itself is the
+ * business's contacts who paid (DEC-041), served by the API to
+ * `contact:read` whatever modules are on.
+ */
+export const PAYING_MODULES = [
+    "COMMERCE",
+    "PAYMENTS",
+    "APPOINTMENTS",
+    "COURSES",
+    "CLASS_PACKS",
+] as const;
 
 export const NAV_GROUPS: NavGroup[] = [
     {
+        label: "Today",
         items: [
             { href: "/", label: "Home", icon: Home },
-            // Home › Business calendar (the "Saroh Business Calendar" design): one
-            // month of everything dated. Named Overview from UX-039 until the
-            // owner chose Calendar (Q9, DEC-170, 19 Oct). Not module-gated — it spans
-            // modules, and each layer on it follows its own module and
-            // permission (the API leaves out what the viewer may not see).
+            // One month of everything dated (DEC-170). Not module-gated —
+            // it spans modules, and each layer on it follows its own module
+            // and permission (the API leaves out what the viewer may not see).
             {
                 href: "/calendar",
                 label: "Business calendar",
@@ -451,168 +484,71 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: Calendar,
                 action: "org:read",
             },
-        ],
-    },
-    {
-        // Grouped by PURPOSE rather than by module, following the canvas
-        // design. A merchant does not think "Commerce" and "Appointments" —
-        // they think "the public face of my business" and "the work of running
-        // it". §6: the architecture may stay modular; the interface should not
-        // make the merchant think in modules.
-        label: "Presence",
-        items: [
             {
-                href: "/sites",
-                label: "Website",
-                icon: Globe,
-                moduleKey: "WEBSITE",
-            },
-        ],
-    },
-    {
-        label: "Run the business",
-        items: [
-            {
-                href: "/commerce",
-                label: "Sell",
-                icon: Store,
+                href: "/commerce/orders",
+                label: "Orders",
+                icon: ShoppingBag,
                 moduleKey: "COMMERCE",
-                // Sell's screens are destinations, so they nest in the rail
-                // (brand file §13): Sell is the section, the child is the page.
-                //
-                // Orders leads, and Storefronts closes. The order is the
-                // design's and it is the order of a working day: the thing
-                // waiting for you first, the things you keep, and the places
-                // you sell from last — a merchant opens Storefronts to change
-                // a setting, not to find out what needs doing.
-                children: [
-                    {
-                        href: "/commerce/orders",
-                        label: "Orders",
-                        // A Member at the counter reaches it through the
-                        // kitchen (DEC-024) and sees no money on it.
-                        action: ["order:read", "order:stage"],
-                    },
-                    {
-                        href: "/commerce/products",
-                        label: "Products",
-                        action: "store:read",
-                    },
-                    {
-                        // Levels, the log and the checks (#527). Reading
-                        // stock is reading the catalogue.
-                        href: STOCK_HREF,
-                        label: "Stock",
-                        action: "store:read",
-                        whenTracking: true,
-                    },
-                    {
-                        href: "/commerce/customers",
-                        label: "Customers",
-                        // Its own read (matrix W-1, B16): the list is the
-                        // business's contacts (DEC-041), which the API
-                        // serves to `contact:read`; the order columns in it
-                        // follow `order:read` there.
-                        action: "contact:read",
-                    },
-                    {
-                        href: "/commerce/discounts",
-                        label: "Discount codes",
-                        action: "discount:read",
-                    },
-                    {
-                        href: STOREFRONTS_HREF,
-                        // Singular for the business with one; `navFor`
-                        // names it "Locations" once there are more
-                        // (DEC-069: storefronts are called locations).
-                        label: "Location",
-                        action: "store:read",
-                    },
-                ],
+                // A Member at the counter reaches it through the kitchen
+                // (DEC-024) and sees no money on it.
+                action: ["order:read", "order:stage"],
             },
-            // Bookings: "what is booked?" and "what can be booked?" as one
-            // section, after the "Saroh Bookings" design. They used to be four
-            // rows of their own (Schedule, Services, Courses, Class packs);
-            // the design nests them, as Sell nests its screens. Every address
-            // is unchanged — the section is presentation only.
-            //
-            // No `moduleKey` on the section itself: Courses is its own module
-            // (ADR-007), so a business may run courses without taking
-            // appointments. Each child carries its own key; a section whose
-            // every child is filtered away is dropped whole, and one whose
-            // landing page was filtered away lands on its first survivor
-            // (see `landOnFirstChild`).
             {
                 href: "/bookings",
                 label: "Bookings",
                 icon: CalendarClock,
-                children: [
-                    // "Bookings", as the phone's tab bar says: "Business
-                    // calendar" is Home's, across every module (owner, 22 Nov),
-                    // so the menu names each once.
-                    {
-                        href: "/bookings",
-                        label: "Bookings",
-                        moduleKey: "APPOINTMENTS",
-                    },
-                    {
-                        href: "/services",
-                        label: "Services",
-                        moduleKey: "APPOINTMENTS",
-                    },
-                    // Who can be booked when, and the business's rules (U16).
-                    {
-                        href: "/bookings/availability",
-                        label: "Hours and time off",
-                        moduleKey: "APPOINTMENTS",
-                    },
-                    {
-                        href: "/courses",
-                        label: "Courses",
-                        moduleKey: "COURSES",
-                        action: "course:read",
-                    },
-                    // Booked time sold ahead (ADR-007): its own module, which
-                    // needs Appointments (E12).
-                    {
-                        href: "/class-packs",
-                        label: "Class packs",
-                        moduleKey: "CLASS_PACKS",
-                        action: "pack:read",
-                    },
-                ],
+                moduleKey: "APPOINTMENTS",
             },
-            // Payments (ADR-007): money a business is owed by a person —
-            // memberships and the invoices for them, after the "Saroh Billing
-            // and Classes" design. The rail says Payments; the addresses stay
-            // `/billing/*`, which is where the old Billing links still land.
+        ],
+    },
+    {
+        label: "People",
+        items: [
             {
-                // The section, like Sell's `/commerce`: every Payments page is
-                // under it, so the rail opens and marks Payments on any of
-                // them. `/billing` itself redirects to Subscriptions.
-                href: "/billing",
-                label: "Payments",
-                icon: CreditCard,
-                moduleKey: "PAYMENTS",
-                children: [
-                    {
-                        href: "/billing/subscriptions",
-                        label: "Subscriptions",
-                        action: "subscription:read",
-                    },
-                    // Plans are a tab of Subscriptions (D3), not a row.
-                    {
-                        href: "/billing/invoices",
-                        label: "Invoices",
-                        action: "invoice:read",
-                    },
-                ],
+                href: CUSTOMERS_HREF,
+                label: "Customers",
+                icon: UserRound,
+                // Its own read (matrix W-1, B16): the business's contacts
+                // who paid (DEC-041), served to `contact:read`; the order
+                // columns in it follow `order:read` there.
+                action: "contact:read",
+                anyModule: PAYING_MODULES,
             },
-            // Invoices without Payments (DEC-070, KTD-11): a business that
-            // doesn't take money online still bills, sends and records paid.
-            // While Payments is on, Invoices sits under it (above); while it
-            // is off, this row takes its place. Same address, so no link
-            // breaks.
+            // Leads and the pipeline need `lead:read` and `pipeline:read`,
+            // which a Member does not hold. Pipeline is Leads' board view
+            // (`LeadsViewSwitch`), so it is not a row of its own: whoever
+            // holds only `pipeline:read` lands on the board (`navFor`).
+            {
+                href: LEADS_HREF,
+                label: "Leads",
+                icon: Target,
+                moduleKey: "CRM",
+                action: ["lead:read", "pipeline:read"],
+            },
+            // Reached with the CRM module (`contact:read`, which a Member
+            // holds). It stays until People is one list with views.
+            {
+                href: "/contacts",
+                label: "Contacts",
+                icon: Users,
+                moduleKey: "CRM",
+            },
+        ],
+    },
+    {
+        label: "Money",
+        items: [
+            // Invoices need no module (DEC-070, KTD-11). Two entries for one
+            // row so it keeps exactly the gates it had: the first while
+            // Payments is on (or unknown), the second while it is off, which
+            // a site for my work doesn't get (`withoutStandaloneInvoices`).
+            {
+                href: INVOICES_HREF,
+                label: "Invoices",
+                icon: ReceiptText,
+                moduleKey: "PAYMENTS",
+                action: "invoice:read",
+            },
             {
                 href: INVOICES_HREF,
                 label: "Invoices",
@@ -620,43 +556,87 @@ export const NAV_GROUPS: NavGroup[] = [
                 action: "invoice:read",
                 unlessModule: "PAYMENTS",
             },
+            // The people paying monthly. The menu and the page's heading
+            // say Memberships; the columns and emails still say
+            // Subscriptions until the owner decides the word (DEC-264).
             {
-                href: "/contacts",
-                label: "Contacts",
-                icon: Users,
-                moduleKey: "CRM",
-            },
-            // Contacts is reached with the CRM module (`contact:read`, which a
-            // Member holds); leads and the pipeline need `lead:read` and
-            // `pipeline:read`, which a Member does not.
-            {
-                href: "/leads",
-                label: "Leads",
-                icon: Target,
-                moduleKey: "CRM",
-                action: "lead:read",
-            },
-            {
-                href: "/pipeline",
-                label: "Pipeline",
-                icon: KanbanSquare,
-                moduleKey: "CRM",
-                action: "pipeline:read",
+                href: "/billing/subscriptions",
+                label: "Memberships",
+                icon: CreditCard,
+                moduleKey: "PAYMENTS",
+                action: "subscription:read",
             },
         ],
     },
     {
-        label: "Grow",
+        label: "What you offer",
         items: [
             {
-                href: "/analytics",
-                label: "Insights",
-                icon: BarChart3,
-                moduleKey: "INSIGHTS",
+                href: "/commerce/products",
+                label: "Products",
+                icon: Package,
+                moduleKey: "COMMERCE",
+                action: "store:read",
             },
-            // Social (#1378, DEC-217): Your posts, then Create post. Saroh
-            // Social will add its channels and calendar layer later.
-            // Website until the Social module exists, as the API gates it.
+            {
+                // Levels, the log and the checks (#527). Reading stock is
+                // reading the catalogue.
+                href: STOCK_HREF,
+                label: "Stock",
+                icon: Layers,
+                moduleKey: "COMMERCE",
+                action: "store:read",
+                whenTracking: true,
+            },
+            {
+                href: "/services",
+                label: "Services",
+                icon: ConciergeBell,
+                moduleKey: "APPOINTMENTS",
+            },
+            {
+                href: "/courses",
+                label: "Courses",
+                icon: GraduationCap,
+                moduleKey: "COURSES",
+                action: "course:read",
+            },
+            // Booked time sold ahead (ADR-007): its own module, which needs
+            // Appointments (E12).
+            {
+                href: "/class-packs",
+                label: "Class packs",
+                icon: Ticket,
+                moduleKey: "CLASS_PACKS",
+                action: "pack:read",
+            },
+            {
+                href: MEMBERSHIP_PLANS_HREF,
+                label: "Membership plans",
+                icon: Repeat,
+                moduleKey: "PAYMENTS",
+                action: "subscription:read",
+            },
+            {
+                href: "/commerce/discounts",
+                label: "Discount codes",
+                icon: Tag,
+                moduleKey: "COMMERCE",
+                action: "discount:read",
+            },
+        ],
+    },
+    {
+        label: "Online",
+        items: [
+            {
+                href: "/sites",
+                label: "Website",
+                icon: Globe,
+                moduleKey: "WEBSITE",
+            },
+            // Social (#1378, DEC-217): Your posts, then Create post. Website
+            // until the Social module exists, as the API gates it.
             {
                 href: SOCIAL_HREF,
                 label: "Social",
@@ -665,41 +645,47 @@ export const NAV_GROUPS: NavGroup[] = [
                 action: "social:read",
             },
         ],
-        // The canvas design also shows Marketing, Automation and AI here as
-        // SOON. The rail deliberately has no "coming soon" state: a nav entry
-        // that cannot be opened spends a permanent line advertising absence,
-        // and §2 asks that what the UI claims match what ships. A capability
-        // appears here when it has a route.
     },
     {
-        label: "Manage",
+        label: "Insights",
+        items: [
+            {
+                href: "/analytics",
+                label: "Insights",
+                icon: BarChart3,
+                moduleKey: "INSIGHTS",
+            },
+        ],
+    },
+    {
+        // Things set once, at the foot of the rail (DEC-262; "Manage" from
+        // DEC-133 until then). The space above it is a flexible spacer.
+        label: "Setup",
         pinToBottom: true,
         items: [
+            {
+                href: STOREFRONTS_HREF,
+                // Singular for the business with one; `navFor` names it
+                // "Locations" once there are more (DEC-069).
+                label: "Location",
+                icon: MapPin,
+                moduleKey: "COMMERCE",
+                action: "store:read",
+            },
+            // Who can be booked when, and the business's rules (U16).
+            {
+                href: "/bookings/availability",
+                label: "Hours and time off",
+                icon: Clock,
+                moduleKey: "APPOINTMENTS",
+            },
             /*
-             * Never module-gated — Settings → Modules is where a capability
-             * gets turned on in the first place, so gating it on a module would
-             * be a door locked from the inside.
-             *
-             * ROLE-gated, though, and it was not. The note here used to say
-             * these "degrade by role on the server, so showing them to every
-             * actor leaks nothing", and three of the five do exactly that:
-             * Notifications, Organization and People answer "you do not have
-             * access to this". Offering a destination whose only content is a
-             * refusal is not degrading gracefully, it is sending someone down a
-             * corridor to a locked door. Providers did not even refuse — it
-             * named the payment and messaging providers the business runs on to
-             * anyone who was not a MEMBER, REVIEWER included (#313).
-             */
-            /*
-             * One Settings row (2026-09-25). Its pages are tabs on the
-             * settings screen itself (`SETTINGS_PAGES`), so the rail does not
-             * repeat them. Offered when the actor may open one of the
-             * business's pages; `/settings` then opens the first they may.
-             * Your profile is everyone's, but it is about the person, so it
-             * does not put Settings in a Reviewer's rail — they reach it from
-             * the account menu, as the design has it. Plan and billing needs
-             * `org:settings:read`, already listed. Notifications moved to the
-             * top bar (`NOTIFICATIONS_NAV`).
+             * Never module-gated: Settings › Modules is where a capability
+             * gets turned on, so gating it on a module would be a door
+             * locked from the inside. Role-gated (#313): offered when the
+             * actor may open one of the business's pages (`SETTINGS_PAGES`,
+             * its tabs); `/settings` then opens the first they may. Your
+             * profile is reached from the account menu.
              */
             {
                 href: "/settings",
@@ -870,17 +856,19 @@ export function navRowsForModule(moduleKey: string): string[] {
     for (const group of NAV_GROUPS) {
         for (const item of group.items) {
             const own = item.moduleKey ?? group.moduleKey;
-            // A section's screens count as rows: turning Commerce off takes
-            // Storefronts, Products and Customers with it, and the merchant
-            // should be told the names they navigate by. A section that spans
-            // modules (Bookings) names the ones this module owns.
+            // The merchant is told the names they navigate by: turning
+            // Commerce off takes Orders, Products, Stock, Discount codes and
+            // Location with it. A section's screens (a site's, in the
+            // palette) count as rows too.
             const children = (item.children ?? []).filter(
                 (child) =>
                     (child.moduleKey ?? own) === moduleKey &&
                     !(child.href && staying.has(child.href)),
             );
             if (own !== moduleKey && children.length === 0) continue;
-            if (own === moduleKey) rows.push(item.label);
+            if (own === moduleKey && !staying.has(item.href)) {
+                rows.push(item.label);
+            }
             for (const child of children) {
                 // A child that repeats its parent's destination AND name is
                 // the section landing page, not a second row, when the
@@ -922,6 +910,12 @@ export function filterNavGroups(
                 ...group,
                 items: group.items.flatMap((item) => {
                     if (!allowed(item.moduleKey)) return [];
+                    if (
+                        item.anyModule &&
+                        !item.anyModule.some((k) => available.has(k))
+                    ) {
+                        return [];
+                    }
                     if (item.unlessModule && available.has(item.unlessModule)) {
                         return [];
                     }
@@ -1082,29 +1076,46 @@ export function navFor({
     const groups = isLocationScopedRole(roleKey)
         ? sellOrdersOnly(billed)
         : billed;
-    return (storefronts ?? 0) > 1 ? pluralStorefronts(groups) : groups;
+    const named = (storefronts ?? 0) > 1 ? pluralStorefronts(groups) : groups;
+    return navCan({ role, actions }, "lead:read")
+        ? named
+        : leadsOnTheBoard(named);
 }
 
-const ORDERS_HREF = "/commerce/orders";
+/**
+ * Leads for someone who reads the pipeline but not the list: the row lands
+ * on its board view, as the Pipeline row it replaced did.
+ */
+function leadsOnTheBoard(groups: NavGroup[]): NavGroup[] {
+    return groups.map((group) => ({
+        ...group,
+        items: group.items.map((item) =>
+            item.href === LEADS_HREF ? { ...item, href: PIPELINE_HREF } : item,
+        ),
+    }));
+}
+
+/** What was Sell's: a location's team is offered its Orders alone. */
+const SELL_ROWS_BUT_ORDERS = new Set([
+    "/commerce/products",
+    STOCK_HREF,
+    CUSTOMERS_HREF,
+    "/commerce/discounts",
+    STOREFRONTS_HREF,
+]);
 
 /**
- * Sell for a location's team (DEC-074): its Orders alone, and the row lands
- * there. The storefronts, products and stock their role can read stay
- * reachable by address; the rail offers the work.
+ * A location's team (DEC-074): of what was Sell, Orders alone. The
+ * storefronts, products and stock their role can read stay reachable by
+ * address; the rail offers the work.
  */
 function sellOrdersOnly(groups: NavGroup[]): NavGroup[] {
     return groups
         .map((group) => ({
             ...group,
-            items: group.items.flatMap((item) => {
-                if (item.href !== "/commerce" || !item.children) return [item];
-                const children = item.children.filter(
-                    (c) => c.href === ORDERS_HREF,
-                );
-                return children.length > 0
-                    ? [{ ...item, href: ORDERS_HREF, children }]
-                    : [];
-            }),
+            items: group.items.filter(
+                (item) => !SELL_ROWS_BUT_ORDERS.has(item.href),
+            ),
         }))
         .filter((group) => group.items.length > 0);
 }
@@ -1133,17 +1144,23 @@ function withoutSocial(groups: NavGroup[]): NavGroup[] {
 
 /** The rows that need the business to track stock, taken out. */
 function withoutStockRows(groups: NavGroup[]): NavGroup[] {
-    return groups.map((group) => ({
-        ...group,
-        items: group.items.map((item) =>
-            item.children
-                ? {
-                      ...item,
-                      children: item.children.filter((c) => !c.whenTracking),
-                  }
-                : item,
-        ),
-    }));
+    return groups
+        .map((group) => ({
+            ...group,
+            items: group.items
+                .filter((item) => !item.whenTracking)
+                .map((item) =>
+                    item.children
+                        ? {
+                              ...item,
+                              children: item.children.filter(
+                                  (c) => !c.whenTracking,
+                              ),
+                          }
+                        : item,
+                ),
+        }))
+        .filter((group) => group.items.length > 0);
 }
 
 /** The Location row, named for a business that has several. */
@@ -1183,21 +1200,37 @@ export function isNavChildCurrent(
 }
 
 /**
- * Pages that belong to a section without living under its address. The
- * person page (`/contacts/:contactId`, #869) is Contacts', and Sell ›
- * Customers' where the rail has no Contacts (CRM off): the first of its
- * homes the actor's rail holds is where the rail says you are. A plan's
- * pages (`/billing/plans/:planId`) are Subscriptions', whose tab Plans is
- * (D3). Every other address is its own.
+ * Pages that belong to a row without living under its address. The person
+ * page (`/contacts/:contactId`, #869) is Contacts' or Customers': the one
+ * the person came from when they came from either (`from`), else the first
+ * of them the actor's rail holds. Leads' board (`/pipeline`) is Leads'
+ * (DEC-262). A plan's pages (`/billing/plans/:planId`) are Membership
+ * plans'. Every other address is its own.
  */
 const NAV_HOMES: readonly { prefix: string; homes: readonly string[] }[] = [
-    { prefix: "/contacts/", homes: ["/contacts", "/commerce/customers"] },
-    { prefix: "/billing/plans/", homes: ["/billing/subscriptions"] },
+    { prefix: "/contacts/", homes: ["/contacts", CUSTOMERS_HREF] },
+    { prefix: PIPELINE_HREF, homes: [LEADS_HREF, PIPELINE_HREF] },
+    {
+        prefix: "/billing/plans/",
+        homes: [MEMBERSHIP_PLANS_HREF, "/billing/subscriptions"],
+    },
 ];
 
+/** Is `pathname` this address or a page beneath it? */
+const isUnder = (pathname: string, href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
+
+/**
+ * The address the rail marks for `pathname`.
+ *
+ * `from` is the last page the person was on before it (`useNavPathname`):
+ * a person opened from Customers keeps Customers lit, and from Contacts,
+ * Contacts.
+ */
 export function navPathname(
     pathname: string,
     groups: readonly NavGroup[],
+    from: string | null = null,
 ): string {
     const entry = NAV_HOMES.find((e) => pathname.startsWith(e.prefix));
     if (!entry) return pathname;
@@ -1209,7 +1242,15 @@ export function navPathname(
             ]),
         ),
     );
-    return entry.homes.find((h) => hrefs.has(h)) ?? pathname;
+    const came = from
+        ? entry.homes.find((h) => hrefs.has(h) && isUnder(from, h))
+        : undefined;
+    return came ?? entry.homes.find((h) => hrefs.has(h)) ?? pathname;
+}
+
+/** Whether `pathname` is one of the pages `navPathname` gives a home. */
+export function hasNavHome(pathname: string): boolean {
+    return NAV_HOMES.some((e) => pathname.startsWith(e.prefix));
 }
 
 export function isNavItemActive(pathname: string, href: string): boolean {
@@ -1219,20 +1260,36 @@ export function isNavItemActive(pathname: string, href: string): boolean {
 /**
  * Is this row — or, for a section, any page in it — where you are?
  *
- * A section's pages need not live under its own address: Bookings is
- * `/bookings`, and its Services and Courses are `/services` and `/courses`.
- * Matching the section's address alone left the rail dark on half of it.
+ * `rows` are the rail's other rows: the deepest match wins, so on Hours
+ * and time off (`/bookings/availability`) Bookings is not lit too, and on
+ * Membership plans Memberships isn't.
  */
 export function isNavSectionActive(
     pathname: string,
     item: Pick<NavItem, "href" | "children">,
+    rows: readonly Pick<NavItem, "href">[] = [],
 ): boolean {
+    const deeper = rows.some(
+        (r) =>
+            r.href.length > item.href.length &&
+            r.href.startsWith(item.href) &&
+            isNavItemActive(pathname, r.href),
+    );
     return (
-        isNavItemActive(pathname, item.href) ||
+        (isNavItemActive(pathname, item.href) && !deeper) ||
         (item.children ?? []).some((child) =>
             isNavChildCurrent(pathname, child.href),
         )
     );
+}
+
+/** The rail row `pathname` (already through `navPathname`) is under, if any. */
+export function activeNavItem(
+    pathname: string,
+    groups: readonly NavGroup[],
+): NavItem | undefined {
+    const rows = groups.flatMap((g) => g.items);
+    return rows.find((item) => isNavSectionActive(pathname, item, rows));
 }
 
 /** Settings › Plan and billing, hidden while plans aren't shown. */

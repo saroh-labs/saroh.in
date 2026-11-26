@@ -390,7 +390,7 @@ export function InvoicesScreen({
             <PageHeader
                 compactOnPhone
                 // Off, it is a top-level page, with nothing to sit under.
-                breadcrumb={paymentsOn ? ["Payments", "Invoices"] : undefined}
+                breadcrumb={paymentsOn ? ["Invoices"] : undefined}
                 title="Invoices"
                 // How many are on hand, until a search or a figure asks
                 // the API: then the rows are the answer, not the business.

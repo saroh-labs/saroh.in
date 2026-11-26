@@ -19,9 +19,8 @@ import { CountBadge } from "@saroh/ui/count-badge";
  * "Everything else": the More tab's bottom sheet (the "Saroh Tab Bar"
  * design).
  *
- * Every section the actor reaches, with all of its pages — including a
- * seated section's, since its tab can only open one of them — then the rows
- * that belong to no section, under Manage. What the bar does not hold is
+ * The rail's groups, in the rail's order and under its headings, each with
+ * the rows the bar has no seat for (DEC-263). What the bar does not hold is
  * here, so the phone reaches exactly what the rail does.
  *
  * A modal dialog: focus goes to Close when it opens (not the first row, so a

@@ -32,10 +32,7 @@ export default async function ServicesPage() {
     if (!canReadServices(organization)) {
         return (
             <PageContainer width="full">
-                <PageHeader
-                    breadcrumb={["Bookings", "Services"]}
-                    title="Services"
-                />
+                <PageHeader breadcrumb={["Services"]} title="Services" />
                 <div>
                     <PermissionDeniedState
                         {...whoCanChange({

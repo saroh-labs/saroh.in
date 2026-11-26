@@ -44,7 +44,7 @@ export function DiscountContainer({ ask }: { ask: DiscountAsk }) {
             <PageLoading
                 shape="form"
                 width="form"
-                breadcrumb={["Sell", "Discount codes"]}
+                breadcrumb={["Discount codes"]}
                 label="Loading the code"
             />
         );
@@ -54,7 +54,7 @@ export function DiscountContainer({ ask }: { ask: DiscountAsk }) {
         <PageContainer width="form">
             <PageHeader
                 holdsData
-                breadcrumb={["Sell", "Discount codes", discount.code]}
+                breadcrumb={["Discount codes", discount.code]}
                 title={<span className="font-mono">{discount.code}</span>}
             />
             {reach ? (

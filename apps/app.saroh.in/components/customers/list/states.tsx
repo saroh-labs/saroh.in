@@ -25,7 +25,7 @@ export function ListHeading({
     return (
         <PageHeader
             className="mb-3.5"
-            breadcrumb={["Sell", "Customers"]}
+            breadcrumb={["Customers"]}
             title="Customers"
             count={count ?? undefined}
             actions={actions}

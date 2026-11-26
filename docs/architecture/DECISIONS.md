@@ -3404,6 +3404,33 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Cards are styled per section or for the whole site only;** there is no "This card" (and no per-card storage).
 - **Page rows** in the editor show the first photo on the page (its stored smaller copy), or a plain page icon.
 
+## DEC-262 The menu is grouped by the merchant's question, one home per thing
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, design canvas page "Grouping the menu": "the grouping looks better now") · amends the group-by-purpose menu ("Presence", "Run the business", "Grow", 2026-08-02) and DEC-133's last group "Manage"
+
+- Context: the menu's groups were modules wearing purpose names. "Run the business" held Sell, Bookings and Payments as sections, so Orders sat beside Location and Bookings beside Hours and time off; people were in four places; what a business sells was filed by the module that built it; a gym with Sell off had no customer list.
+- Decision: **one home per thing; daily work before setup.** Every destination is one flat row in one group: **Today** (Home, Business calendar, Orders, Bookings) · **People** (Customers, Leads, Contacts) · **Money** (Invoices, Memberships) · **What you offer** (Products, Stock, Services, Courses, Class packs, Membership plans, Discount codes) · **Online** (Website, Social) · **Insights** · **Setup** (Location, Hours and time off, Settings) at the foot of the rail. Sell, Bookings and Payments are no longer sections.
+- **The menu does not vary by trade.** Grouping by trade is deferred by the owner (26 Nov 2026); the four trade boards only illustrate what the existing gates produce. A row leaves the menu only by the gates it already had (module, role, plan, edition, switch), each as strict as before.
+- No address moved. Pipeline is Leads' Board view, so Leads is its row (it lands on the board for a role that reads the pipeline only). Membership plans opens Memberships' Plans tab. Team, Integrations and Plan and billing stay inside Settings. A breadcrumb starts at the page's row ("Orders › #1042"), never a group name.
+- Existing merchants are told once, on Home's "New" card ("The menu has moved", moment `new-menu`, stored per business like every moment), with a help article, `/help/where-things-are-in-the-menu`.
+- Not in this round: the merged People list with views (All, Paying, Leads, Follow-ups), a Payments list of money received, Team, Integrations and Plan and billing as Setup rows, one Calendar in place of the Business calendar and the Bookings diary, and a "Booking page, share links" row.
+
+## DEC-263 The phone's tab bar keeps one order everywhere
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, board Nav-phone-proposed; correction the same day: no trade-based tabs for now) · replaces the bar's "the section you are in takes the second seat" (Saroh Tab Bar design)
+
+- The bar's tabs are the ones it had: Home, Business calendar ("Calendar"), Orders (Sell's seat, which opened Orders) and Insights, each when the actor has it; a seat left empty by a gate goes to the rail's next row. **They are drawn in the rail's order, the same on every page**: the page you are on never moves a tab.
+- **A tab exists only when its destination does for that business and person** (the existing gates); the rest keep their order.
+- No tab is chosen by the business's trade or by usage, for now; to be revisited with usage data.
+- The More sheet lists every row without a seat under the rail's group names, in the rail's order.
+
+## DEC-264 Customers is reachable whenever the business takes money; Memberships is the menu's word for subscriptions
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, Nav-proposed pin 2, sticky nq3) · amends DEC-041's placement, not its definition
+
+- **People › Customers is offered whenever any paying module is on**: Sell, Payments, Appointments, Courses or Class packs (`PAYING_MODULES`), with `contact:read` as before. Its page steps round Sell's gate in `commerce/layout.tsx` when Sell is off and one of those is on; the list itself is unchanged (DEC-041: contacts who paid or sign in), read from the organization-level API, which needs only `contact:read`.
+- A person opened from Customers keeps Customers lit and its crumb ("Customers › name"); from Contacts, Contacts. Opened from anywhere else, the rule before holds (Contacts where the rail has it).
+- **"Memberships"** is the menu's and the page's heading word for Subscriptions (`/billing/subscriptions`), and "Membership plans" for its Plans tab. The page's tabs, columns, statuses and emails keep "Subscriptions" until the owner decides the word everywhere.
 ## DEC-261 A service is Free or Paid; a free one is booked straight away, and says "Free"
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026: "book free sessions … give an option to select free or paid … directly book for the free sessions") · amends DEC-257 (its one payment word gains "Free") and DEC-172 (Classic says "Free" too) · follows DEC-098, DEC-088, DEC-089
