@@ -15,6 +15,7 @@ import {
     accountManagerOrNull,
     activeOrganizationOnce,
 } from "@/lib/organizations/service";
+import { toWire } from "@/lib/query/define-read";
 import type { Access, ServerRead } from "@/lib/query/route";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
@@ -165,3 +166,26 @@ export const shellLiveServer: ServerRead<NoParams, ShellLive> = {
     read: shellLiveRead,
     service: readShellLive,
 };
+
+/**
+ * The shell's two reads for a full load, started and not awaited (owner,
+ * 25 Nov 2026): the layout hands the promises to the browser (`ShellSeed`),
+ * so the frame streams at once, the answers follow in the same response and
+ * neither route is asked. Only for a document request: a client render
+ * (`router.refresh()`, a Server Action, a business switch) already holds
+ * them or reads the routes, so it pays for nothing here. The same fields
+ * as the routes (`toWire`), after the same gate (the shell's layout has the
+ * open business); a failed read is `null` and the browser asks the route.
+ */
+export function startShellSeed(requestHeaders: Headers): {
+    settings: Promise<ShellSettings | null>;
+    live: Promise<ShellLive | null>;
+} | null {
+    // Next strips its own `RSC` headers before a render sees them; the
+    // browser says what it asks for. No header (an old browser): the routes.
+    if (requestHeaders.get("sec-fetch-dest") !== "document") return null;
+    return {
+        settings: readShellSettings().then(toWire, () => null),
+        live: readShellLive().then(toWire, () => null),
+    };
+}
