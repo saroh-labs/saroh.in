@@ -20,7 +20,10 @@ import {
     ReadFailed,
     resetReadErrorGuard,
 } from "@/lib/query/client";
-import { invalidateOrganizations } from "@/lib/query/invalidate";
+import {
+    invalidateOrganizations,
+    resetCacheUser,
+} from "@/lib/query/invalidate";
 import { domainKey, ORGANIZATIONS_KEY } from "@/lib/query/keys";
 import { useOrgId } from "@/lib/query/org";
 
@@ -45,7 +48,9 @@ beforeEach(() => {
     root = createRoot(host);
     refresh.mockReset();
     resetReadErrorGuard();
+    resetCacheUser();
     qc().clear();
+    localStorage.clear();
 });
 afterEach(() => {
     act(() => root.unmount());
@@ -62,10 +67,10 @@ function fromOtherTab(kind: "switch" | "signout" | "settings") {
     c.close();
 }
 
-const draw = (orgs: Organization[]) =>
+const draw = (orgs: Organization[], userId = "u1") =>
     act(() =>
         root.render(
-            <QueryProvider orgId="o1" organizations={orgs}>
+            <QueryProvider orgId="o1" userId={userId} organizations={orgs}>
                 <ShowOrg />
             </QueryProvider>,
         ),
@@ -182,6 +187,26 @@ describe("QueryProvider", () => {
                 value: real,
             });
         }
+    });
+
+    it("another person signed in clears everything held, the settings and search recents too", () => {
+        draw([org("o1", "Northwind")]);
+        const settings = domainKey("settings", "o1", "people");
+        qc().setQueryData(settings, ["first person's answer"]);
+        localStorage.setItem("saroh-recent-v1:o1", "[]");
+        localStorage.setItem("other-thing", "kept");
+        // Drawn again for the same person: kept.
+        draw([org("o1", "Northwind")]);
+        expect(qc().getQueryData(settings)).toEqual(["first person's answer"]);
+        // A teammate in the same business, the tab never reloaded.
+        draw([org("o1", "Northwind")], "u2");
+        expect(qc().getQueryData(settings)).toBeUndefined();
+        expect(localStorage.getItem("saroh-recent-v1:o1")).toBeNull();
+        expect(localStorage.getItem("other-thing")).toBe("kept");
+        // This render's list is held for the new person.
+        expect(qc().getQueryData(ORGANIZATIONS_KEY)).toEqual([
+            org("o1", "Northwind"),
+        ]);
     });
 
     it("useOrgId outside the provider throws", () => {
