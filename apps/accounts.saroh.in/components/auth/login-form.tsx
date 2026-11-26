@@ -142,7 +142,7 @@ export function LoginForm({
 
         if (err?.code === "EMAIL_NOT_VERIFIED") {
             // Not a dead end: the server has just mailed a code
-            // (emailVerification.sendOnSignIn), so the code step takes it
+            // (`signInCodeMailHook` in @saroh/auth), so the code step takes it
             // here rather than showing "Email not verified" with nowhere to
             // go. The right code confirms the address and signs in.
             setSent({ wait: 0, kind: "email-verification" });

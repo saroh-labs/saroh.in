@@ -258,7 +258,7 @@ async function rollOut(
         const res = await staff.request.put(
             `${urls.API_URL}/admin/flags/MODULE_${key}/organizations/${org}`,
             {
-                headers: { origin: urls.APP_URL },
+                headers: { origin: urls.ADMIN_URL },
                 data: {
                     enabled: true,
                     reason: "Insights browser test (U14)",

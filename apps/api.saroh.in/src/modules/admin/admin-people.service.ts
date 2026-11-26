@@ -480,7 +480,10 @@ export class AdminPeopleService {
                 "There is no Owner change waiting to be confirmed. It may have expired after a day.",
             );
         }
-        if (request.requestedByUserId === staff.userId) {
+        // The second person is neither the one who asked nor the one the
+        // change is about.
+        const asked = request.requestedByUserId === staff.userId;
+        if (asked || request.userId === staff.userId) {
             await this.audit.write(prisma, {
                 actorUserId: staff.userId,
                 permission: AdminPermission.OrganizationPeopleWrite,
@@ -490,10 +493,14 @@ export class AdminPeopleService {
                 targetId: request.userId,
                 reason,
                 outcome: AdminAuditOutcome.Denied,
-                metadata: { requestId, selfConfirm: true },
+                metadata: asked
+                    ? { requestId, selfConfirm: true }
+                    : { requestId, subjectConfirm: true },
             });
             throw new ForbiddenException(
-                "You asked for this change. A second staff member has to confirm it.",
+                asked
+                    ? "You asked for this change. A second staff member has to confirm it."
+                    : "This change is about you. Another staff member has to confirm it.",
             );
         }
         const owners = await prisma.membership.findMany({
