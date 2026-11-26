@@ -323,8 +323,12 @@ cache.
   while those queries are reading or any save is on its way. A route in
   `lib/query/chrome-refresh.ts` (capped at 6) also calls `router.refresh()`,
   for its server-drawn chrome; its queries read again in the browser all the
-  same, since its render sends no rows. A route on neither list keeps the
-  path above.
+  same, since its render sends no rows. Any other React Query route
+  (`isRqRoute`) reads again, under the same guards, the open business's
+  shown queries whose tier is `records` or `live` (`meta.tier`, set by
+  `defineRead`), never `settings`, and never `router.refresh()`es; a test
+  holds every route in `RQ_ROUTES` to it (26 Nov 2026). Only a route off
+  React Query keeps the path above.
 - **Outside a render, `cache()` doesn't share.** A read route's handler runs in
   `inReadScope` (`lib/api/read-scope.ts`, via `readRoute`), one API answer per
   URL; a Server Action called from a React Query screen takes the tab's

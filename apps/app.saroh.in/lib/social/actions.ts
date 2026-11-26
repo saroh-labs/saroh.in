@@ -1,6 +1,6 @@
 "use server";
 
-import { writeAsOrg } from "@/lib/api/assert-active-org";
+import { writeAsOrg, writeAsOrgIfSent } from "@/lib/api/assert-active-org";
 
 import type { OwnPostInput } from "./own-posts";
 import { createOwnPost, deleteOwnPost, updateOwnPost } from "./own-posts";
@@ -9,8 +9,15 @@ import { createOwnPost, deleteOwnPost, updateOwnPost } from "./own-posts";
  * Save an own post as it is written (#1378): the first save makes it, the
  * rest change it. Thin: the API decides who may and what a post may say.
  */
-export async function saveOwnPost(id: string | null, input: OwnPostInput) {
-    return id ? updateOwnPost(id, input) : createOwnPost(input);
+export async function saveOwnPost(
+    id: string | null,
+    input: OwnPostInput,
+    /** The tab's business (DEC-259): a new post never lands in another. */
+    orgId?: string,
+) {
+    return writeAsOrgIfSent(orgId, () =>
+        id ? updateOwnPost(id, input) : createOwnPost(input),
+    );
 }
 
 /**

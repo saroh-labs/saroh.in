@@ -23,7 +23,9 @@ import {
 } from "@/lib/ask-ai/panel-actions";
 import { upgradeHref } from "@/lib/billing/access";
 import type { CustomerPick } from "@/lib/customers/picker";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { asOrg } from "@/lib/settings/use-settings";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
 import { saySiteDraftChanged, saySitePhotoPreview } from "./open";
 import {
@@ -87,6 +89,7 @@ export function DraftCard({
     // Check this (RULES §5): the facts the person said are right.
     const [sure, setSure] = useState<ReadonlySet<string>>(new Set());
     const router = useRouter();
+    const orgId = useOrgIdOrNull() ?? undefined;
     const words = draftWords(card);
     const big = phone ? "coarse:h-11 h-11" : "";
     // A photo drafted for a section shows on the open page's canvas, dashed
@@ -159,6 +162,7 @@ export function DraftCard({
                 return [field, NUMERIC.has(field) ? Number(v) : v];
             }),
         );
+        const wanted = card.missing.length ? fields : undefined;
         settle(
             await runAction(
                 () =>
@@ -167,11 +171,11 @@ export function DraftCard({
                               card.draftId,
                               undefined,
                               Array.from(sure),
+                              ...asOrg(orgId),
                           )
-                        : confirmDraft(
-                              card.draftId,
-                              card.missing.length ? fields : undefined,
-                          ),
+                        : orgId
+                          ? confirmDraft(card.draftId, wanted, undefined, orgId)
+                          : confirmDraft(card.draftId, wanted),
                 { setBusy },
             ),
         );

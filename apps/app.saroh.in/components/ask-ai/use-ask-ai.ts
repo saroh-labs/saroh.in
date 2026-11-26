@@ -26,6 +26,8 @@ import {
     turnOnAskAi,
 } from "@/lib/ask-ai/panel-actions";
 import { startAskAiTurn, stopAskAiTurn } from "@/lib/ask-ai/turn-requests";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { useAskAiPage } from "./ask-ai-page";
 import { readAskAiEvents } from "./stream";
 import type { Turn } from "./thread";
@@ -70,6 +72,7 @@ export function useAskAi({
     active = true,
 }: UseAskAiOptions) {
     const router = useRouter();
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [state, setState] = useState(initial);
     const [turns, setTurns] = useState<Turn[]>(() =>
         conversation ? turnsOf(conversation) : [],
@@ -322,7 +325,9 @@ export function useAskAi({
         if (!state || language === state.language) return;
         const before = state;
         setState({ ...state, language });
-        const res = await runAction(() => changeAskAiLanguage(language));
+        const res = await runAction(() =>
+            changeAskAiLanguage(language, ...asOrg(orgId)),
+        );
         if (!res?.ok) {
             setState(before);
             if (res) reportFailure(res);
@@ -330,7 +335,9 @@ export function useAskAi({
     };
 
     const turnOn = async () => {
-        const res = await runAction(turnOnAskAi, { setBusy });
+        const res = await runAction(() => turnOnAskAi(...asOrg(orgId)), {
+            setBusy,
+        });
         if (!res) return;
         if (!res.ok) {
             reportFailure(res);

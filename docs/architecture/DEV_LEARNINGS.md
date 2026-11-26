@@ -12,6 +12,48 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Merchant app — React Query screens saved into the wrong business, showed the last person's answers, and didn't update on return
+
+**Symptom**: 26 Nov 2026, a pre-release review of the move to React Query
+(DEC-259) found three gaps. A tab still showing business A saved A's GSTIN
+or web address into B after B was opened in another tab or from the
+accounts chooser. On a shared device, a teammate who signed in after
+someone signed out on accounts could be drawn the first person's Settings
+answers in a tab left open. Calendar, Invoices, Customers, Stock, Leads and
+other screens didn't show an online payment or a new booking when the
+person came back to the tab.
+**Cause**:
+
+- The business-wide saves (business profile and logo, their Undos, web
+  address, a new storefront, where Bookings opens, uploads, Ask AI's
+  switch and language) took no `orgId`, so the API wrote to whichever
+  business the cookie named. `/open/:id` switches without telling other
+  tabs.
+- The browser cache was cleared only by the app's own sign-out. Nothing
+  noticed a different person, and `settings` reads (`staleTime: Infinity`)
+  never ask again on their own.
+- Live refresh invalidated queries only on `LIVE_QUERY_ROUTES` (9 of 78
+  React Query routes). Every other route fell to `router.refresh()`, which
+  reads no rows there. `check:rq-refresh` doesn't walk the live-refresh
+  folder, so it couldn't see this.
+
+**Fix**: those saves take the tab's business last through
+`writeAsOrgIfSent`, and their callers pass `useOrgIdOrNull()` (via
+`asOrg`). `QueryProvider` is told the session's user id and clears the
+cache and the search recents when the person isn't the one the cache was
+filled for (`keepForUser`, `query-provider.test.tsx`). A switch of business
+still keeps the cache. On a React Query route not in `LIVE_QUERY_ROUTES`,
+coming back to the tab invalidates the open business's shown `records` and
+`live` queries (`meta.tier`), and `use-live-refresh-query.test.tsx` walks
+every route in `RQ_ROUTES`.
+**Rule**: a Server Action that writes a business-wide record (one with no
+id that the API could refuse) takes the tab's `orgId` last
+(`frontend-data-and-state.md`). The cache belongs to one person, not one
+tab. A new React Query route reads again on return to the tab without
+being listed anywhere.
+
+---
+
 ## Website — Approve didn't show the post as live, and post specs skipped themselves at random
 
 **Symptom**: 25 Nov 2026, two local `pnpm prepush --e2e` runs: after the

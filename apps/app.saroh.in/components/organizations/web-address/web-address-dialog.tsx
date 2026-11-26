@@ -33,6 +33,8 @@ import {
     saveWebAddress,
 } from "@/lib/organizations/web-address-actions";
 import { afterSettingsSave } from "@/lib/query/invalidate";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 
 const schema = z.object({
     address: z.string().min(1, { error: "Enter a web address" }),
@@ -98,6 +100,7 @@ function ChangeForm({
     onChanged?: (view: WebAddressView) => void;
     onDone: () => void;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const suffix = suffixOf(view);
     const form = useForm<Values>({
         resolver: zodResolver(schema),
@@ -131,7 +134,7 @@ function ChangeForm({
 
     async function onSubmit(values: Values) {
         if (values.address === view.address) return onDone();
-        const res = await saveWebAddress(values.address);
+        const res = await saveWebAddress(values.address, ...asOrg(orgId));
         if (!res.ok) {
             if (res.field === "address") {
                 form.setError("address", { message: res.error });

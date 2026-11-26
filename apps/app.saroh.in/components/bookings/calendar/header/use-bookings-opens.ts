@@ -4,8 +4,10 @@ import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import type { BookingsOpens } from "@/lib/services/bookings-opens";
 import { saveBookingsOpens } from "@/lib/services/bookings-opens-actions";
+import { asOrg } from "@/lib/settings/use-settings";
 
 /**
  * Where Bookings opens for this person (DEC-170), as the "…" sheet and
@@ -14,6 +16,7 @@ import { saveBookingsOpens } from "@/lib/services/bookings-opens-actions";
  * waits for it.
  */
 export function useBookingsOpens(initial: BookingsOpens) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [opens, setOpens] = useState(initial);
     const [from, setFrom] = useState(initial);
     // Changes on their way to the API.
@@ -31,7 +34,9 @@ export function useBookingsOpens(initial: BookingsOpens) {
         const was = opens;
         setOpens({ ...opens, ...next });
         setSaving((n) => n + 1);
-        const res = await runAction(() => saveBookingsOpens(next));
+        const res = await runAction(() =>
+            saveBookingsOpens(next, ...asOrg(orgId)),
+        );
         setSaving((n) => n - 1);
         if (!res) {
             setOpens(was);

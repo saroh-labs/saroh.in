@@ -11,6 +11,8 @@ import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 /** The business's default look as saved: Classic in ink until chosen. */
@@ -43,6 +45,7 @@ export function InvoicePaperSheet({
     /** Saved: the settings now, and what to say. */
     onSaved: (next: OrganizationSettings, said: string) => void;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const saved = savedPaper(settings);
     const [look, setLook] = useState<PaperDefault>(saved);
     const [saving, setSaving] = useState(false);
@@ -60,12 +63,15 @@ export function InvoicePaperSheet({
         setRefusal(null);
         const res = await runAction(
             () =>
-                saveOrganizationSettings({
-                    invoicePaper: {
-                        style: look.style,
-                        colour: look.colour ?? "",
+                saveOrganizationSettings(
+                    {
+                        invoicePaper: {
+                            style: look.style,
+                            colour: look.colour ?? "",
+                        },
                     },
-                }),
+                    ...asOrg(orgId),
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;

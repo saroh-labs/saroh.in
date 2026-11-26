@@ -16,6 +16,8 @@ import { useState, useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { createCategory } from "@/lib/products/actions";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { asOrg } from "@/lib/settings/use-settings";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 export interface CategoryChoice {
@@ -45,6 +47,7 @@ export function CategoryPicker({
     disabled?: boolean;
     id?: string;
 }) {
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [pending, start] = useTransition();
@@ -56,7 +59,9 @@ export function CategoryPicker({
 
     function create() {
         start(async () => {
-            const res = await runAction(() => createCategory({ name: q }));
+            const res = await runAction(() =>
+                createCategory({ name: q }, ...asOrg(orgId)),
+            );
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
