@@ -100,7 +100,10 @@ describe("drawable", () => {
     it("knows PNG, JPEG, WebP and GIF by their first bytes, and nothing else", async () => {
         expect(drawable(await photo("webp"))).toBe(true);
         expect(drawable(await photo("jpeg"))).toBe(true);
-        expect(drawable(Buffer.from("GIF89a000000", "latin1"))).toBe(true);
+        // A 2×2 GIF's header: the size it names is within the limits.
+        expect(
+            drawable(Buffer.from("GIF89a\x02\x00\x02\x00\x00\x00", "latin1")),
+        ).toBe(true);
         expect(drawable(Buffer.from("<svg onload=x>", "latin1"))).toBe(false);
         expect(drawable(null)).toBe(false);
     });
