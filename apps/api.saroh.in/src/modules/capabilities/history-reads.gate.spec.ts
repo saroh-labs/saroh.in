@@ -94,7 +94,13 @@ const CASES = [
     {
         controller: BookingsController,
         moduleKey: "APPOINTMENTS",
-        reads: ["calendarBookings", "listServiceBookings", "getBooking"],
+        reads: [
+            "calendarBookings",
+            "listServiceBookings",
+            "getBooking",
+            // The visit line beside a booking: history, like the booking itself.
+            "bookingVisits",
+        ],
         windDown: ["cancelBooking"],
         gated: [
             "createService",
