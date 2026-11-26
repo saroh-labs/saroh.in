@@ -74,7 +74,7 @@ describe("staff remove an upload (DB)", () => {
 
     beforeEach(() => deleteObject.mockClear());
 
-    it("deletes the object, every smaller copy, then the row, on the ledger", async () => {
+    it("deletes the row on the ledger, then the object and every smaller copy", async () => {
         const media = await upload(organizationId, "photo", [
             {
                 width: 320,
@@ -116,6 +116,38 @@ describe("staff remove an upload (DB)", () => {
         await expect(
             prisma.auditEvent.count({
                 where: { organizationId, action: "media.removed" },
+            }),
+        ).resolves.toBe(1);
+    });
+
+    it("deletes no object until the row and its ledger rows are written", async () => {
+        const media = await upload(organizationId, "kept");
+        const failing = new AdminMediaService(
+            {
+                write: () => Promise.reject(new Error("ledger down")),
+            } as unknown as AdminAuditService,
+            mediaStorages({ deleteObject } as unknown as ObjectStorage, null),
+        );
+        await expect(failing.remove(command(media.id))).rejects.toThrow(
+            "ledger down",
+        );
+        expect(deleteObject).not.toHaveBeenCalled();
+        await expect(
+            prisma.media.count({ where: { id: media.id } }),
+        ).resolves.toBe(1);
+    });
+
+    it("keeps the record when storage won't delete an object afterwards", async () => {
+        const media = await upload(organizationId, "stuck");
+        deleteObject.mockRejectedValueOnce(new Error("storage down"));
+        await expect(service.remove(command(media.id))).resolves.toEqual({
+            ok: true,
+            id: media.id,
+            deleted: true,
+        });
+        await expect(
+            prisma.adminAuditEvent.count({
+                where: { targetId: media.id, action: "media.removed" },
             }),
         ).resolves.toBe(1);
     });
