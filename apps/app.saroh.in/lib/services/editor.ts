@@ -69,6 +69,11 @@ export interface ServiceDraft {
     /** Who may join its Meets; null: the business's default. */
     meetAccess: MeetAccess | null;
     // Price
+    /**
+     * Free or Paid (DEC-261). Free is a price of 0: `price` is "0" and
+     * nothing is taken at booking. Paid needs a price above 0.
+     */
+    charge: ServiceCharge;
     /** As typed: "1200", "1,200", "499.50"; 0 is free, blank is unset. */
     price: string;
     /** What is paid at booking (E8): nothing, a share, or all of it. */
@@ -95,6 +100,27 @@ export interface ServiceDraft {
      * their own (`hours-draft.ts`).
      */
     hours: HoursRow[];
+}
+
+/** Free or Paid (DEC-261): the service editor's first money question. */
+export type ServiceCharge = "FREE" | "PAID";
+
+/** What a service is, from its saved price: Free only for exactly 0. */
+export function chargeOf(priceCents: number | null): ServiceCharge {
+    return priceCents === 0 ? "FREE" : "PAID";
+}
+
+/**
+ * The draft's change when Free or Paid is picked (DEC-261). Free is a price
+ * of 0 with nothing taken at booking; Paid starts with the price field
+ * empty, and keeps a price already typed.
+ */
+export function chargeChange(
+    draft: Pick<ServiceDraft, "price">,
+    charge: ServiceCharge,
+): Partial<ServiceDraft> {
+    if (charge === "FREE") return { charge, price: "0", deposit: "NONE" };
+    return toMinor(draft.price) === 0 ? { charge, price: "" } : { charge };
 }
 
 /** Whole minutes from a field, or 0. */
@@ -166,6 +192,7 @@ export function draftOf(
             meetingUrl: "",
             meetingLink: "MANUAL",
             meetAccess: null,
+            charge: "PAID",
             price: "",
             deposit: "NONE",
             gstPriceMode: SAME_AS_BUSINESS,
@@ -193,6 +220,7 @@ export function draftOf(
         meetingUrl: service.meetingUrl ?? "",
         meetingLink: service.meetingLink ?? "MANUAL",
         meetAccess: service.meetAccess ?? null,
+        charge: chargeOf(service.priceCents),
         price: fromMinor(service.priceCents),
         deposit: service.depositMode,
         gstPriceMode: itemModeValue(service.gstPriceMode),
@@ -248,6 +276,10 @@ export function gstPlace(
         ? "more"
         : "none";
 }
+
+/** Said when Paid is chosen with a price of 0 (DEC-261). */
+export const PAID_NEEDS_PRICE =
+    "A paid service needs a price above 0. Choose Free if it costs nothing.";
 
 /** The field a problem is about: where its sentence is shown. */
 export type ServiceField =
@@ -325,16 +357,13 @@ export function serviceFieldProblems(
             "The link has to be a full https:// link, like https://meet.google.com/abc-defg-hij.",
         );
     }
+    // Free (DEC-261) is a price of 0, set by the choice; Paid needs one.
     const price = toMinor(draft.price);
-    if (price === null) say("price", "Add a price, or 0 if it's free.");
-    else if (Number.isNaN(price)) {
-        say("price", "Write the price as a number, like 1200.");
-    } else if (draft.deposit !== "NONE" && price === 0) {
-        // The API's own sentence (E8): a deposit is a share of a price.
-        say(
-            "price",
-            "A deposit is part of the price. Set a price first, or take nothing at booking.",
-        );
+    if (draft.charge === "PAID") {
+        if (price === null) say("price", "Add a price, or choose Free.");
+        else if (Number.isNaN(price)) {
+            say("price", "Write the price as a number, like 1200.");
+        } else if (price === 0) say("price", PAID_NEEDS_PRICE);
     }
     if (needsGstRate(draft, gstRegistered)) say("gstRate", GST_RATE_NEEDED);
     if (hasStaff && !onePerson && draft.staffIds.length === 0) {
@@ -481,7 +510,15 @@ const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     [HOURS_SECTION, ["hours"]],
     [
         "Money",
-        ["price", "deposit", "gstPriceMode", "gstRate", "sacCode", "visits"],
+        [
+            "charge",
+            "price",
+            "deposit",
+            "gstPriceMode",
+            "gstRate",
+            "sacCode",
+            "visits",
+        ],
     ],
     ["Who does it", ["staffIds"]],
     ["Who can book it", ["showOnBookingPage", "bookableByTeam"]],

@@ -25,6 +25,7 @@ import {
     payInput,
     payProblem,
 } from "@/lib/services/booking-pay";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { LocalDate } from "@/lib/services/diary";
 import { localDateOf } from "@/lib/services/diary";
 import type { Step } from "@/lib/services/new-booking";
@@ -192,7 +193,9 @@ export function NewBookingFlow({
     );
     const usable = startAt ? usablePacks(heldPacks, startAt) : [];
     const pack = usable.find((p) => p.id === packId) ?? usable.at(0);
-    const paying = usePack && pack !== undefined;
+    // A free service (DEC-261): nothing to pay, and no pack spent on it.
+    const free = service?.priceCents === 0;
+    const paying = !free && usePack && pack !== undefined;
 
     // Money, as far as the viewer sees it.
     const price = (s: {
@@ -239,7 +242,7 @@ export function NewBookingFlow({
     };
     const problem = stepProblem(step, draft);
     const missing = bookProblem(draft);
-    const payGap = paying ? null : payProblem(payNow, paidBy);
+    const payGap = paying || free ? null : payProblem(payNow, paidBy);
 
     const whoName = who ? pickName(who) : "";
     const first = firstName(whoName);
@@ -274,7 +277,7 @@ export function NewBookingFlow({
                         idempotencyKey: attempt,
                         ...(staffId ? { staffId } : {}),
                         ...(paying ? { packPurchaseId: pack.id } : {}),
-                        ...(paying ? {} : payInput(payNow, paidBy)),
+                        ...(paying || free ? {} : payInput(payNow, paidBy)),
                         ...(meet && offerMeet
                             ? { meetingLink: "GOOGLE_MEET" as const }
                             : {}),
@@ -318,7 +321,7 @@ export function NewBookingFlow({
             setRefusal(res.error);
             return;
         }
-        const linkAsked = !paying && payNow === "LINK";
+        const linkAsked = !paying && !free && payNow === "LINK";
         const link = linkAsked ? await makePayLink(res.data.id) : null;
         setSaving(false);
         const person = isClass(service)
@@ -340,9 +343,11 @@ export function NewBookingFlow({
                 zone,
                 now,
                 amount,
-                pay: paying
-                    ? { kind: "pack", left: classesLeft(pack) - 1 }
-                    : { kind: payNow, paidBy, link },
+                pay: free
+                    ? { kind: "free" }
+                    : paying
+                      ? { kind: "pack", left: classesLeft(pack) - 1 }
+                      : { kind: payNow, paidBy, link },
                 business: setup.business ?? null,
             }),
         );
@@ -391,13 +396,15 @@ export function NewBookingFlow({
         crumbs.push({ label: firstName(withName), onPress: () => jump(3) });
 
     const whenValue = startAt ? whenWords(startAt, zone) : "Not picked yet";
-    const payValue = paying
-        ? "Class pack"
-        : payNow === "LINK"
-          ? "Send a payment link"
-          : payNow === "PAID"
-            ? "Paid now"
-            : "Pays at the visit";
+    const payValue = free
+        ? BOOKING_WORDS.free
+        : paying
+          ? "Class pack"
+          : payNow === "LINK"
+            ? "Send a payment link"
+            : payNow === "PAID"
+              ? "Paid now"
+              : "Pays at the visit";
     const rail: RailStep[] = (
         [
             [1, who ? whoName : "Not picked yet"],
@@ -555,6 +562,7 @@ export function NewBookingFlow({
 
                     {step === 5 && service ? (
                         <CheckStep
+                            free={free}
                             rows={[
                                 {
                                     key: "Who",
@@ -641,7 +649,7 @@ export function NewBookingFlow({
                             }
                             packRefusal={packRefusal}
                             packsFailed={
-                                packsFailed
+                                packsFailed && !free
                                     ? {
                                           first,
                                           onRetry: () =>

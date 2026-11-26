@@ -110,6 +110,18 @@ function whereWords(draft: ServiceDraft): string {
     return `${lead} · a Google Meet link for each booking${who}`;
 }
 
+/** "At booking, they pay" for a free service (DEC-261). */
+const FREE_AT_BOOKING = "Nothing, it's free";
+
+/** What is taken at booking, in words: nothing for a free service. */
+function atBookingWords(
+    draft: Pick<ServiceDraft, "charge" | "deposit">,
+): string {
+    return draft.charge === "FREE"
+        ? FREE_AT_BOOKING
+        : DEPOSIT_WORDS[draft.deposit];
+}
+
 const DEPOSIT_WORDS: Record<ServiceDraft["deposit"], string> = {
     NONE: "Nothing, they pay at the visit",
     PERCENT_25: "25% deposit, the rest at the visit",
@@ -234,7 +246,7 @@ export function detailRows(input: RowsInput): DetailRow[] {
         {
             panel: "pay",
             label: "At booking, they pay",
-            value: DEPOSIT_WORDS[draft.deposit],
+            value: atBookingWords(draft),
         },
     ];
     if (gstAt !== "none") {
@@ -343,7 +355,7 @@ export function editCards(input: RowsInput): Card[] {
         {
             label: "Price",
             value:
-                gstAt !== "none" && draft.gstRate
+                gstAt !== "none" && draft.gstRate && price !== 0
                     ? `${priceText} · ${draft.gstRate}% GST`
                     : priceText,
             panel: "money",
@@ -359,7 +371,7 @@ export function editCards(input: RowsInput): Card[] {
     }
     money.push({
         label: "At booking, they pay",
-        value: DEPOSIT_WORDS[draft.deposit],
+        value: atBookingWords(draft),
         panel: "money",
     });
     if (draft.kind === "one") {

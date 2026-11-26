@@ -93,6 +93,25 @@ describe("bookingItems", () => {
         });
     });
 
+    it("says a free booking is free, never that it pays at the desk (DEC-261)", () => {
+        const [item] = bookingItems(
+            [
+                booking({
+                    paidWith: "DESK",
+                    snapshot: { service: { priceCents: 0, currency: "INR" } },
+                }),
+            ],
+            VIEW,
+        );
+        expect(item?.who).toBe("With Dr. Arun · free");
+        // No price at all is not free.
+        const [unpriced] = bookingItems(
+            [booking({ paidWith: null, snapshot: { service: {} } })],
+            VIEW,
+        );
+        expect(unpriced?.who).toBe("With Dr. Arun");
+    });
+
     it("tags an arrived booking with the time it was said", () => {
         const [item] = bookingItems(
             [

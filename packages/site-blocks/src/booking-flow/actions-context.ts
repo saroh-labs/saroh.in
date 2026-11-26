@@ -29,6 +29,8 @@ export interface FlowActionsContext {
     putPlace: (joined: WaitlistPlace) => void;
     dropPlace: (startAt: string) => void;
     price: string | null;
+    /** A free service (DEC-261): nothing to pay, no credit offered. */
+    free: boolean;
     payingNow: string;
     rest: string | null;
     whenText: string;

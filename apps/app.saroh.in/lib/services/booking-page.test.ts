@@ -178,6 +178,22 @@ describe("Money's lines", () => {
         refund: null,
         take: { cents: 40_000, byLink: false },
     };
+    it('says "Free" for a free booking, and nothing to take (DEC-261)', () => {
+        expect(
+            moneyRows(
+                {
+                    ...base,
+                    priceCents: 0,
+                    paidOnlineCents: 0,
+                    deposit: false,
+                    dueCents: 0,
+                    take: null,
+                },
+                format,
+                false,
+            ),
+        ).toEqual([{ key: "price", label: "Price", text: "Free" }]);
+    });
     it("says the price, the deposit and what is still to take", () => {
         expect(moneyRows(base, format, false).map((r) => r.text)).toEqual([
             "₹800",

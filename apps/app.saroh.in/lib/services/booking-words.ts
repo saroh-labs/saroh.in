@@ -21,6 +21,8 @@ export const BOOKING_WORDS = {
     markArrived: "Mark arrived",
     /** Paid at the desk, on the day (DEC-170's default for a booking by hand). */
     paysAtVisit: "Pays at the visit",
+    /** Booked at a price of 0: nothing to pay, ever (DEC-261). */
+    free: "Free",
     /** The link a customer pays from. */
     paymentLink: "Payment link",
     /** The button that makes a booking. */

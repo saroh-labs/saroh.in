@@ -4,6 +4,7 @@ import type { ServiceDraft } from "./editor";
 import {
     changedParts,
     changedSections,
+    chargeChange,
     depositNote,
     draftOf,
     draftVisits,
@@ -15,6 +16,7 @@ import {
     hoursNote,
     needsGstRate,
     needsMeetingLink,
+    PAID_NEEDS_PRICE,
     problemFor,
     savedMessage,
     serviceFieldProblems,
@@ -102,6 +104,7 @@ describe("draftOf", () => {
             meetingUrl: "",
             meetingLink: "MANUAL",
             meetAccess: null,
+            charge: "PAID",
             price: "1200",
             deposit: "PERCENT_50",
             gstPriceMode: "",
@@ -172,15 +175,22 @@ describe("serviceProblems", () => {
             "Add a name.",
             "Each visit needs a length of at least 5 minutes.",
             "The break after has to be a number of minutes.",
-            "Add a price, or 0 if it's free.",
+            "Add a price, or choose Free.",
             "Pick who does it.",
         ]);
     });
 
-    it("takes 0 as free, and refuses a price that isn't a number", () => {
+    it("takes Free as a price of 0, and refuses a price that isn't a number", () => {
+        expect(
+            serviceProblems(
+                draft({ charge: "FREE", price: "0", deposit: "NONE" }),
+                true,
+            ),
+        ).toEqual([]);
+        // Paid needs a price above 0 (DEC-261).
         expect(
             serviceProblems(draft({ price: "0", deposit: "NONE" }), true),
-        ).toEqual([]);
+        ).toEqual([PAID_NEEDS_PRICE]);
         expect(serviceProblems(draft({ price: "12,00.5.0" }), true)).toEqual([
             "Write the price as a number, like 1200.",
         ]);
@@ -262,7 +272,10 @@ describe("the GST rate of a GST-registered business's service", () => {
 
     it("is never asked of a free service, or one with no price typed yet", () => {
         expect(
-            problems({ gstRate: "", price: "0", deposit: "NONE" }, true),
+            problems(
+                { gstRate: "", charge: "FREE", price: "0", deposit: "NONE" },
+                true,
+            ),
         ).toEqual([]);
         expect(needsGstRate({ price: "", gstRate: "" }, true)).toBe(false);
         expect(needsGstRate({ price: "twelve", gstRate: "" }, true)).toBe(
@@ -591,20 +604,43 @@ describe("At booking, they pay (E8)", () => {
         );
     });
 
-    it("refuses a deposit on a free service, as the API does", () => {
+    it("takes nothing at booking for a free service (DEC-261)", () => {
+        // Choosing Free sets a price of 0 and drops the deposit.
+        expect(chargeChange({ price: "1200" }, "FREE")).toEqual({
+            charge: "FREE",
+            price: "0",
+            deposit: "NONE",
+        });
+        // Back to Paid: the 0 goes, a typed price stays.
+        expect(chargeChange({ price: "0" }, "PAID")).toEqual({
+            charge: "PAID",
+            price: "",
+        });
+        expect(chargeChange({ price: "1200" }, "PAID")).toEqual({
+            charge: "PAID",
+        });
+        const free = draft({ ...chargeChange({ price: "1200" }, "FREE") });
+        expect(serviceProblems(free, false)).toEqual([]);
+        expect(serviceInput(free, "INR")).toMatchObject({
+            priceCents: 0,
+            depositMode: "NONE",
+        });
+        // A saved price of 0 opens as Free; none at all opens as Paid.
         expect(
-            serviceProblems(
-                draft({ price: "0", deposit: "PERCENT_25" }),
-                false,
+            draftOf(service({ priceCents: 0 }), [], "Asia/Kolkata").charge,
+        ).toBe("FREE");
+        expect(
+            draftOf(service({ priceCents: null }), [], "Asia/Kolkata").charge,
+        ).toBe("PAID");
+    });
+
+    it("counts Free or Paid as a change to Money", () => {
+        expect(
+            changedSections(
+                draft(),
+                draft(chargeChange({ price: "1200" }, "FREE")),
             ),
-        ).toContain(
-            "A deposit is part of the price. Set a price first, or take nothing at booking.",
-        );
-        expect(
-            serviceProblems(draft({ price: "0", deposit: "NONE" }), false),
-        ).not.toContain(
-            "A deposit is part of the price. Set a price first, or take nothing at booking.",
-        );
+        ).toEqual(["Money"]);
     });
 
     it("counts a changed deposit as a change to Money", () => {

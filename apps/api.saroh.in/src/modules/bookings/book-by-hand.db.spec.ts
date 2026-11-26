@@ -833,3 +833,84 @@ describe("Where = Google Meet on New booking (DEC-233)", () => {
         }
     });
 });
+
+describe("A free service, booked by hand (DEC-261)", () => {
+    it("books with nothing to pay, and an older client's 'at the visit' records no way", async () => {
+        const trial = await makeService("Free trial class", { priceCents: 0 });
+        const booked = await bookings.bookByHand(owner, trial, {
+            startAt: nextStart(),
+            bookerName: "Kiran Shah",
+            bookerPhone: "9845022222",
+            paidWith: "DESK",
+        });
+        expect(booked).toMatchObject({ status: "CONFIRMED", paidWith: null });
+        expect(
+            await prisma.invoice.count({ where: { bookingId: booked.id } }),
+        ).toBe(0);
+        const detail = await bookings.getBooking(owner, booked.id);
+        expect(detail.money).toMatchObject({
+            priceCents: 0,
+            paidOnlineCents: 0,
+            take: null,
+        });
+    });
+
+    it("refuses a payment, a class pack or a membership on it", async () => {
+        const trial = await makeService("Free first consult", {
+            priceCents: 0,
+        });
+        for (const pay of [
+            { paidWith: "PAID" as const, paidBy: "CASH" as const },
+            { useClassPack: true },
+        ]) {
+            await expect(
+                bookings.bookByHand(owner, trial, {
+                    startAt: nextStart(),
+                    bookerName: "Kiran Shah",
+                    bookerPhone: "9845033333",
+                    ...pay,
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        }
+        expect(
+            await prisma.booking.count({ where: { serviceId: trial } }),
+        ).toBe(0);
+    });
+
+    it("reads an older zero-price booking 'at the desk' as Free, owing nothing", async () => {
+        const trial = await makeService("Free follow-up", { priceCents: 0 });
+        const made = await bookings.bookByHand(owner, trial, {
+            startAt: nextStart(),
+            bookerName: "Kiran Shah",
+            bookerPhone: "9845044444",
+        });
+        // As one booked before free services were told apart.
+        await prisma.booking.update({
+            where: { id: made.id },
+            data: { paidWith: "DESK" },
+        });
+        const range = {
+            from: new Date(made.startAt.getTime() - 3_600_000).toISOString(),
+            to: new Date(made.endAt.getTime() + 3_600_000).toISOString(),
+        };
+        const row = (await bookings.calendarBookings(owner, range)).diaries
+            .flatMap((d) => d.bookings)
+            .find((b) => b.id === made.id);
+        expect(row).toMatchObject({ free: true, paidWith: null, take: null });
+        // A Member is told it is free too, and never that it owes.
+        const theirs = (await bookings.calendarBookings(member, range)).diaries
+            .flatMap((d) => d.bookings)
+            .find((b) => b.id === made.id);
+        expect(theirs).toMatchObject({ free: true, toTake: false });
+        // A service with no price at all is not free.
+        const unpriced = (
+            await bookings.calendarBookings(owner, {
+                from: new Date(Date.now() - 365 * DAY).toISOString(),
+                to: new Date(Date.now() + 365 * DAY).toISOString(),
+            })
+        ).diaries
+            .flatMap((d) => d.bookings)
+            .filter((b) => b.serviceId === freeId);
+        for (const b of unpriced) expect(b.free).toBe(false);
+    });
+});

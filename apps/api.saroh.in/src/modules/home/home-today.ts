@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingEventType } from "../bookings/booking-event-type";
+import { isFreeBooking, shownPaidWith } from "../bookings/booking-money";
 import { attentionFor } from "../customer-workspace/attention-read";
 import {
     DEFAULT_LATE_THRESHOLDS,
@@ -95,10 +96,17 @@ export interface TodayBookingRow {
     startAt: Date;
     outcome: string | null;
     paidWith: string | null;
+    /** The terms it was booked at: a price of 0 is free (DEC-261). */
+    snapshot?: unknown;
     contactId: string | null;
     bookerName: string | null;
     bookerEmail: string | null;
-    service: { id: string; name: string; capacity: number };
+    service: {
+        id: string;
+        name: string;
+        capacity: number;
+        priceCents?: number | null;
+    };
     staff: { name: string } | null;
     contact: {
         firstName: string | null;
@@ -141,9 +149,14 @@ function filled(text: string | null | undefined): string | null {
 }
 
 /** "With Priya", "With Priya · pays at the desk", "Pays at the desk", or null. */
-function withWhom(staff: string | null, paysAtDesk: boolean): string | null {
+function withWhom(
+    staff: string | null,
+    paysAtDesk: boolean,
+    free = false,
+): string | null {
     const parts = [staff ? `With ${staff}` : null];
     if (paysAtDesk) parts.push(staff ? "pays at the desk" : "Pays at the desk");
+    else if (free) parts.push(staff ? "free" : "Free");
     const out = parts.filter((p): p is string => p !== null).join(" · ");
     return out.length > 0 ? out : null;
 }
@@ -211,13 +224,18 @@ export function bookingItems(
         const said = outcome
             ? row.events.find((e) => e.type === OUTCOME_EVENT[outcome])
             : undefined;
+        const free = isFreeBooking(row.snapshot, row.service.priceCents);
         items.push({
             id: row.id,
             kind: "BOOKING",
             startAt: row.startAt.toISOString(),
             time: clockIn(row.startAt, view.zone),
             what: who ? `${row.service.name} · ${who}` : row.service.name,
-            who: withWhom(staff, row.paidWith === "DESK"),
+            who: withWhom(
+                staff,
+                shownPaidWith(row.paidWith, free) === "DESK",
+                free,
+            ),
             person: who,
             outcome,
             outcomeTime: said ? clockIn(said.createdAt, view.zone) : null,
@@ -418,11 +436,17 @@ export async function readToday(
                       startAt: true,
                       outcome: true,
                       paidWith: true,
+                      snapshot: true,
                       contactId: true,
                       bookerName: true,
                       bookerEmail: true,
                       service: {
-                          select: { id: true, name: true, capacity: true },
+                          select: {
+                              id: true,
+                              name: true,
+                              capacity: true,
+                              priceCents: true,
+                          },
                       },
                       staff: { select: { name: true } },
                       contact: {

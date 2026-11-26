@@ -10,7 +10,12 @@ import { prisma } from "@saroh/database";
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { holdsPlace } from "../bookings/booking-hold";
-import { bookingDueCents, bookingPrice } from "../bookings/booking-money";
+import {
+    bookingDueCents,
+    bookingPrice,
+    isFreeBooking,
+    shownPaidWith,
+} from "../bookings/booking-money";
 import type { BookingPaperRow } from "../bookings/desk-take";
 import { paidAtDesk, paidOnPaperCents } from "../bookings/desk-take";
 import { ownBookingsWhere, ownDiaryOf } from "../bookings/own-diary";
@@ -294,6 +299,20 @@ const PAID_WITH: Record<string, string> = {
     PAID: "Paid online",
     DESK: "At the desk",
 };
+
+/**
+ * How a booking was paid, in the day panel's words: "Free" for one booked
+ * at a price of 0 (DEC-261), never "At the desk"; null when nobody said.
+ */
+export function paidWords(b: {
+    paidWith: string | null;
+    snapshot: unknown;
+    service: { priceCents: number | null };
+}): string | null {
+    const free = isFreeBooking(b.snapshot, b.service.priceCents);
+    const paid = shownPaidWith(b.paidWith, free);
+    return paid ? (PAID_WITH[paid] ?? null) : free ? "Free" : null;
+}
 
 type Unavailable = CalendarUnavailable[];
 
@@ -1281,7 +1300,7 @@ export class CalendarService {
                 snapshot: true,
                 bookerName: true,
                 bookerEmail: true,
-                service: { select: { name: true } },
+                service: { select: { name: true, priceCents: true } },
                 // Its own invoice (ADR-008): what was paid online for it,
                 // and whether a pay link still asks for the rest; and what
                 // was taken at the desk, a deposit's balance with it (P2).
@@ -1342,9 +1361,7 @@ export class CalendarService {
                                 ? null
                                 : desk.cents > 0
                                   ? "Paid at the desk"
-                                  : b.paidWith
-                                    ? PAID_WITH[b.paidWith]
-                                    : null,
+                                  : paidWords(b),
                         ]
                             .filter(Boolean)
                             .join(" · ") || null,

@@ -41,10 +41,17 @@ export interface GapBookedInfo {
     /** The payment link, when one was asked for. */
     link: PayLinkResult | null;
     business: string | null;
+    /** A free service (DEC-261): nothing to pay. */
+    free?: boolean;
 }
 
-/** "Pays at the visit", "Paid by UPI", "Awaiting payment". */
-export function payWords(pay: PayChoice, paidBy: PaidBy | null): string {
+/** "Pays at the visit", "Paid by UPI", "Awaiting payment", "Free". */
+export function payWords(
+    pay: PayChoice,
+    paidBy: PaidBy | null,
+    free = false,
+): string {
+    if (free) return BOOKING_WORDS.free;
     if (pay === "PAID") {
         const how = methodLabel(paidBy);
         return how ? `Paid by ${how}` : "Paid";
@@ -71,12 +78,13 @@ export function GapBooked({
     const [url, setUrl] = useState<string | null>(
         booked.link?.ok ? booked.link.url : null,
     );
-    const message: MessagePay =
-        booked.pay === "LINK"
-            ? { kind: "link", amount: booked.amount, url }
-            : booked.pay === "PAID"
-              ? { kind: "paid", amount: booked.amount }
-              : { kind: "visit", amount: booked.amount };
+    const message: MessagePay = booked.free
+        ? { kind: "free" }
+        : booked.pay === "LINK"
+          ? { kind: "link", amount: booked.amount, url }
+          : booked.pay === "PAID"
+            ? { kind: "paid", amount: booked.amount }
+            : { kind: "visit", amount: booked.amount };
     const text = bookingMessage({
         customer: booked.customer,
         service: booked.service,
@@ -117,7 +125,8 @@ export function GapBooked({
                         className="text-[14px] leading-[1.5] text-muted-foreground"
                     >
                         {booked.service} with {firstName(booked.staffName)},{" "}
-                        {booked.when}. {payWords(booked.pay, booked.paidBy)}.
+                        {booked.when}.{" "}
+                        {payWords(booked.pay, booked.paidBy, booked.free)}.
                     </p>
                     {booked.link ? (
                         <PayLinkPanel

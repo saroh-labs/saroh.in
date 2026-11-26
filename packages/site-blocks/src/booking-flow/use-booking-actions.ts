@@ -155,7 +155,8 @@ export function useBookingActions(ctx: FlowActionsContext) {
         }
         // A credit that covers this class (A10): shown and chosen, and
         // nothing booked or charged until they say so.
-        if (service && chosenStart && ctx.pay !== "CREDIT") {
+        // Never for a free service (DEC-261): a credit isn't spent on it.
+        if (service && chosenStart && !ctx.free && ctx.pay !== "CREDIT") {
             const offered = await ctx.askCredit(
                 customerHandle(who),
                 service.id,
@@ -191,6 +192,7 @@ export function useBookingActions(ctx: FlowActionsContext) {
             ctx.waitMode !== "join" &&
             service &&
             chosenStart &&
+            !ctx.free &&
             ctx.pay !== "CREDIT"
         ) {
             const offered = await ctx.askCredit(
@@ -355,6 +357,7 @@ export function useBookingActions(ctx: FlowActionsContext) {
             booking,
             paid: false,
             price: ctx.price,
+            free: ctx.free,
             rest: null,
             creditText:
                 pay === "CREDIT" && ctx.credit

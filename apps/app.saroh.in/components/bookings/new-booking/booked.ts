@@ -3,6 +3,7 @@ import { formatTimeRange } from "@/lib/format/datetime";
 import { firstName } from "@/lib/names";
 import { methodLabel } from "@/lib/payments/method-words";
 import type { PaidBy, PayChoice } from "@/lib/services/booking-pay";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { whenWords } from "@/lib/services/new-booking";
 import { zoneShortName } from "@/lib/services/time-picker";
 
@@ -26,6 +27,8 @@ export function endWords(
 /** How it was paid, as Book sent it. */
 export type BookedPay =
     | { kind: "pack"; left: number }
+    /** A free service (DEC-261): nothing to pay. */
+    | { kind: "free" }
     | { kind: PayChoice; paidBy: PaidBy | null; link: PayLinkResult | null };
 
 /**
@@ -68,33 +71,37 @@ export function bookedOf(input: {
             ? `With ${firstName(person)} on ${day} at ${time}`
             : `On ${day} at ${time}`,
         pay:
-            pay.kind === "pack"
-                ? {
-                      title: `From ${first}'s class pack`,
-                      sub: `${pay.left} left after this. Cancelling gives it back.`,
-                  }
-                : pay.kind === "LINK"
+            pay.kind === "free"
+                ? { title: BOOKING_WORDS.free, sub: "Nothing to pay" }
+                : pay.kind === "pack"
                   ? {
-                        title: withAmount("Awaiting payment", amount),
-                        sub: "Send the payment link below",
+                        title: `From ${first}'s class pack`,
+                        sub: `${pay.left} left after this. Cancelling gives it back.`,
                     }
-                  : pay.kind === "PAID"
+                  : pay.kind === "LINK"
                     ? {
-                          title: withAmount(`Paid by ${paidWord}`, amount),
-                          sub: "Recorded with the booking",
+                          title: withAmount("Awaiting payment", amount),
+                          sub: "Send the payment link below",
                       }
-                    : {
-                          title: withAmount("Pays at the visit", amount),
-                          sub: "Take it when they come",
-                      },
+                    : pay.kind === "PAID"
+                      ? {
+                            title: withAmount(`Paid by ${paidWord}`, amount),
+                            sub: "Recorded with the booking",
+                        }
+                      : {
+                            title: withAmount("Pays at the visit", amount),
+                            sub: "Take it when they come",
+                        },
         message:
-            pay.kind === "pack"
-                ? { kind: "pack" }
-                : pay.kind === "LINK"
-                  ? { kind: "link", amount, url: link?.ok ? link.url : null }
-                  : pay.kind === "PAID"
-                    ? { kind: "paid", amount }
-                    : { kind: "visit", amount },
+            pay.kind === "free"
+                ? { kind: "free" }
+                : pay.kind === "pack"
+                  ? { kind: "pack" }
+                  : pay.kind === "LINK"
+                    ? { kind: "link", amount, url: link?.ok ? link.url : null }
+                    : pay.kind === "PAID"
+                      ? { kind: "paid", amount }
+                      : { kind: "visit", amount },
         link,
         business: input.business,
     };

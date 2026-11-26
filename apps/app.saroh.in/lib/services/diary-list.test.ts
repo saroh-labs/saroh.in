@@ -97,6 +97,10 @@ describe("a booked row's line", () => {
             "Physio assessment · Meera · class pack",
         );
         expect(listLine(one("a", 540, "in"))).toBe("Physio assessment · Meera");
+        // A free one (DEC-261): never "pays at the visit".
+        expect(
+            listLine(one("a", 540, "booked", { paidWith: null, free: true })),
+        ).toBe("Physio assessment · Meera · free");
     });
 
     it("names a class's teacher and its places", () => {

@@ -319,6 +319,14 @@ function tick(words: string, scope: ParentNode = document.body) {
 }
 
 /** On a phone, More details opens under the questions. */
+/** A radio of a one-of-several control, by its words. */
+const radio = (words: string) =>
+    must(
+        Array.from(
+            document.querySelectorAll<HTMLElement>('[role="radio"]'),
+        ).find((r) => r.textContent.trim() === words),
+    );
+
 const moreDetails = () => {
     const found = Array.from(
         host.querySelectorAll<HTMLButtonElement>("button[aria-expanded]"),
@@ -404,9 +412,9 @@ describe.each([
                 "Other",
             ]),
         );
-        expect(field("Price").getAttribute("placeholder")).toBe(
-            "0 if it's free",
-        );
+        // Free or Paid first (DEC-261): Paid, with its price asked.
+        expect(radio("Paid").getAttribute("aria-checked")).toBe("true");
+        expect(field("Price")).toBeTruthy();
         // A group class asks how many places, from 8.
         act(() =>
             Array.from(host.querySelectorAll<HTMLElement>('[role="radio"]'))
@@ -423,7 +431,16 @@ describe.each([
             "Not bookable yet: add a name and a price, then pick who does it.",
         );
         type(field("What is it called?"), "Dry needling");
-        type(field("Price"), "0");
+        act(() => radio("Free").click());
+        // Free (DEC-261): no price asked, and what customers see is said.
+        expect(
+            Array.from(document.querySelectorAll("label")).some(
+                (l) => l.textContent.trim() === "Price",
+            ),
+        ).toBe(false);
+        expect(text()).toContain(
+            "Customers book it straight away, with nothing to pay. Your booking page shows it as Free.",
+        );
         expect(live()).toContain("Not bookable yet: pick who does it.");
         act(() => tick("Meera Iyer").click());
         expect(live()).toContain(
@@ -486,10 +503,10 @@ describe.each([
         open();
         await press(button("Add service"));
         expect(text()).toContain(
-            "3 things to fill in before it can be added: a name, a price (0 if it's free), and who does it.",
+            "3 things to fill in before it can be added: a name, a price (or choose Free), and who does it.",
         );
         expect(text()).toContain("Add a name.");
-        expect(text()).toContain("Add a price, or 0 if it's free.");
+        expect(text()).toContain("Add a price, or choose Free.");
         expect(text()).toContain("Pick who does it.");
         await frame();
         expect(document.activeElement).toBe(field("What is it called?"));
@@ -556,7 +573,7 @@ describe.each([
         await press(buttonIn(sheet, "Use these hours"));
 
         type(field("What is it called?"), "Open gym");
-        type(field("Price"), "0");
+        act(() => radio("Free").click());
         await press(button("Add service"));
         expect(api.replaceRules).toHaveBeenCalledWith(
             "sv_new",
@@ -636,7 +653,7 @@ describe("New service, adding it", () => {
         });
         open({ staff: [] });
         type(field("What is it called?"), "Open gym");
-        type(field("Price"), "0");
+        act(() => radio("Free").click());
         await press(button("Add service"));
         expect(text()).toContain(
             "Open gym was added, but its weekly hours were not saved.",
