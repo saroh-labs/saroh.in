@@ -143,16 +143,17 @@ export function CatalogueHeader({
             // The plan's meter is a figure, not a button: before them.
             meta={
                 actions && meter && beside.label ? (
-                    // Beside "71 products" it must say why it's fewer.
+                    // Beside "71 products" it says why it's fewer, in
+                    // words, not a hover a phone can't reach (finding 16).
                     <span
-                        title="Archived products don't count toward your plan."
                         className={
                             meter.full
                                 ? "text-[12.5px] font-semibold text-destructive-subtle-foreground"
                                 : "text-[12.5px] text-muted-foreground"
                         }
                     >
-                        {beside.label} on your plan
+                        {beside.label} count toward your plan · archived
+                        don&rsquo;t
                     </span>
                 ) : undefined
             }

@@ -86,11 +86,46 @@ export function priceText(row: CatalogueRow): string {
 export function catalogueColumns({
     ratingById,
     needById = new Map(),
+    sold,
 }: {
     ratingById: Map<string, ProductRating>;
     /** What Needs you says about each product: the Stock cell agrees. */
     needById?: Map<string, NeedDetail>;
+    /**
+     * Each product's last 30 days (finding 17); undefined for a role the
+     * API sends no sales to, and the column isn't drawn.
+     */
+    sold?: Partial<Record<string, { units: number; amount: string }>>;
 }): DataColumn<CatalogueRow>[] {
+    const soldColumn: DataColumn<CatalogueRow>[] = sold
+        ? [
+              {
+                  id: "sold",
+                  header: "Sold, 30 days",
+                  priority: "detail",
+                  width: "150px",
+                  numeric: true,
+                  tableClassName: "hidden min-[900px]:table-cell",
+                  cell: (r) => {
+                      const s = sold[r.id];
+                      return s ? (
+                          <span className="whitespace-nowrap tabular-nums">
+                              <span className="font-semibold">{s.units}</span>
+                              {" · "}
+                              {formatMoneyMajor(s.amount, r.currency)}
+                          </span>
+                      ) : (
+                          <span
+                              data-ph-unmask=""
+                              className="text-muted-foreground"
+                          >
+                              None
+                          </span>
+                      );
+                  },
+              },
+          ]
+        : [];
     return [
         {
             id: "product",
@@ -202,6 +237,7 @@ export function catalogueColumns({
                 </span>
             ),
         },
+        ...soldColumn,
     ];
 }
 

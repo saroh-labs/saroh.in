@@ -182,7 +182,8 @@ describe("the Products list's address (#519)", () => {
             view: undefined,
             q: "rye",
             storefront: undefined,
-            status: undefined,
+            // Live and draft unless a status is chosen (DEC-268).
+            status: "CURRENT",
             category: undefined,
             option: undefined,
             collection: undefined,
@@ -190,6 +191,18 @@ describe("the Products list's address (#519)", () => {
             size: 50,
             sort: undefined,
         });
+    });
+
+    it("opens on live and draft, with Archived and All a choice away (DEC-268)", () => {
+        expect(readListQuery({}).status).toBeNull();
+        expect(
+            catalogueFilter(readListQuery({ status: "ARCHIVED" })).status,
+        ).toBe("ARCHIVED");
+        const all = readListQuery({ status: "all" });
+        expect(all.status).toBe("ALL");
+        expect(catalogueFilter(all).status).toBeUndefined();
+        expect(listHref(all)).toBe("/commerce/products?status=ALL");
+        expect(listHref(readListQuery({}))).toBe("/commerce/products");
     });
 
     it("asks the API for the page by its number, at the size on screen", () => {

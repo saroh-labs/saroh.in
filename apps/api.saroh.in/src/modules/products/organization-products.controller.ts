@@ -19,6 +19,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { PriceHistoryQueryDto } from "../audit/price-history.dto";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { allows } from "../organizations/organization-policy";
 import { SetSoldOutDto, SetStockTrackingDto } from "../stock/dto";
 import { CatalogueQueryDto, cataloguePage, wantsPage } from "./catalogue-page";
 import {
@@ -78,10 +79,14 @@ export class OrganizationProductsController {
     ) {
         const { organizationId } = this.access.business(ctx);
         if (wantsPage(query)) {
-            return cataloguePage(this.products, organizationId, query);
+            // Sales are order money: `order:read`'s alone (finding 17).
+            return cataloguePage(this.products, organizationId, query, {
+                sold: allows(ctx, "order:read"),
+            });
         }
         return this.products.catalogue(organizationId, {
-            status: query.status,
+            // "CURRENT" is the paged list's; the whole catalogue is every one.
+            status: query.status === "CURRENT" ? undefined : query.status,
             storefront: query.storefront,
         });
     }

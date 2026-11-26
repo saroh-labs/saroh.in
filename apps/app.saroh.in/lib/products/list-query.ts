@@ -18,7 +18,11 @@ export interface ListQuery {
     view: CatalogueView;
     q: string;
     storefront: string | null;
-    status: ProductStatus | null;
+    /**
+     * One status, or "ALL"; null for the view the list opens on, live and
+     * draft (DEC-268): what is sold or about to be, archived a view away.
+     */
+    status: ProductStatus | "ALL" | null;
     /** A category's id, or "none" for Uncategorized. */
     category: string | null;
     /** Products choosing their variants by this option (Settings › Options). */
@@ -45,7 +49,12 @@ const VIEWS: readonly CatalogueView[] = [
 ];
 /** The views that are tabs of the screen, written as `?tab=`. */
 const TAB_VIEWS: readonly CatalogueView[] = ["collections", "inventory"];
-const STATUSES: readonly ProductStatus[] = ["PUBLISHED", "DRAFT", "ARCHIVED"];
+const STATUSES: readonly (ProductStatus | "ALL")[] = [
+    "PUBLISHED",
+    "DRAFT",
+    "ARCHIVED",
+    "ALL",
+];
 
 function one(params: Params, key: string): string | undefined {
     const raw = params[key];
@@ -76,7 +85,7 @@ export function readListQuery(
                 : (VIEWS.find((v) => v === view) ?? "all"),
         q: one(params, "q") ?? "",
         storefront: one(params, "storefront") ?? null,
-        status: STATUSES.find((s) => s === status) ?? null,
+        status: STATUSES.find((s) => s === status?.toUpperCase()) ?? null,
         category: one(params, "category") ?? null,
         option: one(params, "option") ?? null,
         collection: one(params, "collection") ?? null,
@@ -142,7 +151,11 @@ export function catalogueFilter(query: ListQuery) {
         view: query.view === "all" ? undefined : query.view,
         q: query.q || undefined,
         storefront: query.storefront ?? undefined,
-        status: query.status ?? undefined,
+        // Live and draft unless a status is chosen (DEC-268).
+        status:
+            query.status === "ALL"
+                ? undefined
+                : (query.status ?? ("CURRENT" as const)),
         category: query.category ?? undefined,
         option: query.option ?? undefined,
         collection: query.collection ?? undefined,

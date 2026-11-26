@@ -36,6 +36,13 @@ describe("the catalogue page's query", () => {
         }
     });
 
+    it("reads live and draft as a status of the list's (DEC-268)", async () => {
+        expect((await read({ status: "CURRENT" })).status).toBe("CURRENT");
+        await expect(read({ status: "SOLD" })).rejects.toThrow(
+            BadRequestException,
+        );
+    });
+
     it("reads a sort the list offers, and no other", async () => {
         for (const sort of [
             "newest",
