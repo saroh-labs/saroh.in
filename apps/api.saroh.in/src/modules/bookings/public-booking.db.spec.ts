@@ -860,8 +860,28 @@ describe("a hold's lifecycle under the team and the webhook (#508, real database
 
 describe("a free service on the booking page (DEC-261, real database)", () => {
     let trial: string;
+    let paid: string;
 
     beforeAll(async () => {
+        // A paid class of its own, same hours: no other test books it.
+        paid = (
+            await bookings.createService(owner, {
+                name: "Paid class beside the free one",
+                durationMinutes: 30,
+                timezone: "UTC",
+                priceCents: 50_000,
+                currency: "INR",
+            })
+        ).id;
+        await prisma.availabilityRule.create({
+            data: {
+                organizationId: owner.organizationId,
+                serviceId: paid,
+                dayOfWeek: MONDAY,
+                startMinute: 13 * 60,
+                endMinute: 15 * 60,
+            },
+        });
         // A free trial class: Mondays 13:00–15:00 UTC, nobody in particular.
         trial = (
             await bookings.createService(owner, {
@@ -927,9 +947,11 @@ describe("a free service on the booking page (DEC-261, real database)", () => {
     it("a paid service stays paid: its price can't be dropped at booking", async () => {
         // Nothing the booker sends sets the price: a paid one still holds
         // for payment.
-        const at = nextMonday(7, 6);
+        // 14:00, where the free test above booked nothing: whoever takes
+        // bookings is free then.
+        const at = nextMonday(14, 3);
         const { payToken } = await publicBookings.bookOnline(
-            oneToOne,
+            paid,
             { ...booker("paid@example.in", "NOW", at), priceCents: 0 } as never,
             "ip_free",
         );
