@@ -123,7 +123,11 @@ export function SellPackDialog({
     });
 
     const pack = fixed ?? onSale.find((p) => p.id === packId);
-    const person = contacts.find((c) => c.id === contactId);
+    // Found by a search, or read by id: not among the recent few.
+    const [found, setFound] = useState<ContactOption | null>(null);
+    const person =
+        contacts.find((c) => c.id === contactId) ??
+        (found?.id === contactId ? found : undefined);
     const who = person?.name ?? "They";
     const kinds = new Map<string, PackKind>(
         packs.map((p) => [p.id, packKind(p)]),
@@ -252,6 +256,7 @@ export function SellPackDialog({
                                 contacts={contacts}
                                 value={contactId}
                                 onValueChange={setContactId}
+                                onContact={setFound}
                                 placeholder="Choose a customer"
                                 aria-invalid={blocked ? true : undefined}
                                 aria-describedby={

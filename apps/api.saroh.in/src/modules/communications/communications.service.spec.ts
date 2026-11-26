@@ -57,6 +57,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { CredentialCheck } from "../../common/providers/provider-attention";
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { decryptSecret } from "../payments/crypto";
 import { CommunicationsService } from "./communications.service";
@@ -719,6 +720,7 @@ describe("CommunicationsService reads (auditable lifecycle)", () => {
             where: { organizationId: "org_1", leadId: "lead_1" },
             include: { deliveries: { orderBy: { createdAt: "asc" } } },
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
     });
 

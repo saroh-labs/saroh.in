@@ -13,6 +13,8 @@ import {
     ValidateIf,
 } from "class-validator";
 
+import { INT_COLUMN_MAX } from "../../common/validation";
+
 import type { GstPriceMode } from "../invoices/gst-price";
 import { GST_PRICE_MODES } from "../invoices/gst-price";
 import type { AutopayChargeTiming } from "./autopay-timing";
@@ -136,6 +138,7 @@ export class ListPlansQueryDto {
 export class DraftRevisionDto {
     @IsInt({ message: "Reload the plan and try again" })
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 }
 
@@ -147,6 +150,7 @@ export class DraftRevisionDto {
 export class PlanDraftDto extends PlanInputDto {
     @IsInt({ message: "Reload the plan and try again" })
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 }
 
@@ -155,6 +159,7 @@ export class DeleteDraftQueryDto {
     @Type(() => Number)
     @IsInt({ message: "Reload the plan and try again" })
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 }
 

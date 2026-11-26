@@ -17,6 +17,7 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import { INT_COLUMN_MAX } from "../../common/validation";
 import type { MeetAccess } from "../calendar-sync/google/google-calendar.port";
 import { MEET_ACCESS } from "../calendar-sync/google/google-calendar.port";
 
@@ -152,11 +153,13 @@ export class CreateServiceDto {
     @IsOptional()
     @IsInt()
     @Min(1)
+    @Max(10_000)
     capacity?: number;
 
     @IsOptional()
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     priceCents?: number;
 
     @IsOptional()
@@ -302,11 +305,13 @@ export class UpdateServiceDto {
     @IsOptional()
     @IsInt()
     @Min(1)
+    @Max(10_000)
     capacity?: number;
 
     @IsOptional()
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     priceCents?: number;
 
     @IsOptional()

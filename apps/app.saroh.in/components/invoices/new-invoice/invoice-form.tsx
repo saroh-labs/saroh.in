@@ -306,6 +306,14 @@ export function InvoiceForm({
         },
     });
 
+    // Someone found by the picker's search joins the list too, so the
+    // paper names them.
+    function onContactPicked(c: AddedContact) {
+        setAdded((a) =>
+            [...a, ...listed].some((x) => x.id === c.id) ? a : [...a, c],
+        );
+    }
+
     function onContactAdded(c: AddedContact) {
         setAdded((a) => [c, ...a]);
         form.setValue("contactId", c.id, {
@@ -405,6 +413,7 @@ export function InvoiceForm({
                             contacts,
                             canAdd: !draft,
                             onContactAdded,
+                            onContactPicked,
                             registered,
                             businessState: biz?.state ?? null,
                             buyerOpen,
@@ -428,6 +437,7 @@ export function InvoiceForm({
                                 contacts={contacts}
                                 canAdd={!draft}
                                 onContactAdded={onContactAdded}
+                                onContactPicked={onContactPicked}
                                 registered={registered}
                                 businessState={biz?.state ?? null}
                                 buyerOpen={buyerOpen}

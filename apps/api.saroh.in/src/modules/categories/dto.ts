@@ -7,6 +7,7 @@ import {
     IsOptional,
     IsString,
     Matches,
+    Max,
     MaxLength,
     Min,
     MinLength,
@@ -95,6 +96,7 @@ export class CategoryDefaultsInput {
     @ValidateIf((_o, v) => v !== null)
     @IsInt()
     @Min(0)
+    @Max(1_000_000)
     lowStockAlert?: number | null;
 
     @IsOptional()

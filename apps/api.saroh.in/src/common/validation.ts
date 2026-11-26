@@ -36,6 +36,12 @@ import type { ValidationPipeOptions } from "@nestjs/common";
  * The rule this leaves is simple, and it is the same one in both directions:
  * what a caller sends is what the validators see.
  */
+/**
+ * The most a 32-bit Postgres `Int` column holds: the bound for a whole
+ * number that has no smaller one of its own (an amount in minor units).
+ */
+export const INT_COLUMN_MAX = 2_147_483_647;
+
 export const validationPipeOptions: ValidationPipeOptions = {
     whitelist: true,
     forbidNonWhitelisted: true,

@@ -6,10 +6,13 @@ import {
     IsObject,
     IsOptional,
     IsString,
+    Max,
     MaxLength,
     Min,
     MinLength,
 } from "class-validator";
+
+import { INT_COLUMN_MAX } from "../../common/validation";
 
 import type { InsightsPeriod } from "./period";
 import { INSIGHTS_PERIODS } from "./period";
@@ -38,6 +41,7 @@ export class IngestAnalyticsEventDto {
     @IsOptional()
     @IsInt()
     @Min(1)
+    @Max(INT_COLUMN_MAX)
     schemaVersion?: number;
 
     /** Event properties — validated against the `(type, schemaVersion)` contract. */

@@ -421,9 +421,10 @@ export class ProductOverviewService {
         const waiting = { productId, status: "PUBLISHED", reply: null };
         const [published, hiddenCount, toAnswer, unanswered] =
             await Promise.all([
-                prisma.productReview.findMany({
+                prisma.productReview.groupBy({
+                    by: ["rating"],
                     where: { productId, status: "PUBLISHED" },
-                    select: { rating: true },
+                    _count: { _all: true },
                 }),
                 prisma.productReview.count({
                     where: { productId, status: "HIDDEN" },
@@ -453,7 +454,7 @@ export class ProductOverviewService {
         const latest = [...unanswered, ...rest];
         const titles = new Map(product.variants.map((v) => [v.id, v.title]));
         return {
-            summary: ratingSummary(published.map((r) => r.rating)),
+            summary: ratingSummary(published),
             toAnswer,
             hiddenCount,
             latest: latest.map((r) => {

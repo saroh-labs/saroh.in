@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { Logger } from "@nestjs/common";
 
 import { cashfreeBaseUrl } from "../../../common/providers/cashfree-env";
+import { providerCallSignal } from "../../payments/providers/provider-call";
 import type {
     BillingProvider,
     CreateSubscriptionInput,
@@ -56,6 +57,7 @@ export class CashfreeBillingProvider implements BillingProvider {
         try {
             res = await fetch(`${this.baseUrl}/subscriptions`, {
                 method: "POST",
+                signal: providerCallSignal(),
                 headers: this.authHeaders(),
                 body: JSON.stringify({
                     subscription_id: `${input.organizationId}_${input.planKey}`,
@@ -111,7 +113,11 @@ export class CashfreeBillingProvider implements BillingProvider {
         try {
             res = await fetch(
                 `${this.baseUrl}/subscriptions/${providerSubscriptionId}/cancel`,
-                { method: "POST", headers: this.authHeaders() },
+                {
+                    method: "POST",
+                    headers: this.authHeaders(),
+                    signal: providerCallSignal(),
+                },
             );
         } catch {
             throw new Error(

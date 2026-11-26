@@ -7,6 +7,7 @@ import {
     IsInt,
     IsOptional,
     IsString,
+    Max,
     MaxLength,
     Min,
     MinLength,
@@ -104,6 +105,7 @@ export class DefaultsEntryInput {
     @Type(() => Number)
     @IsInt({ message: "Low stock at must be a whole number, zero or more." })
     @Min(0, { message: "Low stock at must be a whole number, zero or more." })
+    @Max(1_000_000)
     lowStockAlert?: number | null;
 
     @IsOptional()
@@ -162,6 +164,7 @@ export class StockAlertSnapshot {
 
     @IsInt()
     @Min(0)
+    @Max(1_000_000)
     lowStockAlert!: number;
 }
 

@@ -19,6 +19,7 @@ vi.mock("@/lib/contacts/create", () => ({ createContact: vi.fn() }));
 import { ContactsContainer } from "@/components/contacts/contacts-container";
 import { contactsSaved } from "@/lib/contacts/use-contacts";
 import { customersSaved } from "@/lib/customers/use-customers";
+import { LIST_LIMIT } from "@/lib/lists/capped";
 import { makeTestClient, renderWithQuery } from "@/lib/query/test-utils";
 
 const CONTACT = {
@@ -83,6 +84,31 @@ describe("Contacts before its first read", () => {
         expect(host.querySelector('[data-shape="rows"]')).toBeNull();
         expect(host.querySelector('[data-slot="figure-loading"]')).toBeNull();
         expect(host.textContent).toContain("Priya");
+        unmount();
+    });
+});
+
+describe("a long list", () => {
+    it("says when it shows only the newest contacts", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(() => {
+                const many = Array.from({ length: LIST_LIMIT }, (_, i) => ({
+                    ...CONTACT,
+                    id: `c${i}`,
+                }));
+                return Promise.resolve(
+                    new Response(JSON.stringify(many), { status: 200 }),
+                );
+            }),
+        );
+        const { host, unmount } = renderWithQuery(
+            <ContactsContainer canAdd openOnArrival={false} currency="INR" />,
+        );
+        await tick(50);
+        expect(host.textContent).toContain(
+            `Showing the newest ${LIST_LIMIT} contacts.`,
+        );
         unmount();
     });
 });

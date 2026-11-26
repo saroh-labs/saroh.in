@@ -171,21 +171,18 @@ type Tx = Prisma.TransactionClient;
 export const CHECKOUT_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Coupon tries a minute (U16): per business, and per address across
- * businesses. Shared across replicas in Redis (`SharedRateLimiter`):
- * a speed bump against guessing codes, not a guarantee.
+ * Coupon tries a minute (U16): per business, and per signed-in person
+ * across their businesses. Never per address: the workspace calls from its
+ * own servers, so an address would count every merchant together. Shared
+ * across replicas in Redis (`SharedRateLimiter`): a speed bump against
+ * guessing codes, not a guarantee.
  */
 export const COUPON_TRIES_PER_ORG = 10;
-export const COUPON_TRIES_PER_ADDRESS = 30;
+export const COUPON_TRIES_PER_PERSON = 30;
 
 /** A checkout refused for changing another owner's billing profile. */
 export const PROFILE_NOT_YOURS =
     "This billing profile is another owner's, so only they can change it. Choose one of your own profiles in Plan & billing.";
-
-/** Who is asking, for the coupon limit: the caller's address, hashed. */
-export interface CheckoutClient {
-    addressKey?: string | null;
-}
 
 /** `GET …/billing/change-plan`: what a change would be, and cost. */
 export interface ChangePlanQuoteView {
@@ -418,9 +415,9 @@ export class CheckoutService {
         COUPON_TRIES_PER_ORG,
         60_000,
     );
-    private readonly couponTriesByAddress = new SharedRateLimiter(
-        "coupon-tries-address",
-        COUPON_TRIES_PER_ADDRESS,
+    private readonly couponTriesByPerson = new SharedRateLimiter(
+        "coupon-tries-person",
+        COUPON_TRIES_PER_PERSON,
         60_000,
     );
 
@@ -440,16 +437,10 @@ export class CheckoutService {
         ctx: OrganizationContext,
         input: { plan: string; cycle: BillingCycle; coupon?: string | null },
         now: Date = new Date(),
-        client: CheckoutClient = {},
     ): Promise<ChangePlanQuoteView> {
         authorize(ctx, "billing:read");
         await assertSarohKeeps(ctx, now);
-        await this.limitCouponTries(
-            ctx.organizationId,
-            input.coupon,
-            client,
-            now,
-        );
+        await this.limitCouponTries(ctx, input.coupon, now);
         const { target, quote, coupon, addonsEnding, monthAddons, offerNotes } =
             await this.resolve(
                 ctx.organizationId,
@@ -698,17 +689,11 @@ export class CheckoutService {
             confirmSharedProfile?: boolean | null;
         } & BillingDetailsSent,
         now: Date = new Date(),
-        client: CheckoutClient = {},
     ): Promise<ChangePlanResult> {
         authorize(ctx, "billing:manage");
         await assertSarohKeeps(ctx, now);
         const billTo = checkoutBillTo(input);
-        await this.limitCouponTries(
-            ctx.organizationId,
-            input.coupon,
-            client,
-            now,
-        );
+        await this.limitCouponTries(ctx, input.coupon, now);
         const typed = Boolean(input.coupon?.trim());
         const resolved = await this.resolve(
             ctx.organizationId,
@@ -1029,24 +1014,21 @@ export class CheckoutService {
 
     /** A coupon in the request counts against both limits (U16). */
     private async limitCouponTries(
-        organizationId: string,
+        ctx: OrganizationContext,
         code: string | null | undefined,
-        client: CheckoutClient,
         now: Date,
     ): Promise<void> {
         if (!code?.trim()) return;
         const at = now.getTime();
         const byOrg = await this.couponTriesByOrg.take(
-            `org:${organizationId}`,
+            `org:${ctx.organizationId}`,
             at,
         );
-        const byAddress = client.addressKey
-            ? await this.couponTriesByAddress.take(
-                  `ip:${client.addressKey}`,
-                  at,
-              )
-            : true;
-        if (!byOrg || !byAddress) {
+        const byPerson = await this.couponTriesByPerson.take(
+            `user:${ctx.userId}`,
+            at,
+        );
+        if (!byOrg || !byPerson) {
             throw new HttpException(
                 "Too many coupon tries. Wait a minute and try again.",
                 HttpStatus.TOO_MANY_REQUESTS,

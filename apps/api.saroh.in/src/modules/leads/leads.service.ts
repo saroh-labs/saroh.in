@@ -6,6 +6,7 @@ import {
 import type { Activity, Lead, Stage } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { enquiryEntriesFor } from "../forms/enquiry-entries";
 import { authorize } from "../organizations/organization-policy";
@@ -280,7 +281,7 @@ export class LeadsService {
     }
 
     /**
-     * The lead's activity timeline, newest first — a dedicated fetch for the
+     * The lead's activity timeline, newest first (the newest `LIST_LIMIT`) — a dedicated fetch for the
      * timeline component (the lead detail already embeds activities oldest
      * first). Authorizes `activity:read`; a missing / cross-tenant lead 404s.
      */
@@ -295,6 +296,7 @@ export class LeadsService {
         return prisma.activity.findMany({
             where: { leadId, organizationId: ctx.organizationId },
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
     }
 
@@ -388,7 +390,8 @@ export class LeadsService {
 
     /**
      * Open (incomplete) follow-up TASKs across the org — a follow-up worklist,
-     * soonest due first (nulls last), then newest. Authorizes `activity:read`.
+     * soonest due first (nulls last), then newest; the first `LIST_LIMIT`.
+     * Authorizes `activity:read`.
      */
     async listOpenTasks(ctx: OrganizationContext): Promise<Activity[]> {
         authorize(ctx, "activity:read");
@@ -400,6 +403,7 @@ export class LeadsService {
                 completedAt: null,
             },
             orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
+            take: LIST_LIMIT,
         });
     }
 
