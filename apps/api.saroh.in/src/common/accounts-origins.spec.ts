@@ -3,7 +3,11 @@ import { ForbiddenException } from "@nestjs/common";
 import { hostsFor, urlOf } from "@saroh/edition";
 
 import { env } from "../env";
-import { accountsOrigins, fromAccounts } from "./accounts-origins";
+import {
+    accountsOrigins,
+    adminOrigins,
+    fromAccounts,
+} from "./accounts-origins";
 import { AccountsOriginGuard } from "./guards/accounts-origin.guard";
 
 /**
@@ -64,6 +68,41 @@ describe("accountsOrigins", () => {
             ["https://accounts.saroh.localhost"],
         );
         expect(accountsOrigins(undefined, { NODE_ENV: "test" })).toEqual([]);
+    });
+});
+
+describe("adminOrigins", () => {
+    const admin = (edition: "INDIA" | "GLOBAL") =>
+        urlOf(hostsFor(edition, "production").admin);
+
+    it("is each edition's console in the API's environment, never another app", () => {
+        const source = {
+            BETTER_AUTH_URL: urlOf(indiaApi),
+            NODE_ENV: "production",
+        };
+        const origins = adminOrigins(undefined, source);
+        expect(origins).toEqual(
+            expect.arrayContaining([admin("INDIA"), admin("GLOBAL")]),
+        );
+        expect(origins).not.toContain(india("production"));
+        expect(origins).not.toContain(
+            urlOf(hostsFor("INDIA", "production").app),
+        );
+        expect(adminOrigins(indiaApi, source)).toEqual([admin("INDIA")]);
+    });
+
+    it("a stack on ports takes its ADMIN_URL; development with nothing set, the local console", () => {
+        expect(
+            adminOrigins("localhost:3333", {
+                ADMIN_URL: "http://localhost:3006",
+                BETTER_AUTH_URL: "http://localhost:3333",
+                NODE_ENV: "test",
+            }),
+        ).toEqual(["http://localhost:3006"]);
+        expect(adminOrigins(undefined, { NODE_ENV: "development" })).toEqual([
+            "https://admin.saroh.localhost",
+        ]);
+        expect(adminOrigins(undefined, { NODE_ENV: "test" })).toEqual([]);
     });
 });
 

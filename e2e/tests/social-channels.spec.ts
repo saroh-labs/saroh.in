@@ -33,7 +33,7 @@ async function rollOut(
         const res = await staff.request.put(
             `${urls.API_URL}/admin/flags/MODULE_SOCIAL/organizations/${NORTHWIND_ORG}`,
             {
-                headers: { origin: urls.APP_URL },
+                headers: { origin: urls.ADMIN_URL },
                 data: {
                     enabled,
                     reason: "Saroh Social browser test (U9)",

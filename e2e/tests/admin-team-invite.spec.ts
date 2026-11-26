@@ -60,7 +60,7 @@ async function invite(
     testInfo: TestInfo,
 ) {
     return request.post(`${urls.API_URL}/admin/staff/invites`, {
-        headers: { origin: urls.APP_URL },
+        headers: { origin: urls.ADMIN_URL },
         data: {
             email,
             name: "Asha Rao",
@@ -181,7 +181,7 @@ test.describe("adding a teammate by invite (U24)", () => {
         const withdrawn = await page.request.delete(
             `${urls.API_URL}/admin/staff/invites/${row?.id}`,
             {
-                headers: { origin: urls.APP_URL },
+                headers: { origin: urls.ADMIN_URL },
                 data: {
                     reason: "Hired someone else (browser test)",
                     idempotencyKey: `withdraw-${stamp(testInfo)}`,

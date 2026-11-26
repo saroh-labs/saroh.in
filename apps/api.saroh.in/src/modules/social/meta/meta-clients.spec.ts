@@ -339,6 +339,28 @@ describe("publishing", () => {
     });
 });
 
+describe("disconnecting", () => {
+    it("takes the person's permissions back with the app's own token", async () => {
+        const { meta, seen } = client([[/\/permissions/, { success: true }]]);
+        await meta.revoke("INSTAGRAM", "fb-user-9");
+        expect(seen).toHaveLength(1);
+        expect(seen[0].url).toBe(
+            "https://graph.facebook.com/v27.0/fb-user-9/permissions",
+        );
+        expect(seen[0].init?.method).toBe("DELETE");
+        expect(
+            (seen[0].init?.headers as Record<string, string>).Authorization,
+        ).toBe("Bearer fb-app|fb-secret");
+    });
+
+    it("says when Meta refuses", async () => {
+        const { meta } = client([
+            [/\/permissions/, { error: { code: 1, message: "x" } }, 500],
+        ]);
+        await expect(meta.revoke("FACEBOOK", "u")).rejects.toThrow();
+    });
+});
+
 describe("Meta's errors", () => {
     it.each([
         [400, { error: { code: 190 } }, "auth"],

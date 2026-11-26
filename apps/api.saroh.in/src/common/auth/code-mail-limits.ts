@@ -111,18 +111,3 @@ export async function claimCodeMail(
         return null;
     });
 }
-
-/**
- * Whether a password sign-in for `email` mails a code: only to an account
- * whose address is not yet proven (Better Auth's `sendOnSignIn`), once the
- * password is right. Such a sign-in counts against the address's cap like
- * any other code (03-M9); every other sign-in mails nothing and is not
- * counted, so a mistyped password never meets the cooldown.
- */
-export async function mailsOnPasswordSignIn(email: string): Promise<boolean> {
-    const user = await prisma.user.findUnique({
-        where: { email },
-        select: { emailVerified: true },
-    });
-    return user !== null && !user.emailVerified;
-}

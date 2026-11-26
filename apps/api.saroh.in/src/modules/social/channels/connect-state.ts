@@ -11,6 +11,8 @@ import { socialKey, withSocialKey } from "./sealing";
  * it stops being good (10 minutes). Signed with a keyed digest under
  * `SOCIAL_ENC_KEY` (any key on the ring opens it), so nobody can make one
  * up, and the callback refuses one for anyone but the person signed in.
+ * Good once: its nonce is kept until the callback spends it
+ * (`SocialChannelsService.useState`), as Calendar's is.
  */
 
 export const STATE_TTL_MS = 10 * 60_000;
@@ -33,15 +35,19 @@ interface Payload {
     e: number;
 }
 
+/** A fresh nonce: the caller keeps it to make the state good once. */
+export const newNonce = (): string => randomBytes(12).toString("base64url");
+
 export function signState(
     who: Pick<ConnectState, "organizationId" | "userId" | "kind">,
     now: Date = new Date(),
+    nonce: string = newNonce(),
 ): string {
     const payload: Payload = {
         o: who.organizationId,
         u: who.userId,
         k: who.kind,
-        n: randomBytes(12).toString("base64url"),
+        n: nonce,
         e: now.getTime() + STATE_TTL_MS,
     };
     const body = Buffer.from(JSON.stringify(payload)).toString("base64url");

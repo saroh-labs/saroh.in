@@ -7,10 +7,16 @@ import {
     HttpException,
     HttpStatus,
     Injectable,
+    Logger,
     Optional,
     ServiceUnavailableException,
 } from "@nestjs/common";
-import { Prisma, prisma, runInOrgContext } from "@saroh/database";
+import {
+    outsideOrgContext,
+    Prisma,
+    prisma,
+    runInOrgContext,
+} from "@saroh/database";
 
 import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
 import type { WindowLimiter } from "../rate-limits/shared-window";
@@ -56,6 +62,16 @@ import { siteCodeSecret } from "./site-secrets";
  * secret; the session token only as its SHA-256. A code lives 10 minutes
  * and allows 5 tries. Answers never say whether an email had an account.
  */
+
+/**
+ * How a requested code leaves: `now` (awaited, 503 if it can't), in the
+ * `background` (email off, an email-only account), or `none`: a decoy row
+ * whose hash no code matches, for an address that may not have one.
+ */
+type Delivery = "now" | "background" | "none";
+
+/** Not hex, so `sameHash` never matches it. */
+const DECOY_CODE_HASH = "decoy";
 
 /** What `codes` answers, the same for every email. */
 export interface CodeRequested {
@@ -181,6 +197,8 @@ function wrongCode(reason: "invalid" | "expired"): BadRequestException {
 
 @Injectable()
 export class SignInCodesService {
+    private readonly logger = new Logger(SignInCodesService.name);
+
     constructor(
         private readonly linking: AccountLinkingService,
         private readonly sessions: SessionsService,
@@ -251,11 +269,18 @@ export class SignInCodesService {
             // code after code (A-2).
             const addressBusy = await this.takeAddress(site, relay, now);
 
-            // Email off (DEC-196): only an email-only account gets a code;
-            // anyone else gets the same answer and nothing is sent.
-            if (!(await this.ways.emailAllowed(site.organizationId, email))) {
-                return CODE_REQUESTED;
-            }
+            // Email off (DEC-196): only an email-only account gets a code.
+            // Every address still takes the same limits and writes a row
+            // (a decoy that no code matches for anyone else), and the one
+            // real send goes in the background, so the answer and its time
+            // are the same whoever asks.
+            const delivery: Delivery = (
+                await this.ways.effective(site.organizationId)
+            ).includes("EMAIL")
+                ? "now"
+                : (await this.ways.emailAllowed(site.organizationId, email))
+                  ? "background"
+                  : "none";
 
             const returning = await prisma.customerAccount.count({
                 where: {
@@ -270,6 +295,7 @@ export class SignInCodesService {
                 addressBusy,
                 challenge: dto.challenge,
                 now,
+                delivery,
             });
         });
     }
@@ -292,6 +318,8 @@ export class SignInCodesService {
             addressBusy: boolean;
             challenge: string | undefined;
             now: Date;
+            /** Unset: sent now, and a failed send answers 503. */
+            delivery?: Delivery;
         },
     ): Promise<CodeRequested> {
         const { destinationHash, newDestination, addressBusy, now } = input;
@@ -324,6 +352,7 @@ export class SignInCodesService {
             destinationHash,
             newDestination,
             now,
+            delivery: input.delivery ?? "now",
         });
     }
 
@@ -437,58 +466,92 @@ export class SignInCodesService {
         site: SiteHost,
         relay: SiteRelay,
         email: string,
-        input: { destinationHash: string; newDestination: boolean; now: Date },
+        input: {
+            destinationHash: string;
+            newDestination: boolean;
+            now: Date;
+            delivery: Delivery;
+        },
     ): Promise<CodeRequested> {
-        const { destinationHash, newDestination, now } = input;
+        const { destinationHash, newDestination, now, delivery } = input;
         const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
         const row = await prisma.customerSignInCode.create({
             data: {
                 organizationId: site.organizationId,
                 destinationHash,
-                codeHash: codeHashFor(
-                    site.organizationId,
-                    destinationHash,
-                    code,
-                ),
+                codeHash:
+                    delivery === "none"
+                        ? DECOY_CODE_HASH
+                        : codeHashFor(
+                              site.organizationId,
+                              destinationHash,
+                              code,
+                          ),
                 expiresAt: new Date(now.getTime() + CODE_TTL_MS),
                 clientHash: relay.clientHash,
                 newDestination,
             },
             select: { id: true, createdAt: true },
         });
+        if (delivery === "none") return CODE_REQUESTED;
 
-        const sent = await this.delivery.deliver(site.organizationId, email, {
-            code,
-            businessName: cleanBusinessName(site.businessName, site.host),
-            minutes: CODE_TTL_MS / 60_000,
-            edition: site.edition,
-        });
-        if (!sent) {
-            // The code never left: nothing may be left live for it, and the
-            // customer's last code (if any) stays as it was.
-            await prisma.customerSignInCode.deleteMany({
-                where: { id: row.id, organizationId: site.organizationId },
+        const send = async (): Promise<boolean> => {
+            const sent = await this.delivery.deliver(
+                site.organizationId,
+                email,
+                {
+                    code,
+                    businessName: cleanBusinessName(
+                        site.businessName,
+                        site.host,
+                    ),
+                    minutes: CODE_TTL_MS / 60_000,
+                    edition: site.edition,
+                },
+            );
+            if (!sent) {
+                // The code never left: nothing may be left live for it, and
+                // the customer's last code (if any) stays as it was.
+                await prisma.customerSignInCode.deleteMany({
+                    where: { id: row.id, organizationId: site.organizationId },
+                });
+                return false;
+            }
+            // A new code retires the older live ones for the same email.
+            // Only older ones: of two requests at once, the newer survives.
+            await prisma.customerSignInCode.updateMany({
+                where: {
+                    organizationId: site.organizationId,
+                    destinationHash,
+                    id: { not: row.id },
+                    createdAt: { lte: row.createdAt },
+                    consumedAt: null,
+                    retiredAt: null,
+                },
+                data: { retiredAt: now },
             });
+            return true;
+        };
+
+        if (delivery === "background") {
+            // Off any request transaction, in this business's context. The
+            // delivery reports its own failures (`code-delivery.ts`); the
+            // customer just asks again.
+            void outsideOrgContext(() =>
+                runInOrgContext(site.organizationId, send),
+            ).catch((error: unknown) =>
+                this.logger.error(
+                    `site_code_background_send_failed org=${site.organizationId} error=${error instanceof Error ? error.name : "unknown"}`,
+                ),
+            );
+            return CODE_REQUESTED;
+        }
+        if (!(await send())) {
             throw new ServiceUnavailableException({
                 message: UNAVAILABLE_MESSAGE,
                 details: { reason: "unavailable" },
             });
         }
-
-        // A new code retires the older live ones for the same email. Only
-        // older ones: of two requests at once, the newer code survives.
-        await prisma.customerSignInCode.updateMany({
-            where: {
-                organizationId: site.organizationId,
-                destinationHash,
-                id: { not: row.id },
-                createdAt: { lte: row.createdAt },
-                consumedAt: null,
-                retiredAt: null,
-            },
-            data: { retiredAt: now },
-        });
-
         return CODE_REQUESTED;
     }
 
