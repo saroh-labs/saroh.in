@@ -1,7 +1,7 @@
 "use client";
 
 import { PageHeader } from "@saroh/ui/page-header";
-import { notFound } from "next/navigation";
+import { notFound, useSearchParams } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/page/page-container";
 import { PageLoading } from "@/components/shared/page/page-loading";
@@ -26,13 +26,15 @@ export function DiscountsContainer({ canWrite }: { canWrite: boolean }) {
 }
 
 /**
- * One code: the form for whoever may change it (`discount:write`: the read
- * carries the form's choices), its text for the rest. Its title is the
- * code, so the route's loader stands until it lands. No such code here is
- * the page's 404. The form keeps its draft: the read only starts it.
+ * One code, read first (DEC-267): what it gave and its facts, with Edit
+ * for whoever may change it (`discount:write`: the read carries the form's
+ * choices), which opens the form (`?edit=1`, so a link can too). Its title
+ * is the code, so the route's loader stands until it lands. No such code
+ * here is the page's 404. The form keeps its draft: the read only starts it.
  */
 export function DiscountContainer({ ask }: { ask: DiscountAsk }) {
     const read = useDiscount(ask);
+    const editing = useSearchParams().get("edit") === "1";
     if (read.isError && !read.data) {
         const status =
             read.error instanceof ReadFailed ? read.error.status : null;
@@ -57,14 +59,21 @@ export function DiscountContainer({ ask }: { ask: DiscountAsk }) {
                 breadcrumb={["Sell", "Discount codes", discount.code]}
                 title={<span className="font-mono">{discount.code}</span>}
             />
-            {reach ? (
+            {reach && editing ? (
                 <DiscountForm
                     discount={discount}
                     options={reach.options}
                     defaultCurrency={reach.defaultCurrency}
                 />
             ) : (
-                <DiscountReadView discount={discount} />
+                <DiscountReadView
+                    discount={discount}
+                    editHref={
+                        reach
+                            ? `/commerce/discounts/${encodeURIComponent(discount.id)}?edit=1`
+                            : null
+                    }
+                />
             )}
         </PageContainer>
     );

@@ -11,9 +11,11 @@ import { act, Component } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
+// A code opens read first (DEC-267); `?edit=1` is its form.
+const address = { search: "" };
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn() }),
-    useSearchParams: () => new URLSearchParams(),
+    useSearchParams: () => new URLSearchParams(address.search),
     usePathname: () => "/commerce/discounts",
     notFound: () => {
         throw new Error("NEXT_NOT_FOUND");
@@ -125,6 +127,41 @@ describe("the codes", () => {
     });
 });
 
+describe("a code, read first (DEC-267)", () => {
+    it("opens on what it gave and its facts, with Edit for who may change it", async () => {
+        const client = makeTestClient();
+        client.setQueryData(discountRead.key("org_1", ASK), {
+            discount: {
+                ...CODE,
+                used: 14,
+                usage: {
+                    gaveOff: "2100.00",
+                    currency: "INR",
+                    ordersTotal: "18400.00",
+                },
+            },
+            reach: {
+                options: { STOREFRONT: [], COLLECTION: [], PRODUCT: [] },
+                defaultCurrency: "INR",
+            },
+        });
+        const { host, unmount } = renderWithQuery(
+            <DiscountContainer ask={ASK} />,
+            { client },
+        );
+        await tick();
+        expect(host.textContent).toContain("Used on 14 orders · ₹2,100 off");
+        expect(host.textContent).toContain("₹18,400 in those orders");
+        // No field to type in by accident: Edit opens the form.
+        expect(host.querySelector("input")).toBeNull();
+        const edit = Array.from(host.querySelectorAll("a")).find(
+            (a) => a.textContent === "Edit",
+        );
+        expect(edit?.getAttribute("href")).toMatch(/\?edit=1$/);
+        unmount();
+    });
+});
+
 describe("a code's End it now", () => {
     async function ended(result: unknown) {
         release();
@@ -139,11 +176,13 @@ describe("a code's End it now", () => {
                 defaultCurrency: "INR",
             },
         });
+        address.search = "edit=1";
         const { host, unmount } = renderWithQuery(
             <DiscountContainer ask={ASK} />,
             { client },
         );
         await tick();
+        address.search = "";
         reads.length = 0;
         const end = Array.from(host.querySelectorAll("button")).find(
             (b) => b.textContent === "End it now",

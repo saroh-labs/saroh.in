@@ -29,6 +29,21 @@ export interface DiscountView {
     /** Every redemption, counted — what the cap has spent. */
     used: number;
     state: DiscountState;
+    /**
+     * What it gave (DEC-267): the money it took off across those orders,
+     * and — one code's read, with `order:read` only — what the orders came
+     * to. Summed in the database, in the business's own currency.
+     */
+    usage?: DiscountUsage;
+}
+
+export interface DiscountUsage {
+    /** "2100.00": every redemption's amount, summed. */
+    gaveOff: string;
+    /** The redemptions' currency; null before any. */
+    currency: string | null;
+    /** "18400.00": those orders' totals, summed; only with `order:read`. */
+    ordersTotal?: string;
 }
 
 export const DISCOUNT_INCLUDE = {

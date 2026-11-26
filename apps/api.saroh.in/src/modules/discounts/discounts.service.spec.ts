@@ -18,6 +18,8 @@ jest.mock("@saroh/database", () => {
                 findUnique: jest.fn(),
             },
             store: { count: jest.fn() },
+            discountRedemption: { groupBy: jest.fn() },
+            order: { aggregate: jest.fn() },
             category: { count: jest.fn() },
             product: { count: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
@@ -45,6 +47,8 @@ const db = prisma as unknown as {
     store: Record<string, jest.Mock>;
     category: Record<string, jest.Mock>;
     product: Record<string, jest.Mock>;
+    discountRedemption: Record<string, jest.Mock>;
+    order: Record<string, jest.Mock>;
     __tx: Record<string, Record<string, jest.Mock>>;
 };
 
@@ -74,6 +78,48 @@ beforeEach(() => {
     db.discount.findUnique!.mockResolvedValue(null);
     db.discount.findFirst!.mockResolvedValue(row());
     db.__tx.discount!.create!.mockResolvedValue({ id: "d_1" });
+});
+
+describe("what a code gave (DEC-267)", () => {
+    it("sums each code's redemptions in one grouped read, scoped to the business", async () => {
+        db.discount.findMany!.mockResolvedValue([row(), row({ id: "d_2" })]);
+        db.discountRedemption.groupBy!.mockResolvedValue([
+            { discountId: "d_1", currency: "INR", _sum: { amount: "2100.00" } },
+        ]);
+        const [used, unused] = await service.list("org_1");
+        expect(used!.usage).toEqual({ gaveOff: "2100.00", currency: "INR" });
+        expect(unused!.usage).toEqual({ gaveOff: "0.00", currency: null });
+        expect(db.discountRedemption.groupBy).toHaveBeenCalledTimes(1);
+        expect(db.discountRedemption.groupBy!.mock.calls[0]![0]).toMatchObject({
+            where: {
+                organizationId: "org_1",
+                discountId: { in: ["d_1", "d_2"] },
+            },
+        });
+    });
+
+    it("adds what those orders came to only when asked, from this business's orders", async () => {
+        db.discountRedemption.groupBy!.mockResolvedValue([
+            { discountId: "d_1", currency: "INR", _sum: { amount: "300.00" } },
+        ]);
+        db.order.aggregate!.mockResolvedValue({ _sum: { total: "4200.00" } });
+        const full = await service.getWithUsage("org_1", "d_1", true);
+        expect(full.usage).toEqual({
+            gaveOff: "300.00",
+            currency: "INR",
+            ordersTotal: "4200.00",
+        });
+        expect(db.order.aggregate!.mock.calls[0]![0]).toMatchObject({
+            where: {
+                organizationId: "org_1",
+                discountRedemption: { is: { discountId: "d_1" } },
+            },
+        });
+        db.order.aggregate!.mockClear();
+        const plain = await service.getWithUsage("org_1", "d_1", false);
+        expect(plain.usage?.ordersTotal).toBeUndefined();
+        expect(db.order.aggregate).not.toHaveBeenCalled();
+    });
 });
 
 describe("create", () => {
