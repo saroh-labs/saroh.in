@@ -29,6 +29,8 @@ export const MOMENT_KEYS = [
     "new-ai-apps",
     "new-share",
     "new-ask-ai",
+    // Home's one-time "The menu has moved" card (DEC-262, 26 Nov 2026).
+    "new-menu",
 ] as const;
 
 export type MomentKey = (typeof MOMENT_KEYS)[number];

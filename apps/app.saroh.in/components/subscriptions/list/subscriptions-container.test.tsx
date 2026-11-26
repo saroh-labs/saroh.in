@@ -91,7 +91,8 @@ describe("Subscriptions' first paint", () => {
         const subscribe = Array.from(host.querySelectorAll("button")).find(
             (b) => b.textContent === "Subscribe someone",
         );
-        expect(host.querySelector("h1")?.textContent).toBe("Subscriptions");
+        // The menu's word for the page (DEC-264).
+        expect(host.querySelector("h1")?.textContent).toBe("Memberships");
         expect(host.querySelectorAll('[role="tab"]')).toHaveLength(2);
         expect(subscribe?.disabled).toBe(true);
         expect(

@@ -288,7 +288,6 @@ export function ProductHeader({
                 holdsData
                 className="mb-0"
                 breadcrumb={[
-                    "Sell",
                     <IntentLink
                         data-ph-unmask=""
                         key="list"

@@ -343,9 +343,10 @@ describe("InvoicesScreen: states", () => {
 describe("InvoicesScreen: the breadcrumb", () => {
     const crumbs = () => document.querySelector("nav")?.textContent ?? "";
 
-    it("sits under Payments while Payments is on", () => {
+    it("names no Payments section while Payments is on (DEC-262)", () => {
         show({ invoices: [DUE], summary: SUMMARY });
-        expect(crumbs()).toContain("Payments");
+        expect(crumbs()).toContain("Invoices");
+        expect(crumbs()).not.toContain("Payments");
     });
 
     it("names no Payments while it is off (DEC-070)", () => {

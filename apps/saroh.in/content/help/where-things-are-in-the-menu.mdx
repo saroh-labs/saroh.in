@@ -1,0 +1,62 @@
+---
+# Every label below was checked in the code on 26 Nov 2026 (R7). Sources,
+# from the repo root:
+#   NAV   apps/app.saroh.in/components/shared/navigation/nav-items.tsx
+#         (NAV_GROUPS: Today, People, Money, What you offer, Online,
+#         Insights, Setup, and each row's label; "Location" turns
+#         "Locations" with more than one, DEC-069)
+#   PHONE apps/app.saroh.in/lib/nav/mobile-nav.ts (four tabs in one order,
+#         then More, which lists the rest under the same group names)
+#   NOTE  apps/app.saroh.in/lib/moments/derive.ts ("The menu has moved",
+#         Home's one-time card, which links here)
+#   WHY   docs/architecture/DECISIONS.md DEC-262, DEC-263, DEC-264
+# No route moved, so every old link and bookmark still opens its page.
+# The step lists groups as cards instead of a picture: the menu is the
+# same list in words, and a capture would show one business's rows only.
+title: Where things are in the menu
+slug: where-things-are-in-the-menu
+area: Getting started
+group: Get set up
+order: 20
+intro: "Saroh's menu is grouped by what you came to do: today's work first, the things you set once at the foot. Nothing was taken away and every link still works. This takes a minute to read."
+description: "Saroh's menu is grouped by what you came to do: Today, People, Money, What you offer, Online, Insights and Setup. Here's where each page is."
+readMinutes: 2
+updated: "2026-11-26"
+steps:
+    # NAV
+    - title: Find each page in its group
+      body: "Each page is in one group in the menu on the left. You only see a page when your business uses it and your role can open it, so your menu may be shorter than this list."
+      apps:
+          - id: today
+            name: Today
+            how: "Home, Business calendar, Orders and Bookings: the work waiting for you. Orders used to be under Sell, and Bookings was a section of its own."
+          - id: people
+            name: People
+            how: "Customers, Leads and Contacts. Customers used to be under Sell; it's here now for any business that takes money, Sell or not. The leads board is Leads' Board view."
+          - id: money
+            name: Money
+            how: "Invoices and Memberships, the people paying you monthly. Both used to be under Payments, where Memberships was called Subscriptions."
+          - id: what-you-offer
+            name: What you offer
+            how: "Products, Stock, Services, Courses, Class packs, Membership plans and Discount codes: everything you sell, whichever part of Saroh it was set up in."
+          - id: online
+            name: Online
+            how: "Website and Social. They used to be under Presence and Grow."
+          - id: insights
+            name: Insights
+            how: "Insights, as before."
+          - id: setup
+            name: Setup
+            how: "Location (Locations once you have more than one), Hours and time off, and Settings, at the foot of the menu. Team, Integrations and Plan and billing are still inside Settings."
+    # PHONE
+    - title: On your phone
+      body: "The bar at the bottom keeps the same tabs in the same order on every page: Home, Calendar, Orders and Insights when your business has them, with the next pages in the menu taking any seat left. More opens everything else, under the same group names as the menu."
+      apps:
+          - id: phone-more
+            name: More
+            how: "Lists the groups in the menu's order, each with the pages that have no tab."
+troubles:
+    - title: A page I used isn't in the menu.
+      body: "It shows only while your business uses it and your role can open it. Check Settings › Modules, or ask the owner about your role. A saved link to it still opens the page."
+next: [create-your-business]
+---

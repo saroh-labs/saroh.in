@@ -8,7 +8,6 @@ export default function Loading() {
             shape="form"
             width="form"
             breadcrumb={[
-                "Sell",
                 <IntentLink
                     data-ph-unmask=""
                     key="1"

@@ -1091,19 +1091,23 @@ test.describe("availability and services", () => {
                     await expectNothingHiddenSideways(page);
                 }
 
-                // Leaving never asks: there is no draft to lose. The page
-                // header has no breadcrumb (U17), so leave by the menu: the
-                // rail at a desk, the More sheet's Bookings group on a phone.
+                // Leaving never asks: there is no draft to lose. Leave by
+                // the menu: the rail at a desk; on a phone, Bookings' tab
+                // or its row in the More sheet (DEC-263), whichever it has.
                 if (test.info().project.name.startsWith("phone")) {
-                    await page
-                        .getByRole("navigation", { name: "Main" })
-                        .getByRole("button", { name: /^More/ })
-                        .click();
-                    await page
-                        .getByRole("dialog", { name: "Everything else" })
-                        .getByRole("group", { name: "Bookings", exact: true })
-                        .locator('a[href="/bookings"]')
-                        .click();
+                    const bar = page.getByRole("navigation", { name: "Main" });
+                    const tab = bar.locator('a[href="/bookings"]');
+                    if ((await tab.count()) > 0) {
+                        await tab.click();
+                    } else {
+                        await bar
+                            .getByRole("button", { name: /^More/ })
+                            .click();
+                        await page
+                            .getByRole("dialog", { name: "Everything else" })
+                            .locator('a[href="/bookings"]')
+                            .click();
+                    }
                 } else {
                     await page
                         .getByRole("navigation", { name: "Primary" })

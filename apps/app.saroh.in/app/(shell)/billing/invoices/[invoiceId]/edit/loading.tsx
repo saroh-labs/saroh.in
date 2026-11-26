@@ -8,7 +8,6 @@ export default function Loading() {
             shape="editor"
             width="full"
             breadcrumb={[
-                "Payments",
                 <IntentLink data-ph-unmask="" key="1" href="/billing/invoices">
                     Invoices
                 </IntentLink>,

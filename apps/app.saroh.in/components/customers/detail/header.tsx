@@ -84,7 +84,6 @@ export function Header({
                 breadcrumb={
                     sells
                         ? [
-                              "Sell",
                               <IntentLink
                                   data-ph-unmask=""
                                   key="list"

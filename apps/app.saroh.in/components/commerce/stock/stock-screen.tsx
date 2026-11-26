@@ -235,7 +235,7 @@ export function StockScreen({
             <PageHeader
                 holdsData="description"
                 className="mb-0"
-                breadcrumb={["Sell", "Stock"]}
+                breadcrumb={["Stock"]}
                 title="Stock"
                 description={stockSubline(business, storefronts) || undefined}
                 actions={

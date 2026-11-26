@@ -133,7 +133,7 @@ export function StorefrontsScreen({
     const header = (
         <PageHeader
             holdsData
-            breadcrumb={["Sell", word]}
+            breadcrumb={[word]}
             title={chosen?.name ?? word}
             description={selected ? locationSubtitle(selected) : undefined}
             actions={

@@ -8,7 +8,6 @@ export default function Loading() {
             shape="list"
             width="full"
             breadcrumb={[
-                "Sell",
                 <IntentLink data-ph-unmask="" key="1" href="/commerce/orders">
                     Orders
                 </IntentLink>,

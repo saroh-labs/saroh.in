@@ -31,7 +31,8 @@ import { people } from "../fixtures/sessions";
 
 /**
  * Every row of `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) whose module
- * Northwind runs. Sell › Stock is drawn only while the business tracks stock,
+ * Northwind runs, in the rail's order (DEC-262: Today, People, Money, What
+ * you offer, Online, Insights, Setup). Stock is drawn only while the business tracks stock,
  * which a product spec may have turned off, so it is allowed and not asked.
  * Class packs is not in it: the module is not offered on any plan (DEC-099),
  * so it is hidden from the menu for every role, whatever the seed turned on.
@@ -39,42 +40,24 @@ import { people } from "../fixtures/sessions";
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
     { label: "Business calendar", href: "/calendar" },
-    { label: "Website", href: "/sites" },
-    {
-        label: "Sell",
-        href: "/commerce",
-        pages: [
-            { label: "Orders", href: "/commerce/orders" },
-            { label: "Products", href: "/commerce/products" },
-            { label: "Stock", href: "/commerce/stock", optional: true },
-            { label: "Customers", href: "/commerce/customers" },
-            { label: "Discount codes", href: "/commerce/discounts" },
-            { label: "Location", href: "/commerce/locations" },
-        ],
-    },
-    {
-        label: "Bookings",
-        href: "/bookings",
-        pages: [
-            { label: "Bookings", href: "/bookings" },
-            { label: "Services", href: "/services" },
-            { label: "Hours and time off", href: "/bookings/availability" },
-            { label: "Courses", href: "/courses" },
-        ],
-    },
-    {
-        label: "Payments",
-        href: "/billing",
-        pages: [
-            { label: "Subscriptions", href: "/billing/subscriptions" },
-            { label: "Invoices", href: "/billing/invoices" },
-        ],
-    },
-    { label: "Contacts", href: "/contacts" },
+    { label: "Orders", href: "/commerce/orders" },
+    { label: "Bookings", href: "/bookings" },
+    { label: "Customers", href: "/commerce/customers" },
     { label: "Leads", href: "/leads" },
-    { label: "Pipeline", href: "/pipeline" },
-    { label: "Insights", href: "/analytics" },
+    { label: "Contacts", href: "/contacts" },
+    { label: "Invoices", href: "/billing/invoices" },
+    { label: "Memberships", href: "/billing/subscriptions" },
+    { label: "Products", href: "/commerce/products" },
+    { label: "Stock", href: "/commerce/stock", optional: true },
+    { label: "Services", href: "/services" },
+    { label: "Courses", href: "/courses" },
+    { label: "Membership plans", href: "/billing/subscriptions?tab=plans" },
+    { label: "Discount codes", href: "/commerce/discounts" },
+    { label: "Website", href: "/sites" },
     { label: "Social", href: "/social" },
+    { label: "Insights", href: "/analytics" },
+    { label: "Location", href: "/commerce/locations" },
+    { label: "Hours and time off", href: "/bookings/availability" },
     { label: "Settings", href: "/settings" },
 ];
 

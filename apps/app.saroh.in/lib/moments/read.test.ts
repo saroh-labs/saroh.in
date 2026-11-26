@@ -16,10 +16,16 @@ vi.mock("./service", () => ({ getSeenMoments: () => Promise.resolve(seen) }));
 beforeEach(() => {
     switches.api = true;
     switches.share = true;
-    seen = new Set();
+    // The menu card is everyone's first (DEC-262); these are about the rest.
+    seen = new Set<MomentKey>(["new-menu"]);
 });
 
 describe("Home's New card, for this person", () => {
+    it("tells everyone the menu has moved, first (DEC-262)", async () => {
+        seen = new Set();
+        expect((await homeNewFeature({ actions: [] }))?.key).toBe("new-menu");
+    });
+
     it("shows AI apps to anyone once its switch is on, staff too", async () => {
         expect((await homeNewFeature({ actions: [] }))?.key).toBe(
             "new-ai-apps",
@@ -36,17 +42,17 @@ describe("Home's New card, for this person", () => {
 
     it("follows the switch: Share off, no Share card", async () => {
         switches.share = false;
-        seen = new Set<MomentKey>(["new-ai-apps"]);
+        seen = new Set<MomentKey>(["new-menu", "new-ai-apps"]);
         expect(await homeNewFeature({ actions: ["social:read"] })).toBeNull();
     });
 
     it("never offers Ask AI until it has a switch", async () => {
-        seen = new Set<MomentKey>(["new-ai-apps", "new-share"]);
+        seen = new Set<MomentKey>(["new-menu", "new-ai-apps", "new-share"]);
         expect(await homeNewFeature({ actions: ["social:read"] })).toBeNull();
     });
 
     it("is gone for everyone once anyone in the business put it away", async () => {
-        seen = new Set<MomentKey>(["new-ai-apps"]);
+        seen = new Set<MomentKey>(["new-menu", "new-ai-apps"]);
         expect((await homeNewFeature({ actions: ["social:read"] }))?.key).toBe(
             "new-share",
         );

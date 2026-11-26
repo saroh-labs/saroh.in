@@ -249,7 +249,7 @@ export function ServicesScreen({
         <div className={hasRows && canEdit ? "max-[759px]:pb-20" : undefined}>
             <PageHeader
                 className="mb-3.5"
-                breadcrumb={["Bookings", "Services"]}
+                breadcrumb={["Services"]}
                 title="Services"
                 count={servicesCount(all, hasPage)}
                 description="What customers can book, how long it takes, and who does it."

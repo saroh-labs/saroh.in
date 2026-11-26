@@ -89,6 +89,8 @@ export async function homeNewFeature(
     viewer: Viewer,
 ): Promise<MomentView | null> {
     const open = {
+        // Everyone whose Home has a news slot knew the old menu (DEC-262).
+        "new-menu": true,
         "new-ai-apps": apiAreaOn(),
         "new-share": sharePostsOn() && permits(viewer, "social:read"),
         // TODO(plan 2026-11-13-001): Ask AI has no app switch yet. Open it

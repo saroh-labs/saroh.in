@@ -1818,8 +1818,8 @@ const AI_APPS_SHOTS: Shot[] = [
     },
 ];
 
-/** Home's "Use Saroh from Claude" notice: a moment, not what a step shows. */
-const HIDE_AI_MOMENT: Step = { hide: '[data-moment="new-ai-apps"]' };
+/** Home's "New" notices (AI apps, the menu): a moment, not what a step shows. */
+const HIDE_AI_MOMENT: Step = { hide: '[data-moment^="new-"]' };
 /** Home's desk layout; the phone one is in the page too, hidden. */
 const HOME_DESK = '[data-home-layout="desk"]';
 

@@ -242,13 +242,12 @@ export function PlanDetail({
                     holdsData
                     className="mb-0"
                     breadcrumb={[
-                        "Payments",
                         <IntentLink
                             data-ph-unmask=""
                             key="plans"
                             href={PLANS_HREF}
                         >
-                            Plans
+                            Membership plans
                         </IntentLink>,
                         plan.name,
                     ]}

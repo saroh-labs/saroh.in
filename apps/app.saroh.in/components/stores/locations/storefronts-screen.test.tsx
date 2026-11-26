@@ -147,7 +147,7 @@ describe("StorefrontsScreen as a location's own page", () => {
     it("is titled with the location's name; the crumb keeps the word", () => {
         const html = screen();
         expect(h1(html)).toBe("Hill Road");
-        expect(html).toMatch(/aria-label="Breadcrumb"[^]*Sell[^]*Location/);
+        expect(html).toMatch(/aria-label="Breadcrumb"[^]*Location/);
         // The line under it: a place customers visit, by its address.
         expect(text(html)).toContain("Customers visit · 12 Hill Road");
         expect(text(html)).toContain("New location");

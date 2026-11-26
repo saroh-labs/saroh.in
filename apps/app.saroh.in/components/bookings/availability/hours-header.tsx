@@ -14,7 +14,7 @@ export function HoursHeader({ readOnly }: { readOnly: boolean }) {
     return (
         <>
             <PageHeader
-                breadcrumb={["Bookings", "Hours and time off"]}
+                breadcrumb={["Hours and time off"]}
                 title="Hours and time off"
                 description={HOURS_LEAD}
                 holdsData={false}

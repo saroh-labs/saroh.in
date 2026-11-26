@@ -121,7 +121,8 @@ test.describe("subscriptions", () => {
     }) => {
         await page.goto("/billing/subscriptions");
         await expect(
-            page.getByRole("heading", { name: "Subscriptions" }),
+            // The menu's word for the page (DEC-264).
+            page.getByRole("heading", { name: "Memberships" }),
         ).toBeVisible();
         // Where each subscription stands is a dropdown in the toolbar; the
         // tabs above it are the two views, Subscribers and Plans.
