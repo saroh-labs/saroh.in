@@ -3403,3 +3403,38 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Phone:** Custom opens as a bottom sheet (the shared Drawer), the tapped button scrolled into view above it, Use this colour pinned on top of Cancel. While a colour is tried on the canvas, "Preview only · not saved" shows (desk: in the canvas bar; phone: under the top bar) and goes on Use, Cancel or the Site colours tab.
 - **Cards are styled per section or for the whole site only;** there is no "This card" (and no per-card storage).
 - **Page rows** in the editor show the first photo on the page (its stored smaller copy), or a plain page icon.
+
+## DEC-265 Orders opens on Open, soonest late first, with month-old orders folded
+
+**Status: Accepted — 2026-11-26, built** · owner (26 Nov 2026, UX audit of the selling screens, board "Orders", Q3) · extends DEC-163 from Home to the Orders list
+
+- Context: the list opened on every order, newest placed first, so at a boutique every row read "Late · 61 d" and the order due in an hour sat among two-month-old ones nobody marked collected (finding 6).
+- Decision:
+    - **The bare list opens on Open**, sorted by when each order turns late (placed plus its location's threshold for its type), soonest first; what can never turn late goes last. All and Refunded stay one choice away, with a visible sort ("Due soonest first", "Newest first"). An address naming a view (`?tab=`, `?view=`) or an order (`?sort=`) wins; an address that narrows the list another way (a search, a filter, Home's "Last 24 hours", an Insights week) still asks about every order, as such links always have.
+    - **Open orders placed 30 days ago or more fold** under one line, "N orders open over a month · Close them", which opens their own list (`?older=1`). Closing them is the existing bulk bar's moves, and in that list every move asks first.
+    - **Late is said against when it was due**: "Late · 2 h", not the order's age. The quick view keeps the Late chip.
+    - Sorting and folding are the API's (`sort=due`, `older=hide|only`, `counts.stale`), so the counts, the pages and the rows agree on any size of business.
+- Consequences: the late-rule notice is one notice naming every location it is about, and only for someone who can change the rule (finding 9). Search also finds a product on the order, and a phone for a role that reads contacts (finding 19).
+
+## DEC-266 Stock opens on what needs you
+
+**Status: Accepted — 2026-11-26, built** · owner (26 Nov 2026, board "Stock") · as DEC-153 did for Subscriptions
+
+- Context: the Levels tab said 10 products needed someone while the list under it opened A to Z on healthy shelves, "Needs you" a switch left off (finding 7).
+- Decision: with no `?show=` chosen, Levels opens on Needs you while anything needs you, else on everything; the switch shows which. Either way the rows come short first, then out, then low, then the rest, each in name order. A search looks through everything; an address with `?show=` wins. The API decides it in one read (`needs=auto`, `sort=need`, `needsShown`).
+
+## DEC-267 A discount code is read first, with what it gave
+
+**Status: Accepted — 2026-11-26, built** · owner (26 Nov 2026, board "Discount code", Q9) · follows the owner rule of 19 Oct (read-first rows, edit on request)
+
+- Context: opening a code landed in its form, an ended code one keystroke from a change, and nothing said whether the code worked (finding 8).
+- Decision: a code opens on what it did ("Used on 14 orders · ₹2,100 off", "₹18,400 in those orders", when it ran) and its facts; **Edit** opens the existing form (`?edit=1`) for whoever may change codes. The list gains **Gave off** and one **Ends** column that carries the state ("Ended 25 Nov", "Live until 31 Dec", "Used up"), and the policy paragraph under it became "How codes work", one press away (finding 26).
+- The figures are summed in the database, scoped to the business: what came off from the code's redemptions (`discount:read`), and what those orders came to only for a role that reads orders' money (`order:read`).
+
+## DEC-268 Products opens on Live and Draft
+
+**Status: Accepted — 2026-11-26, built** · owner (26 Nov 2026, board "Products", Q7)
+
+- Context: the list opened on every status, so archived products filled the first page, and why "73 products" differed from the plan's count was only in a hover (finding 16).
+- Decision: the list opens on **Live and draft**: what is sold or about to be. Archived and All statuses are choices in the Status filter (`?status=ARCHIVED`, `?status=ALL`). The header says, in words, "N of M products count toward your plan · archived don't".
+- Also (finding 17, owner's Q5): a **Sold, 30 days** column — units and money per product on the page, from one grouped read over order lines — for a role that reads orders' money. Not built yet: sorting by it ("Best sellers first") and the product page's Overview line, which need a read across the whole catalogue.
