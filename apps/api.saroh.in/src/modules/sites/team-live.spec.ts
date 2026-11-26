@@ -95,14 +95,12 @@ describe("Our team, read live", () => {
         );
         expect(out).toMatchObject({
             title: "Our team",
-            staffId: "st_1",
             name: "Asha Rao",
             role: "Warehouse lead",
-            people: [
-                { staffId: "st_2", name: "Farah Sheikh" },
-                { name: "Typed Person" },
-            ],
+            people: [{ name: "Farah Sheikh" }, { name: "Typed Person" }],
         });
+        // The public page never carries the internal ids.
+        expect(JSON.stringify(out)).not.toContain("st_");
     });
 
     it("draws a bound person's photo and About them from the profile, not the page's old copies", () => {
@@ -144,7 +142,6 @@ describe("Our team, read live", () => {
             new Map([["st_2", { name: "Farah" }]]),
         );
         expect(out).toMatchObject({
-            staffId: "st_2",
             name: "Farah",
             role: "Trade accounts",
             people: [{ name: "Typed Person" }],
