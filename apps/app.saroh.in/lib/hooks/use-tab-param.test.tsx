@@ -21,7 +21,7 @@ afterEach(() => {
 it("Back returns to the tab the address names, even when Next's search params never moved", () => {
     window.history.replaceState(null, "", "/commerce/locations?storefront=s1");
     let current = "";
-    let choose: (k: "place" | "payments") => void = () => {};
+    let choose: (k: "place" | "payments") => void = () => undefined;
     function Tabs() {
         const [tab, setTab] = useTabParam(
             "section",
