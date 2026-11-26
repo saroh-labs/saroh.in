@@ -127,6 +127,15 @@ export function usePostDraft({
     const [fields, setFields] = useState(() => fieldsOf(post, fromAskAi));
     const [live, setLive] = useState(post?.live ?? false);
     const [liveAt, setLiveAt] = useState<string | null>(post?.liveAt ?? null);
+    // A re-read that moves the server's live state (an approver's Approve
+    // put it live, say) moves the editor's too, in render as useTabParam.
+    const server = { live: post?.live ?? false, at: post?.liveAt ?? null };
+    const [seenServer, setSeenServer] = useState(server);
+    if (server.live !== seenServer.live || server.at !== seenServer.at) {
+        setSeenServer(server);
+        setLive(server.live);
+        setLiveAt(server.at);
+    }
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [publishing, setPublishing] = useState(false);

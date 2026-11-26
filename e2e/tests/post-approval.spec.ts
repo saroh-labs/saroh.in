@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
 import { people, useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
@@ -95,9 +96,11 @@ test(
 
             await page.goto(`/sites/${site.id}/posts/${made.id}`);
             test.skip(
-                !page.url().includes(`/write/${made.id}`),
+                !(await websiteAreaOn(page)),
                 "The Website area is off: today's post editor",
             );
+            // A streamed redirect (a loading boundary above): it can land after load.
+            await page.waitForURL((u) => u.href.includes(`/write/${made.id}`));
 
             // A direct publish is refused in the site's words.
             const refused = await page.request.post(
@@ -110,7 +113,7 @@ test(
             // Publish post is Send for approval.
             await page
                 .locator("[data-post-bar]")
-                .getByRole("button", { name: "Publish post" })
+                .getByRole("button", { name: "Publish post", exact: true })
                 .click();
             const sheet = page.getByRole("dialog", {
                 name: "Send for approval",

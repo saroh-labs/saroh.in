@@ -303,8 +303,16 @@ function SavedLine({ model }: { model: PostEditorModel }) {
  * count. The one way to switch posts (`EBPostLeftPanel`).
  */
 function PostPicker({ model }: { model: PostEditorModel }) {
-    const { siteId, posts, readOnly, postsPrefix } = model.data;
+    const { siteId, readOnly, postsPrefix } = model.data;
     const title = model.draft.fields.title.trim() || "New post";
+    const postId = model.draft.postId;
+    // The list is read once with the page; a new post's first save only
+    // swaps the address (`use-post-draft`), so it isn't in it yet.
+    const read = model.data.posts;
+    const posts =
+        read && postId && !read.some((p) => p.id === postId)
+            ? [{ id: postId, title, live: false }, ...read]
+            : read;
     const slug = model.draft.fields.slug.trim();
     const path = slug ? `/${postsPrefix}/${slug}` : `/${postsPrefix}/`;
     const [open, setOpen] = useState(false);
@@ -342,7 +350,7 @@ function PostPicker({ model }: { model: PostEditorModel }) {
             >
                 <nav aria-label="Posts" className="grid">
                     {(posts ?? []).slice(0, 8).map((p) => {
-                        const current = p.id === model.draft.postId;
+                        const current = p.id === postId;
                         return (
                             <IntentLink
                                 key={p.id}

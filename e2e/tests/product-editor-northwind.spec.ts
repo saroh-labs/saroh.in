@@ -98,7 +98,11 @@ test.describe("product editor on Northwind (#525)", () => {
                     .getByRole("button", { name: "Create draft" })
                     .click();
                 await page.waitForURL(/\/commerce\/products\/[^/]+\/edit/);
-                await expect(page.getByText("All changes saved")).toBeVisible();
+                await expect(
+                    page
+                        .getByText("All changes saved")
+                        .filter({ visible: true }),
+                ).toBeVisible();
 
                 const id = /\/commerce\/products\/([^/]+)\/edit/.exec(
                     page.url(),
@@ -117,7 +121,11 @@ test.describe("product editor on Northwind (#525)", () => {
                 // Opened again, nothing reads as unsaved (#525): not the
                 // description, not the allergens.
                 await page.reload();
-                await expect(page.getByText("All changes saved")).toBeVisible();
+                await expect(
+                    page
+                        .getByText("All changes saved")
+                        .filter({ visible: true }),
+                ).toBeVisible();
             } finally {
                 await removeProducts(page.request, NW, name);
                 if (added) {

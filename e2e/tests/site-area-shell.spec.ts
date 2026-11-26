@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 import { northwind } from "../fixtures/own-data";
 import { onPhone } from "../fixtures/reviewer-editor";
 import { useSession } from "../fixtures/sessions";
+import { websiteAreaOn } from "../fixtures/website-area";
 import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
@@ -94,9 +95,11 @@ test.describe("the Website area's shell", () => {
         const siteId = await northwindSite(page.request);
         await page.goto(`/sites/${siteId}/posts`);
         test.skip(
-            !page.url().includes("/writing"),
+            !(await websiteAreaOn(page)),
             "The Website area is off: Posts is still a tab",
         );
+        // A streamed redirect (a loading boundary above): it can land after load.
+        await page.waitForURL((u) => u.href.includes("/writing"));
         await expect(
             page.getByRole("heading", {
                 name: "Blog and other writing",

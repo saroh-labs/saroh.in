@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { tabFromParam } from "@/lib/settings/search";
 
@@ -44,6 +44,24 @@ export function useTabParam<K extends string>(
         setSeen(fromUrl);
         setLocal(fromUrl);
     }
+    // Back and Forward follow the address itself: Next can fold a tab's
+    // push and the Back after it into one render, so `search` never shows
+    // the tab that was left and the check above sees nothing move.
+    const known = keys.join(",");
+    useEffect(() => {
+        const follow = () => {
+            const params = new URL(window.location.href).searchParams;
+            setLocal(
+                tabFromParam(
+                    params.get(param) ?? (alias ? params.get(alias) : null),
+                    known.split(",") as K[],
+                    fallback,
+                ),
+            );
+        };
+        window.addEventListener("popstate", follow);
+        return () => window.removeEventListener("popstate", follow);
+    }, [param, alias, known, fallback]);
     const setTab = (key: K) => {
         // Only the tab: `seen` follows the address, which Next updates
         // after this render, so setting it here would snap the tab back.
