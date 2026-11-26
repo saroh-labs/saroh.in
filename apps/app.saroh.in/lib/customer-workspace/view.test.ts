@@ -587,6 +587,19 @@ describe("a gym customer's bookings and classes", () => {
         expect(paidText(null)).toBeNull();
     });
 
+    it('says "Free" for a free booking, never Pays at the desk (DEC-261)', () => {
+        expect(
+            bookingRow(booking({ paidWith: null, free: true }), true, NOW).pay,
+        ).toBe("Free");
+        // An older free booking the API still marks "at the desk".
+        expect(
+            bookingRow(booking({ paidWith: "DESK", free: true }), true, NOW)
+                .pay,
+        ).toBe("Free");
+        // No price at all is not free.
+        expect(bookingRow(booking({ paidWith: null }), true, NOW).pay).toBe("");
+    });
+
     it("marks a no-show and a late cancel as the ones to ask about", () => {
         const late = booking({
             id: "b3",

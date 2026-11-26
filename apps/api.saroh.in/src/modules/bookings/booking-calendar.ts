@@ -1,4 +1,4 @@
-import { bookingPrice } from "./booking-money";
+import { bookingPrice, isFreeBooking, shownPaidWith } from "./booking-money";
 import type { DeskTake } from "./desk-take";
 import { chargingOnly, deskTake, paidAtDesk } from "./desk-take";
 import type { PaidWith } from "./dto";
@@ -237,9 +237,7 @@ export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
     const desk = deskOf(row);
     // Booked at a price of 0 (DEC-261). One booked before free services
     // were told apart says "at the desk"; there is nothing to pay there.
-    const free =
-        (bookingPrice(row.snapshot).priceCents ?? row.service.priceCents) === 0;
-    const paid = howPaid(row);
+    const free = isFreeBooking(row.snapshot, row.service.priceCents);
     return {
         id: row.id,
         serviceId: row.serviceId,
@@ -257,7 +255,7 @@ export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
         service: serviceView(row, money),
         contact: row.contact,
         staff: row.staff,
-        paidWith: free && paid === "DESK" ? null : paid,
+        paidWith: shownPaidWith(howPaid(row), free),
         free,
         packName:
             pack !== null && pack.reversedAt === null
