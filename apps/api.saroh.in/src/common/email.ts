@@ -43,6 +43,18 @@ export function onQuietSendFailed(
     quietSendFailed = handler;
 }
 
+/**
+ * How long any Saroh SMTP send waits to connect, for the greeting and on a
+ * quiet socket. Nodemailer's own defaults run to minutes, so a stuck
+ * provider would hold a request or a job lane; with these the send fails,
+ * and the job's retry rules send it again.
+ */
+export const SEND_TIMEOUTS = {
+    connectionTimeout: 5_000,
+    greetingTimeout: 5_000,
+    socketTimeout: 10_000,
+};
+
 function getTransporter(): Transporter | null {
     const host = env.SMTP_HOST ?? env.SMTP_HOSTNAME;
     const port = env.SMTP_PORT;
@@ -55,6 +67,7 @@ function getTransporter(): Transporter | null {
             port: port ? Number(port) : 465,
             secure: env.SMTP_SECURE !== "false",
             auth: { user, pass },
+            ...SEND_TIMEOUTS,
         });
     }
     if (user && pass) {
@@ -64,6 +77,7 @@ function getTransporter(): Transporter | null {
             port: 465,
             secure: true,
             auth: { user, pass },
+            ...SEND_TIMEOUTS,
         });
     }
     return null;
@@ -1468,9 +1482,7 @@ type SiteCodesSmtpEnv = IdentitySmtpEnv &
 export const POOLED_SEND = {
     pool: true as const,
     maxConnections: 2,
-    connectionTimeout: 5_000,
-    greetingTimeout: 5_000,
-    socketTimeout: 10_000,
+    ...SEND_TIMEOUTS,
 };
 
 type IdentitySmtpEnv = Pick<
