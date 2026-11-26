@@ -46,10 +46,27 @@ test("Add: the / menu's new blocks save, Find opens, search and sharing in the c
 
         // W1: "/" on the empty last line opens the menu, and filters.
         const body = page.locator("[data-writing-surface] .ProseMirror");
-        await body.locator("p").last().click();
-        await page.keyboard.press("/");
         const filter = page.getByRole("textbox", { name: "Type to filter" });
-        await expect(filter).toBeVisible();
+        // The menu listens once the editor's view mounts, after hydration: a
+        // "/" typed before then is only text, so take it back and try again.
+        await expect(async () => {
+            if (!(await filter.isVisible())) {
+                await body.locator("p").last().click();
+                await page.keyboard.press("End");
+                await page.keyboard.press("/");
+            }
+            if (
+                !(await filter
+                    .waitFor({ state: "visible", timeout: 1_000 })
+                    .then(
+                        () => true,
+                        () => false,
+                    ))
+            ) {
+                await page.keyboard.press("Backspace");
+                throw new Error("the / menu didn't open yet");
+            }
+        }).toPass({ timeout: 15_000 });
         const menu = page.getByRole("listbox", { name: "Add to the post" });
         for (const name of [
             "Offer",

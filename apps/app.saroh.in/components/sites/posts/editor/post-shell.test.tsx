@@ -608,6 +608,16 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         ).toContain("Bridal trial");
     });
 
+    it("lists the post being written even when the page's list predates it", () => {
+        draw(
+            <PostShell key="p1" data={{ ...listed, posts: [] }} post={post} />,
+        );
+        act(() => named("Blog post: Bridal trial. Open another post")?.click());
+        expect(
+            el('nav[aria-label="Posts"] a[aria-current="page"]').textContent,
+        ).toContain("Bridal trial");
+    });
+
     it("keeps the rail's tab across posts", () => {
         draw(<PostShell key="p1" data={listed} post={post} />);
         act(() => named("Add")?.click());
