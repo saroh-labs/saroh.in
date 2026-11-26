@@ -54,8 +54,7 @@ export async function runOne<R extends { ok: boolean }>(
 /**
  * After a product's sheet saved (details, description, photos): on the
  * product page its queries are read again (`useProductsSaved`); on a
- * screen still server-rendered (a post's editor, Search and sharing), the
- * page is.
+ * screen still server-rendered (a post's editor), the page is.
  */
 export const ProductSavedContext = createContext<(() => unknown) | null>(null);
 
@@ -63,7 +62,7 @@ export function useProductSaved(): () => unknown {
     const router = useRouter();
     return (
         useContext(ProductSavedContext) ??
-        // rq-refresh-ok: the sheets' other screens are server-rendered.
+        // rq-refresh-ok: off the product page only a post's editor (/sites/[siteId]/write) draws these sheets, server-rendered.
         (() => router.refresh())
     );
 }

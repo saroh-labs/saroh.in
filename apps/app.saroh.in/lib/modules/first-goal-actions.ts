@@ -31,6 +31,7 @@ export async function startWithGoalAction(
     );
     if (outcome.turnedOn.length > 0) {
         await forgetGate();
+        // rq-revalidate-ok: Setup (/onboarding) is not a React Query route, and the layout's module gates change.
         revalidatePath("/", "layout");
     }
     return outcome;

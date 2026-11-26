@@ -30,10 +30,9 @@ import {
 } from "@/lib/price-history/words";
 import { archiveService } from "@/lib/services/actions";
 import { callName } from "@/lib/services/call-name";
-import type { Service } from "@/lib/services/service";
-import type { WhoFields } from "@/lib/services/service-cards";
-import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
-import type { ServiceDraft } from "@/lib/services/service-editor";
+import type { WhoFields } from "@/lib/services/cards";
+import { AVAILABILITY_HREF } from "@/lib/services/cards";
+import type { ServiceDraft } from "@/lib/services/editor";
 import {
     businessModeFor,
     chargedAsSaved,
@@ -43,8 +42,8 @@ import {
     savedMessage,
     serviceFieldProblems,
     staffFor,
-} from "@/lib/services/service-editor";
-import type { Bookers } from "@/lib/services/service-form";
+} from "@/lib/services/editor";
+import type { Bookers } from "@/lib/services/form";
 import {
     bookersOf,
     freeTimeOf,
@@ -53,10 +52,11 @@ import {
     pauseLabel,
     takingLine,
     withSameName,
-} from "@/lib/services/service-form";
-import { hoursFromRules } from "@/lib/services/service-hours-draft";
-import type { PanelKey } from "@/lib/services/service-panels";
-import { editCards } from "@/lib/services/service-panels";
+} from "@/lib/services/form";
+import { hoursFromRules } from "@/lib/services/hours-draft";
+import type { PanelKey } from "@/lib/services/panels";
+import { editCards } from "@/lib/services/panels";
+import type { Service } from "@/lib/services/service";
 import { zoneShortName } from "@/lib/services/time-picker";
 import { useServiceSave } from "@/lib/services/use-services";
 import type { ConfirmResult } from "@saroh/ui/confirm-dialog";

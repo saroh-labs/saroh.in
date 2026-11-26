@@ -88,15 +88,15 @@ test("a marked line, a comment, and React Query's own plumbing pass", () => {
     assert.deepEqual(run(tree, { routes: ["/"] }).errors, []);
 });
 
-test("revalidatePath in a React Query domain's actions is a warning, not an error", () => {
+test("revalidatePath in a React Query domain's actions fails unless marked", () => {
     const tree = {
         "lib/orders/actions.ts": `revalidatePath("/commerce/orders");\n// rq-revalidate-ok: the public page\nrevalidatePath("/x");`,
+        "lib/orders/screen-actions.ts": `if (ok) revalidatePath("/y"); // rq-revalidate-ok: a gate`,
         "lib/products/actions.ts": `revalidatePath("/commerce/products");`,
     };
-    const { errors, warnings } = run(tree, { domains: ["orders"] });
-    assert.deepEqual(errors, []);
-    assert.equal(warnings.length, 1);
-    assert.match(warnings[0], /lib\/orders\/actions\.ts:1/);
+    const { errors } = run(tree, { domains: ["orders"] });
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /lib\/orders\/actions\.ts:1: revalidatePath/);
 });
 
 test("routeOf drops groups and private folders; matchRoute is exact", () => {

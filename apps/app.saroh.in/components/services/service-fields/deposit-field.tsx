@@ -6,10 +6,10 @@ import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { Eyebrow } from "@/components/bookings/calendar/parts";
 import type { PlanLock } from "@/lib/billing/access";
 import { depositLock } from "@/lib/billing/access";
+import type { ServiceCharged } from "@/lib/services/editor";
+import { depositNote, depositPausedNote } from "@/lib/services/editor";
 import type { OnlineProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
-import type { ServiceCharged } from "@/lib/services/service-editor";
-import { depositNote, depositPausedNote } from "@/lib/services/service-editor";
 import type { BookingPayment } from "@/lib/staff/types";
 
 import { PlanWay } from "@/components/billing/plan-way";

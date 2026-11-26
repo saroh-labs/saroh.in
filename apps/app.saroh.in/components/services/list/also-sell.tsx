@@ -12,6 +12,7 @@ import type { ModuleView } from "@/lib/modules/schema";
 import { afterSettingsSave } from "@/lib/query/invalidate";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import { alsoSellToast } from "@/lib/services/also-sell";
+import { asOrg, useSettingsSave } from "@/lib/settings/use-settings";
 import { CheckRow } from "@saroh/ui/check-row";
 
 /**
@@ -37,8 +38,14 @@ export function AlsoSell({
     const [pending, startTransition] = useTransition();
     const [picked, setPicked] = useState<string[] | null>(null);
 
+    const { orgId } = useSettingsSave();
     const set = (key: string, on: boolean) =>
-        setModuleStatusAction(key, on ? "ENABLED" : "DISABLED");
+        setModuleStatusAction(
+            key,
+            on ? "ENABLED" : "DISABLED",
+            undefined,
+            ...asOrg(orgId),
+        );
 
     const flip = (f: AlsoSellFeature) => {
         if (!f.on) return setPicked([f.key]);

@@ -24,6 +24,8 @@ import { GST_RATE_NEEDED, rateOption } from "@/lib/invoices/gst";
 import type { BookingPayment } from "@/lib/staff/types";
 import { absentText } from "@saroh/ui/lib/absent";
 
+import type { HoursRow } from "./hours-draft";
+import { hoursProblems, sameHours } from "./hours-draft";
 import type {
     CreateServiceInput,
     DepositMode,
@@ -32,8 +34,6 @@ import type {
     Service,
     UpdateServiceInput,
 } from "./service";
-import type { HoursRow } from "./service-hours-draft";
-import { hoursProblems, sameHours } from "./service-hours-draft";
 import type { ServiceUsage } from "./usage";
 
 export type ServiceKind = "one" | "class";
@@ -92,7 +92,7 @@ export interface ServiceDraft {
     sacCode: string;
     /**
      * Its own weekly hours, saved with the page's one Save in a call of
-     * their own (`service-hours-draft.ts`).
+     * their own (`hours-draft.ts`).
      */
     hours: HoursRow[];
 }

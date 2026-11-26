@@ -9,10 +9,10 @@ import { PRICE_WRITES_ON, PriceSheet } from "./price-sheet";
 const readServicePrice = vi.fn();
 const readServiceUses = vi.fn();
 const updateService = vi.fn();
-vi.mock("@/lib/sites/service-price-read", () => ({
+vi.mock("@/lib/sites/price-read", () => ({
     readServicePrice: (...a: unknown[]) => readServicePrice(...a) as unknown,
 }));
-vi.mock("@/lib/sites/service-uses-read", () => ({
+vi.mock("@/lib/sites/uses-read", () => ({
     readServiceUses: (...a: unknown[]) => readServiceUses(...a) as unknown,
 }));
 vi.mock("@/lib/services/actions", () => ({

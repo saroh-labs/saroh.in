@@ -549,10 +549,15 @@ describe("the address on the website", () => {
         );
         await press(item("Save"));
 
-        expect(updateStore).toHaveBeenCalledWith("st_indira", {
-            address: "14 Hill Road\nBengaluru",
-            mapUrl: "maps.app.goo.gl/AbC123xyZ",
-        });
+        expect(updateStore).toHaveBeenCalledWith(
+            "st_indira",
+            {
+                address: "14 Hill Road\nBengaluru",
+                mapUrl: "maps.app.goo.gl/AbC123xyZ",
+            },
+            // The tab's business, as the Settings tab sends it.
+            "org_1",
+        );
         expect(save).not.toHaveBeenCalled();
         expect(showSuccess).toHaveBeenCalledWith(
             "Location address saved. Your website shows it now.",

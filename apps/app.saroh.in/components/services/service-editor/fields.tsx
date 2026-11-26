@@ -4,7 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 import { useId } from "react";
 
-import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
+import type { ServiceDraft, ServiceField } from "@/lib/services/editor";
 
 /*
  * The Service Editor's small parts, after the design: a section card with

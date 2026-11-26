@@ -8,13 +8,13 @@ import { ChevronDown, Plus, X } from "lucide-react";
 import { useId, useState } from "react";
 
 import { ClockRow } from "@/components/bookings/availability/clock-select";
-import type { HoursRow } from "@/lib/services/service-hours-draft";
+import type { HoursRow } from "@/lib/services/hours-draft";
 import {
     DAY_NAMES,
     minutesToTime,
     timeToMinutes,
-} from "@/lib/services/service-hours-draft";
-import { windowWords } from "@/lib/services/service-panels";
+} from "@/lib/services/hours-draft";
+import { windowWords } from "@/lib/services/panels";
 import { cn } from "@saroh/ui/lib/utils";
 
 /** Monday first, as the week is listed everywhere else. */

@@ -291,7 +291,11 @@ describe("adding a domain on a plan without one (DEC-139)", () => {
         });
         await draw();
         await add();
-        expect(claim).toHaveBeenCalledWith("site_1", "shop.example.com");
+        expect(claim).toHaveBeenCalledWith(
+            "site_1",
+            "shop.example.com",
+            undefined,
+        );
         expect(showPlanRefusal).toHaveBeenCalledWith(refusal);
         expect(document.querySelector('[role="dialog"]')).toBeNull();
         // Nothing was added.

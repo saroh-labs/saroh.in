@@ -15,8 +15,8 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ServiceDraft } from "@/lib/services/service-editor";
-import { draftOf } from "@/lib/services/service-editor";
+import type { ServiceDraft } from "@/lib/services/editor";
+import { draftOf } from "@/lib/services/editor";
 import type { BookingPaymentView } from "@/lib/staff/types";
 
 import { PriceSection } from "./editor-sections";

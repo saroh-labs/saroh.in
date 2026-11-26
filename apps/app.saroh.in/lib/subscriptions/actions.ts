@@ -21,7 +21,7 @@ function refresh() {
         ["/billing/plans", "layout"],
         ["/billing/invoices", undefined],
     ] as const) {
-        // rq-revalidate-ok: reached only by a write without orgId, from a server-rendered screen (a person's page).
+        // rq-revalidate-ok: a write without orgId; no caller today (every screen and Home send it).
         revalidatePath(path, type);
     }
 }

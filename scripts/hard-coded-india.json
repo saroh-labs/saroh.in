@@ -54,7 +54,7 @@
     "apps/app.saroh.in/lib/insights/sells.fixture.ts": 1,
     "apps/app.saroh.in/lib/saroh-billing/plan-status.ts": 1,
     "apps/app.saroh.in/lib/saroh-billing/plan-view.ts": 2,
-    "apps/app.saroh.in/lib/services/service-editor.ts": 1,
+    "apps/app.saroh.in/lib/services/editor.ts": 1,
     "apps/app.saroh.in/lib/services/time-picker.ts": 1,
     "apps/app.saroh.in/lib/settings/activity-detail.ts": 1,
     "apps/app.saroh.in/lib/subscriptions/plan-editor.ts": 1,

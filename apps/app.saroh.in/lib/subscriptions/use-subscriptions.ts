@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { createContext, createElement, useContext, useMemo } from "react";
 
+import { customersKeys } from "@/lib/customers/queries";
 import { homeKeys } from "@/lib/home/queries";
 import { invoicesKeys } from "@/lib/invoices/queries";
 import { afterSettingsSave } from "@/lib/query/invalidate";
@@ -53,7 +54,8 @@ export function useSubscriptionContacts(enabled: boolean) {
 /**
  * After a subscription or plan write landed: the list, the subscription
  * and the plan on screen are read again (resolving once they are back, so a busy state
- * lasts until the screen changed); Invoices (a renewal, a restart or a
+ * lasts until the screen changed), and a person's page (their Subscriptions
+ * tab) when it is the one open; Invoices (a renewal, a restart or a
  * cancel makes or voids one) and Home (Needs you shows failed renewals)
  * are marked stale for their next visit. Never throws: a read that fails
  * is the screen's failed state.
@@ -67,6 +69,7 @@ export function subscriptionsSaved(
         qc.invalidateQueries({ queryKey: subscriptionsListKeys(orgId) }),
         qc.invalidateQueries({ queryKey: subscriptionKeys(orgId) }),
         qc.invalidateQueries({ queryKey: planKeys(orgId) }),
+        qc.invalidateQueries({ queryKey: customersKeys(orgId) }),
         qc.invalidateQueries({ queryKey: invoicesKeys(orgId), ...stale }),
         qc.invalidateQueries({ queryKey: homeKeys(orgId), ...stale }),
     ]).then(
@@ -130,9 +133,8 @@ export function SubscriptionSaveProvider({
 
 /**
  * How a Subscriptions part saves: Subscriptions' own (inside
- * `SubscriptionSaveProvider`), or as before on a screen still
- * server-rendered (a person's page): no business named, the page read
- * again.
+ * `SubscriptionSaveProvider`, which a person's Subscribe also wears), or,
+ * outside one, no business named and the page read again.
  */
 export function useSubscriptionSave(): SubscriptionSave {
     const router = useRouter();
@@ -141,7 +143,7 @@ export function useSubscriptionSave(): SubscriptionSave {
         provided ?? {
             orgId: undefined,
             saved: () => {
-                // rq-refresh-ok: reached only outside the provider, on a server-rendered screen; Subscriptions' own screens provide theirs.
+                // rq-refresh-ok: no caller today: Subscriptions' layouts and a person's Subscribe provide theirs.
                 router.refresh();
                 return Promise.resolve();
             },

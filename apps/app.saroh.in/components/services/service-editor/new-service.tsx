@@ -9,7 +9,7 @@ import { useRef, useState } from "react";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { callName } from "@/lib/services/call-name";
-import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
+import type { ServiceDraft, ServiceField } from "@/lib/services/editor";
 import {
     changedSections,
     chargedAsSaved,
@@ -18,7 +18,7 @@ import {
     problemFor,
     savedMessage,
     serviceFieldProblems,
-} from "@/lib/services/service-editor";
+} from "@/lib/services/editor";
 import {
     addedMessage,
     gapsLine,
@@ -26,13 +26,10 @@ import {
     sameNameAs,
     summaryLine,
     withSameName,
-} from "@/lib/services/service-form";
-import {
-    hoursNotSaved,
-    startingHours,
-} from "@/lib/services/service-hours-draft";
-import type { PanelKey } from "@/lib/services/service-panels";
-import { detailRows, PANEL_FIELDS } from "@/lib/services/service-panels";
+} from "@/lib/services/form";
+import { hoursNotSaved, startingHours } from "@/lib/services/hours-draft";
+import type { PanelKey } from "@/lib/services/panels";
+import { detailRows, PANEL_FIELDS } from "@/lib/services/panels";
 import { zoneShortName } from "@/lib/services/time-picker";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { useSaveShortcut } from "@saroh/ui/lib/keyboard-save";

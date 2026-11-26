@@ -117,7 +117,7 @@ function SoldOutButton({
                 return;
             }
             showSuccess(soldOutSaid(res.data.name || place.name, next));
-            // rq-refresh-ok: the product editor is server-rendered.
+            // rq-refresh-ok: no quick-edits host only on the product editor (/edit, /new), which is server-rendered.
             if (!hosted) router.refresh();
         });
     }

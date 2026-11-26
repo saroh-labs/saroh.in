@@ -17,9 +17,10 @@ import {
  * Thin: the API decides who may change or close a storefront and refuses
  * otherwise. From Sell › Locations (React Query, DEC-259) each takes the
  * tab's business last (`writeAsOrg`, refusing a moved tab) and revalidates
- * nothing: the screen reads its own queries again. Without it (Settings ›
- * Business hours, the website's address sheet, both server-rendered) a
- * save revalidates the whole layout, as the storefront pickers name them.
+ * nothing: the screen reads its own queries again; so do Settings ›
+ * Business hours and the website's address sheet (`afterSettingsSave()`).
+ * Without it (the site editor's Find settings, server-rendered, and
+ * Business hours' Undo) a save revalidates the whole layout, as before.
  */
 
 export async function updateStorefront(
@@ -31,7 +32,7 @@ export async function updateStorefront(
         return writeAsOrg(orgId, () => updateStorefrontApi(storeId, input));
     }
     const res = await updateStorefrontApi(storeId, input);
-    // rq-revalidate-ok: only from the server-rendered callers above.
+    // rq-revalidate-ok: only the site editor's Find settings (server-rendered) and Business hours' Undo.
     if (res.ok) revalidatePath("/", "layout");
     return res;
 }
@@ -43,7 +44,7 @@ export async function closeStorefront(storeId: string, orgId: string) {
 /** Put Orders' one-time late notice away for a storefront (B17). */
 export async function dismissLateRuleNotice(storeId: string) {
     const res = await dismissLateRuleNoticeApi(storeId);
-    // rq-revalidate-ok: Orders' late notice, which hides itself; not Locations'.
+    // rq-revalidate-ok: Orders' late notices are its server render (`LateRuleNotice`), not a query.
     if (res.ok) revalidatePath("/commerce/orders");
     return res;
 }

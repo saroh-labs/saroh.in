@@ -10,14 +10,10 @@ import { TextLink } from "@saroh/ui/text-link";
 import { PlanWay } from "@/components/billing/plan-way";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { isPlanHref } from "@/lib/billing/plan-access";
+import type { WhoCanBook } from "@/lib/services/cards";
+import { SAMPLE_WORD, TAKING_LABEL, WHO_TAG } from "@/lib/services/cards";
 import type { OnlineProblem } from "@/lib/services/online-booking";
 import type { Service } from "@/lib/services/service";
-import type { WhoCanBook } from "@/lib/services/service-cards";
-import {
-    SAMPLE_WORD,
-    TAKING_LABEL,
-    WHO_TAG,
-} from "@/lib/services/service-cards";
 import { SwitchRow } from "@saroh/ui/check-row";
 import { KEEP_ALL } from "./use-keep-samples";
 

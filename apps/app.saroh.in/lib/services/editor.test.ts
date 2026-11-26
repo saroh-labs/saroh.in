@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Service } from "./service";
-import type { ServiceDraft } from "./service-editor";
+import type { ServiceDraft } from "./editor";
 import {
     changedParts,
     changedSections,
@@ -31,7 +30,8 @@ import {
     VIEW_ONLY,
     whereNote,
     whoseHours,
-} from "./service-editor";
+} from "./editor";
+import type { Service } from "./service";
 
 describe("VIEW_ONLY (E26)", () => {
     it("says the role can't change set-up, in words, with no permission code", () => {

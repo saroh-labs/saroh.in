@@ -13,6 +13,8 @@ import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import { sameWeek } from "@/lib/organizations/opening-hours";
 import { undoStorefrontHours } from "@/lib/organizations/settings-actions";
 import { hoursUndo } from "@/lib/organizations/settings-undo";
+import { afterSettingsSave } from "@/lib/query/invalidate";
+import { useSettingsSave } from "@/lib/settings/use-settings";
 import { hoursBackwards } from "@/lib/stores/opening-hours-summary";
 import { updateStorefront } from "@/lib/stores/storefront-actions";
 import type {
@@ -55,6 +57,7 @@ export function BusinessHoursSheet({
     /** Every location saved: what to say, and the Undo while there is one. */
     onSaved: (said: string, undo: (() => Promise<UndoOutcome>) | null) => void;
 }) {
+    const { orgId } = useSettingsSave();
     const first = stores.at(0);
     const saved = first?.openingHours ?? null;
     const [week, setWeek] = useState<OpeningHoursDay[]>(saved ?? DEFAULT_WEEK);
@@ -75,9 +78,11 @@ export function BusinessHoursSheet({
         const results = await Promise.all(
             stores.map(async (store) => ({
                 store,
-                result: await updateStorefront(store.id, {
-                    openingHours: week,
-                }),
+                result: await updateStorefront(
+                    store.id,
+                    { openingHours: week },
+                    orgId,
+                ),
             })),
         );
         onStores(() =>
@@ -98,6 +103,8 @@ export function BusinessHoursSheet({
             );
             return;
         }
+        // Sell › Locations draws each location's week: read on its next visit.
+        afterSettingsSave();
         const back = hoursUndo(
             results.map(({ store, result }) => ({
                 id: store.id,

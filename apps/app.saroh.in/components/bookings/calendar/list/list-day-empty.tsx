@@ -87,6 +87,9 @@ export function ListDayEmpty({
         <EmptyState
             data-ph-unmask=""
             data-list-empty="open"
+            // On a phone New booking floats over the foot (U2): room to
+            // scroll these buttons clear of it.
+            className="max-[759px]:pb-24"
             icon={<CalendarDays />}
             title={title}
             description={

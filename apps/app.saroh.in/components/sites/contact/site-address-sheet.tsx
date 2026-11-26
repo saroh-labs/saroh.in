@@ -9,6 +9,7 @@ import { Switch } from "@saroh/ui/switch";
 import { useState } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
+import { useSettingsSaved } from "@/components/sites/settings/settings-saved";
 import { LocationAddressFields } from "@/components/stores/place/location-address-fields";
 import { runAction } from "@/lib/api/run-action";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
@@ -16,6 +17,7 @@ import type {
     OrganizationSettings,
     SiteContact,
 } from "@/lib/organizations/settings-service";
+import { afterSettingsSave } from "@/lib/query/invalidate";
 import { SETTINGS_ROW_ID } from "@/lib/sites/settings-edit";
 import {
     ADDRESS_SHEET,
@@ -262,6 +264,7 @@ function LocationAddressEdit({
     const [left, setLeft] = useState(false);
     const [refusal, setRefusal] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const { orgId } = useSettingsSaved();
 
     async function save() {
         setTried(true);
@@ -273,7 +276,7 @@ function LocationAddressEdit({
         }
         setRefusal(null);
         const result = await runAction(
-            () => updateStorefront(location.id, patch),
+            () => updateStorefront(location.id, patch, orgId),
             { setBusy: setSaving },
         );
         if (!result) return;
@@ -281,6 +284,8 @@ function LocationAddressEdit({
             setRefusal(result.error);
             return;
         }
+        // Sell › Locations draws the address: read on its next visit.
+        afterSettingsSave();
         onSaved(
             {
                 id: location.id,

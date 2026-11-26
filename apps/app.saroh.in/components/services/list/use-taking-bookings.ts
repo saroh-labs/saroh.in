@@ -7,14 +7,10 @@ import { useRef, useState } from "react";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { updateService } from "@/lib/services/actions";
-import type { WhoFields } from "@/lib/services/service-cards";
-import {
-    pauseToast,
-    takingPatch,
-    whoPatch,
-} from "@/lib/services/service-cards";
-import type { Bookers } from "@/lib/services/service-form";
-import { bookersPatch, bookersToast } from "@/lib/services/service-form";
+import type { WhoFields } from "@/lib/services/cards";
+import { pauseToast, takingPatch, whoPatch } from "@/lib/services/cards";
+import type { Bookers } from "@/lib/services/form";
+import { bookersPatch, bookersToast } from "@/lib/services/form";
 import { useServiceSave } from "@/lib/services/use-services";
 
 /** How a caller draws a write: a change to the fields it shows now. */

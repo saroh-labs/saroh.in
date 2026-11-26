@@ -42,6 +42,7 @@ export async function setModuleStatusAction(
     const result = await forgetGateAfter(
         await setStatusApi(moduleKey, status, options),
     );
+    // rq-revalidate-ok: a call with no business only (a test); Modules and Services' Also sell send it.
     if (result.ok) revalidatePath(MODULES_PATH);
     return result;
 }
@@ -62,7 +63,9 @@ export async function selectProjectModuleAction(
 ): Promise<ModuleMutationResult> {
     const result = await selectApi(projectId, moduleKey);
     if (result.ok) {
+        // rq-revalidate-ok: from a project's Modules (/settings/projects/[projectId]/modules), server-rendered.
         revalidatePath(MODULES_PATH);
+        // rq-revalidate-ok: as above.
         revalidatePath(`/settings/projects/${projectId}/modules`);
     }
     return result;
@@ -74,7 +77,9 @@ export async function deselectProjectModuleAction(
 ): Promise<ModuleMutationResult> {
     const result = await deselectApi(projectId, moduleKey);
     if (result.ok) {
+        // rq-revalidate-ok: from a project's Modules (/settings/projects/[projectId]/modules), server-rendered.
         revalidatePath(MODULES_PATH);
+        // rq-revalidate-ok: as above.
         revalidatePath(`/settings/projects/${projectId}/modules`);
     }
     return result;

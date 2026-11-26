@@ -30,6 +30,7 @@ import {
     domainView,
 } from "@/lib/domains/domain-view";
 import type { SiteDomain } from "@/lib/domains/service";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { SETTINGS_ROW_ID, settingsEditId } from "@/lib/sites/settings-edit";
 import { FailedRead } from "@saroh/ui/failed-read";
@@ -107,6 +108,7 @@ export function CustomDomain({
     sheet?: SheetControl;
 }) {
     const zone = useBusinessZone();
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [domains, setDomains] = useState<SiteDomain[] | null>(null);
     const [loadError, setLoadError] = useState(false);
     // Try again reads the domains again, without leaving the page.
@@ -138,7 +140,7 @@ export function CustomDomain({
     }, [siteId, attempt]);
 
     async function claim(hostname: string) {
-        const res = await claimDomain(siteId, hostname);
+        const res = await claimDomain(siteId, hostname, orgId);
         if (!res.ok) {
             // A plan without its own domain: the plan's notice, with the
             // way to the plans, takes over from the dialog (DEC-139).
@@ -164,9 +166,12 @@ export function CustomDomain({
      * record, in place.
      */
     async function addBare(from: SiteDomain, hostname: string) {
-        const res = await runAction(() => claimDomain(siteId, hostname), {
-            setBusy: (on) => setBusy(on ? `bare:${from.id}` : null),
-        });
+        const res = await runAction(
+            () => claimDomain(siteId, hostname, orgId),
+            {
+                setBusy: (on) => setBusy(on ? `bare:${from.id}` : null),
+            },
+        );
         if (!res) return;
         if (!res.ok) {
             showError(res.error);
@@ -187,7 +192,7 @@ export function CustomDomain({
     }
 
     async function check(domain: SiteDomain) {
-        const res = await runAction(() => verifyDomain(domain.id), {
+        const res = await runAction(() => verifyDomain(domain.id, orgId), {
             setBusy: (on) => setBusy(on ? domain.id : null),
         });
         if (!res) return;
@@ -204,7 +209,7 @@ export function CustomDomain({
     }
 
     async function remove(domain: SiteDomain) {
-        const res = await runAction(() => removeDomain(domain.id), {
+        const res = await runAction(() => removeDomain(domain.id, orgId), {
             setBusy: (on) => setBusy(on ? domain.id : null),
         });
         setConfirmRemove(null);

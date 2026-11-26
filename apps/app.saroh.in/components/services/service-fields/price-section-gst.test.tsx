@@ -22,11 +22,8 @@ import {
 } from "@/components/shared/fields/gst-rate-picker.testing";
 
 import type { GstPriceMode } from "@/lib/gst/price-mode";
-import type {
-    ServiceCharged,
-    ServiceDraft,
-} from "@/lib/services/service-editor";
-import { draftOf, serviceInput } from "@/lib/services/service-editor";
+import type { ServiceCharged, ServiceDraft } from "@/lib/services/editor";
+import { draftOf, serviceInput } from "@/lib/services/editor";
 
 import { PriceSection } from "./editor-sections";
 

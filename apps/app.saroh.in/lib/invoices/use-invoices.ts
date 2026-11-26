@@ -129,7 +129,7 @@ export function useInvoiceSave(): InvoiceSave {
         provided ?? {
             orgId: undefined,
             saved: () => {
-                // rq-refresh-ok: reached only outside a provider, on a server-rendered screen; React Query screens provide their own.
+                // rq-refresh-ok: no caller today: every invoice part is under InvoiceSaveProvider or InvoiceSaveFor.
                 router.refresh();
                 return Promise.resolve();
             },

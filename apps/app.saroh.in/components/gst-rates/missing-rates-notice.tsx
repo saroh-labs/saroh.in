@@ -3,9 +3,10 @@
 import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
 import { showSuccess } from "@saroh/ui/toast";
+import { QueryClientContext } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 
 import { GstRatesSheet } from "@/components/gst-rates/gst-rates-sheet";
 import { saveGstRates } from "@/lib/gst-rates/actions";
@@ -16,6 +17,8 @@ import {
     missingLine,
     savedMessage,
 } from "@/lib/gst-rates/missing";
+import { useOrgIdOrNull } from "@/lib/query/org";
+import { servicesKeys } from "@/lib/services/queries";
 
 /**
  * The sheet where each missing GST rate is chosen in its row, and whether
@@ -31,6 +34,9 @@ export function useMissingRatesSheet(missing: MissingRates | null): {
     sheet: ReactNode;
 } {
     const router = useRouter();
+    // None in a test drawn without the shell.
+    const qc = useContext(QueryClientContext);
+    const orgId = useOrgIdOrNull();
     const [open, setOpen] = useState(false);
     const canSet =
         missing?.items.some((item) => item.canSet !== false) ?? false;
@@ -53,7 +59,12 @@ export function useMissingRatesSheet(missing: MissingRates | null): {
                 setOpen(false);
                 if (saved === null) return;
                 showSuccess(savedMessage(saved));
-                // rq-refresh-ok: what is missing is the page's own server prop (Invoices too), not a query.
+                // Services reads what is missing in its query.
+                if (qc && orgId)
+                    void qc.invalidateQueries({
+                        queryKey: servicesKeys(orgId),
+                    });
+                // rq-refresh-ok: Invoices, Subscriptions, Class packs and Courses still pass it as their page's server prop.
                 router.refresh();
             }}
         />

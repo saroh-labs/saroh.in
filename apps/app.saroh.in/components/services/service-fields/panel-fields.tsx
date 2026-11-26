@@ -8,14 +8,8 @@ import { Textarea } from "@saroh/ui/textarea";
 import type { PlanLock } from "@/lib/billing/access";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { callName } from "@/lib/services/call-name";
-import { onlineBookingProblem } from "@/lib/services/online-booking";
-import type { ServicePerson } from "@/lib/services/queries";
-import type { DepositMode } from "@/lib/services/service";
-import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
-import type {
-    ServiceCharged,
-    ServiceDraft,
-} from "@/lib/services/service-editor";
+import { AVAILABILITY_HREF } from "@/lib/services/cards";
+import type { ServiceCharged, ServiceDraft } from "@/lib/services/editor";
 import {
     draftVisits,
     gstGoesOnTop,
@@ -24,13 +18,12 @@ import {
     toMinor,
     TREATMENT_NEEDS_STOREFRONT,
     wholeNumber,
-} from "@/lib/services/service-editor";
-import {
-    freeTimeOf,
-    lengthNote,
-    sameNameAs,
-} from "@/lib/services/service-form";
-import type { PanelKey } from "@/lib/services/service-panels";
+} from "@/lib/services/editor";
+import { freeTimeOf, lengthNote, sameNameAs } from "@/lib/services/form";
+import { onlineBookingProblem } from "@/lib/services/online-booking";
+import type { PanelKey } from "@/lib/services/panels";
+import type { ServicePerson } from "@/lib/services/queries";
+import type { DepositMode } from "@/lib/services/service";
 import type { BookingPaymentView } from "@/lib/staff/types";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { TimezoneSelect } from "./timezone-select";

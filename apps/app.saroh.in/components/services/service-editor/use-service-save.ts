@@ -11,15 +11,15 @@ import {
     replaceRules,
     updateService,
 } from "@/lib/services/actions";
-import type { ServicePerson } from "@/lib/services/queries";
-import type { ServiceDraft } from "@/lib/services/service-editor";
+import type { ServiceDraft } from "@/lib/services/editor";
 import {
     changedParts,
     serviceInput,
     serviceUpdate,
     TREATMENT_NEEDS_STOREFRONT,
-} from "@/lib/services/service-editor";
-import { hoursNotSaved, rulesOf } from "@/lib/services/service-hours-draft";
+} from "@/lib/services/editor";
+import { hoursNotSaved, rulesOf } from "@/lib/services/hours-draft";
+import type { ServicePerson } from "@/lib/services/queries";
 import { useServiceSave } from "@/lib/services/use-services";
 import { setStaffServices } from "@/lib/staff/actions";
 

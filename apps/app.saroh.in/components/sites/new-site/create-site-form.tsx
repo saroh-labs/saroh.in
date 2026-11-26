@@ -25,6 +25,7 @@ import {
     cleanAddressInput,
     MAX_ADDRESS_LENGTH,
 } from "@/lib/organizations/address";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import { createSite } from "@/lib/sites/actions";
 import type { NewSiteDefaults, Template } from "@/lib/sites/service";
 import type { TemplateKind } from "@saroh/templates";
@@ -134,6 +135,7 @@ export function CreateSiteForm({
     modules?: ModuleStates | null;
 }) {
     const router = useRouter();
+    const orgId = useOrgIdOrNull() ?? undefined;
     const listed = choice ? (templates ?? []) : [];
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -164,13 +166,16 @@ export function CreateSiteForm({
         )
             ? values.styleId
             : undefined;
-        const res = await createSite({
-            name: values.name,
-            subdomain: values.subdomain,
-            templateId: template?.id,
-            templateVersion: template?.version,
-            ...(styleId ? { styleId } : {}),
-        });
+        const res = await createSite(
+            {
+                name: values.name,
+                subdomain: values.subdomain,
+                templateId: template?.id,
+                templateVersion: template?.version,
+                ...(styleId ? { styleId } : {}),
+            },
+            orgId,
+        );
         if (!res.ok) {
             setSuggestion(res.suggestion ?? null);
             if (res.field === "subdomain" || res.field === "name") {

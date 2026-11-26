@@ -6,15 +6,11 @@ import type {
     ServiceDraft,
     ServiceField,
     ServiceProblem,
-} from "@/lib/services/service-editor";
-import { problemFor } from "@/lib/services/service-editor";
-import { sameHours } from "@/lib/services/service-hours-draft";
-import type { PanelKey } from "@/lib/services/service-panels";
-import {
-    PANEL_FIELDS,
-    PANEL_SAYS,
-    PANEL_TITLE,
-} from "@/lib/services/service-panels";
+} from "@/lib/services/editor";
+import { problemFor } from "@/lib/services/editor";
+import { sameHours } from "@/lib/services/hours-draft";
+import type { PanelKey } from "@/lib/services/panels";
+import { PANEL_FIELDS, PANEL_SAYS, PANEL_TITLE } from "@/lib/services/panels";
 import { FormSheet } from "@saroh/ui/form-sheet";
 
 import type { PanelSetup } from "@/components/services/service-fields/panel-fields";

@@ -14,6 +14,7 @@ import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { useSiteFaces } from "@/components/sites/looks/site-faces";
 import { env } from "@/env";
 import { runAction } from "@/lib/api/run-action";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import { createComment } from "@/lib/sites/actions";
 import type { ReviewableSection, SiteCommentView } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
@@ -193,6 +194,7 @@ function SectionSlot({
     onChanged: () => Promise<void>;
 }) {
     const zone = useBusinessZone();
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [body, setBody] = useState("");
     const [saving, setSaving] = useState(false);
 
@@ -204,12 +206,16 @@ function SectionSlot({
         if (text.length === 0) return;
         const res = await runAction(
             () =>
-                createComment(siteId, {
-                    pageId,
-                    sectionKey: section.key,
-                    body: text,
-                    ...(testReleaseId ? { testReleaseId } : {}),
-                }),
+                createComment(
+                    siteId,
+                    {
+                        pageId,
+                        sectionKey: section.key,
+                        body: text,
+                        ...(testReleaseId ? { testReleaseId } : {}),
+                    },
+                    orgId,
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;

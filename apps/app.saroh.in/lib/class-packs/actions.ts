@@ -17,7 +17,7 @@ import * as api from "./service";
  */
 
 function refresh() {
-    // rq-revalidate-ok: only the booking page's pack writes (server-rendered) reach here.
+    // rq-revalidate-ok: a write without orgId; no caller today (createPack and updatePack are uncalled, the booking page sends it).
     revalidatePath("/class-packs", "layout");
     // rq-revalidate-ok: as above.
     revalidatePath("/class-packs/purchases");
@@ -91,7 +91,7 @@ export async function payBookingWithPack(
         );
     }
     const res = await then(api.payBookingWithPack(bookingId, packPurchaseId));
-    // rq-revalidate-ok: the booking's page is server-rendered.
+    // rq-revalidate-ok: without orgId only; no caller today (the booking's page sends it, U26).
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);
     return res;
 }
@@ -116,7 +116,7 @@ export async function olderPackEvents(packId: string, cursor: string) {
 export async function takePackOffBooking(bookingId: string, orgId?: string) {
     if (orgId) return writeAsOrg(orgId, () => api.removeFromBooking(bookingId));
     const res = await then(api.removeFromBooking(bookingId));
-    // rq-revalidate-ok: the booking's page is server-rendered.
+    // rq-revalidate-ok: without orgId only; no caller today (the booking's page sends it, U26).
     if (res.ok) revalidatePath(`/bookings/${bookingId}`);
     return res;
 }

@@ -8,15 +8,15 @@ import { useRef } from "react";
 
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 
-import type { ServiceDraft } from "@/lib/services/service-editor";
-import type { Bookers } from "@/lib/services/service-form";
+import type { ServiceDraft } from "@/lib/services/editor";
+import type { Bookers } from "@/lib/services/form";
 import {
     detailsLine,
     freeTimeOf,
     PAUSE_LINE,
     summaryLine,
-} from "@/lib/services/service-form";
-import type { DetailRow, PanelKey } from "@/lib/services/service-panels";
+} from "@/lib/services/form";
+import type { DetailRow, PanelKey } from "@/lib/services/panels";
 
 import { DESK, DetailsList, PHONE } from "./service-rows";
 import { WhoCanBookCard } from "./who-can-book";

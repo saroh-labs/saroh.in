@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { runAction } from "@/lib/api/run-action";
 import { initials } from "@/lib/names";
+import { useOrgIdOrNull } from "@/lib/query/org";
 import {
     createComment,
     deleteComment,
@@ -72,6 +73,7 @@ export function PostFeedback({
     pin?: string | null;
 }) {
     const zone = useBusinessZone();
+    const orgId = useOrgIdOrNull() ?? undefined;
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
@@ -118,11 +120,15 @@ export function PostFeedback({
         if (!body) return;
         const res = await runAction(
             () =>
-                createComment(siteId, {
-                    postId,
-                    body,
-                    ...(quote ? { quote } : {}),
-                }),
+                createComment(
+                    siteId,
+                    {
+                        postId,
+                        body,
+                        ...(quote ? { quote } : {}),
+                    },
+                    orgId,
+                ),
             { setBusy: setSending },
         );
         if (!res) return;
@@ -177,6 +183,7 @@ export function PostFeedback({
                                         siteId,
                                         c.id,
                                         editing.body.trim(),
+                                        orgId,
                                     ),
                                 "Note changed.",
                             );
@@ -240,7 +247,12 @@ export function PostFeedback({
                                     onClick={() =>
                                         void change(
                                             c.id,
-                                            () => deleteComment(siteId, c.id),
+                                            () =>
+                                                deleteComment(
+                                                    siteId,
+                                                    c.id,
+                                                    orgId,
+                                                ),
                                             "Note deleted.",
                                         )
                                     }
@@ -264,6 +276,7 @@ export function PostFeedback({
                                                 siteId,
                                                 c.id,
                                                 c.resolvedAt === null,
+                                                orgId,
                                             ),
                                         c.resolvedAt === null
                                             ? "Note marked settled."

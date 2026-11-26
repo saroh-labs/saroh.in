@@ -36,7 +36,7 @@ unsaved changes. What takes effect as it is pressed is not part of any
 Save: "Who can book it" (DEC-170, Q5) is two ticks that save at once with
 Undo (`use-taking-bookings.ts` `setBookers`), and More's Pause unticks
 both. The rules, the live line, the rows and what Save sends are pure, in
-`lib/services/service-editor.ts` and `lib/services/service-form.ts`. A
+`lib/services/editor.ts` and `lib/services/form.ts`. A
 length people mostly pick from a few values is chips with Other
 (`length-field.tsx`), over the same string the number field held.
 
@@ -44,7 +44,7 @@ length people mostly pick from a few values is chips with Other
 fails** (10 Oct). The Service Editor's Save sends the service, then who
 takes it, then its own weekly hours (`PUT …/rules`, which replaces the
 set). The hours are rows of the same draft
-(`lib/services/service-hours-draft.ts`, `hours-field.tsx`, the 12-hour
+(`lib/services/hours-draft.ts`, `hours-field.tsx`, the 12-hour
 picker of Hours and time off): there is no "Save availability". They sit
 under "When it can be booked" (a More details row on a new service, the
 Time and place panel on a saved one), which says whose hours a one-to-one

@@ -143,7 +143,11 @@ describe("Add domain", () => {
         type(field(), "https://Shop.Example.com/");
         await press(item("Add domain", dialog() ?? document));
         // A pasted address is taken down to its domain before it is sent.
-        expect(claim).toHaveBeenCalledWith("site_rye", "shop.example.com");
+        expect(claim).toHaveBeenCalledWith(
+            "site_rye",
+            "shop.example.com",
+            undefined,
+        );
         expect(dialogName()).toBe("New domain");
         expect(field()?.value).toBe("https://Shop.Example.com/");
         expect(dialog()?.querySelector('[role="alert"]')?.textContent).toBe(
@@ -191,7 +195,7 @@ describe("Add domain", () => {
         ).not.toBeNull();
 
         await press(item("Check now", dialog() ?? document));
-        expect(verify).toHaveBeenCalledWith("dom_1");
+        expect(verify).toHaveBeenCalledWith("dom_1", undefined);
         expect(dialogName()).toBe("shop.example.com added");
 
         await press(item("Done"));

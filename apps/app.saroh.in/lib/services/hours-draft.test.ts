@@ -8,7 +8,7 @@ import {
     sameHours,
     startingHours,
     timeToMinutes,
-} from "./service-hours-draft";
+} from "./hours-draft";
 
 const OPENING = [
     { dayOfWeek: 0, startMinute: 600, endMinute: 840 },

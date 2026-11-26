@@ -102,7 +102,7 @@ export function useBookingSave(): BookingSave {
     return (
         useContext(BookingSaveContext) ?? {
             save: (write, run) => runAction(() => write(), run),
-            // rq-refresh-ok: a bookings part outside the bookings screens' providers.
+            // rq-refresh-ok: no caller today: every bookings part is under a screen's BookingSaveContext.
             saved: () => router.refresh(),
             // rq-refresh-ok: as above.
             refresh: () => router.refresh(),

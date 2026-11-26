@@ -165,7 +165,7 @@ describe("adding a bare domain", () => {
         await press(item("Add domain", dialog() ?? document));
 
         // What was typed is what is sent: the api decides it becomes www.
-        expect(claim).toHaveBeenCalledWith("site_rye", BARE);
+        expect(claim).toHaveBeenCalledWith("site_rye", BARE, undefined);
         expect(dialogName()).toBe(`${WWW} added`);
         const step = dialog()?.querySelector("[data-added-domain]");
         expect(step?.querySelector('[data-notice="info"]')?.textContent).toBe(
@@ -278,7 +278,7 @@ describe("a www domain's row", () => {
         ]);
 
         await press(item("Check again", row ?? host));
-        expect(verify).toHaveBeenCalledWith("dom_www");
+        expect(verify).toHaveBeenCalledWith("dom_www", undefined);
         expect(card(WWW)?.querySelector("[data-notice]")).toBeNull();
         expect(card(WWW)?.textContent).toContain(`${BARE} forwards to ${WWW}.`);
     });
@@ -308,7 +308,7 @@ describe("a www domain's row", () => {
 
         await press(item(`Add ${BARE}`, row ?? host));
 
-        expect(claim).toHaveBeenCalledWith("site_rye", BARE);
+        expect(claim).toHaveBeenCalledWith("site_rye", BARE, undefined);
         // No dialog and no other page: its card is here, with its record.
         expect(dialog()).toBeNull();
         expect(card(BARE)?.textContent).toContain("saroh-verify=def456");

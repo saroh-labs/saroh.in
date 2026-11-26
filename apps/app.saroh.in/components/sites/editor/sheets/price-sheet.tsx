@@ -15,11 +15,11 @@ import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { formatMoney } from "@/lib/format/money";
 import { updateService } from "@/lib/services/actions";
-import { fromMinor, toMinor } from "@/lib/services/service-editor";
-import type { ServicePriceRead } from "@/lib/sites/service-price-read";
-import { readServicePrice } from "@/lib/sites/service-price-read";
-import type { ServiceUsesRead } from "@/lib/sites/service-uses-read";
-import { readServiceUses } from "@/lib/sites/service-uses-read";
+import { fromMinor, toMinor } from "@/lib/services/editor";
+import type { ServicePriceRead } from "@/lib/sites/price-read";
+import { readServicePrice } from "@/lib/sites/price-read";
+import type { ServiceUsesRead } from "@/lib/sites/uses-read";
+import { readServiceUses } from "@/lib/sites/uses-read";
 
 /**
  * O1 (owner yes, 20 Nov 2026): the sheet writes the price to Services

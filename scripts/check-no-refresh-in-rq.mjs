@@ -8,8 +8,8 @@
 // Excepted: a chrome entry (`lib/query/chrome-refresh.ts`, at most 6), whose
 // writes change server-rendered chrome, and a line marked `rq-refresh-ok`
 // (on it or the line above) with its reason. `revalidatePath` in a React
-// Query domain's actions (`RQ_DOMAINS`) is listed as a warning until it
-// reaches zero or is marked `rq-revalidate-ok`.
+// Query domain's actions (`RQ_DOMAINS`) fails too, unless marked
+// `rq-revalidate-ok` with its reason.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
@@ -108,12 +108,11 @@ export function refreshLines(text) {
 
 /**
  * The check over a tree: `files` the app's tracked files, `read(file)` their
- * text (undefined when missing). Returns `{ errors, warnings }`.
+ * text (undefined when missing). Returns `{ errors, routes }`.
  */
 export function checkRefresh(files, read) {
     const all = new Set(files);
     const errors = [];
-    const warnings = [];
     const rqRoutes = stringList(
         read(`${APP}lib/query/rq-routes.ts`),
         "RQ_ROUTES",
@@ -169,7 +168,7 @@ export function checkRefresh(files, read) {
                         x?.includes("rq-revalidate-ok"),
                     )
                 ) {
-                    warnings.push(
+                    errors.push(
                         `${file}:${i + 1}: revalidatePath in React Query domain ${domain}: drop it or mark rq-revalidate-ok with the reason`,
                     );
                 }
@@ -177,7 +176,7 @@ export function checkRefresh(files, read) {
         }
     }
     // A file reached from two routes is reported once per route; say it once.
-    return { errors: [...new Set(errors)], warnings, routes: rqRoutes.length };
+    return { errors: [...new Set(errors)], routes: rqRoutes.length };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -193,8 +192,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         existsSync(join(root, f))
             ? readFileSync(join(root, f), "utf8")
             : undefined;
-    const { errors, warnings, routes } = checkRefresh(files, read);
-    for (const w of warnings) console.warn(`warning: ${w}`);
+    const { errors, routes } = checkRefresh(files, read);
     for (const e of errors) console.error(e);
     if (errors.length) process.exitCode = 1;
     else
