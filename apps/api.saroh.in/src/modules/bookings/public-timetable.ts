@@ -11,11 +11,12 @@ import { DateTime } from "luxon";
 import { LiveReadCache } from "../../common/live-read-cache";
 import type { GstOnPrice } from "../invoices/gst-price";
 import { loadPriceTerms } from "../invoices/price-terms";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { appointmentsOpen } from "./appointments-open";
 import type { PublicDays } from "./public-booking-page";
 import { offeredOnSite, publicDays } from "./public-booking-page";
 import { secondsUntil } from "./public-today";
-import { FixedWindowRateLimiter } from "./rate-limiter";
 import { onceReads } from "./reservation";
 import { serviceCharge } from "./service-price";
 import { businessTimezone } from "./staff-availability";
@@ -179,8 +180,10 @@ export function sortSessions(rows: TimetableSession[]): TimetableSession[] {
 export class PublicTimetableService {
     constructor(
         // Not a DI provider — a per-instance default that tests can replace.
+        // In Redis, so every replica counts one visitor's reads together.
         @Optional()
-        private readonly limiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly limiter: WindowLimiter = new SharedRateLimiter(
+            "timetable-reads",
             READS_PER_WINDOW,
             READ_WINDOW_MS,
         ),
@@ -204,7 +207,7 @@ export class PublicTimetableService {
         callerHash: string | undefined,
         now: Date = new Date(),
     ): Promise<PublicTimetable> {
-        if (!this.limiter.take(callerHash ?? `site:${siteId}`)) {
+        if (!(await this.limiter.take(callerHash ?? `site:${siteId}`))) {
             throw new HttpException(
                 "Too many requests. Try again shortly.",
                 429,
