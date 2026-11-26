@@ -1,7 +1,7 @@
 import type { SharedCustomer } from "@/lib/api/client";
 import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
-import { apiFetch, getJson, getList, readError } from "@/lib/api/http";
+import { apiFetch, getJson, readError } from "@/lib/api/http";
 
 /**
  * Customers data access for app.saroh.in. Forwards the session cookie to
@@ -49,8 +49,15 @@ export type CustomerResult =
     | { ok: true; data: { id: string } }
     | { ok: false; error: string; field?: "email" };
 
-export function listCustomers(storeId: string): Promise<CustomerListItem[]> {
-    return getList<CustomerListItem>(`/stores/${storeId}/customers`);
+/** The storefront's customer with this email, if it has one. */
+export async function findCustomerByEmail(
+    storeId: string,
+    email: string,
+): Promise<CustomerListItem | null> {
+    const page = await getJson<{ rows: CustomerListItem[] }>(
+        `/stores/${storeId}/customers?email=${encodeURIComponent(email)}&size=10`,
+    );
+    return page?.rows[0] ?? null;
 }
 
 export function getCustomer(

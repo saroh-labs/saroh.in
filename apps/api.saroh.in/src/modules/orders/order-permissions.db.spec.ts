@@ -314,7 +314,10 @@ describe("the store-scoped order reads, which send totals: order:read (#868)", (
 
     it("sends the totals to a role carrying order:read", async () => {
         const id = await freshOrder();
-        const list = await orders.list(storeId, users["location-reader-b16"]);
+        const { rows: list } = await orders.list(
+            storeId,
+            users["location-reader-b16"],
+        );
         expect(list.find((o) => o.id === id)?.total).toMatch(/^\d+\.\d{2}$/);
     });
 });

@@ -36,6 +36,25 @@ describe("middleware matcher", () => {
         expect(gated("/manifest.webmanifest")).toBe(false);
     });
 
+    it("gates a page whose path only looks like a file", () => {
+        for (const page of [
+            "/orders/x.png",
+            "/sites/abc/logo.svg",
+            "/missing.png",
+            "/favicon.ico/x",
+            "/templates/../orders.png",
+        ]) {
+            expect(gated(page)).toBe(true);
+        }
+    });
+
+    it("lets every file in public/ through", () => {
+        const files = publicFiles(path.resolve(__dirname, "../public")).filter(
+            (f) => f !== "/_headers",
+        );
+        expect(files.filter(gated)).toEqual([]);
+    });
+
     it("still gates the app's pages", () => {
         for (const page of [
             "/",

@@ -15,6 +15,7 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { StoreLifecycleGuard } from "../../common/guards/store-lifecycle.guard";
+import { StoreListQueryDto } from "../../common/store-list-query";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
@@ -35,8 +36,12 @@ export class OrdersController {
 
     /** History: not module-gated. */
     @Get()
-    list(@CurrentUser() user: AuthUser, @Param("storeId") storeId: string) {
-        return this.orders.list(storeId, user.id);
+    list(
+        @CurrentUser() user: AuthUser,
+        @Param("storeId") storeId: string,
+        @Query() query: StoreListQueryDto,
+    ) {
+        return this.orders.list(storeId, user.id, query);
     }
 
     /**

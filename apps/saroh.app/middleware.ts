@@ -18,13 +18,12 @@ import {
 export const config = {
     matcher: [
         /*
-         * Match all paths except for:
-         * 1. /api routes
-         * 2. /_next (Next.js internals)
-         * 3. /_static (inside /public)
-         * 4. all root files inside /public (e.g. /favicon.ico)
+         * Every path except Next's own files and the two files in /public.
+         * A dotted path is not a file: skipping it once let a path name
+         * another site and render it with no site policy (26 Nov 2026).
+         * `middleware.test.ts` checks every /public file still skips.
          */
-        "/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)",
+        "/((?!_next/|(?:next|vercel)\\.svg$).*)",
         /*
          * 5. …but a site's crawl files are its own (#890): the dotted-path
          *    rule above would otherwise send them to /public, where no

@@ -18,8 +18,17 @@ jest.mock("@saroh/database", () => ({
         organizationRole: { findUnique: jest.fn() },
         storeOwner: { findUnique: jest.fn() },
         storeMembers: { findUnique: jest.fn() },
-        order: { findMany: jest.fn(), findFirst: jest.fn() },
-        customer: { findMany: jest.fn(), findFirst: jest.fn() },
+        order: {
+            findMany: jest.fn(),
+            findFirst: jest.fn(),
+            count: jest.fn(),
+            groupBy: jest.fn(),
+        },
+        customer: {
+            findMany: jest.fn(),
+            findFirst: jest.fn(),
+            count: jest.fn(),
+        },
     },
 }));
 
@@ -41,8 +50,13 @@ const db = prisma as unknown as {
     organizationRole: { findUnique: jest.Mock };
     storeOwner: { findUnique: jest.Mock };
     storeMembers: { findUnique: jest.Mock };
-    order: { findMany: jest.Mock; findFirst: jest.Mock };
-    customer: { findMany: jest.Mock; findFirst: jest.Mock };
+    order: {
+        findMany: jest.Mock;
+        findFirst: jest.Mock;
+        count: jest.Mock;
+        groupBy: jest.Mock;
+    };
+    customer: { findMany: jest.Mock; findFirst: jest.Mock; count: jest.Mock };
 };
 
 const PAID_ORDER = {
@@ -75,14 +89,16 @@ const CUSTOMER = {
     zipCode: null,
     createdAt: new Date("2026-09-01T10:00:00Z"),
     updatedAt: new Date("2026-09-01T10:00:00Z"),
-    orders: [
-        {
-            total: "1250.00",
-            currency: "INR",
-            paymentStatus: "PAID",
-            createdAt: new Date("2026-10-01T10:00:00Z"),
-        },
-    ],
+};
+
+/** The customer's orders as the database sums them. */
+const CUSTOMER_ORDERS = {
+    customerId: "c1",
+    currency: "INR",
+    paymentStatus: "PAID",
+    _count: { _all: 1 },
+    _sum: { total: "1250.00" },
+    _max: { createdAt: new Date("2026-10-01T10:00:00Z") },
 };
 
 /**
@@ -114,7 +130,10 @@ function caller(
     db.storeOwner.findUnique.mockResolvedValue(owner ? { id: "so" } : null);
     db.storeMembers.findUnique.mockResolvedValue(null);
     db.order.findMany.mockResolvedValue([PAID_ORDER]);
+    db.order.count.mockResolvedValue(1);
+    db.order.groupBy.mockResolvedValue([CUSTOMER_ORDERS]);
     db.customer.findMany.mockResolvedValue([CUSTOMER]);
+    db.customer.count.mockResolvedValue(1);
     const stores = new StoresService({
         isEnabled: jest.fn().mockResolvedValue(orgPath),
     } as unknown as FeatureFlagService);
@@ -169,20 +188,24 @@ describe("store-scoped reads send amounts only with a money permission (#868)", 
         const { orders, customers } = caller("cashier", {
             actions: ["store:read", "order:read"],
         });
-        await expect(orders.list(STORE, USER)).resolves.toEqual([
-            expect.objectContaining({ total: "1250.00", currency: "INR" }),
-        ]);
-        await expect(customers.list(STORE, USER)).resolves.toEqual([
-            expect.objectContaining({ spent: "1250.00", currency: "INR" }),
-        ]);
+        await expect(orders.list(STORE, USER)).resolves.toMatchObject({
+            rows: [
+                expect.objectContaining({ total: "1250.00", currency: "INR" }),
+            ],
+        });
+        await expect(customers.list(STORE, USER)).resolves.toMatchObject({
+            rows: [
+                expect.objectContaining({ spent: "1250.00", currency: "INR" }),
+            ],
+        });
     });
 
     it("sends them to an Owner and an Admin by their permissions", async () => {
         for (const role of ["OWNER", "ADMIN"]) {
             const { orders } = caller(role);
-            await expect(orders.list(STORE, USER)).resolves.toEqual([
-                expect.objectContaining({ total: "1250.00" }),
-            ]);
+            await expect(orders.list(STORE, USER)).resolves.toMatchObject({
+                rows: [expect.objectContaining({ total: "1250.00" })],
+            });
         }
     });
 

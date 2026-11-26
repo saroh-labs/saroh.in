@@ -7,6 +7,7 @@ import { checkoutClosedOf, intentBody } from "./invoice-pay";
 import { payContactOf, payOnlineOf, payUrlOf } from "./invoice-pay-shape";
 import type { PayOrder } from "./order-pay-shape";
 import { isPayOrder } from "./order-pay-shape";
+import { withRelay } from "./relay-headers";
 
 export type { PayOrder, PayOrderLine } from "./order-pay-shape";
 
@@ -33,7 +34,7 @@ export async function getPayOrder(token: string): Promise<OrderPayLookup> {
             `${API_URL}/public/order-pay/${encodeURIComponent(token)}`,
             {
                 cache: "no-store",
-                headers: { accept: "application/json" },
+                headers: await withRelay({ accept: "application/json" }),
                 signal: serverReadSignal(),
             },
         );
@@ -83,10 +84,10 @@ export async function startOrderPayment(
             {
                 method: "POST",
                 cache: "no-store",
-                headers: {
+                headers: await withRelay({
                     accept: "application/json",
                     "content-type": "application/json",
-                },
+                }),
                 body: intentBody(idempotencyKey, returnPath),
             },
         );

@@ -3,13 +3,14 @@ import {
     Controller,
     Get,
     Header,
+    Headers,
     HttpCode,
     Param,
     Post,
 } from "@nestjs/common";
 
-import { hashClientIp } from "../../common/client-ip";
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
+import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { CreateIntentResult } from "./payments.service";
 import type { PublicOrderPayView } from "./public-order-pay.service";
 import { PublicOrderPayService } from "./public-order-pay.service";
@@ -34,8 +35,10 @@ export class PublicOrderPayController {
     read(
         @Param("token") token: string,
         @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicOrderPayView> {
-        return this.orders.read(token, hashClientIp(ip));
+        // saroh.app reads from its server, so count the relayed visitor.
+        return this.orders.read(token, visitorKey(ip, relay));
     }
 
     /**
@@ -53,7 +56,8 @@ export class PublicOrderPayController {
         @Param("token") token: string,
         @Body() body: unknown,
         @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<CreateIntentResult> {
-        return this.orders.createIntent(token, body, hashClientIp(ip));
+        return this.orders.createIntent(token, body, visitorKey(ip, relay));
     }
 }

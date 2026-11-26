@@ -388,3 +388,40 @@ describe("middleware: a private page says so on its response (DEC-142)", () => {
         expect(privatePathHeaders("/shop")).toEqual({});
     });
 });
+
+describe("middleware matcher: only real files skip it", () => {
+    // Read as Next reads this form of matcher: one pattern, anchored.
+    const runs = async (pathname: string) => {
+        const { config } = await import("./middleware");
+        return config.matcher.some((m) => new RegExp(`^${m}$`).test(pathname));
+    };
+
+    it("runs on a path that names another site, or any dotted path", async () => {
+        for (const path of [
+            "/other.saroh.app",
+            "/other.saroh.app/shop",
+            "/shop.rye.in/about",
+            "/photo.png",
+            "/blog/post.html",
+            "/robots.txt",
+            "/sitemap.xml",
+            "/favicon.ico",
+            "/api/anything",
+        ]) {
+            expect(await runs(path)).toBe(true);
+        }
+    });
+
+    it("skips Next's own files and every file in public/", async () => {
+        const { readdirSync } = await import("node:fs");
+        const files = readdirSync(new URL("./public", import.meta.url));
+        expect(files.length).toBeGreaterThan(0);
+        for (const path of [
+            "/_next/static/chunks/main.js",
+            "/_next/image",
+            ...files.map((file) => `/${file}`),
+        ]) {
+            expect(await runs(path)).toBe(false);
+        }
+    });
+});

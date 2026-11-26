@@ -11,11 +11,13 @@ jest.mock("@saroh/database", () => ({
         order: {
             findMany: jest.fn().mockResolvedValue([]),
             findFirst: jest.fn().mockResolvedValue(null),
+            count: jest.fn().mockResolvedValue(0),
         },
     },
 }));
 
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import { prisma } from "@saroh/database";
 
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
@@ -50,7 +52,9 @@ describe("OrdersService store-scoped reads", () => {
 
     it("lets a role that reads orders in", async () => {
         const orders = service(["order:read", "order:stage"]);
-        await expect(orders.list("store_1", "user_1")).resolves.toEqual([]);
+        await expect(orders.list("store_1", "user_1")).resolves.toMatchObject({
+            rows: [],
+        });
         // Past the check: an unknown order is a 404, not a refusal.
         await expect(
             orders.get("store_1", "order_1", "user_1"),
@@ -70,12 +74,16 @@ describe("OrdersService store-scoped reads", () => {
 
     it("lets a business role that reads orders in, store access or not", async () => {
         const orders = service(["store:read", "order:read"]);
-        await expect(orders.list("store_1", "user_1")).resolves.toEqual([]);
+        await expect(orders.list("store_1", "user_1")).resolves.toMatchObject({
+            rows: [],
+        });
     });
 
     it("leaves a legacy storefront owner, with no membership, as it was", async () => {
         const orders = service([], { owner: true });
-        await expect(orders.list("store_1", "user_1")).resolves.toEqual([]);
+        await expect(orders.list("store_1", "user_1")).resolves.toMatchObject({
+            rows: [],
+        });
     });
 
     it("refuses a storefront role alone: no amounts by its name (DEC-106)", async () => {
@@ -87,5 +95,17 @@ describe("OrdersService store-scoped reads", () => {
         await expect(
             orders.get("store_1", "order_1", "user_1"),
         ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("reads one page, never the whole store", async () => {
+        const orders = service(["order:read"]);
+        await orders.list("store_1", "user_1", { page: 2, size: 100 });
+        expect(prisma.order.findMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({ skip: 100, take: 100 }),
+        );
+        await orders.list("store_1", "user_1");
+        expect(prisma.order.findMany).toHaveBeenLastCalledWith(
+            expect.objectContaining({ skip: 0, take: 50 }),
+        );
     });
 });

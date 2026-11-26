@@ -8,6 +8,7 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Optional,
     Param,
     Post,
     Put,
@@ -21,6 +22,9 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
+import { limited } from "../site-accounts/sign-in-codes.service";
 import { SignInWaysService } from "../site-accounts/sign-in-ways";
 import { resolveSiteHost } from "../site-accounts/site-host";
 import type { SiteRelay } from "../site-accounts/site-relay";
@@ -168,6 +172,10 @@ const CHECK_REFUSALS: Record<Exclude<CheckOutcome, "verified">, () => Error> = {
     not_found: () => new NotFoundException("No such code was sent."),
 };
 
+/** Codes one visitor may ask one business for in a window. */
+export const VERIFICATION_SENDS_PER_VISITOR = 3;
+export const VERIFICATION_SEND_WINDOW_MS = 10 * 60_000;
+
 /**
  * A customer on a business's site asking for a code and checking it
  * (DEC-191, #1242). Server-to-server behind the signed site relay, as site
@@ -181,6 +189,14 @@ export class PublicVerificationsController {
     constructor(
         private readonly send: VerificationSendService,
         private readonly verification: VerificationService,
+        // Per visitor per business, before anything is sent or held: every
+        // ask counts, as site sign-in's code requests do.
+        @Optional()
+        private readonly sendLimiter: WindowLimiter = new SharedRateLimiter(
+            "site-verification-sends",
+            VERIFICATION_SENDS_PER_VISITOR,
+            VERIFICATION_SEND_WINDOW_MS,
+        ),
     ) {}
 
     @Post()
@@ -200,6 +216,13 @@ export class PublicVerificationsController {
         }
         const site = await resolveSiteHost(relay.host);
         await assertOrganizationOpen(site.organizationId);
+        const visitor = `${site.organizationId}:${relay.clientHash}`;
+        if (!(await this.sendLimiter.take(visitor))) {
+            throw limited(
+                "limit",
+                await this.sendLimiter.retryAfterSeconds(visitor),
+            );
+        }
         return this.send.sendCode({
             organizationId: site.organizationId,
             module: dto.module,

@@ -12,7 +12,7 @@ import { personHref } from "@/lib/contacts/person-href";
 import { contactForCustomer } from "@/lib/customer-workspace/detail";
 import { customerHref } from "@/lib/customers/links";
 import type { Customer, CustomerListItem } from "@/lib/customers/service";
-import { getCustomer, listCustomers } from "@/lib/customers/service";
+import { findCustomerByEmail, getCustomer } from "@/lib/customers/service";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { OrderStanding } from "@/lib/orders/business-service";
 import { listAllOrderRows } from "@/lib/orders/business-service";
@@ -329,15 +329,13 @@ async function otherPlaces(
     customer: Customer,
 ): Promise<{ store: Store; customer: CustomerListItem }[]> {
     const others = stores.filter((s) => s.id !== here.id);
-    const lists = await Promise.all(
-        others.map((s) => listCustomers(s.id).catch(() => [])),
-    );
     const email = customer.email.trim().toLowerCase();
+    const matches = await Promise.all(
+        others.map((s) => findCustomerByEmail(s.id, email).catch(() => null)),
+    );
     const out: { store: Store; customer: CustomerListItem }[] = [];
     for (let i = 0; i < others.length; i++) {
-        const match = lists[i].find(
-            (c) => c.email.trim().toLowerCase() === email,
-        );
+        const match = matches[i];
         if (match) out.push({ store: others[i], customer: match });
     }
     return out;

@@ -9,6 +9,11 @@ import {
 import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
+import type {
+    StoreListQueryDto,
+    StorePage,
+} from "../../common/store-list-query";
+import { storePageOf } from "../../common/store-list-query";
 import { moneyWordsMinor } from "../../common/words-format";
 import { ActivationEvents } from "../analytics/activation-events";
 import { recordOrderPaidInTx } from "../analytics/order-events";
@@ -76,6 +81,7 @@ import {
 import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
 import { assertNotPayingOnlineInTx } from "./payment-in-flight";
+import type { OrderSummaryDto } from "./serialize";
 import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
 
 const CUSTOMER_SELECT = {
@@ -125,14 +131,41 @@ export class OrdersService {
         @Optional() private readonly discounts?: DiscountsService,
     ) {}
 
-    async list(storeId: string, userId: string) {
+    /** A page of the store's orders, newest first (never the whole store). */
+    async list(
+        storeId: string,
+        userId: string,
+        query: StoreListQueryDto = {},
+    ): Promise<StorePage<OrderSummaryDto>> {
         await this.requireOrderRead(storeId, userId);
-        const orders = await prisma.order.findMany({
-            where: { storeId },
-            orderBy: { createdAt: "desc" },
-            include: { customer: CUSTOMER_SELECT },
-        });
-        return orders.map(serializeOrderSummary);
+        const { page, pageSize, skip, take } = storePageOf(query);
+        const [orders, total] = await Promise.all([
+            prisma.order.findMany({
+                where: { storeId },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                skip,
+                take,
+                select: {
+                    id: true,
+                    orderId: true,
+                    customerId: true,
+                    walkInName: true,
+                    status: true,
+                    paymentStatus: true,
+                    total: true,
+                    currency: true,
+                    createdAt: true,
+                    customer: CUSTOMER_SELECT,
+                },
+            }),
+            prisma.order.count({ where: { storeId } }),
+        ]);
+        return {
+            rows: orders.map(serializeOrderSummary),
+            total,
+            page,
+            pageSize,
+        };
     }
 
     /**
