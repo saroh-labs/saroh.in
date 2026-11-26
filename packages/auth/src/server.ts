@@ -211,7 +211,8 @@ export interface CreateAuthOptions {
     trustedProxies?: string[];
     /**
      * Asked before a code or link is mailed to an address someone typed
-     * ({@link CODE_MAIL_PATHS}), with that address, lowercased: the API's
+     * ({@link CODE_MAIL_PATHS}, and a password sign-in to an unproven
+     * account once the password is right), with that address, lowercased: the API's
      * per-address cap, on top of the per-caller rate limit, with the bot
      * challenge's token the page sent in {@link CODE_CHALLENGE_HEADER}. A
      * wait refuses with 429 and `X-Retry-After`, as the rate limit does;
@@ -554,11 +555,10 @@ export const CODE_MAIL_PATHS: readonly string[] = [
     "/forget-password/email-otp",
     "/send-verification-email",
     "/request-password-reset",
-    // A sign-up mails the address a code, or the existing-account notice;
-    // a password sign-in to an unproven account mails a code again (03-M9).
-    // The host is told the path, so it counts a sign-in only when it mails.
+    // A sign-up mails the address a code, or the existing-account notice.
+    // A password sign-in to an unproven account mails a code too, but is
+    // asked only once the password is right (`signInCodeMailHook`).
     "/sign-up/email",
-    "/sign-in/email",
 ];
 
 /** One check run by the host's `hooks.before`; it throws to refuse. */
@@ -641,6 +641,48 @@ function signInFailedHook(
     });
 }
 
+/** The host's per-address cap refused a code: 429 with the wait, or `CHALLENGE`. */
+interface MailRefusal {
+    status: "TOO_MANY_REQUESTS" | "BAD_REQUEST";
+    body: { code: string; message: string };
+    headers: Record<string, string>;
+}
+
+/** Asks the host's per-address cap; null when the code may go. */
+async function mailRefusal(
+    mayMailCode: NonNullable<CreateAuthOptions["mayMailCode"]>,
+    email: string,
+    ctx: { request?: Request; path?: string; headers?: Headers },
+): Promise<MailRefusal | null> {
+    const verdict = await mayMailCode(email, {
+        turnstileToken: ctx.headers?.get(CODE_CHALLENGE_HEADER) ?? null,
+        path: ctx.path ?? "",
+        host:
+            ctx.headers?.get("host") ??
+            (ctx.request ? new URL(ctx.request.url).host : null),
+    });
+    if (!verdict) return null;
+    if ("challenge" in verdict) {
+        return {
+            status: "BAD_REQUEST",
+            body: {
+                code: "CHALLENGE",
+                message: "Confirm you're not a robot, then try again.",
+            },
+            headers: {},
+        };
+    }
+    return {
+        status: "TOO_MANY_REQUESTS",
+        body: {
+            code: "TOO_MANY_REQUESTS",
+            message:
+                "Too many codes asked for this address. Wait a while, then try again.",
+        },
+        headers: { "X-Retry-After": String(verdict.retryAfterSeconds) },
+    };
+}
+
 /** Better Auth's `hooks.before` for {@link CreateAuthOptions.mayMailCode}. */
 function codeMailHook(
     mayMailCode: NonNullable<CreateAuthOptions["mayMailCode"]>,
@@ -651,31 +693,58 @@ function codeMailHook(
         const email: unknown = (ctx.body as { email?: unknown } | undefined)
             ?.email;
         if (typeof email !== "string" || !email.trim()) return;
-        const verdict = await mayMailCode(email.trim().toLowerCase(), {
-            turnstileToken: ctx.headers?.get(CODE_CHALLENGE_HEADER) ?? null,
-            path: ctx.path,
-            host: ctx.headers?.get("host") ?? new URL(ctx.request.url).host,
-        });
-        if (!verdict) return;
-        if ("challenge" in verdict) {
-            // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
-            throw new APIError("BAD_REQUEST", {
-                code: "CHALLENGE",
-                message: "Confirm you're not a robot, then try again.",
+        const refusal = await mailRefusal(
+            mayMailCode,
+            email.trim().toLowerCase(),
+            ctx,
+        );
+        if (!refusal) return;
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
+        throw new APIError(refusal.status, refusal.body, refusal.headers);
+    };
+}
+
+/**
+ * `hooks.after` for a password sign-in to an account whose address is not
+ * yet proven: the right password answered `EMAIL_NOT_VERIFIED`, so a code
+ * goes to the address, within the host's per-address cap. Only here, after
+ * the password check: a wrong password answers the same for every address,
+ * with no cap asked and nothing mailed (`emailVerification.sendOnSignIn` is
+ * off for that reason).
+ */
+function signInCodeMailHook(mayMailCode: CreateAuthOptions["mayMailCode"]) {
+    return createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/sign-in/email") return;
+        const returned = ctx.context.returned as
+            { name?: unknown; body?: { code?: unknown } } | undefined;
+        if (
+            returned?.name !== "APIError" ||
+            returned.body?.code !== "EMAIL_NOT_VERIFIED"
+        )
+            return;
+        const email = signInEmail(ctx);
+        const send =
+            ctx.context.options.emailVerification?.sendVerificationEmail;
+        if (!email || !send) return;
+        const found = await ctx.context.internalAdapter.findUserByEmail(email);
+        if (!found) return;
+        // Not asked on a server-side `auth.api` call, as `codeMailHook`.
+        const refusal =
+            mayMailCode && ctx.request
+                ? await mailRefusal(mayMailCode, email, ctx)
+                : null;
+        if (refusal) {
+            // A Response: an APIError thrown here keeps the handler's 403.
+            return Response.json(refusal.body, {
+                status: refusal.status === "BAD_REQUEST" ? 400 : 429,
+                headers: refusal.headers,
             });
         }
-        const wait = verdict;
-        // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
-        throw new APIError(
-            "TOO_MANY_REQUESTS",
-            {
-                code: "TOO_MANY_REQUESTS",
-                message:
-                    "Too many codes asked for this address. Wait a while, then try again.",
-            },
-            { "X-Retry-After": String(wait.retryAfterSeconds) },
+        // The `emailOTP` plugin's sender: a fresh code to the verify step.
+        await ctx.context.runInBackgroundOrAwait(
+            send({ user: found.user, url: "", token: "" }, ctx.request),
         );
-    };
+    });
 }
 
 export const MAILBOX_PROOF_PATHS: readonly string[] = [
@@ -740,8 +809,9 @@ function authHooks(opts: CreateAuthOptions): Pick<BetterAuthOptions, "hooks"> {
     const after = [
         opts.passwordTries && passwordTriesAfter(opts.passwordTries),
         opts.onSignInFailed && signInFailedHook(opts.onSignInFailed),
+        // Last: its refusal replaces the answer and ends the loop.
+        signInCodeMailHook(opts.mayMailCode),
     ].filter((h) => !!h);
-    if (before.length === 0 && after.length === 0) return {};
     return {
         hooks: {
             ...(before.length
@@ -754,7 +824,13 @@ function authHooks(opts: CreateAuthOptions): Pick<BetterAuthOptions, "hooks"> {
             ...(after.length
                 ? {
                       after: createAuthMiddleware(async (ctx) => {
-                          for (const hook of after) await hook(ctx);
+                          for (const hook of after) {
+                              const { response } = (await hook(ctx)) as {
+                                  response?: unknown;
+                              };
+                              // A hook's own answer replaces the response.
+                              if (response instanceof Response) return response;
+                          }
                       }),
                   }
                 : {}),
@@ -835,10 +911,12 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         emailVerification: {
             sendOnSignUp: true,
             // Someone who signed up, missed the code and came back to sign in
-            // gets a fresh one automatically — so the 403 below is always
-            // actionable. The login form reads EMAIL_NOT_VERIFIED and forwards
-            // them to the verify screen, where that code is already waiting.
-            sendOnSignIn: true,
+            // with the right password gets a fresh one automatically — so the
+            // 403 is always actionable. The login form reads
+            // EMAIL_NOT_VERIFIED and forwards them to the verify screen, where
+            // that code is already waiting. Sent by `signInCodeMailHook`, not
+            // here, so the per-address cap is asked only after the password.
+            sendOnSignIn: false,
             // Verifying the code IS the sign-in. Without this, a user who just
             // proved mailbox control would be bounced to /login to retype the
             // password they entered ninety seconds ago — the dead end this

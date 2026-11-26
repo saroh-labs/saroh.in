@@ -1,6 +1,5 @@
 import type { LeadContactOption } from "@/components/leads/add-lead-dialog";
-import { listContacts } from "@/lib/contacts/service";
-import { contactName } from "@/lib/crm/format";
+import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import type { Pipeline } from "@/lib/pipelines/service";
 import { listPipelines } from "@/lib/pipelines/service";
@@ -16,17 +15,14 @@ export async function loadAddLead(pipelines?: Pipeline[]): Promise<{
     currency: string;
 }> {
     const [contacts, all, currency] = await Promise.all([
-        listContacts().catch(() => []),
+        // The most recent; the dialog's picker searches for anyone else.
+        contactPickerOptions().catch(() => []),
         pipelines ?? listPipelines().catch(() => []),
         readBusinessCurrency(),
     ]);
     const pipeline = all.find((p) => p.isDefault) ?? all.at(0);
     return {
-        contacts: contacts.map((c) => ({
-            id: c.id,
-            name: contactName(c),
-            email: c.email,
-        })),
+        contacts,
         stages: (pipeline?.stages ?? [])
             .slice()
             .sort((a, b) => a.order - b.order)

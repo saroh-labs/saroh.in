@@ -80,6 +80,7 @@ export class RazorpayProvider implements MerchantProvider {
         try {
             res = await fetch(`${this.baseUrl}/orders`, {
                 method: "POST",
+                signal: providerCallSignal(),
                 headers: {
                     Authorization: `Basic ${basicAuth(credentials)}`,
                     "Content-Type": "application/json",
@@ -156,6 +157,7 @@ export class RazorpayProvider implements MerchantProvider {
                 `${this.baseUrl}/payments/${providerPaymentRef}/refund`,
                 {
                     method: "POST",
+                    signal: providerCallSignal(),
                     headers: {
                         Authorization: `Basic ${basicAuth(credentials)}`,
                         "Content-Type": "application/json",
@@ -215,6 +217,7 @@ export class RazorpayProvider implements MerchantProvider {
                     headers: {
                         Authorization: `Basic ${basicAuth(credentials)}`,
                     },
+                    signal: providerCallSignal(),
                 },
             );
         } catch {

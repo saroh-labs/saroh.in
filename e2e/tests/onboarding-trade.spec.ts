@@ -38,7 +38,7 @@ async function rollOutForEveryone(browser: Browser, testInfo: TestInfo) {
     const context = await browser.newContext({ ignoreHTTPSErrors });
     const staff = await context.newPage();
     await useSession(staff, "staff");
-    const headers = { origin: urls.APP_URL };
+    const headers = { origin: urls.ADMIN_URL };
     const set = async (flag: string, enabled: boolean, what: string) => {
         const res = await staff.request.put(
             `${urls.API_URL}/admin/flags/${flag}`,

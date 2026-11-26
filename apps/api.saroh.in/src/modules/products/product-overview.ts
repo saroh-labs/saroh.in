@@ -111,13 +111,19 @@ export interface RatingSummary {
     distribution: [number, number, number, number, number];
 }
 
-/** Published reviews only — what customers see is what the page summarises. */
-export function ratingSummary(ratings: number[]): RatingSummary {
+/**
+ * Published reviews only — what customers see is what the page summarises.
+ * Takes a count per star, as `productReview.groupBy({ by: ["rating"] })`
+ * gives it, so the summary never reads one row per review.
+ */
+export function ratingSummary(
+    stars: { rating: number; _count: { _all: number } }[],
+): RatingSummary {
     const distribution: [number, number, number, number, number] = [
         0, 0, 0, 0, 0,
     ];
-    for (const r of ratings) {
-        if (r >= 1 && r <= 5) distribution[r - 1] += 1;
+    for (const { rating, _count } of stars) {
+        if (rating >= 1 && rating <= 5) distribution[rating - 1] += _count._all;
     }
     const count = distribution.reduce((a, b) => a + b, 0);
     const total = distribution.reduce((sum, n, i) => sum + n * (i + 1), 0);

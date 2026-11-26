@@ -347,6 +347,10 @@ export class InvoicesService {
                 status: "ISSUED",
                 paidCents: { gt: 0 },
             },
+            orderBy: { createdAt: "desc" },
+            // shortcut: the newest LIST_LIMIT partly paid invoices; compare
+            // the amount in SQL if a business ever keeps more open at once.
+            take: LIST_LIMIT,
             select: { id: true, total: true, paidCents: true },
         });
         const leftIds = partlyPaid

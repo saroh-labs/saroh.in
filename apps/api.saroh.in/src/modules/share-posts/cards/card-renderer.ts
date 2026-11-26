@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import type { Node } from "@takumi-rs/core";
 import { Renderer } from "@takumi-rs/core";
 
+import { withinImageLimits } from "../../../common/image-size";
 import { bundledFonts, fontStack, GoogleFonts } from "./card-fonts";
 import type { ShareCardInput } from "./card-model";
 import { SHARE_SIZES } from "./card-model";
@@ -30,9 +31,13 @@ export interface CardRender extends Omit<ShareCardInput, "photo" | "logo"> {
 /** JPEG quality for Saroh Social's pictures: well under Meta's 8 MB at 1080 wide. */
 const JPEG_QUALITY = 90;
 
-/** PNG, JPEG, WebP or GIF by its first bytes; AVIF and the rest are not drawn. */
+/**
+ * PNG, JPEG, WebP or GIF by its first bytes, within the API's image limits
+ * by its header (`common/image-size.ts`); AVIF, the rest and anything too
+ * big are not drawn.
+ */
 export function drawable(bytes: Uint8Array | null | undefined): boolean {
-    if (!bytes || bytes.length < 12) return false;
+    if (!bytes || bytes.length < 12 || !withinImageLimits(bytes)) return false;
     const at = (i: number, ...values: number[]) =>
         values.every((v, k) => bytes[i + k] === v);
     return (

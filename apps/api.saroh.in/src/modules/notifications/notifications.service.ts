@@ -6,6 +6,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { clearStaleLimitNotices } from "../billing/limit-notice-clear";
 import { allows } from "../organizations/organization-policy";
@@ -59,7 +60,7 @@ export interface ListNotificationsOptions {
  */
 @Injectable()
 export class NotificationsService {
-    /** List the org's notifications newest-first; optionally unread-only. */
+    /** The org's newest `LIST_LIMIT` notifications; optionally unread-only. */
     async list(
         ctx: OrganizationContext,
         options: ListNotificationsOptions = {},
@@ -72,6 +73,7 @@ export class NotificationsService {
                 ...(options.unreadOnly ? { readAt: null } : {}),
             },
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
         return rows.map((row) => ({ ...row, target: noticeTargetOf(row) }));
     }

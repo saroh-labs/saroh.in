@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { BusinessPhoneInput } from "@/components/shared/fields/business-phone-input";
+import { ContactPicker } from "@/components/shared/fields/contact-picker";
 import { runAction } from "@/lib/api/run-action";
 import { createLead } from "@/lib/leads/actions";
 import { useLeadsSave } from "@/lib/leads/use-leads";
@@ -214,17 +215,11 @@ export function AddLeadDialog({
                         error={errors.contact}
                         className="space-y-0"
                     >
-                        <OptionSelect
+                        <ContactPicker
                             id={ids.contact}
+                            contacts={contacts}
                             value={contactId}
                             onValueChange={setContactId}
-                            options={contacts.map((c) => ({
-                                value: c.id,
-                                label:
-                                    c.name === c.email
-                                        ? c.email
-                                        : `${c.name} · ${c.email}`,
-                            }))}
                         />
                     </Field>
                 ) : (

@@ -15,6 +15,7 @@ import { assertEditionMatchesAddress } from "../../common/edition-address";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
 import { VISITOR_SHARE } from "../api-keys/api-key.guard";
+import { countWrongKey } from "../api-keys/wrong-key-limit";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import type { OrgAction } from "../organizations/organization-actions";
@@ -79,6 +80,7 @@ export class StorefrontTokenGuard implements CanActivate {
         )?.[1];
         const token = bearer ? await this.tokens.find(bearer) : null;
         if (!token) {
+            await countWrongKey(req, res);
             throw refusal(
                 HttpStatus.UNAUTHORIZED,
                 "unauthorized",

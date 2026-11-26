@@ -7,6 +7,13 @@ import { IsIn, IsInt, IsOptional, Max, Min } from "class-validator";
  * the offered sizes (anything else is a 400), and `{ rows, total, page,
  * pageSize }` back. Never the whole store in one answer.
  */
+/**
+ * The most rows a "latest N" read returns (newest first), for a list the
+ * screen draws whole: an inbox, a lead's timeline, the contacts list.
+ * The app's `lib/lists/capped.ts` says the same number.
+ */
+export const LIST_LIMIT = 500;
+
 export const STORE_PAGE_SIZE = 50;
 export const STORE_PAGE_SIZES = [10, 25, 50, 100] as const;
 const PAGE_MAX = 10_000;

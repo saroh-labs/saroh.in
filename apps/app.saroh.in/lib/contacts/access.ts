@@ -6,9 +6,15 @@ import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { listPipelines } from "@/lib/pipelines/service";
 import type { ServerRead } from "@/lib/query/route";
 
+import type { ContactOption } from "@/components/shared/fields/contact-picker";
+import {
+    contactPickerOption,
+    contactPickerOptions,
+} from "@/lib/invoices/contacts";
 import { personTabGates } from "./person";
-import type { PersonCrm, PersonCrmAsk } from "./queries";
-import { contactsListRead, personCrmRead } from "./queries";
+
+import type { ContactSearchAsk, PersonCrm, PersonCrmAsk } from "./queries";
+import { contactSearchRead, contactsListRead, personCrmRead } from "./queries";
 import type { ContactListItem } from "./service";
 import { getContact, listContacts } from "./service";
 
@@ -93,4 +99,20 @@ export const contactsListServer: ServerRead<
 export const personCrmServer: ServerRead<PersonCrmAsk, PersonCrm> = {
     read: personCrmRead,
     service: readPersonCrm,
+};
+
+/**
+ * The pickers' search. Not behind CRM: the API's search isn't, and an
+ * invoice or a booking finds its person whichever modules are on.
+ */
+export const contactSearchServer: ServerRead<
+    ContactSearchAsk,
+    ContactOption[]
+> = {
+    read: contactSearchRead,
+    service: async ({ q, id }) => {
+        if (!id) return contactPickerOptions(q ?? "");
+        const one = await contactPickerOption(id);
+        return one ? [one] : [];
+    },
 };

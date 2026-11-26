@@ -95,6 +95,8 @@ export class CountRowDto {
     /** What the counter was shown ("Log says N"); null when shown nothing. */
     @IsOptional()
     @IsInt({ message: "Whole numbers only." })
+    @Min(-1_000_000)
+    @Max(1_000_000)
     expected?: number | null;
 
     @IsInt({ message: "Whole numbers only." })

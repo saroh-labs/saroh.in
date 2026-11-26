@@ -51,6 +51,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import { LeadsService } from "./leads.service";
@@ -713,6 +714,7 @@ describe("LeadsService.listActivities", () => {
         expect(activityFindMany).toHaveBeenCalledWith({
             where: { leadId: "l_1", organizationId: "org_1" },
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
     });
 
@@ -741,6 +743,7 @@ describe("LeadsService.listOpenTasks", () => {
                 completedAt: null,
             },
             orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
+            take: LIST_LIMIT,
         });
     });
 

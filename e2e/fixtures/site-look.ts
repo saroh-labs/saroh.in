@@ -147,7 +147,7 @@ export async function overrideNorthwindFlag(
     const page = await context.newPage();
     await useSession(page, "staff");
     const admin = page.request;
-    const headers = { origin: urls.APP_URL };
+    const headers = { origin: urls.ADMIN_URL };
     const flagUrl = `${urls.API_URL}/admin/flags/${flagName}`;
     const overrideUrl = `${flagUrl}/organizations/${NORTHWIND_ORG}`;
 
@@ -215,7 +215,7 @@ export async function grantNorthwindThemes(
     });
     const page = await context.newPage();
     await useSession(page, "staff");
-    const headers = { origin: urls.APP_URL };
+    const headers = { origin: urls.ADMIN_URL };
     const overrides = `${urls.API_URL}/admin/organizations/${NORTHWIND_ORG}/overrides`;
     const granted = await page.request.post(`${overrides}/modules`, {
         headers,

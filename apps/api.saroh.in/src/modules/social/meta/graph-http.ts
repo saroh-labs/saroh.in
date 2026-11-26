@@ -80,7 +80,7 @@ export async function metaCall<T>(
     fetchFn: FetchFn,
     url: string,
     init: {
-        method?: "GET" | "POST";
+        method?: "GET" | "POST" | "DELETE";
         token?: string;
         form?: Record<string, string>;
     } = {},

@@ -99,6 +99,7 @@ export class WhatsappCommsProvider implements CommsProvider {
                 `${origin}/${version}/${phoneNumberId}/messages`,
                 {
                     method: "POST",
+                    signal: providerCallSignal(),
                     headers: {
                         Authorization: `Bearer ${accessToken}`,
                         "Content-Type": "application/json",

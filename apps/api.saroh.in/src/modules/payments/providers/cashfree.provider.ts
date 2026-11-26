@@ -80,6 +80,7 @@ export class CashfreeProvider implements MerchantProvider {
         try {
             res = await fetch(`${this.baseUrl}/orders`, {
                 method: "POST",
+                signal: providerCallSignal(),
                 headers: {
                     "x-client-id": credentials.keyId,
                     "x-client-secret": credentials.keySecret,
@@ -156,6 +157,7 @@ export class CashfreeProvider implements MerchantProvider {
                 `${this.baseUrl}/orders/${cashfreeOrderId(input)}/refunds`,
                 {
                     method: "POST",
+                    signal: providerCallSignal(),
                     headers: this.headers(credentials),
                     body: JSON.stringify({
                         refund_amount: Number((amountCents / 100).toFixed(2)),
@@ -204,7 +206,10 @@ export class CashfreeProvider implements MerchantProvider {
         try {
             res = await fetch(
                 `${this.baseUrl}/orders/${cashfreeOrderId(input)}/refunds/${encodeURIComponent(reference)}`,
-                { headers: this.headers(credentials) },
+                {
+                    headers: this.headers(credentials),
+                    signal: providerCallSignal(),
+                },
             );
         } catch {
             throw new RefundCallError(

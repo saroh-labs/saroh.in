@@ -4,7 +4,10 @@ import { InvoiceForm } from "@/components/invoices/new-invoice/invoice-form";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { canPickProducts } from "@/lib/invoices/can-pick-products";
-import { contactPickerOptions } from "@/lib/invoices/contacts";
+import {
+    contactPickerOption,
+    contactPickerOptions,
+} from "@/lib/invoices/contacts";
 import { newInvoiceBusiness } from "@/lib/invoices/new-invoice-business";
 import { mayUpdateBusiness } from "@/lib/invoices/paper-access";
 import { payLinkPossible, paymentsModuleOn } from "@/lib/invoices/payments-on";
@@ -20,8 +23,7 @@ export const metadata = { title: "New invoice" };
 /**
  * Payments → Invoices → New invoice (A), DEC-173 U14 #1126: an invoice for
  * trade and one-off work, with its paper beside it as it is typed. `?contactId=` — from a contact's page
- * — starts it for that person, when they are among the contacts this person
- * can pick.
+ * — starts it for that person, when this person can read them.
  */
 export default async function NewInvoicePage({
     searchParams,
@@ -60,7 +62,12 @@ export default async function NewInvoicePage({
         canPickProducts(),
         searchParams,
     ]);
-    const forContact = contacts.find((c) => c.id === contactId);
+    // Someone older than the recent few is read on their own.
+    const forContact =
+        contacts.find((c) => c.id === contactId) ??
+        (typeof contactId === "string"
+            ? await contactPickerOption(contactId)
+            : null);
 
     return (
         <PageContainer width="full">
@@ -79,7 +86,11 @@ export default async function NewInvoicePage({
                     ],
                     title: "New invoice",
                 }}
-                contacts={contacts}
+                contacts={
+                    forContact && !contacts.includes(forContact)
+                        ? [forContact, ...contacts]
+                        : contacts
+                }
                 // The currency the business last invoiced in.
                 defaultCurrency={
                     invoices.rows.at(0)?.currency ?? (await startingCurrency())

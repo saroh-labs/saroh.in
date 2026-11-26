@@ -37,6 +37,7 @@ import {
 } from "./api-keys.service";
 import type { KeyContext } from "./key-context.cache";
 import { keyContextCache } from "./key-context.cache";
+import { countWrongKey } from "./wrong-key-limit";
 
 /** `lastUsedAt` is written at most this often per key: a list shows "used today", not every call. */
 export const TOUCH_EVERY_MS = 60_000;
@@ -111,7 +112,10 @@ export class ApiKeyGuard implements CanActivate {
                 : bearerOf(req.headers.authorization);
         const now = new Date();
         const found = token ? await this.contextFor(token, now) : null;
-        if (!found) throw badKey();
+        if (!found) {
+            await countWrongKey(req, res);
+            throw badKey();
+        }
         const { key, context: ctx } = found;
 
         if (

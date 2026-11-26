@@ -10,12 +10,15 @@ import {
     IsOptional,
     IsString,
     Matches,
+    Max,
     MaxLength,
     Min,
     MinLength,
     ValidateIf,
     ValidateNested,
 } from "class-validator";
+
+import { INT_COLUMN_MAX } from "../../common/validation";
 
 import type { PageKind } from "@saroh/database";
 
@@ -78,6 +81,7 @@ export class CreateSiteFromTemplateDto {
     @IsOptional()
     @IsInt({ message: "templateVersion must be an integer" })
     @Min(1, { message: "templateVersion must be at least 1" })
+    @Max(INT_COLUMN_MAX)
     templateVersion?: number;
 
     /** One of the template's colourways; its first when absent (KTD-1). */
@@ -105,6 +109,7 @@ export class DraftSectionInputDto {
 
     @IsInt({ message: "contractVersion must be an integer" })
     @Min(1, { message: "contractVersion must be at least 1" })
+    @Max(INT_COLUMN_MAX)
     contractVersion!: number;
 
     // Any JSON value the contract will validate; must be present (an empty
@@ -160,6 +165,7 @@ export class UpdateDraftSectionsDto {
     @IsOptional()
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision?: number;
 
     @IsArray()
@@ -563,18 +569,21 @@ export class UpdateSiteSettingsDto {
     @ValidateIf((_o, v) => v !== null)
     @IsInt()
     @Min(1)
+    @Max(INT_COLUMN_MAX)
     socialImageWidth?: number | null;
 
     @IsOptional()
     @ValidateIf((_o, v) => v !== null)
     @IsInt()
     @Min(1)
+    @Max(INT_COLUMN_MAX)
     socialImageHeight?: number | null;
 
     @IsOptional()
     @ValidateIf((_o, v) => v !== null)
     @IsInt()
     @Min(1)
+    @Max(INT_COLUMN_MAX)
     socialImageBytes?: number | null;
 
     /**

@@ -3,7 +3,7 @@ import "reflect-metadata";
 import { BadRequestException, ValidationPipe } from "@nestjs/common";
 
 import { validationPipeOptions } from "../../common/validation";
-import { CreateOrderDto, EditOrderDto } from "./dto";
+import { CreateOrderDto, EditOrderDto, ORDER_LINE_QUANTITY_MAX } from "./dto";
 
 /**
  * How an order leaves, as a create or an edit sends it (DEC-045). The
@@ -117,4 +117,25 @@ describe("the create DTO's walk-in and payment (B13)", () => {
             }),
         ).rejects.toThrow(BadRequestException);
     });
+});
+
+/** A line's quantity has the invoice line's bounds: 1 to the most. */
+describe("the create DTO's line quantity", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const parse = (quantity: unknown) =>
+        pipe.transform(
+            { customerId: "c1", items: [{ productId: "p1", quantity }] },
+            { type: "body", metatype: CreateOrderDto },
+        );
+
+    it("takes the most a line may hold", async () => {
+        await expect(parse(ORDER_LINE_QUANTITY_MAX)).resolves.toBeDefined();
+    });
+
+    it.each([ORDER_LINE_QUANTITY_MAX + 1, 2 ** 53 + 1, 1e308, 0])(
+        "refuses %s with 400",
+        async (quantity) => {
+            await expect(parse(quantity)).rejects.toThrow(BadRequestException);
+        },
+    );
 });

@@ -17,6 +17,8 @@ import {
     MinLength,
 } from "class-validator";
 
+import { INT_COLUMN_MAX } from "../../common/validation";
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -28,6 +30,7 @@ const upperTrim = ({ value }: { value: unknown }) =>
 export class PreviewTokenDto {
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 }
 
@@ -47,11 +50,13 @@ export class SaveDraftDto {
 
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 
     @IsOptional()
     @IsInt()
     @Min(1)
+    @Max(INT_COLUMN_MAX)
     baseVersion?: number | null;
 
     @IsOptional()
@@ -66,6 +71,7 @@ export class SaveDraftDto {
 export class DiscardDraftDto {
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 
     @IsOptional()
@@ -104,6 +110,7 @@ export class PublishDto extends ReasonedWriteDto {
     /** The draft revision reviewed: a newer save is a 409, not a surprise. */
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     revision!: number;
 
     /** Absent: now. Otherwise a moment ahead (a scheduled version). */
@@ -169,6 +176,7 @@ export class CreateCouponDto extends ReasonedWriteDto {
     /** Off each month's charge, in paise, before GST; 0 with `percentOff`. */
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     discountPaise!: number;
 
     /** Or a whole percent off the plan's monthly price; absent: an amount. */
@@ -221,6 +229,7 @@ export class UpdateCouponDto extends ReasonedWriteDto {
     @IsOptional()
     @IsInt()
     @Min(0)
+    @Max(INT_COLUMN_MAX)
     discountPaise?: number;
 
     /** A whole percent, or null to make it an amount coupon. */

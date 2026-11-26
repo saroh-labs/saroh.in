@@ -705,7 +705,10 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   API sends `origin: requestOrigin(await headers())`** (`@saroh/auth/origins`),
   as `apiFetch` and `adminFetch` do. A new server-side client that forgets it
   gets a 403 on every write. So does a Playwright test that writes through
-  `request`: put `origin: urls.APP_URL` in its headers.
+  `request`: put `origin: urls.APP_URL` in its headers. An `/admin` write
+  takes only the admin console's origin (`adminOrigins()`, from `ADMIN_URL`
+  or `BETTER_AUTH_URL`; an admin spec sends `urls.ADMIN_URL`), and in
+  production an API address with no edition serves no console.
 - **Current** — **A Saroh account code goes only where it can be used, and
   only from accounts** (owner, 18 Nov 2026). A phone sign-in code on WhatsApp
   goes only to a number already verified on an account; any other number
@@ -726,7 +729,11 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   header. Turnstile for these sends is asked with the accounts hostnames,
   so a token solved on a merchant site or saroh.tech (one key serves all
   three) is refused. Merchant-site customer codes (`site-accounts/`) are a
-  different path and keep their own rules.
+  different path and keep their own rules. **A sign-in step answers alike
+  for unknown, unproven and proven accounts**: anything that depends on the
+  account (a password sign-in's code mail and its cap, a site code with
+  email off) runs only after the credential is proven, or takes the same
+  limits, rows and time for every address (26 Nov 2026).
 - **Current** — **Frontend session reads keep "signed out" and "could not check"
   apart.** Edge middleware checks cookie presence only
   (`@saroh/auth/middleware`); Server Components use `requireSession()`, and only

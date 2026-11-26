@@ -121,6 +121,7 @@ export class EmailCommsProvider implements CommsProvider {
         try {
             res = await fetch(url, {
                 method: "POST",
+                signal: providerCallSignal(),
                 headers: {
                     Authorization: `Bearer ${apiKey}`,
                     "Content-Type": "application/json",
