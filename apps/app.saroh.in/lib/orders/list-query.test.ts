@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { NO_FILTERS } from "@/lib/orders/list-filters";
 
 import {
+    exportParams,
     orderListParams,
     ordersEmptyCopy,
     ordersHref,
@@ -81,6 +82,16 @@ describe("readOrdersQuery", () => {
         });
         expect(ordersHref(q)).toBe("/commerce/orders?sort=placed&older=1");
         expect(readOrdersQuery({ sort: "sideways" }).sort).toBeNull();
+    });
+
+    it("exports the view newest first, as the cursor walks it", () => {
+        const params = exportParams(readOrdersQuery({ page: "3" }));
+        expect(params).toMatchObject({
+            tab: "open",
+            older: "hide",
+            page: undefined,
+        });
+        expect(params.sort).toBeUndefined();
     });
 
     it("pages through what the view holds: Open less the folded ones", () => {

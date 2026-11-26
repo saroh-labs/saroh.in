@@ -250,6 +250,18 @@ export function orderListParams(query: OrdersQuery): OrderListParams {
     };
 }
 
+/**
+ * What Export asks for every page of the view: from the top, at the list's
+ * own size, newest first, since the cursor it walks follows when orders
+ * were placed, never when they turn late (DEC-265, which pages by number).
+ */
+export function exportParams(query: OrdersQuery): OrderListParams {
+    return {
+        ...orderListParams({ ...query, page: 1, size: ORDERS_PAGE_SIZE }),
+        sort: undefined,
+    };
+}
+
 /** What an empty list says, and what fills it. */
 export interface OrdersEmptyCopy {
     kind: "search" | "filter" | "tab" | "since" | "older" | "first-run";
