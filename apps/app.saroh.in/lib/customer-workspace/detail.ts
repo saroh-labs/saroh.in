@@ -83,6 +83,11 @@ export interface DetailBooking {
     paidWith: PaidWith | null;
     /** Booked at a price of 0 (DEC-261): "Free". Absent on an older API. */
     free?: boolean;
+    /**
+     * The one payment word (DEC-272), as Bookings says it: AWAITING_PAYMENT
+     * once a visit has ended unpaid (DEC-273). Absent on an older API.
+     */
+    payWord?: string | null;
     packName: string | null;
     cancelledLate: boolean;
     /**

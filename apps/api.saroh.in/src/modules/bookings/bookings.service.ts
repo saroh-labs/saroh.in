@@ -42,7 +42,7 @@ import { OPENS_CHECKOUT } from "../payments/public-key";
 import { isValidSlotStart } from "./availability";
 import {
     CANT_USE_PACKS,
-    mayTakeDeskPayment,
+    readsMoney,
     requireBookingPower,
 } from "./booking-access";
 import type { PersonDiary } from "./booking-calendar";
@@ -55,7 +55,7 @@ import { isExpiredHold } from "./booking-hold";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { intakeNoteFor } from "./booking-intake";
 import type { BookingMoney } from "./booking-money";
-import { bookingMoney, bookingPrice } from "./booking-money";
+import { bookingMoney, bookingPrice, payWords } from "./booking-money";
 import { moveFoundBooking } from "./booking-move";
 import { lockVisitOrderInTx, writeOutcomeInTx } from "./booking-outcome";
 import { bookingPayLinkInTx } from "./booking-pay-link";
@@ -183,6 +183,31 @@ export type BookingDetailView = (
     | Omit<BookingDetail, "order">
     | WithoutIntakeNote<Omit<BookingDetail, "order">>
 ) & { money: BookingMoney; treatment: TreatmentView | null };
+
+/**
+ * The booking as its viewer is sent it (DEC-098, DEC-274): the payment word
+ * everyone reads (`pay`); for a viewer who reads no money, no `money`, no
+ * `snapshot` (the price it froze) and the service's price nulled.
+ */
+export type BookingDetailShown =
+    | (BookingDetailView & { pay: BookingMoney["pay"] })
+    | (Omit<BookingDetailView, "money" | "snapshot"> & {
+          pay: Pick<BookingMoney["pay"], "word" | "how">;
+      });
+
+/** {@link BookingDetailShown} of a booking, for this viewer. */
+export function detailFor(
+    ctx: OrganizationContext,
+    view: BookingDetailView,
+): BookingDetailShown {
+    if (readsMoney(ctx)) return { ...view, pay: view.money.pay };
+    const { snapshot: _terms, money, ...shown } = view;
+    return {
+        ...shown,
+        service: { ...shown.service, priceCents: null, gstRate: null },
+        pay: payWords(money.pay),
+    };
+}
 
 /** What the bookings calendar reads per booking (see {@link DiaryRow}). */
 const diarySelect = {
@@ -994,7 +1019,7 @@ export class BookingsService {
         }
         // Whoever may take payment at the desk sees what they take (DEC-098):
         // the figure follows the permission, not the role's name.
-        const money = allows(ctx, "payment:read") || mayTakeDeskPayment(ctx);
+        const money = readsMoney(ctx);
         return {
             from: from.toISOString(),
             to: to.toISOString(),
@@ -1010,6 +1035,7 @@ export class BookingsService {
                 ),
                 people,
                 money,
+                now,
             ),
         };
     }
@@ -1174,6 +1200,38 @@ export class BookingsService {
         const treatment = treatmentOf({ ...rest, order });
         // The booker's note (E7) only behind C1's sensitive gate.
         return { ...intakeNoteFor(ctx, rest), money, treatment };
+    }
+
+    /**
+     * Which visit this is for its customer (DEC-274): how many of their
+     * bookings at this business they came to before this one starts, and
+     * when the last of those was. One counted read; `booking:read` and
+     * `contact:read` (it is the person's history). Null with no contact.
+     */
+    async bookingVisits(
+        ctx: OrganizationContext,
+        bookingId: string,
+    ): Promise<{ before: number; lastAt: string | null } | null> {
+        requireBookingPower(ctx, "booking:read");
+        requireBookingPower(ctx, "contact:read");
+        const booking = await this.requireOwnedBooking(ctx, bookingId, "read");
+        if (!booking.contactId) return null;
+        const seen = await prisma.booking.aggregate({
+            where: {
+                organizationId: ctx.organizationId,
+                contactId: booking.contactId,
+                outcome: "ATTENDED",
+                status: { not: "CANCELLED" },
+                startAt: { lt: booking.startAt },
+                id: { not: booking.id },
+            },
+            _count: { _all: true },
+            _max: { startAt: true },
+        });
+        return {
+            before: seen._count._all,
+            lastAt: seen._max.startAt?.toISOString() ?? null,
+        };
     }
 
     /**

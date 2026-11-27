@@ -12,7 +12,7 @@ import { personHref } from "@/lib/contacts/person-href";
 import { firstName } from "@/lib/names";
 import { phoneLabel } from "@/lib/organizations/business-phone";
 import type { PeekPerson } from "@/lib/services/peek";
-import { attentionText } from "@/lib/services/peek";
+import { attentionText, visitText } from "@/lib/services/peek";
 
 import { CARD, CardTitle, Row } from "./cards";
 
@@ -28,6 +28,7 @@ export function CustomerCard({
     email,
     person,
     note,
+    zone,
     className,
     style,
 }: {
@@ -40,12 +41,23 @@ export function CustomerCard({
     person: PeekPerson | null;
     /** The booker's note (E7), for whoever may see it. */
     note: string | null;
+    /** The business's zone, for "4th visit · last 12 Sep" (DEC-274). */
+    zone?: string;
     className?: string;
     style?: CSSProperties;
 }) {
     const attention = attentionText(person?.attention ?? null);
     const first = firstName(who);
     const call = phone?.replace(/\s+/g, "") ?? null;
+    const visit = zone ? visitText(person?.visits, zone) : null;
+    const visitLine = visit ? (
+        <span
+            data-visit-line=""
+            className="block text-[12.5px] font-normal text-muted-foreground min-[760px]:text-[13px]"
+        >
+            {visit}
+        </span>
+    ) : null;
     return (
         <section
             aria-labelledby="customer-title"
@@ -67,15 +79,19 @@ export function CustomerCard({
                     >
                         {who}
                     </p>
+                    <span className="hidden min-[760px]:block">
+                        {visitLine}
+                    </span>
                 </div>
             </div>
             <div className="flex min-h-12 items-center gap-3 border-b border-border/70 text-[14px] min-[760px]:hidden">
                 <span className="flex w-[22px] shrink-0 text-muted-foreground">
                     <User aria-hidden className="size-[18px]" />
                 </span>
-                <b data-ph-mask="" className="min-w-0 flex-1">
-                    {who}
-                </b>
+                <span className="min-w-0 flex-1">
+                    <b data-ph-mask="">{who}</b>
+                    {visitLine}
+                </span>
             </div>
             {attention ? (
                 // Read by whoever is about to see them (DEC-040): a

@@ -64,7 +64,10 @@ export function listLine(block: Block): string {
     const who = takerOf(block);
     if (who) parts.push(who);
     if (b.paidAtDesk) parts.push("paid at the desk");
-    else if (b.paidWith === "DESK" && block.state === "booked")
+    else if (
+        (b.pay ? b.pay.word === "PAYS_AT_VISIT" : b.paidWith === "DESK") &&
+        block.state === "booked"
+    )
         parts.push(BOOKING_WORDS.paysAtVisit.toLowerCase());
     else if (b.paidWith === "PAID") parts.push("paid");
     else if (b.paidWith === "PACK") parts.push("class pack");

@@ -8,6 +8,7 @@ import type {
 } from "./booking-calendar";
 import { BOOKING_WORDS } from "./booking-words";
 import { paidAtDeskText } from "./desk-pay";
+import { payText } from "./money-answer";
 
 /**
  * The bookings calendar's geometry (U15): local days in the business's zone,
@@ -560,9 +561,11 @@ export function whoFor(b: DiaryBooking): string {
     return b.bookerEmail ?? "Someone";
 }
 
-/** How a place was paid, in words. */
+/** How a place was paid, in words: the one money answer (DEC-272). */
 export function paidText(b: DiaryBooking): string {
     if (b.paidAtDesk) return paidAtDeskText(b.paidAtDesk.method);
+    const said = payText(b.pay, b.packName);
+    if (said) return said;
     if (b.free) return BOOKING_WORDS.free;
     switch (b.paidWith) {
         case "MEMBERSHIP":
@@ -595,9 +598,14 @@ export function blockLine(block: Block, withTeacher = true): string {
             : places;
     }
     const b = block.booking;
+    // The one answer (DEC-272): "pays at the visit" only before the visit;
+    // money owed after it is the block's pill (Awaiting payment).
+    const atVisit = b.pay
+        ? b.pay.word === "PAYS_AT_VISIT"
+        : b.paidWith === "DESK";
     const pay = b.paidAtDesk
         ? " · paid at the desk"
-        : b.paidWith === "DESK" && block.state === "booked"
+        : atVisit && block.state === "booked"
           ? " · pays at the visit"
           : b.paidWith === "PACK"
             ? " · pack"

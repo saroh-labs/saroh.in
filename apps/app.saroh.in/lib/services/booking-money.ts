@@ -12,6 +12,7 @@ import { permits } from "@/lib/organizations/permits";
 import type { resolveActiveOrganization } from "@/lib/organizations/service";
 import type { DeskTake } from "@/lib/services/desk-pay";
 import { methodWord } from "@/lib/services/desk-pay";
+import type { BookingPay } from "@/lib/services/money-answer";
 
 /** A cancel's refund, as the provider has answered for it so far. */
 export interface BookingRefund {
@@ -52,6 +53,8 @@ export interface BookingMoney {
     deskMethod?: string | null;
     /** What "Take ₹X" takes now (P2); null when there's nothing to take. */
     take?: DeskTake | null;
+    /** The one money answer (DEC-272); absent from an older API. */
+    pay?: BookingPay;
 }
 
 /** What a cancel did with money paid online (`DELETE bookings/:id`). */

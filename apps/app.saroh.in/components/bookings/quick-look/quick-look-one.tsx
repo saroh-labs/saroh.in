@@ -33,6 +33,7 @@ import { canCheckIn, canMarkNoShow } from "@/lib/services/booking-state";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { DiaryState } from "@/lib/services/diary";
 import { paidText, whoFor } from "@/lib/services/diary";
+import { payLine, payText } from "@/lib/services/money-answer";
 import type { PeekPerson } from "@/lib/services/peek";
 import { attentionText, phoneText } from "@/lib/services/peek";
 import {
@@ -73,29 +74,22 @@ export const FRONT_DESK_LINE =
 export const CALENDAR_ONLY_LINE =
     "Your role sees the calendar only, so you can't change bookings. An owner can change this in Settings › Team.";
 
-/** "₹500 · Awaiting payment", how it was paid, or its treatment's order. */
+/**
+ * The money line: the one answer (DEC-272), as the List and the booking's
+ * page say it — "Awaiting payment ₹1,200", "Paid online ₹1,200", "Pays at
+ * the visit ₹800" — with the amount only for a viewer who reads money.
+ * From an older API, how it was paid as the diary says it.
+ */
 export function paidWords(
     b: DiaryBooking,
     ctx: QuickLookContext,
-    state: DiaryState,
+    _state: DiaryState,
 ): string {
-    const price = ctx.money
-        ? formatMoney(b.service.priceCents ?? null, b.service.currency ?? null)
-        : null;
-    if (b.paidAtDesk) return paidText(b);
-    if (b.paidWith === "PAID")
-        return price ? `${price} paid online` : "Paid online";
-    if (b.paidWith === "DESK") {
-        if (state === "in" && b.take) {
-            const due = formatMoney(b.take.cents, b.service.currency ?? null);
-            return `${due} · ${BOOKING_WORDS.awaitingPayment}`;
-        }
-        // The one payment word (DEC-257), as the block and the list say it.
-        return price
-            ? `${price} · ${BOOKING_WORDS.awaitingPayment}`
-            : BOOKING_WORDS.awaitingPayment;
-    }
-    return paidText(b);
+    if (b.paidAtDesk || !b.pay) return paidText(b);
+    const line = ctx.money
+        ? payLine(b.pay, b.service.currency ?? null, b.packName)
+        : payText(b.pay, b.packName);
+    return line ?? paidText(b);
 }
 
 /** The rules the sheet runs on, for this booking and this viewer. */

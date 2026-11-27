@@ -31,11 +31,11 @@ import type { WithoutIntakeNote } from "./booking-intake";
 import { withoutIntakeNote } from "./booking-intake";
 import type { ReassignCandidate } from "./booking-reassign";
 import type {
-    BookingDetailView,
+    BookingDetailShown,
     BookingsCalendar,
     CancelledBooking,
 } from "./bookings.service";
-import { BookingsService } from "./bookings.service";
+import { BookingsService, detailFor } from "./bookings.service";
 import { TakeDeskPaymentDto } from "./desk-pay.dto";
 import {
     AddRuleDto,
@@ -266,8 +266,24 @@ export class BookingsController {
     getBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
-    ): Promise<BookingDetailView> {
-        return this.bookings.getBooking(ctx, bookingId);
+    ): Promise<BookingDetailShown> {
+        // Amounts only for a viewer who reads money (DEC-098, DEC-274).
+        return this.bookings
+            .getBooking(ctx, bookingId)
+            .then((view) => detailFor(ctx, view));
+    }
+
+    /**
+     * Which visit a booking is for its customer (DEC-274): "First visit" or
+     * "4th visit · last 12 Sep" under their name in the quick look and on
+     * the booking's page.
+     */
+    @Get("bookings/:bookingId/visits")
+    bookingVisits(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+    ): Promise<{ before: number; lastAt: string | null } | null> {
+        return this.bookings.bookingVisits(ctx, bookingId);
     }
 
     /**

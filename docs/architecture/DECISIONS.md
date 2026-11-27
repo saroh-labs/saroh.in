@@ -3470,6 +3470,32 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **MCP and v1:** a price of 0 makes a service free (tool and OpenAPI descriptions say so); `list_services` names it "free".
 - **Left alone:** customer messages (they never named a payment for a booking), Home's needs-attention and Insights (they count invoices and holds, which a free booking never has), the Business calendar's subtitle, Home's Today line and the customer page for the few free bookings stored "at the desk" before this decision (new ones store none), and a service with no price at all.
 
+## DEC-272 One money answer for a booking, worked out once on the server
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, approved boards Booking-money and Quick-look) · amends DEC-257 (its payment words are now computed in one place) · builds on DEC-261 (Free) and DEC-173 (paid is the paper's ledger)
+
+- Context: one booking (Pulse Fitness, personal training, 30 Jul) read "₹1,200 · Paid" on the List, "₹1,200 paid online" in the quick look and "Still to take ₹1,200" on its page. It was booked "Paid now" by hand with no payment on paper. The List was right (the desk could not take anything for it); the quick look guessed "online" from "Paid"; the page's sum ignored "Paid now" and asked for the whole price.
+- **The rule (`bookingPay`, `apps/api.saroh.in/src/modules/bookings/booking-money.ts`), in order:** cancelled says Paid with what it had paid (the refund is on the booking), else Nothing to pay; a price of 0 is Free (DEC-261); a treatment's visit, a course's session, a class pack and a membership say so, with no amount; no price says Paid if marked paid, else nothing. Otherwise _paid_ is what the booking's own paper holds (online, at the desk, by hand on Invoices); marked "Paid now" with nothing on paper is paid in full. Nothing left: **Paid** (online, at the desk, or both; just "Paid" when not recorded). Money left: a hold or a pay link out is **Awaiting payment**; didn't come is Nothing to pay (the desk can still take a fee); a visit that has ended is **Awaiting payment** (DEC-273); before it, **Pays at the visit**.
+- **Every read says it from the same function:** the diary and List read (`pay` on each booking), the quick look, the booking's page (`pay` beside `money`), the Business calendar's day panel and its Due, Home's Today line, the customer page's bookings. Each sends the word and how to everyone who reads bookings, and the amounts paid and still to take only to a viewer who reads money (DEC-098).
+- **Not affected:** MCP and v1 booking tools and the data export send no payment word (they send the stored record); customer messages never named a payment for a booking.
+
+## DEC-273 After the visit, money still to take is "Awaiting payment", and it is counted
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026: "extending DEC-257's one payment word to past bookings") · amends DEC-257
+
+- Context: a desk-paid visit that ended unpaid read "Came · Pays at the visit" on the List, while the Awaiting payment view said "Nobody owes you for a booking".
+- **One set of words before and after the visit:** Pays at the visit (still to come), Awaiting payment (ended, or a pay link out, or a hold), Paid online / Paid at the desk, Free.
+- **Attendance stays its own fact.** "Came" or "Not marked yet" keeps its badge; "Awaiting payment" sits beside it. A booking whose person didn't come is not owed.
+- **The Awaiting payment view counts every booking owed**, not only pay links and holds. Its empty line: "Nobody owes you for a booking. Anyone who still has to pay, at the desk or by link, shows here."
+- The diary's block wears Awaiting payment only when owed now; one still to come says "pays at the visit" in its line.
+
+## DEC-274 A finished class says who came and who owes; the visit line; a desk Member's money in both places or neither
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, approved boards Past-class and Quick-look, sticky 3) · follows DEC-260 (sessions · people) · amends DEC-257 and DEC-098 (who sees the List's Money column)
+
+- **A finished class** on the List reads "8 came · 1 didn't · 3 to pay" (or "Not marked") instead of "8 places left", desk and phone; its Money cell says "₹3,600 taken · ₹1,350 to take". Before it starts it still says places left. Opening it lists each person with Came or Didn't come and Awaiting payment. The diary's block for a class says "3 to pay".
+- **The visit line:** under the customer's name in the quick look and on the booking's page, "First visit" or "4th visit · last 12 Sep": their bookings at this business they came to before this one starts, and the last one's day (`GET bookings/:id/visits`, one counted read, `booking:read` and `contact:read`). The phone with Call was already on both.
+- **A desk Member's money:** whoever reads money (`payment:read`) or takes it at the desk (`booking:write` and `invoice:write`) sees what to collect in both places: the List's Money column and the booking's Money card. Anyone else sees neither: the API sends them no `money`, no `snapshot` and no service price on the booking, only the payment word (Awaiting payment, Paid…), which every screen says to them alike.
 ## DEC-279 Menu groups fold; everything is open the first time; each person's folds are remembered; Setup is fixed at the foot and folds too; the current page's group is always shown
 
 **Status: Accepted — 2026-11-27** · owner (27 Nov 2026: "Setup should also be collapsible … By default, on the first time, lets keep everything open … and persist their choice"; "then they can open whenever they want and it will also persist"; "this should also update the mobile menu in the app") · amends DEC-262 (the rail's groups) and DEC-263 (the More sheet's groups)

@@ -115,9 +115,10 @@ export async function bookingsCan(organization: Organization | null) {
         // Give anyone's booking to someone else from the quick look (#1157).
         assign: may("service:write"),
         readOrder: may("order:read"),
-        // The Money column follows what the role may read (DEC-098): never
-        // a Member or Reviewer by default.
-        money: may("payment:read"),
+        // The Money column follows what the role is sent (DEC-098,
+        // DEC-274): whoever reads money or takes it at the desk sees what
+        // to collect here as on the booking's page; anyone else, neither.
+        money: seesAmounts(organization),
         link: may("booking:write") && may("invoice:write") && online,
         online: takesOnlinePayment(await billingAccessOrNull()),
         /** The plan takes payment online, for New booking (U8). */
@@ -270,7 +271,7 @@ export async function readBookingView({
             ? undefined
             : readClassWaitlist(booking.serviceId, booking.startAt),
         booking.contact && may("contact:read")
-            ? readPeekPerson(booking.contact.id)
+            ? readPeekPerson(booking.contact.id, booking.id)
             : null,
         // New booking's people, and the viewer's place on the diary for
         // Change who (#1157): only for someone who may book.

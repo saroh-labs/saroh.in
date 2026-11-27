@@ -13,6 +13,8 @@ import {
 } from "@/lib/services/booking-money";
 import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { methodWord } from "@/lib/services/desk-pay";
+import type { BookingPay } from "@/lib/services/money-answer";
+import { owes, payLine } from "@/lib/services/money-answer";
 
 /** One line of the Money card. */
 export interface MoneyRow {
@@ -73,7 +75,15 @@ export function moneyRows(
             bad: r.status === "FAILED",
         });
     }
-    if (!cancelled) {
+    if (!cancelled && m.pay) {
+        // The one answer (DEC-272), as the List and the quick look say it.
+        const row = payRow(
+            m.pay,
+            m.currency,
+            m.paidOnlineCents > 0 || desk > 0,
+        );
+        if (row) rows.push(row);
+    } else if (!cancelled) {
         const left = m.take?.cents ?? m.dueCents;
         if (left !== null && left > 0) {
             rows.push({
@@ -96,6 +106,38 @@ export function moneyRows(
         }
     }
     return rows;
+}
+
+/**
+ * The Money card's payment line (DEC-272): "Awaiting payment ₹1,200",
+ * "Pays at the visit ₹800", "Membership", or once paid with its payments
+ * listed above it, "Nothing left to take". For a viewer who reads no money
+ * (`pay` without amounts, DEC-274) the word alone. Null: nothing to say.
+ */
+export function payRow(
+    pay: BookingPay,
+    currency: string | null,
+    paidListed = false,
+): MoneyRow | null {
+    if (pay.word === "PAID" && paidListed) {
+        return {
+            key: "left",
+            label: "Payment",
+            text: "Nothing left to take",
+            strong: true,
+        };
+    }
+    if (pay.word === "FREE") return null;
+    const text = payLine(pay, currency);
+    return text
+        ? {
+              key: "left",
+              label: "Payment",
+              text,
+              strong: true,
+              bad: owes(pay),
+          }
+        : null;
 }
 
 /** A sentence under Money's lines; `bad` for a refund that failed. */

@@ -11,6 +11,7 @@ import {
 } from "./diary";
 import type { Laned } from "./diary-lanes";
 import { bookingLanes } from "./diary-lanes";
+import { owes } from "./money-answer";
 
 /**
  * What the diary draws, worked out from its geometry (`diary.ts`): closed
@@ -74,13 +75,15 @@ export function hoursAcross(columns: readonly Column[]): DayHours | null {
 // ── Who still owes ──────────────────────────────────────────────────────────
 
 /**
- * Whether a booking still has money to take: what the API says "Take" would
- * take now (`take`), or for a viewer who reads no money, that there is
- * something (`toTake`). From an API before either, one that pays at the
- * session and has not been taken at the desk. Never a cancelled one.
+ * Whether a booking is owed money now: the one money answer says Awaiting
+ * payment (DEC-272, DEC-273) — a visit ended unpaid, a pay link out, a
+ * hold. One still to come that pays at the visit is not owed yet. From an
+ * API before that answer, what "Take" would take (`take`, `toTake`), else
+ * one that pays at the session and was not taken. Never a cancelled one.
  */
 export function toPay(b: DiaryBooking): boolean {
     if (b.status === "CANCELLED") return false;
+    if (b.pay) return owes(b.pay);
     if (b.take !== undefined || b.toTake !== undefined) {
         return (b.take?.cents ?? 0) > 0 || b.toTake === true;
     }
@@ -89,15 +92,15 @@ export function toPay(b: DiaryBooking): boolean {
 
 /**
  * The mark a block wears while money is still to take: "Awaiting payment"
- * on a booking, "2 awaiting payment" on a class with two places that owe. Null when
- * nothing is owed.
+ * on a booking, "2 to pay" on a class with two places that owe (the List's
+ * class row says the same, DEC-274). Null when nothing is owed.
  */
 export function toPayText(block: Block): string | null {
     if (!isLive(block)) return null;
     if (block.kind === "one")
         return toPay(block.booking) ? BOOKING_WORDS.awaitingPayment : null;
     const n = liveSeats(block.session).filter(toPay).length;
-    return n > 0 ? `${n} ${BOOKING_WORDS.awaitingPayment.toLowerCase()}` : null;
+    return n > 0 ? `${n} to pay` : null;
 }
 
 /**
