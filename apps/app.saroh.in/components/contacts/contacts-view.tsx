@@ -342,12 +342,9 @@ export function ContactsView({
                 ),
         },
         {
-            // Searched and shown on the person and in Grid; off the table,
-            // which keeps to what the list is opened for (DEC-277).
             id: "email",
             header: "Email",
             priority: "detail",
-            tableHidden: true,
             sortValue: (c) => (shownEmail(c) ?? "").toLowerCase(),
             // The one column allowed to give up space: an address is recognised
             // from its start, and the full value is a click away on the row.
@@ -380,6 +377,19 @@ export function ContactsView({
                     <Missing />
                 );
             },
+        },
+        {
+            id: "added",
+            header: "Added",
+            priority: "detail",
+            numeric: true,
+            sortValue: (c) => new Date(c.createdAt).getTime(),
+            cell: (c) => (
+                <ViewerDate
+                    iso={c.createdAt}
+                    className="whitespace-nowrap text-muted-foreground"
+                />
+            ),
         },
     ];
     const columns = all.filter((c): c is DataColumn<ContactListItem> => !!c);
