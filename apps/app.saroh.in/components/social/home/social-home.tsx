@@ -82,7 +82,7 @@ export function SocialHome({
             className="mb-5"
             holdsData={false}
             compactOnPhone
-            breadcrumb={["Grow", POST_WORDS.social]}
+            breadcrumb={[POST_WORDS.social]}
             title={POST_WORDS.social}
             description={narrow ? undefined : POST_WORDS.socialDescription}
             actions={

@@ -5,7 +5,7 @@ export default function Loading() {
         <PageLoading
             shape="form"
             width="form"
-            breadcrumb={["Sell", "Discount codes"]}
+            breadcrumb={["Discount codes"]}
             label="Loading the code"
         />
     );

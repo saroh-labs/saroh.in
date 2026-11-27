@@ -5,7 +5,6 @@ import type {
 } from "@/components/shared/navigation/nav-items";
 import {
     isNavChildCurrent,
-    isNavItemActive,
     isNavSectionActive,
     navCountFor,
 } from "@/components/shared/navigation/nav-items";
@@ -24,11 +23,15 @@ import {
 /** How many real tabs the bar holds before More. */
 export const TAB_SEATS = 4;
 
-/** The design's default seats, by name, when you are in no section. */
+/**
+ * The rows that hold the seats, by name, when the actor has them: the bar's
+ * tabs before the regroup (Sell's seat opened Orders). The rest of the
+ * seats go to the rail's next rows, in its order (DEC-263).
+ */
 export const DEFAULT_PREFERENCE = [
     "Home",
-    "Sell",
     "Business calendar",
+    "Orders",
     "Insights",
 ] as const;
 
@@ -75,12 +78,6 @@ export interface MobileNav {
     note: string;
 }
 
-/**
- * The sheet heading over the rows that belong to no section: the same
- * word as the rail's last group (owner, 11 Oct; "Workspace" before).
- */
-export const MANAGE_HEADING = "Manage";
-
 const isSection = (item: NavItem) =>
     item.children?.some((child) => child.href) ?? false;
 
@@ -92,32 +89,12 @@ const pagesOf = (item: NavItem) =>
     );
 
 /**
- * Which rows get the four seats.
- *
- * By a named preference first, then in rail order skipping sections. On a
- * page inside a section — or on Calendar, which the design seats the same
- * way — that place takes the second seat, so where you are is always one tap
- * away. Calendar comes after Sell; Sell gives up its seat to Calendar when it
- * is the section you are in, since it is already seated.
+ * One fixed order everywhere (DEC-263): the seats are the preferred rows
+ * the actor has, then the rail's next rows, and they are drawn in the
+ * rail's order. The page you are on never moves a tab; a row a gate leaves
+ * out is simply absent and the rest keep their order. No tab is chosen by
+ * the business's trade.
  */
-export function seatPreference(currentSection: string | null): string[] {
-    if (!currentSection) return [...DEFAULT_PREFERENCE];
-    // Notifications moved to the top bar (2026-09-25), so its seat goes to
-    // the next of the design's defaults not already seated.
-    return Array.from(
-        new Set([
-            "Home",
-            currentSection,
-            currentSection === "Sell" ? "Business calendar" : "Sell",
-            "Business calendar",
-            "Insights",
-        ]),
-    );
-}
-
-/** The one plain row that holds the second seat while you are on it. */
-const SEATED_WHEN_CURRENT = "/calendar";
-
 export function buildMobileNav({
     groups,
     pathname,
@@ -132,31 +109,18 @@ export function buildMobileNav({
 }): MobileNav {
     const rows = groups.flatMap((group) => group.items);
     const count = (href?: string) => navCountFor(href, counts, unread);
+    const active = (item: NavItem) => isNavSectionActive(pathname, item, rows);
 
-    const sectionNow = rows.find(
-        (item) =>
-            (isSection(item) && isNavSectionActive(pathname, item)) ||
-            (item.href === SEATED_WHEN_CURRENT &&
-                isNavItemActive(pathname, item.href)),
-    );
-    const preference = seatPreference(sectionNow?.label ?? null);
-
-    // Seats: preference by name, then rail order without sections.
-    const seated: NavItem[] = [];
+    const seated = new Set<NavItem>();
     const seat = (item: NavItem | undefined) => {
-        if (!item || seated.length >= TAB_SEATS || seated.includes(item)) {
-            return;
-        }
-        seated.push(item);
+        if (item && seated.size < TAB_SEATS) seated.add(item);
     };
-    for (const name of preference) {
+    for (const name of DEFAULT_PREFERENCE) {
         seat(rows.find((item) => item.label === name));
     }
     for (const item of rows) {
         if (!isSection(item)) seat(item);
     }
-    // The bar shows them in the order they were seated, as the design does:
-    // Home first, and the section you are in beside it.
 
     const sectionCount = (item: NavItem) =>
         count(item.href) +
@@ -164,65 +128,60 @@ export function buildMobileNav({
             .filter((page) => page.href !== item.href)
             .reduce((sum, page) => sum + count(page.href), 0);
 
-    const tabs: MobileTab[] = seated.map((item) => {
-        const section = isSection(item);
-        return {
-            key: item.href,
-            label: item.shortLabel ?? item.label,
-            href: section ? (pagesOf(item)[0]?.href ?? item.href) : item.href,
-            icon: item.icon,
-            count: section ? sectionCount(item) : count(item.href),
-            current: section
-                ? isNavSectionActive(pathname, item)
-                : isNavItemActive(pathname, item.href),
-            section,
-        };
-    });
-
-    // The sheet: every section, seated or not — one tab opens one page, so
-    // the rest of a seated section's pages have to be somewhere — then what
-    // is left, under Manage.
-    const sheet: MobileSheetGroup[] = [];
-    for (const item of rows) {
-        if (!isSection(item)) continue;
-        const pages = pagesOf(item);
-        sheet.push({
-            label: item.label,
-            rows: pages.map((page) => ({
-                key: `${item.href}>${page.href}`,
-                label: page.label,
-                href: page.href,
-                // The parent's icon: the sheet is a column of icons, and a
-                // page's own would be decoration the rail never drew.
-                icon: item.icon,
-                count: count(page.href),
-                current: isNavChildCurrent(pathname, page.href, pages),
-            })),
-        });
-    }
-    const rest = rows.filter(
-        (item) => !isSection(item) && !seated.includes(item),
-    );
-    if (rest.length > 0) {
-        sheet.push({
-            label: MANAGE_HEADING,
-            rows: rest.map((item) => ({
+    const tabs: MobileTab[] = rows
+        .filter((item) => seated.has(item))
+        .map((item) => {
+            const section = isSection(item);
+            return {
                 key: item.href,
-                label: item.label,
-                href: item.href,
+                label: item.shortLabel ?? item.label,
+                href: section
+                    ? (pagesOf(item)[0]?.href ?? item.href)
+                    : item.href,
                 icon: item.icon,
-                count: count(item.href),
-                current: isNavItemActive(pathname, item.href),
-            })),
+                count: section ? sectionCount(item) : count(item.href),
+                current: active(item),
+                section,
+            };
         });
-    }
+
+    // The sheet: the rail's groups, in its order, with what has no seat —
+    // a section's pages all, since one tab opens one of them.
+    const sheet: MobileSheetGroup[] = groups.map((group, i) => ({
+        label: group.label ?? `group-${i}`,
+        rows: group.items.flatMap((item): MobileSheetRow[] => {
+            if (isSection(item)) {
+                const pages = pagesOf(item);
+                return pages.map((page) => ({
+                    key: `${item.href}>${page.href}`,
+                    label: page.label,
+                    href: page.href,
+                    // The parent's icon: a page's own would be decoration
+                    // the rail never drew.
+                    icon: item.icon,
+                    count: count(page.href),
+                    current: isNavChildCurrent(pathname, page.href, pages),
+                }));
+            }
+            if (seated.has(item)) return [];
+            return [
+                {
+                    key: item.href,
+                    label: item.label,
+                    href: item.href,
+                    icon: item.icon,
+                    count: count(item.href),
+                    current: active(item),
+                },
+            ];
+        }),
+    }));
     const groupsWithRows = sheet.filter((group) => group.rows.length > 0);
 
     // More counts what is waiting only in the sheet. A seated section's pages
-    // are listed there too, but their work already shows on that section's
-    // tab — counting it twice would say twice as much is waiting.
+    // are listed there too, but their work already shows on its tab.
     const seatedHrefs = new Set(
-        seated.flatMap((item) => [
+        Array.from(seated).flatMap((item) => [
             item.href,
             ...pagesOf(item).map((p) => p.href),
         ]),

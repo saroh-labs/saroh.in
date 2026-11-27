@@ -163,9 +163,8 @@ export function PlanEditor({
             canEdit={canEdit}
             readOnlyText={readOnlyText}
             breadcrumb={(r) => [
-                "Payments",
                 <IntentLink data-ph-unmask="" key="plans" href={PLANS_HREF}>
-                    Plans
+                    Membership plans
                 </IntentLink>,
                 r ? planTitle(r.values, true) : "New plan",
             ]}

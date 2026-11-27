@@ -1,18 +1,13 @@
 import {
-    isNavSectionActive,
+    activeNavItem,
     NAV_GROUPS,
     navPathname,
 } from "@/components/shared/navigation/nav-items";
 
-/** The rail row an address belongs to: Home, Sell, Bookings, Settings… */
+/** The rail row an address belongs to: Home, Orders, Bookings, Settings… */
 export function routeSection(pathname: string): string {
-    const at = navPathname(pathname, NAV_GROUPS);
-    for (const group of NAV_GROUPS) {
-        for (const item of group.items) {
-            if (isNavSectionActive(at, item)) return item.href;
-        }
-    }
-    return `/${pathname.split("/")[1] ?? ""}`;
+    const item = activeNavItem(navPathname(pathname, NAV_GROUPS), NAV_GROUPS);
+    return item?.href ?? `/${pathname.split("/")[1] ?? ""}`;
 }
 
 /**

@@ -5,7 +5,7 @@ export default function Loading() {
         <PageLoading
             shape="list"
             width="full"
-            breadcrumb={["Sell", "Stock"]}
+            breadcrumb={["Stock"]}
             title="Stock"
             label="Loading stock"
         />

@@ -50,7 +50,6 @@ export function OrderHeading({
             holdsData
             className="mb-0"
             breadcrumb={[
-                "Sell",
                 <IntentLink
                     data-ph-unmask=""
                     key="orders"

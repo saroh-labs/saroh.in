@@ -68,7 +68,6 @@ export function OrderTickets({
                 holdsData="description"
                 className="mb-5 print:hidden"
                 breadcrumb={[
-                    "Sell",
                     <IntentLink
                         data-ph-unmask=""
                         key="orders"

@@ -335,12 +335,18 @@ describe("shown once", () => {
             "new-ai-apps",
             "new-share",
             "new-ask-ai",
+            "new-menu",
         ]);
     });
 });
 
 describe("Home's New card", () => {
-    const ALL = { "new-ai-apps": true, "new-share": true, "new-ask-ai": true };
+    const ALL = {
+        "new-menu": false,
+        "new-ai-apps": true,
+        "new-share": true,
+        "new-ask-ai": true,
+    };
     const seen = (...keys: MomentKey[]) => new Set<MomentKey>(keys);
 
     it("shows AI apps first, then Share, then Ask AI, then nothing", () => {
@@ -366,6 +372,7 @@ describe("Home's New card", () => {
         expect(
             newFeatureMoment(
                 {
+                    "new-menu": false,
                     "new-ai-apps": false,
                     "new-share": false,
                     "new-ask-ai": false,
@@ -373,6 +380,14 @@ describe("Home's New card", () => {
                 seen(),
             ),
         ).toBeNull();
+    });
+
+    it("tells of the moved menu before any feature (DEC-262)", () => {
+        const all = { ...ALL, "new-menu": true };
+        expect(newFeatureMoment(all, seen())?.key).toBe("new-menu");
+        expect(newFeatureMoment(all, seen("new-menu"))?.key).toBe(
+            "new-ai-apps",
+        );
     });
 
     it("is not shown when what was seen can't be read", () => {

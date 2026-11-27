@@ -91,7 +91,7 @@ test("a storefront teammate sees and moves only their storefront's orders (DEC-0
             page.getByRole("heading", { name: "Orders" }),
         ).toBeVisible();
 
-        // Sell holds Orders alone: no Products, Stock or Storefronts.
+        // Of what was Sell, Orders alone: no Products, Stock or Storefronts.
         const rail = onPhone(page)
             ? page.getByRole("navigation", { name: "Main" })
             : page.getByRole("navigation", { name: "Primary" });

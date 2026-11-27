@@ -13,7 +13,7 @@ import { useServicesList } from "@/lib/services/use-services";
 
 import { ServicesScreen } from "./services-screen";
 
-const BREADCRUMB = ["Bookings", "Services"];
+const BREADCRUMB = ["Services"];
 const DESCRIPTION =
     "What customers can book, how long it takes, and who does it.";
 

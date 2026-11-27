@@ -54,9 +54,12 @@ export function shellLoadingWords(pathname: string): ShellLoadingWords {
         };
     }
     const at = navPathname(pathname, NAV_GROUPS);
+    const rows = NAV_GROUPS.flatMap((group) => group.items);
     for (const group of NAV_GROUPS) {
         for (const item of group.items) {
-            if (item.href === "/" || !isNavSectionActive(at, item)) continue;
+            if (item.href === "/" || !isNavSectionActive(at, item, rows)) {
+                continue;
+            }
             const children = item.children ?? [];
             const child = children.find((c) =>
                 isNavChildCurrent(at, c.href, children),

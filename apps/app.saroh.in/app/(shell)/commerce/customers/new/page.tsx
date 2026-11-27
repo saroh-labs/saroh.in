@@ -32,7 +32,6 @@ export default async function NewCustomerPage() {
         <PageContainer width="form">
             <PageHeader
                 breadcrumb={[
-                    "Sell",
                     <IntentLink
                         data-ph-unmask=""
                         key="customers"

@@ -139,7 +139,6 @@ export function CoursePage({
                 holdsData
                 className="mb-0"
                 breadcrumb={[
-                    "Bookings",
                     <IntentLink
                         data-ph-unmask=""
                         key="courses"
