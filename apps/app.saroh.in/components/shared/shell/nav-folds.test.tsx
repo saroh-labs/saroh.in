@@ -117,6 +117,10 @@ describe("the rail's folding groups", () => {
         const button = groupButton("What you offer");
         expect(button.getAttribute("aria-expanded")).toBe("false");
         expect(rowsOf(button).hidden).toBe(true);
+        // jsdom applies no CSS: a display class (`flex`) would draw the
+        // rows in a browser despite `hidden`, so the class must say so too.
+        expect(rowsOf(button).classList.contains("hidden")).toBe(true);
+        expect(rowsOf(button).classList.contains("flex")).toBe(false);
         expect(button.textContent).toMatch(/items/);
         expect(saved("u1")).toEqual({ "What you offer": false });
     });
