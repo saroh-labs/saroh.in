@@ -7285,6 +7285,7 @@ its fields; the live team read drops `staffId`.
 their record; a disconnect revokes at the provider where it can; secret
 models are read with a `select`.
 **Category**: security · admin, social, sites
+
 ## API — a list the screen draws whole reads the newest rows only
 
 **Symptom**: 26 Nov 2026 release review: the inbox, a lead's messages,
@@ -7389,3 +7390,37 @@ them all; anything else forgets nothing.
 **Rule**: a cache is cleared by the writes that can change it, after they
 succeed. Tested in `module-availability.service.spec.ts`.
 **Category**: performance · `capabilities`
+
+## API — a board's list holds its open cards first
+
+**Symptom**: 27 Nov 2026, following the 26 Nov release review: Leads and
+the Pipeline board, a service's bookings and the consents list read every
+row a business had.
+**Fix**: `leads.list` holds at most `LIST_LIMIT`: the open leads first,
+then the newest won and lost ones in what is left, so a board keeps every
+open card for any business with fewer open leads than that. Leads and the
+board say so at the cap. A service's bookings and the consents list read
+the newest `LIST_LIMIT`; the bookings calendar and list already read a
+bounded date range.
+**Rule**: a "newest N" window on a screen that groups rows (a board, a
+worklist) is taken over the rows the screen exists for first, so the cap
+drops history before work in hand. Tested in `leads.service.spec.ts` and
+`leads-container.test.tsx`.
+**Category**: performance · `leads`, `bookings`, `communications`
+
+## Limits — session reads aren't counted by address
+
+**Symptom**: 27 Nov 2026, following the 26 Nov release review: Better
+Auth's per-address limit also counted `/get-session`, which the workspace
+and accounts call from their own servers on every page, so many people
+shared one count.
+**Fix**: `authOptions` sets `rateLimit.customRules` to leave
+`/get-session` out of the address limit (`packages/auth/src/server.ts`).
+It answers nothing without a session cookie signed with the auth secret,
+checked before any database read. Better Auth builds its key from the
+address and path before any custom rule runs, so it can't be re-keyed on
+the person.
+**Rule**: as "a signed-in call counts the person, not the address": a
+route the apps' servers call for everyone isn't held to a per-address
+count. Tested in `packages/auth/src/sign-in-code.test.ts`.
+**Category**: limits · `packages/auth`

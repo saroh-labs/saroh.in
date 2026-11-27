@@ -838,6 +838,14 @@ function authHooks(opts: CreateAuthOptions): Pick<BetterAuthOptions, "hooks"> {
     };
 }
 
+/**
+ * Reading the session is not counted by address. The workspace and accounts
+ * read it from their servers, so one address carries many people. It answers
+ * nothing without a session cookie signed with the auth secret, which is
+ * checked before any database read, so the cookie is the bound.
+ */
+const SESSION_READ_RULES = { "/get-session": false } as const;
+
 export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
     const secret = resolveAuthSecret();
     const baseURL = opts.baseURL ?? process.env.BETTER_AUTH_URL;
@@ -849,9 +857,12 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         // `jwt()` (AI apps' sign-in) adds a session-to-JWT `/token`: nothing
         // here hands a session out as a bearer token.
         disabledPaths: ["/token"],
-        ...(opts.rateLimitStorage
-            ? { rateLimit: { customStorage: opts.rateLimitStorage } }
-            : {}),
+        rateLimit: {
+            ...(opts.rateLimitStorage
+                ? { customStorage: opts.rateLimitStorage }
+                : {}),
+            customRules: SESSION_READ_RULES,
+        },
         trustedOrigins: getTrustedOrigins(),
         database: prismaAdapter(prisma, {
             provider: "postgresql",

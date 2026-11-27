@@ -25,6 +25,7 @@ import { LeadDetailContainer } from "@/components/crm/lead-detail-container";
 import { PipelineContainer } from "@/components/crm/pipeline-container";
 import { LeadsContainer } from "@/components/leads/leads-container";
 import { leadsSaved } from "@/lib/leads/use-leads";
+import { LIST_LIMIT } from "@/lib/lists/capped";
 import { makeTestClient, renderWithQuery } from "@/lib/query/test-utils";
 
 const LEAD = {
@@ -150,6 +151,45 @@ describe("the Pipeline board before its first read", () => {
         expect(host.querySelector('[aria-label="Stage New"]')).not.toBeNull();
         expect(host.textContent).toContain("Wedding flowers");
         unmount();
+    });
+});
+
+describe("the leads cap", () => {
+    const NOTE = `Showing ${LIST_LIMIT} leads: every open one first`;
+
+    it("says nothing below the cap", async () => {
+        release();
+        const { host, unmount } = renderWithQuery(
+            <LeadsContainer tab="leads" canWrite canLog currency="INR" />,
+        );
+        await tick(50);
+        expect(host.textContent).toContain("Wedding flowers");
+        expect(host.textContent).not.toContain(NOTE);
+        unmount();
+    });
+
+    it("the board says it holds the API's LIST_LIMIT, open ones first", async () => {
+        const many = Array.from({ length: LIST_LIMIT }, (_, i) => ({
+            ...LEAD,
+            id: `l${i}`,
+        }));
+        const pipeline = BODY["/api/pipeline"] as Record<string, unknown>;
+        BODY["/api/pipeline"] = { ...pipeline, leads: many };
+        try {
+            release();
+            const { host, unmount } = renderWithQuery(
+                <PipelineContainer
+                    canWrite={false}
+                    mayManage={false}
+                    currency="INR"
+                />,
+            );
+            await tick(100);
+            expect(host.textContent).toContain(NOTE);
+            unmount();
+        } finally {
+            BODY["/api/pipeline"] = pipeline;
+        }
     });
 });
 

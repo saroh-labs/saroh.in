@@ -11,6 +11,7 @@ import { Inbox, Settings2 } from "lucide-react";
 import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { PipelineBoardStart } from "@/components/crm/pipeline-board-start";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
+import { LeadsCapNote } from "@/components/leads/leads-container";
 import { LeadsViewSwitch } from "@/components/leads/leads-view-switch";
 import { StagesDialog } from "@/components/leads/stages-dialog";
 import { PageLoading } from "@/components/shared/page/page-loading";
@@ -255,6 +256,7 @@ export function PipelineContainer({
                     );
                 })}
             </div>
+            <LeadsCapNote count={leads.length} />
         </>
     );
 }

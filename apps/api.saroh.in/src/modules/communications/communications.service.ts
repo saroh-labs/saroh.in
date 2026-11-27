@@ -473,6 +473,7 @@ export class CommunicationsService {
     /**
      * List the org's consents, optionally scoped to one contact. `consent:read`.
      * When a `contactId` is given it must belong to the org (404 otherwise).
+     * The newest `LIST_LIMIT`; one contact has one per channel.
      */
     async listConsents(
         ctx: OrganizationContext,
@@ -488,6 +489,7 @@ export class CommunicationsService {
                 ...(contactId ? { contactId } : {}),
             },
             orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
         });
     }
 

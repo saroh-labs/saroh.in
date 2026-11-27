@@ -10,6 +10,7 @@ import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 import { IANAZone } from "luxon";
 
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import type { PricedItem, PriceHistoryPage } from "../audit/price-history";
@@ -841,8 +842,8 @@ export class BookingsService {
     // ── Bookings (management) ──────────────────────────────────────────────
 
     /**
-     * List the org's bookings (optionally for one service), newest slot first.
-     * `booking:read`.
+     * List the org's bookings (optionally for one service), newest slot first,
+     * at most `LIST_LIMIT`. `booking:read`.
      *
      * The linked Contact travels with each row. A booking's `bookerName` is only
      * populated when someone typed one into the public form, so the management
@@ -873,6 +874,8 @@ export class BookingsService {
             // and read one booking at a time behind its gate.
             omit: { intakeNote: true },
             orderBy: { startAt: "desc" },
+            // The newest LIST_LIMIT slots; the calendar reads by date range.
+            take: LIST_LIMIT,
             include: {
                 contact: {
                     select: {
