@@ -116,6 +116,7 @@ export function LeadsContainer({
                             leads={view.leads}
                             currency={currency}
                             initialView={initialView}
+                            tasks={view.tasks}
                         />
                         <LeadsCapNote count={view.leads.length} />
                     </>

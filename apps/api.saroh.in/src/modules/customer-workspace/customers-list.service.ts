@@ -30,6 +30,8 @@ import {
 } from "./customers-list.sql";
 import type { AttentionKind } from "./dto";
 import { normaliseEmail } from "./duplicates";
+import { owesRowsSql, unpaidOrderSql } from "./owes.sql";
+import { orderRefundedSql } from "./spent.sql";
 
 /**
  * The Customers list (DEC-041, C3): one list for the whole business, keyed
@@ -40,8 +42,10 @@ import { normaliseEmail } from "./duplicates";
  * - the person — name, phone, email, offers, Needs attention — with
  *   `contact:read`, which the list itself needs;
  * - their orders — count, last order, where, open — with `order:read`;
- * - "Spent", which sums orders and invoices, with both `order:read` and
- *   `invoice:read`;
+ * - their orders without amounts (count, last order, open) also with
+ *   `order:stage`, a Member at the counter (DEC-024, DEC-275);
+ * - "Paid" (`spent`), which sums orders and invoices, and "Owes"
+ *   (`owes.sql.ts`), with both `order:read` and `invoice:read`;
  * - whether they subscribe, with `subscription:read`.
  * A part the viewer may not read is left out of the row, never sent as a
  * zero, and its chip and sort are refused.
@@ -88,6 +92,21 @@ export interface CustomerRow {
     };
     /** With `order:read` and `invoice:read`: per currency, zeros left out. */
     spent?: MoneyTotal[];
+    /**
+     * What they still owe (DEC-275, `owes.sql.ts`): unpaid orders and
+     * invoices, per currency, zeros left out. With `spent`'s reads.
+     */
+    owes?: MoneyTotal[];
+    /**
+     * A paying store customer no contact holds yet (DEC-275): `contactId`
+     * is then the store customer's id, there is no person page, and Link
+     * joins them to `holder`, the contact that holds their email.
+     */
+    unlinked?: {
+        customerId: string;
+        storefront: { id: string; name: string } | null;
+        holder: UnlinkedCustomer["holder"];
+    };
     /** A live subscription; with `subscription:read`. */
     subscriber?: boolean;
 }
@@ -100,7 +119,10 @@ export interface CustomersPage {
     total: number;
     page: number;
     pageSize: number;
-    /** Every customer the business has, before any search or filter. */
+    /**
+     * Every customer the business has, before any search or filter; the
+     * unlinked payers are counted apart, in `unlinkedPaying`.
+     */
     everyone: number;
     /**
      * Per chip, under the search and storefront but not the chip. A chip
@@ -118,6 +140,21 @@ export interface CustomersPage {
     sees: { orders: boolean; spent: boolean; subscriptions: boolean };
     sort: CustomerSort;
     chip: CustomerChip;
+}
+
+/** What a chip or sort needs: an action, or `orders` (`order:read` or `order:stage`). */
+type Need = OrgAction | "orders";
+
+function holds(ctx: OrganizationContext, need: Need): boolean {
+    return need === "orders"
+        ? allows(ctx, "order:read") || allows(ctx, "order:stage")
+        : allows(ctx, need);
+}
+
+function requireNeed(ctx: OrganizationContext, need: Need): void {
+    if (!holds(ctx, need)) {
+        requireCustomerPower(ctx, need === "orders" ? "order:read" : need);
+    }
 }
 
 export interface UnlinkedCustomer {
@@ -145,17 +182,19 @@ export interface UnlinkedPage {
 }
 
 /** What a chip needs beyond `contact:read`. */
-const CHIP_NEEDS: Record<CustomerChip, readonly OrgAction[]> = {
+const CHIP_NEEDS: Record<CustomerChip, readonly Need[]> = {
     all: [],
-    returning: ["order:read"],
+    returning: ["orders"],
     subscribers: ["subscription:read"],
-    open: ["order:read"],
+    open: ["orders"],
     offers: [],
     attention: [],
+    owes: ["order:read", "invoice:read"],
+    unlinked: [],
 };
 
-const SORT_NEEDS: Record<CustomerSort, readonly OrgAction[]> = {
-    last: ["order:read"],
+const SORT_NEEDS: Record<CustomerSort, readonly Need[]> = {
+    last: ["orders"],
     spent: ["order:read", "invoice:read"],
     name: [],
 };
@@ -176,6 +215,8 @@ interface PeopleRow {
     offers: boolean;
     /** Absent from a test double that predates C14. */
     added_by_hand?: boolean;
+    /** A paying store customer no contact holds (DEC-275); absent before it. */
+    unlinked?: boolean;
 }
 
 function personName(p: {
@@ -200,6 +241,28 @@ function totals(
         .map(([currency, minor]) => ({ currency, amount: fromMinor(minor) }));
 }
 
+/** Per-id totals from rows of an id, a currency and an amount. */
+function groupTotals(
+    rows: {
+        contactId: string;
+        currency: string;
+        amount: { toString(): string } | null;
+    }[],
+): Map<string, MoneyTotal[]> {
+    const by = new Map<
+        string,
+        { currency: string; amount: { toString(): string } | null }[]
+    >();
+    for (const r of rows) {
+        const list = by.get(r.contactId) ?? [];
+        list.push(r);
+        by.set(r.contactId, list);
+    }
+    const out = new Map<string, MoneyTotal[]>();
+    for (const [id, list] of by) out.set(id, totals(list));
+    return out;
+}
+
 @Injectable()
 export class CustomersListService {
     constructor(@Optional() private readonly db: typeof prisma = prisma) {}
@@ -211,15 +274,15 @@ export class CustomersListService {
         requireCustomerPower(ctx, "contact:read");
         const organizationId = ctx.organizationId;
         const sees = {
-            orders: allows(ctx, "order:read"),
+            orders: holds(ctx, "orders"),
             spent: allows(ctx, "order:read") && allows(ctx, "invoice:read"),
             subscriptions: allows(ctx, "subscription:read"),
         };
         const invoicesToo = allows(ctx, "invoice:read");
         const chip = query.chip ?? "all";
         const sort = query.sort ?? (sees.orders ? "last" : "name");
-        for (const action of [...CHIP_NEEDS[chip], ...SORT_NEEDS[sort]]) {
-            requireCustomerPower(ctx, action);
+        for (const need of [...CHIP_NEEDS[chip], ...SORT_NEEDS[sort]]) {
+            requireNeed(ctx, need);
         }
         // "Bought at" is about orders; a storefront of another business is
         // a 404, as every cross-tenant id.
@@ -237,7 +300,7 @@ export class CustomersListService {
         });
         const matches = matchesSql(query.q, query.store);
         const usable = CUSTOMER_CHIPS.filter((c) =>
-            CHIP_NEEDS[c].every((a) => allows(ctx, a)),
+            CHIP_NEEDS[c].every((n) => holds(ctx, n)),
         );
         const countColumns = usable.map(
             (c) =>
@@ -250,14 +313,15 @@ export class CustomersListService {
                     SELECT m.id, m."firstName", m."lastName", m.email, m.phone,
                         m.account_email, m.orders, m.paid_orders,
                         m.open_orders, m.last_order_at, m.paid_invoices,
-                        m.subscriber, m.offers, m.added_by_hand
+                        m.subscriber, m.offers, m.added_by_hand, m.unlinked
                     FROM m
                     WHERE ${matches} AND ${chipSql(chip, invoicesToo)}
                     ORDER BY ${orderBySql(sort)}
                     LIMIT ${size}
                     OFFSET ${(page - 1) * size}`,
                 this.db.$queryRaw<Record<string, number>[]>`${cte}
-                    SELECT COUNT(*)::int AS everyone, ${Prisma.join(countColumns)}
+                    SELECT (COUNT(*) FILTER (WHERE NOT m.unlinked))::int AS everyone,
+                        ${Prisma.join(countColumns)}
                     FROM m`,
                 this.unlinkedCount(organizationId, query.store),
                 sees.orders
@@ -270,13 +334,23 @@ export class CustomersListService {
             ],
         );
 
-        const ids = rows.map((r) => r.id);
-        const [attention, duplicates, spent, lastStores] = await Promise.all([
-            attentionFor(ctx, ids, this.db),
-            possibleDuplicates(this.db, organizationId, ids),
-            sees.spent ? this.spentFor(organizationId, ids) : undefined,
-            sees.orders ? this.lastStorefronts(organizationId, ids) : undefined,
-        ]);
+        const ids = rows.filter((r) => !r.unlinked).map((r) => r.id);
+        const payers = rows.filter((r) => r.unlinked);
+        const [attention, duplicates, spent, owes, lastStores, unlinked] =
+            await Promise.all([
+                attentionFor(ctx, ids, this.db),
+                possibleDuplicates(this.db, organizationId, ids),
+                sees.spent ? this.spentFor(organizationId, ids) : undefined,
+                sees.spent ? this.owesFor(organizationId, ids) : undefined,
+                sees.orders
+                    ? this.lastStorefronts(organizationId, ids)
+                    : undefined,
+                this.unlinkedParts(
+                    organizationId,
+                    payers.map((r) => ({ id: r.id, email: r.email })),
+                    sees.spent,
+                ),
+            ]);
 
         const countsOut: CustomerChipCounts = {};
         // COUNT always answers one row.
@@ -313,7 +387,19 @@ export class CustomersListService {
                     };
                 }
                 if (spent) row.spent = spent.get(r.id) ?? [];
+                if (owes) row.owes = owes.get(r.id) ?? [];
                 if (sees.subscriptions) row.subscriber = r.subscriber;
+                const payer = r.unlinked ? unlinked.get(r.id) : undefined;
+                if (payer) {
+                    row.unlinked = payer.unlinked;
+                    if (sees.orders && row.orders) {
+                        row.orders.lastStorefront = payer.unlinked.storefront;
+                    }
+                    if (sees.spent) {
+                        row.spent = payer.spent;
+                        row.owes = payer.owes;
+                    }
+                }
                 return row;
             }),
             total: countsOut[chip] ?? 0,
@@ -449,16 +535,116 @@ export class CustomersListService {
         >`SELECT s."contactId", s.currency, SUM(s.amount) AS amount
             FROM (${spentRowsSql(organizationId, contactIds)}) s
             GROUP BY s."contactId", s.currency`;
-        const by = new Map<
+        return groupTotals(rows);
+    }
+
+    /** "Owes" per contact and currency (`owes.sql.ts`, DEC-275). */
+    private async owesFor(
+        organizationId: string,
+        contactIds: string[],
+    ): Promise<Map<string, MoneyTotal[]>> {
+        const out = new Map<string, MoneyTotal[]>();
+        if (contactIds.length === 0) return out;
+        const rows = await this.db.$queryRaw<
+            {
+                contactId: string;
+                currency: string;
+                amount: { toString(): string } | null;
+            }[]
+        >`SELECT w."contactId", w.currency, SUM(w.amount) AS amount
+            FROM (${owesRowsSql(organizationId, { contactIds, orders: true, invoices: true })}) w
+            GROUP BY w."contactId", w.currency`;
+        return groupTotals(rows);
+    }
+
+    /**
+     * For the unlinked payers on a page (DEC-275): where they paid, the
+     * contact that holds their email (to link them to), and with money
+     * reads what their own orders paid and still owe.
+     */
+    private async unlinkedParts(
+        organizationId: string,
+        payers: { id: string; email: string }[],
+        money: boolean,
+    ): Promise<
+        Map<
             string,
-            { currency: string; amount: { toString(): string } | null }[]
+            {
+                unlinked: NonNullable<CustomerRow["unlinked"]>;
+                spent: MoneyTotal[];
+                owes: MoneyTotal[];
+            }
+        >
+    > {
+        const out = new Map<
+            string,
+            {
+                unlinked: NonNullable<CustomerRow["unlinked"]>;
+                spent: MoneyTotal[];
+                owes: MoneyTotal[];
+            }
         >();
-        for (const r of rows) {
-            const list = by.get(r.contactId) ?? [];
-            list.push(r);
-            by.set(r.contactId, list);
+        if (payers.length === 0) return out;
+        const ids = payers.map((p) => p.id);
+        const [customers, holders, moneyRows] = await Promise.all([
+            this.db.customer.findMany({
+                where: { id: { in: ids }, store: { organizationId } },
+                select: {
+                    id: true,
+                    store: { select: { id: true, name: true } },
+                },
+            }),
+            this.holders(
+                organizationId,
+                payers.map((p) => p.email),
+            ),
+            money
+                ? this.db.$queryRaw<
+                      {
+                          customerId: string;
+                          currency: string;
+                          paid: { toString(): string } | null;
+                          owes: { toString(): string } | null;
+                      }[]
+                  >`SELECT o."customerId", o.currency,
+                        SUM(CASE WHEN o."paymentStatus" = 'PAID'
+                            THEN GREATEST(o.total - ${orderRefundedSql(organizationId)}, 0) END) AS paid,
+                        SUM(CASE WHEN ${unpaidOrderSql()} THEN o.total END) AS owes
+                    FROM "Order" o
+                    WHERE o."organizationId" = ${organizationId}
+                      AND o."customerId" = ANY(${ids}::text[])
+                    GROUP BY o."customerId", o.currency`
+                : Promise.resolve([]),
+        ]);
+        const storeOf = new Map(customers.map((c) => [c.id, c.store]));
+        const paid = groupTotals(
+            moneyRows.map((r) => ({
+                contactId: r.customerId,
+                currency: r.currency,
+                amount: r.paid,
+            })),
+        );
+        const owed = groupTotals(
+            moneyRows.map((r) => ({
+                contactId: r.customerId,
+                currency: r.currency,
+                amount: r.owes,
+            })),
+        );
+        for (const p of payers) {
+            // Only a store of this business: the order read already holds it.
+            if (!storeOf.has(p.id)) continue;
+            const email = normaliseEmail(p.email);
+            out.set(p.id, {
+                unlinked: {
+                    customerId: p.id,
+                    storefront: storeOf.get(p.id) ?? null,
+                    holder: (email ? holders.get(email) : undefined) ?? null,
+                },
+                spent: paid.get(p.id) ?? [],
+                owes: owed.get(p.id) ?? [],
+            });
         }
-        for (const [id, list] of by) out.set(id, totals(list));
         return out;
     }
 

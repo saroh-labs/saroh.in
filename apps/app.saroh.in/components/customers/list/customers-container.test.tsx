@@ -150,3 +150,80 @@ describe("Customers before its first page", () => {
         unmount();
     });
 });
+
+describe("everyone who paid (DEC-275)", () => {
+    it("counts both in the header, and an unlinked payer is a row with Link", async () => {
+        const view = structuredClone(VIEW);
+        view.page.everyone = 1;
+        view.page.unlinkedPaying = 292;
+        Object.assign(view.page.rows[0], {
+            phone: "+919876543210",
+            spent: [{ currency: "INR", amount: "18400.00" }],
+            owes: [{ currency: "INR", amount: "2150.00" }],
+        });
+        view.page.rows.push({
+            contactId: "cu1",
+            name: "Meera Nair",
+            email: "meera@example.com",
+            phone: null,
+            signsIn: false,
+            possibleDuplicate: false,
+            offers: false,
+            attention: [],
+            hiddenSensitiveCount: 0,
+            ...{
+                orders: {
+                    count: 3,
+                    open: 0,
+                    lastAt: null,
+                    lastStorefront: null,
+                },
+                spent: [{ currency: "INR", amount: "6720.00" }],
+                owes: [],
+                unlinked: {
+                    customerId: "cu1",
+                    storefront: { id: "s1", name: "Hill Road" },
+                    holder: {
+                        contactId: "c9",
+                        name: "Meera N",
+                        email: "meera@example.com",
+                    },
+                },
+            },
+        });
+        vi.stubGlobal(
+            "fetch",
+            vi.fn((url: string) =>
+                Promise.resolve(
+                    new Response(
+                        JSON.stringify(
+                            url.startsWith("/api/customers/requests")
+                                ? { rows: [] }
+                                : view,
+                        ),
+                        { status: 200 },
+                    ),
+                ),
+            ),
+        );
+        const { host, unmount } = open();
+        await tick(50);
+        const text = host.textContent;
+        expect(text).toContain("1 customer · 292 waiting to be linked");
+        expect(text).not.toContain("No customers yet");
+        expect(text).toContain("Not linked");
+        expect(text).toContain("Paid for 3 orders");
+        expect(text).toContain("Owes ₹2,150");
+        expect(
+            host.querySelector('button[aria-label="Link Meera Nair"]'),
+        ).not.toBeNull();
+        // Paid and Owes, one rule on the list and the customer's page.
+        const head = Array.from(host.querySelectorAll("span")).map(
+            (s) => s.textContent,
+        );
+        expect(head).toContain("Paid");
+        expect(head).toContain("Owes");
+        expect(head).not.toContain("Spent");
+        unmount();
+    });
+});

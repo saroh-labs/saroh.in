@@ -1,5 +1,5 @@
 import { formatMoneyMajor, formatNumber } from "@/lib/format/money";
-import { count } from "@/lib/format/plural";
+import { count, plural } from "@/lib/format/plural";
 import { absentText } from "@saroh/ui/lib/absent";
 import { DEFAULT_PAGE_SIZE, readPageSize } from "@saroh/ui/lib/paging";
 
@@ -21,6 +21,9 @@ export const CUSTOMER_CHIPS = [
     "open",
     "offers",
     "attention",
+    // DEC-275: who owes money, and the people who paid but aren't linked.
+    "owes",
+    "unlinked",
 ] as const;
 export type CustomerChip = (typeof CUSTOMER_CHIPS)[number];
 
@@ -35,11 +38,13 @@ export const CHIP_LABEL: Record<CustomerChip, string> = {
     open: "Open order",
     offers: "Said yes to offers",
     attention: "Needs attention",
+    owes: "Owes money",
+    unlinked: "Not linked",
 };
 
 export const SORT_LABEL: Record<CustomerSort, string> = {
     last: "Last order, newest",
-    spent: "Spent, highest",
+    spent: "Paid, highest",
     name: "Name, A to Z",
 };
 
@@ -87,8 +92,21 @@ export interface CustomerRow {
         lastAt: string | null;
         lastStorefront: { id: string; name: string } | null;
     };
+    /** "Paid" (DEC-275): orders, invoices and memberships, net of refunds. */
     spent?: MoneyTotal[];
+    /** "Owes" (DEC-275): unpaid orders and invoices. With `spent`'s reads. */
+    owes?: MoneyTotal[];
     subscriber?: boolean;
+    /**
+     * Paid, but no contact holds them yet (DEC-275): `contactId` is the
+     * store customer's id and there is no person page. Link joins them to
+     * `holder`, the contact that holds their email.
+     */
+    unlinked?: {
+        customerId: string;
+        storefront: { id: string; name: string } | null;
+        holder: UnlinkedCustomer["holder"];
+    };
 }
 
 export interface CustomersPage {
@@ -230,20 +248,32 @@ export function apiSearch(query: ListQuery): string {
     return s.toString();
 }
 
-/** What a chip or sort needs beyond `contact:read` (C3's rules). */
+/**
+ * What a chip or sort needs beyond `contact:read` (C3's rules). `orders`
+ * is `order:read` or `order:stage`: a Member at the counter sees orders
+ * without amounts (DEC-024, DEC-275).
+ */
 const CHIP_NEEDS: Record<CustomerChip, readonly string[]> = {
     all: [],
-    returning: ["order:read"],
+    returning: ["orders"],
     subscribers: ["subscription:read"],
-    open: ["order:read"],
+    open: ["orders"],
     offers: [],
     attention: [],
+    owes: ["order:read", "invoice:read"],
+    unlinked: [],
 };
 const SORT_NEEDS: Record<CustomerSort, readonly string[]> = {
-    last: ["order:read"],
+    last: ["orders"],
     spent: ["order:read", "invoice:read"],
     name: [],
 };
+
+function mayNeed(may: (action: string) => boolean, need: string): boolean {
+    return need === "orders"
+        ? may("order:read") || may("order:stage")
+        : may(need);
+}
 
 /**
  * The address, trimmed to what this viewer may ask. The API answers a chip,
@@ -266,7 +296,8 @@ export function allowedQuery(
     query: ListQuery,
     may: (action: string) => boolean,
 ): ListQuery {
-    const ok = (needs: readonly string[]) => needs.every(may);
+    const ok = (needs: readonly string[]) =>
+        needs.every((n) => mayNeed(may, n));
     return {
         ...query,
         chip: ok(CHIP_NEEDS[query.chip]) ? query.chip : "all",
@@ -280,10 +311,14 @@ export function allowedQuery(
  * as the API will answer them (a chip's count comes with the page).
  */
 export function chipsAllowed(may: (action: string) => boolean): CustomerChip[] {
-    return CUSTOMER_CHIPS.filter((c) => CHIP_NEEDS[c].every(may));
+    return CUSTOMER_CHIPS.filter((c) =>
+        CHIP_NEEDS[c].every((n) => mayNeed(may, n)),
+    );
 }
 export function sortsAllowed(may: (action: string) => boolean): CustomerSort[] {
-    return CUSTOMER_SORTS.filter((s) => SORT_NEEDS[s].every(may));
+    return CUSTOMER_SORTS.filter((s) =>
+        SORT_NEEDS[s].every((n) => mayNeed(may, n)),
+    );
 }
 
 /** Whether anything narrows the list (for which empty state to show). */
@@ -319,6 +354,32 @@ export function sortsFor(page: CustomersPage): CustomerSort[] {
 /** "1 customer", "1,204 customers". */
 export function customersText(n: number): string {
     return count(n, "customer");
+}
+
+/**
+ * The header's count, the whole truth (DEC-275): "28 customers · 292
+ * waiting to be linked". Null when there is nobody at all.
+ */
+export function headerCount(page: {
+    everyone: number;
+    unlinkedPaying: number;
+}): { customers: string | null; waiting: string | null } | null {
+    if (page.everyone <= 0 && page.unlinkedPaying <= 0) return null;
+    return {
+        customers: page.everyone > 0 ? customersText(page.everyone) : null,
+        waiting:
+            page.unlinkedPaying > 0
+                ? page.everyone > 0
+                    ? `${formatNumber(page.unlinkedPaying)} waiting to be linked`
+                    : `${count(page.unlinkedPaying, "person", "people")} ${plural(page.unlinkedPaying, "has", "have")} paid you · none linked yet`
+                : null,
+    };
+}
+
+/** "Owes ₹2,150", or null when they owe nothing (or it isn't read). */
+export function owesText(owes: MoneyTotal[] | undefined): string | null {
+    if (!owes || owes.length === 0) return null;
+    return `Owes ${spentText(owes)}`;
 }
 
 /** "Showing 51–100 of 120". */

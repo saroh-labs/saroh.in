@@ -15,6 +15,8 @@ jest.mock("@saroh/database", () => {
     const contact = { findUnique: jest.fn(), upsert: jest.fn() };
     const stage = { findUnique: jest.fn() };
     const activity = {
+        // The list's last-contact read (DEC-277); empty unless a test sets it.
+        groupBy: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),

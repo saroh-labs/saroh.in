@@ -248,14 +248,8 @@ export function AttentionCard({
                             read {plural(state.hiddenCount, "it", "them")}.
                         </p>
                     ) : null}
-                    {!canWrite ? (
-                        <p
-                            data-ph-unmask=""
-                            className="mt-2.5 text-[11.5px] text-muted-foreground"
-                        >
-                            Your role can read this but not change their record.
-                        </p>
-                    ) : null}
+                    {/* A role that only reads is told once, in the page's
+                        header (DEC-276), not again here. */}
                 </>
             )}
         </section>

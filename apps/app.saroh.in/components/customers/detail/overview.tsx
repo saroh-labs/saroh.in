@@ -67,6 +67,27 @@ export function Overview({
     // list: the card is left out rather than drawn empty.
     const usual = favourites(rows);
     const saved = addressLine(d.contact);
+    // The bookings card only for someone who has booked (DEC-276); a read
+    // that failed still says so.
+    const booked =
+        d.bookings === null ||
+        (d.bookings !== undefined &&
+            (d.bookings.upcoming.length > 0 ||
+                d.bookings.past.length > 0 ||
+                (d.stats.bookings ?? 0) > 0));
+    const classes = d.stats.classesLeft !== undefined;
+    const bookingsBlock =
+        d.bookings !== undefined && (classes || booked) ? (
+            <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))]">
+                {classes ? (
+                    <ClassesLeft d={d} now={now} onSell={onSellPack} />
+                ) : null}
+                {booked ? (
+                    <NextBooking d={d} now={now} onAll={onBookings} />
+                ) : null}
+            </div>
+        ) : null;
+    const buysFirst = orders && rows.length > 0;
     return (
         <div className="flex flex-col gap-4">
             {attention}
@@ -89,14 +110,9 @@ export function Overview({
                     <div className="text-[13.5px] leading-[1.5]">{saved}</div>
                 </section>
             ) : null}
-            {d.bookings !== undefined ? (
-                <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))]">
-                    {d.stats.classesLeft !== undefined ? (
-                        <ClassesLeft d={d} now={now} onSell={onSellPack} />
-                    ) : null}
-                    <NextBooking d={d} now={now} onAll={onBookings} />
-                </div>
-            ) : null}
+            {/* Where they buy as well as book, what they buy comes first,
+                so a shop's customer never opens on a bookings card (DEC-276). */}
+            {buysFirst ? null : bookingsBlock}
             {orders && rows.length > 0 ? (
                 <>
                     <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr))]">
@@ -161,6 +177,7 @@ export function Overview({
                     </div>
                 </>
             ) : null}
+            {buysFirst ? bookingsBlock : null}
             {d.consent ? (
                 <section className={CARD} aria-label="Offers and news">
                     <div data-ph-unmask="" className={cn(LABEL, "mb-1.5")}>

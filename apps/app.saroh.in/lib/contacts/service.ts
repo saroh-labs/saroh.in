@@ -46,6 +46,16 @@ export interface ContactListItem extends Contact {
     openLeadCount: number;
     /** ISO start of the next confirmed booking, or null. */
     nextBookingAt: string | null;
+    /**
+     * Their last visit (DEC-277): the latest confirmed booking that has
+     * started and wasn't a no-show. Absent from an API before it.
+     */
+    lastVisitAt?: string | null;
+    /**
+     * What they still owe (DEC-275), per currency in major units; absent
+     * for a role that reads neither orders nor invoices.
+     */
+    owes?: { currency: string; amount: string }[];
     /** ISO instant of the most recent order, or null. */
     lastOrderAt: string | null;
     /** That order's total in MAJOR units as a decimal string, and its currency. */

@@ -39,6 +39,8 @@ async function firstCustomers(page: Page, org: string, query = "") {
             contactId: string;
             name: string | null;
             email: string | null;
+            /** A payer no contact holds yet (DEC-275): no person page. */
+            unlinked?: unknown;
         }[];
         everyone: number;
         unlinkedPaying: number;
@@ -60,9 +62,10 @@ test.describe("customers list", () => {
         await expect(
             page.getByRole("heading", { name: "Customers", level: 1 }),
         ).toBeVisible();
-        test.skip(api.rows.length === 0, "Rye has no customer rows");
+        const linked = api.rows.filter((r) => !r.unlinked);
+        test.skip(linked.length === 0, "Rye has no linked customer rows");
 
-        const someone = api.rows[0];
+        const someone = linked[0];
         const name = someone.name ?? someone.email ?? "";
         await page
             .getByRole("searchbox", { name: "Search customers" })
@@ -80,7 +83,7 @@ test.describe("customers list", () => {
         await expect(show).toContainText("Returning");
 
         await page.getByRole("combobox", { name: "Sort" }).click();
-        await page.getByRole("option", { name: "Spent, highest" }).click();
+        await page.getByRole("option", { name: "Paid, highest" }).click();
         await expect(page).toHaveURL(/sort=spent/);
 
         // Clear back to everyone, then open the person.
@@ -115,32 +118,36 @@ test.describe("customers list", () => {
         await expect(page).toHaveURL(/\/commerce\/customers$/);
     });
 
-    test("unlinked paying customers are named, and Review lists them", async ({
+    test("unlinked paying customers are rows, counted in the header", async ({
         page,
     }) => {
+        // DEC-275: everyone who paid is a row; the header counts both.
         await signIn(page, NORTHWIND);
         const api = await firstCustomers(page, NORTHWIND);
         test.skip(api.unlinkedPaying === 0, "Every paying customer is linked");
         await page.goto("/commerce/customers");
-        const notice = page.getByText(
-            /paying customers? (aren't|isn't) linked to a contact yet/,
-        );
-        await expect(notice).toBeVisible();
-        await page.getByRole("button", { name: "Review" }).click();
-        const sheet = page.getByRole("dialog", {
-            name: "Paying customers to link",
-        });
-        await expect(sheet).toBeVisible();
-        await expect(sheet.getByRole("listitem").first()).toBeVisible();
+        await expect(page.getByText("No customers yet")).toHaveCount(0);
+        if (api.everyone > 0) {
+            await page
+                .getByRole("button", { name: /waiting to be linked$/ })
+                .click();
+            await expect(page).toHaveURL(/chip=unlinked/);
+        } else {
+            await expect(
+                page.getByRole("button", { name: "Review one by one" }),
+            ).toBeVisible();
+        }
+        await expect(page.getByText("Not linked").first()).toBeVisible();
     });
 
-    test("a Member without invoices sees no Spent", async ({ page }) => {
+    test("a Member without invoices sees no Paid or Owes", async ({ page }) => {
         await signIn(page, RYE, "member");
         await page.goto("/commerce/customers");
         await expect(
             page.getByRole("heading", { name: "Customers", level: 1 }),
         ).toBeVisible();
-        await expect(page.getByText("Spent", { exact: true })).toHaveCount(0);
+        await expect(page.getByText("Paid", { exact: true })).toHaveCount(0);
+        await expect(page.getByText("Owes", { exact: true })).toHaveCount(0);
         await expect(page.getByRole("main")).not.toContainText("₹");
     });
 

@@ -26,13 +26,14 @@ import { useCustomerSave } from "@/lib/customers/use-customers";
 import { TextLink } from "@saroh/ui/text-link";
 
 /**
- * "12 paying customers aren't linked to a contact yet · Review" (C4).
+ * "12 paying customers aren't linked to a contact yet · Review one by one"
+ * (C4, DEC-275).
  *
  * C2 made a contact for every paying store customer — except where a
  * contact already held their email, because linking silently is what #120
- * refused. Those people aren't rows yet, so the list names them rather than
- * quietly showing fewer customers than there are. The notice goes when the
- * count reaches zero.
+ * refused. They are rows on the list, tagged Not linked (DEC-275); while
+ * nobody is linked yet this one card offers the review. The notice goes
+ * when the count reaches zero.
  */
 export function UnlinkedNotice({
     count,
@@ -59,12 +60,12 @@ export function UnlinkedNotice({
                         onClick={() => setOpen(true)}
                         className="shrink-0"
                     >
-                        Review
+                        Review one by one
                     </Button>
                 }
             >
-                {unlinkedText(count)}. Until they are, they aren&apos;t in this
-                list.
+                {unlinkedText(count)}. Linking gives each one a page with their
+                orders, what they owe and how to reach them.
             </PartialNotice>
             <UnlinkedSheet
                 open={open}

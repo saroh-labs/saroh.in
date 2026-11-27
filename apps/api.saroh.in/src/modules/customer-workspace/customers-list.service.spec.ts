@@ -78,6 +78,21 @@ function make(people: Record<string, unknown>[] = [PERSON]) {
                 { contactId: "c1", id: "s1", name: "Hill Road" },
             ]);
         }
+        if (sql.includes("SUM(w.amount)")) {
+            return Promise.resolve([
+                { contactId: "c1", currency: "INR", amount: "300.00" },
+            ]);
+        }
+        if (sql.includes('o."customerId", o.currency')) {
+            return Promise.resolve([
+                {
+                    customerId: "cu1",
+                    currency: "INR",
+                    paid: "6720",
+                    owes: null,
+                },
+            ]);
+        }
         if (sql.includes("SELECT m.id")) return Promise.resolve(people);
         return Promise.resolve([]);
     });
@@ -90,6 +105,13 @@ function make(people: Record<string, unknown>[] = [PERSON]) {
                 .mockResolvedValue([{ id: "s1", name: "Hill Road" }]),
         },
         contact: { findMany: jest.fn().mockResolvedValue([]) },
+        customer: {
+            findMany: jest
+                .fn()
+                .mockResolvedValue([
+                    { id: "cu1", store: { id: "s1", name: "Hill Road" } },
+                ]),
+        },
         contactAttention: {
             findMany: jest.fn().mockResolvedValue([]),
             groupBy: jest.fn().mockResolvedValue([]),
@@ -153,8 +175,79 @@ describe("CustomersListService.list", () => {
                 lastStorefront: { id: "s1", name: "Hill Road" },
             },
             spent: [{ currency: "INR", amount: "2050.00" }],
+            owes: [{ currency: "INR", amount: "300.00" }],
             subscriber: true,
         });
+    });
+
+    it("lists a paying store customer no contact holds, tagged and with their own figures (DEC-275)", async () => {
+        const { service, db } = make([
+            PERSON,
+            {
+                ...PERSON,
+                id: "cu1",
+                firstName: "Meera",
+                lastName: "Nair",
+                email: "meera@example.com",
+                subscriber: false,
+                offers: false,
+                paid_invoices: 0,
+                unlinked: true,
+            },
+        ]);
+        // Only the holder read: the duplicates' read asks for more.
+        db.contact.findMany.mockImplementation(
+            async (args: { select?: Record<string, unknown> }) =>
+                args.select?.unlinkedCustomerAccounts
+                    ? []
+                    : [
+                          {
+                              id: "c9",
+                              firstName: "Meera",
+                              lastName: "N",
+                              email: "meera@example.com",
+                              customerAccounts: [],
+                          },
+                      ],
+        );
+        const page = await service.list(ctx(EVERYTHING), {});
+        const payer = page.rows[1];
+        expect(payer.unlinked).toEqual({
+            customerId: "cu1",
+            storefront: { id: "s1", name: "Hill Road" },
+            holder: {
+                contactId: "c9",
+                name: "Meera N",
+                email: "meera@example.com",
+            },
+        });
+        expect(payer.spent).toEqual([{ currency: "INR", amount: "6720.00" }]);
+        expect(payer.owes).toEqual([]);
+        expect(payer.orders?.lastStorefront).toEqual({
+            id: "s1",
+            name: "Hill Road",
+        });
+        // The linked row is untouched by the payer beside it.
+        expect(page.rows[0]).not.toHaveProperty("unlinked");
+    });
+
+    it("gives a role that stages orders their orders without amounts (DEC-024)", async () => {
+        const { service } = make();
+        const page = await service.list(
+            ctx(["contact:read", "order:stage"]),
+            {},
+        );
+        expect(page.sees).toEqual({
+            orders: true,
+            spent: false,
+            subscriptions: false,
+        });
+        expect(page.sort).toBe("last");
+        expect(page.rows[0].orders).toMatchObject({ count: 3, open: 1 });
+        expect(page.rows[0]).not.toHaveProperty("spent");
+        expect(page.rows[0]).not.toHaveProperty("owes");
+        expect(page.counts).toHaveProperty("open");
+        expect(page.counts).not.toHaveProperty("owes");
     });
 
     it("says who was added on the list by hand (DEC-056, C14)", async () => {
@@ -190,6 +283,7 @@ describe("CustomersListService.list", () => {
             "all",
             "attention",
             "offers",
+            "unlinked",
         ]);
         expect(db.store.findMany).not.toHaveBeenCalled();
     });

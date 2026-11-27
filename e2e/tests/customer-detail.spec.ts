@@ -302,7 +302,9 @@ test.describe("customer detail", () => {
 });
 
 test.describe("customer detail, as a Member", () => {
-    test("a Member sees no billing tabs and no money", async ({ page }) => {
+    test("a Member sees their orders, no billing tabs and no money", async ({
+        page,
+    }) => {
         await signIn(page, RYE, "member");
         await page.goto(`/customers/${PRIYA}`);
         await expect(
@@ -321,8 +323,13 @@ test.describe("customer detail, as a Member", () => {
         // A Member reads no leads: no Leads or Enquiries tab.
         for (const name of [/^Leads/, /^Enquiries/])
             await expect(tab(page, name)).toHaveCount(0);
-        for (const name of [/^Invoices/, /^Subscriptions/, /^Orders/])
+        for (const name of [/^Invoices/, /^Subscriptions/])
             await expect(tab(page, name)).toHaveCount(0);
+        // A Member who hands orders over sees this customer's orders, with
+        // no amounts (DEC-276, DEC-024).
+        await expect(tab(page, /^Orders/)).toBeVisible();
+        await expect(page.getByRole("main")).not.toContainText("₹");
+        await tab(page, /^Orders/).click();
         await expect(page.getByRole("main")).not.toContainText("₹");
         await expect(
             page.getByRole("button", { name: "Edit details" }),
@@ -443,9 +450,11 @@ test.describe("needs attention", () => {
         // Reads, but can't change the record.
         const card = page.getByRole("region", { name: "Needs attention" });
         await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
-        await expect(card).toContainText(
-            "Your role can read this but not change their record.",
+        // Said once, in the header (DEC-276), not again on the card.
+        await expect(main).toContainText(
+            "Your role can see this customer but not edit them.",
         );
+        await expect(card).not.toContainText("Your role can");
     });
 
     test("an Owner sees the medical note by the name", async ({ page }) => {

@@ -194,7 +194,17 @@ export interface DetailStats {
         nextExpiry: string | null;
         allowance: MembershipAllowance | null;
     } | null;
+    /** "Paid" on screen (DEC-275): orders, invoices and memberships. */
     spent?: MoneyTotal[] | null;
+    /**
+     * What they still owe (DEC-275): unpaid orders and invoices, the
+     * Customers list's rule. Absent from an API before it.
+     */
+    owes?: {
+        totals: MoneyTotal[];
+        invoices: number;
+        orders: number;
+    } | null;
     owed?: {
         totals: MoneyTotal[];
         unpaidCount: number;

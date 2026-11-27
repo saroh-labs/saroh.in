@@ -19,6 +19,7 @@ import {
     howTheyGet,
     invoiceRow,
     kindOf,
+    leadLine,
     nextCredit,
     offersText,
     orderTiles,
@@ -427,7 +428,7 @@ describe("a shop customer's overview", () => {
         const tiles = orderTiles(shop(), NOW);
         expect(tiles.map((t) => [t.label, t.value, t.note])).toEqual([
             ["Orders", "2", "1 open, new"],
-            ["Spent", "₹1,500", "Including delivery"],
+            ["Paid", "₹1,500", "Including delivery"],
             ["Average order", "₹750", "Across 2 orders"],
             ["Last order", "Today", "12:44 pm at Rye & Co."],
         ]);
@@ -456,15 +457,43 @@ describe("a shop customer's overview", () => {
         ]);
     });
 
-    it("says what is still owed on the Spent tile", () => {
+    it("says what is still owed on the Paid tile", () => {
         const d = shop();
         d.stats.owed = {
             totals: [{ currency: "INR", amount: "300.00" }],
             unpaidCount: 1,
             overdueCount: 1,
         };
-        expect(orderTiles(d, NOW)[1].note).toBe("₹300 still owed");
+        expect(orderTiles(d, NOW)[1].note).toBe("Owes ₹300");
         expect(owedLine(d)).toBe("1 invoice unpaid · ₹300, some overdue");
+        // DEC-275: Owes counts unpaid orders too, the list's one rule.
+        d.stats.owes = {
+            totals: [{ currency: "INR", amount: "1050.00" }],
+            invoices: 1,
+            orders: 1,
+        };
+        expect(orderTiles(d, NOW)[1].note).toBe("Owes ₹1,050");
+    });
+
+    it("leads with what they owe, open orders and the last purchase (DEC-276)", () => {
+        const d = shop();
+        d.stats.owes = {
+            totals: [{ currency: "INR", amount: "2150.00" }],
+            invoices: 2,
+            orders: 0,
+        };
+        expect(leadLine(d, NOW)).toEqual({
+            owes: "Owes ₹2,150 on 2 invoices",
+            rest: "1 open order · last bought 23 Sep",
+        });
+        d.stats.owes = { totals: [], invoices: 0, orders: 0 };
+        expect(leadLine(d, NOW)?.owes).toBeNull();
+        expect(
+            leadLine(
+                shop({ orders: { from: "linked-customers", rows: [] } }),
+                NOW,
+            ),
+        ).toBeNull();
     });
 
     it("finds what they usually buy, and the size they take", () => {

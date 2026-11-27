@@ -15,8 +15,8 @@ import { useCallback } from "react";
 import { importCustomersHref, newCustomerHref } from "@/lib/customers/links";
 import type { CustomersPage, ListQuery } from "@/lib/customers/list";
 import {
-    customersText,
     emptyTitle,
+    headerCount,
     isNarrowed,
     listHref,
     pageText,
@@ -96,14 +96,32 @@ export function CustomersList({
         </>
     );
 
+    // The whole truth (DEC-275): those linked, and those who paid and wait.
+    const said = page ? headerCount(page) : null;
     const heading = (
         <>
             <ListHeading
                 count={
                     !page ? (
                         <FigureLoading />
-                    ) : page.everyone > 0 ? (
-                        customersText(page.everyone)
+                    ) : said ? (
+                        <>
+                            {said.customers}
+                            {said.customers && said.waiting ? " · " : null}
+                            {said.waiting && said.customers ? (
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    size="inline"
+                                    data-ph-unmask=""
+                                    onClick={() => go({ chip: "unlinked" })}
+                                >
+                                    {said.waiting}
+                                </Button>
+                            ) : (
+                                said.waiting
+                            )}
+                        </>
                     ) : null
                 }
                 actions={actions}
@@ -133,21 +151,28 @@ export function CustomersList({
         );
     }
 
-    const notice = (
-        <UnlinkedNotice
-            count={page.unlinkedPaying}
-            store={query.store}
-            canLink={canLink}
-        />
-    );
+    // Nobody linked yet, but people have paid (DEC-275): their rows, under
+    // the one card that offers to review them one by one. With some linked,
+    // the header's count and the Not linked view say it instead.
+    const notice =
+        page.everyone === 0 ? (
+            <UnlinkedNotice
+                count={page.unlinkedPaying}
+                store={query.store}
+                canLink={canLink}
+            />
+        ) : null;
 
-    // Nobody at all, and nothing narrowing: the one place "No customers
-    // yet" is true. Unlinked paying customers still get their notice.
-    if (page.everyone === 0 && !isNarrowed(query)) {
+    // Nobody has paid, signs in or was added, and nothing narrows: the one
+    // place "No customers yet" is true.
+    if (
+        page.everyone === 0 &&
+        page.unlinkedPaying === 0 &&
+        !isNarrowed(query)
+    ) {
         return (
             <div>
                 {heading}
-                {notice}
                 <ListFirstRun
                     contacts={contacts}
                     hasStorefront={stores.length > 0}
@@ -170,6 +195,7 @@ export function CustomersList({
             <PendingRegion pending={pending}>
                 <Rows
                     page={page}
+                    canLink={canLink}
                     empty={
                         <NoMatch
                             title={emptyTitle(query)}

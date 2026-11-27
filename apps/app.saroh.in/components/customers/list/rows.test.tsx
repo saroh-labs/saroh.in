@@ -7,6 +7,8 @@ import type { CustomersPage } from "@/lib/customers/list";
 
 import { Rows } from "./rows";
 
+// Link's Server Action (DEC-275) is never called here.
+vi.mock("@/lib/api/http", () => ({}));
 vi.mock("next/link", () => ({
     default: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));

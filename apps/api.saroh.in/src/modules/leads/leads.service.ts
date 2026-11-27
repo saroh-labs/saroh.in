@@ -9,7 +9,7 @@ import { prisma } from "@saroh/database";
 import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { enquiryEntriesFor } from "../forms/enquiry-entries";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { emitWebhook } from "../outbound-webhooks/emitter";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import type {
@@ -19,6 +19,16 @@ import type {
     MoveLeadDto,
     UpdateLeadDto,
 } from "./dto";
+
+/**
+ * When the team last did something with a lead by hand (DEC-277): a note,
+ * or a follow-up marked done. Saroh records no call or message on a lead,
+ * so this is what "last contact" can honestly say.
+ */
+export interface LeadLastContact {
+    at: Date;
+    kind: "NOTE" | "FOLLOW_UP";
+}
 
 /** Optional filters for the lead list. */
 export interface LeadListFilter {
@@ -55,7 +65,7 @@ export class LeadsService {
     async list(
         ctx: OrganizationContext,
         filter: LeadListFilter = {},
-    ): Promise<Lead[]> {
+    ): Promise<(Lead & { lastContact: LeadLastContact | null })[]> {
         authorize(ctx, "lead:read");
         const where = {
             organizationId: ctx.organizationId,
@@ -70,11 +80,63 @@ export class LeadsService {
                 take,
             });
         const open = await read("OPEN", LIST_LIMIT);
-        if (open.length >= LIST_LIMIT) return open;
-        const closed = await read({ not: "OPEN" }, LIST_LIMIT - open.length);
-        return [...open, ...closed].sort(
+        const closed =
+            open.length >= LIST_LIMIT
+                ? []
+                : await read({ not: "OPEN" }, LIST_LIMIT - open.length);
+        const leads = [...open, ...closed].sort(
             (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
         );
+        const last = await this.lastContacts(
+            ctx.organizationId,
+            leads.map((l) => l.id),
+        );
+        return leads.map((l) => ({
+            ...l,
+            lastContact: last.get(l.id) ?? null,
+        }));
+    }
+
+    /** Each lead's last note or follow-up done, in two aggregates. */
+    private async lastContacts(
+        organizationId: string,
+        leadIds: string[],
+    ): Promise<Map<string, LeadLastContact>> {
+        const out = new Map<string, LeadLastContact>();
+        if (leadIds.length === 0) return out;
+        const [notes, done] = await Promise.all([
+            prisma.activity.groupBy({
+                by: ["leadId"],
+                where: {
+                    organizationId,
+                    leadId: { in: leadIds },
+                    type: "NOTE",
+                },
+                _max: { createdAt: true },
+            }),
+            prisma.activity.groupBy({
+                by: ["leadId"],
+                where: {
+                    organizationId,
+                    leadId: { in: leadIds },
+                    type: "TASK",
+                    completedAt: { not: null },
+                },
+                _max: { completedAt: true },
+            }),
+        ]);
+        for (const n of notes) {
+            const at = n._max.createdAt;
+            if (at) out.set(n.leadId, { at, kind: "NOTE" });
+        }
+        for (const d of done) {
+            const at = d._max.completedAt;
+            const had = out.get(d.leadId);
+            if (at && (!had || at > had.at)) {
+                out.set(d.leadId, { at, kind: "FOLLOW_UP" });
+            }
+        }
+        return out;
     }
 
     /**
@@ -102,10 +164,40 @@ export class LeadsService {
         }
         // What they wrote, when the lead came from a form (UX-002): stored
         // on the submission and shown nowhere until now.
-        const enquiries = await enquiryEntriesFor(ctx.organizationId, {
-            leadId: lead.id,
-        });
-        return { ...lead, enquiries };
+        const [enquiries, nextBooking] = await Promise.all([
+            enquiryEntriesFor(ctx.organizationId, { leadId: lead.id }),
+            // Their next booking (DEC-277): a lead at "Trial booked" links
+            // the trial itself. With `booking:read` only.
+            lead.contactId && allows(ctx, "booking:read")
+                ? prisma.booking.findFirst({
+                      where: {
+                          organizationId: ctx.organizationId,
+                          contactId: lead.contactId,
+                          status: "CONFIRMED",
+                          startAt: { gte: new Date() },
+                      },
+                      orderBy: { startAt: "asc" },
+                      select: {
+                          id: true,
+                          startAt: true,
+                          timezone: true,
+                          service: { select: { name: true } },
+                      },
+                  })
+                : Promise.resolve(null),
+        ]);
+        return {
+            ...lead,
+            enquiries,
+            nextBooking: nextBooking
+                ? {
+                      id: nextBooking.id,
+                      startAt: nextBooking.startAt.toISOString(),
+                      timezone: nextBooking.timezone,
+                      service: nextBooking.service.name,
+                  }
+                : null,
+        };
     }
 
     /**

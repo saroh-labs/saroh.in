@@ -235,6 +235,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
      * A new `TabStrip` goes here with what its views are.
      */
     const VIEWS: Allow = {
+        "components/notifications/notifications-inbox.tsx":
+            "All and Bookings: booking events as a view of their own (DEC-278)",
         "components/settings/developers/developers-nav.tsx":
             "API and AI apps: AI assistants, keys, webhooks and usage, four pages",
         "components/class-packs/list/class-packs-tabs.tsx":

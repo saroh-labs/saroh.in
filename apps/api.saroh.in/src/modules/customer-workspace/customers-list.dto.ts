@@ -28,6 +28,9 @@ export const CUSTOMER_CHIPS = [
     "open",
     "offers",
     "attention",
+    // DEC-275: who owes money, and the paying people no contact holds yet.
+    "owes",
+    "unlinked",
 ] as const;
 export type CustomerChip = (typeof CUSTOMER_CHIPS)[number];
 
@@ -63,7 +66,8 @@ export class ListCustomersQueryDto {
     @IsOptional()
     @Transform(blankless)
     @IsIn(CUSTOMER_CHIPS, {
-        message: "Pick all, returning, subscribers, open, offers or attention.",
+        message:
+            "Pick all, returning, subscribers, open, offers, attention, owes or unlinked.",
     })
     chip?: CustomerChip;
 

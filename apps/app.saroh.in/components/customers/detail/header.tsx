@@ -10,7 +10,7 @@ import {
 import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Globe, MoreHorizontal } from "lucide-react";
+import { Globe, MoreHorizontal, Phone } from "lucide-react";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type { MoreItem } from "@/lib/customer-workspace/more-menu";
@@ -50,6 +50,8 @@ export function Header({
     onEdit,
     menu,
     starts = [],
+    unnamed = false,
+    lead = null,
 }: {
     /** The crumbs say Sell › Customers; otherwise Contacts. */
     sells: boolean;
@@ -75,7 +77,15 @@ export function Header({
      * on, are passed; none draws nothing.
      */
     starts?: { label: string; href: string }[];
+    /**
+     * No name was given (DEC-276): the heading says "No name" in body
+     * size, and the email under it says who, never a three-line address.
+     */
+    unnamed?: boolean;
+    /** The one line under the header: what they owe, open orders, last bought. */
+    lead?: React.ReactNode;
 }) {
+    const title = unnamed ? "No name" : name;
     return (
         <>
             <PageHeader
@@ -91,7 +101,7 @@ export function Header({
                               >
                                   Customers
                               </IntentLink>,
-                              name,
+                              title,
                           ]
                         : [
                               <IntentLink
@@ -101,7 +111,7 @@ export function Header({
                               >
                                   Contacts
                               </IntentLink>,
-                              name,
+                              title,
                           ]
                 }
                 lead={
@@ -114,7 +124,18 @@ export function Header({
                 }
                 // A long name wraps, however unbroken, and the tags beside
                 // it wrap under it — never off-screen.
-                title={name}
+                title={
+                    unnamed ? (
+                        <span
+                            data-ph-unmask=""
+                            className="text-[15px] font-semibold text-muted-foreground"
+                        >
+                            No name
+                        </span>
+                    ) : (
+                        name
+                    )
+                }
                 badge={
                     tag || attention ? (
                         <>
@@ -187,6 +208,18 @@ export function Header({
                 // button to its own line, full size, rather than shrink.
                 actions={
                     <>
+                        {/* How to reach them first (DEC-276): a tap calls. */}
+                        {phone?.trim() ? (
+                            <Button variant="outline" asChild>
+                                <a href={`tel:${phone.replace(/[^\d+]/g, "")}`}>
+                                    <Phone
+                                        aria-hidden
+                                        className="mr-1.5 size-4"
+                                    />
+                                    Call
+                                </a>
+                            </Button>
+                        ) : null}
                         {starts.map((s) => (
                             <Button key={s.href} variant="outline" asChild>
                                 <IntentLink href={s.href}>{s.label}</IntentLink>
@@ -236,6 +269,7 @@ export function Header({
                     </>
                 }
             />
+            {lead}
             {!canEdit ? (
                 <p
                     data-ph-unmask=""

@@ -7,11 +7,13 @@ import {
 import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { fromMinor, toMinor } from "../../common/money";
 import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { queueCalendarSyncInTx } from "../calendar-sync/queue-sync";
+import { owesRowsSql } from "../customer-workspace/owes.sql";
 import { enquiryEntriesFor } from "../forms/enquiry-entries";
 import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -72,6 +74,17 @@ export interface ContactListItem extends Contact {
     openLeadCount: number;
     /** The next confirmed booking's start, or null. */
     nextBookingAt: Date | null;
+    /**
+     * Their last visit (DEC-277): the latest confirmed booking that has
+     * started and wasn't a no-show, or null. With `booking:read`.
+     */
+    lastVisitAt: Date | null;
+    /**
+     * What they still owe (DEC-275, `owes.sql.ts`), per currency in major
+     * units: unpaid orders with `order:read`, unpaid invoices with
+     * `invoice:read`. Absent for a role that reads neither.
+     */
+    owes?: { currency: string; amount: string }[];
     /** When this person last bought, across every store in the org. */
     lastOrderAt: Date | null;
     /** That order's total, in MAJOR units as a decimal string, with its currency. */
@@ -164,12 +177,19 @@ export class ContactsService {
         if (contacts.length === 0) return [];
 
         const contactIds = contacts.map((c) => c.id);
-        const [leadsByContact, nextBookingByContact, lastOrderByContact] =
-            await Promise.all([
-                this.openLeadsByContact(ctx, contactIds),
-                this.nextBookingByContact(ctx, contactIds),
-                this.lastOrderByContact(ctx, contacts),
-            ]);
+        const [
+            leadsByContact,
+            nextBookingByContact,
+            lastOrderByContact,
+            lastVisitByContact,
+            owesByContact,
+        ] = await Promise.all([
+            this.openLeadsByContact(ctx, contactIds),
+            this.nextBookingByContact(ctx, contactIds),
+            this.lastOrderByContact(ctx, contacts),
+            this.lastVisitByContact(ctx, contactIds),
+            this.owesByContact(ctx, contactIds),
+        ]);
 
         return contacts.map(({ customerAccounts, ...contact }) => {
             const leads = leadsByContact.get(contact.id);
@@ -180,6 +200,10 @@ export class ContactsService {
                 openLeadValue: leads?.value ?? null,
                 openLeadCount: leads?.count ?? 0,
                 nextBookingAt: nextBookingByContact.get(contact.id) ?? null,
+                lastVisitAt: lastVisitByContact.get(contact.id) ?? null,
+                ...(owesByContact
+                    ? { owes: owesByContact.get(contact.id) ?? [] }
+                    : {}),
                 lastOrderAt: order?.at ?? null,
                 lastOrderTotal: order?.total ?? null,
                 lastOrderCurrency: order?.currency ?? null,
@@ -242,6 +266,69 @@ export class ContactsService {
             // an unlinked walk-in books without a Contact.
             const startAt = row._min.startAt;
             if (row.contactId && startAt) out.set(row.contactId, startAt);
+        }
+        return out;
+    }
+
+    /**
+     * The last visit per contact (DEC-277): the latest confirmed booking
+     * that has started and nobody marked a no-show, in one aggregate.
+     */
+    private async lastVisitByContact(
+        ctx: OrganizationContext,
+        contactIds: string[],
+    ): Promise<Map<string, Date>> {
+        const out = new Map<string, Date>();
+        if (!allows(ctx, "booking:read")) return out;
+        const rows = await prisma.booking.groupBy({
+            by: ["contactId"],
+            where: {
+                organizationId: ctx.organizationId,
+                contactId: { in: contactIds },
+                status: "CONFIRMED",
+                startAt: { lt: new Date() },
+                OR: [{ outcome: null }, { outcome: { not: "NO_SHOW" } }],
+            },
+            _max: { startAt: true },
+        });
+        for (const row of rows) {
+            const at = row._max.startAt;
+            if (row.contactId && at) out.set(row.contactId, at);
+        }
+        return out;
+    }
+
+    /**
+     * What each contact still owes (DEC-275), by the rule the Customers
+     * list and the customer's page read; undefined for a role that reads
+     * neither orders nor invoices.
+     */
+    private async owesByContact(
+        ctx: OrganizationContext,
+        contactIds: string[],
+    ): Promise<
+        Map<string, { currency: string; amount: string }[]> | undefined
+    > {
+        const orders = allows(ctx, "order:read");
+        const invoices = allows(ctx, "invoice:read");
+        if (!orders && !invoices) return undefined;
+        const rows = await prisma.$queryRaw<
+            {
+                contactId: string;
+                currency: string;
+                amount: { toString(): string } | null;
+            }[]
+        >`SELECT w."contactId", w.currency, SUM(w.amount) AS amount
+            FROM (${owesRowsSql(ctx.organizationId, { contactIds, orders, invoices })}) w
+            GROUP BY w."contactId", w.currency
+            ORDER BY w.currency`;
+        const out = new Map<string, { currency: string; amount: string }[]>();
+        for (const r of rows) {
+            const minor = r.amount == null ? 0 : toMinor(r.amount);
+            if (minor === 0) continue;
+            const list = out.get(r.contactId) ?? [];
+            list.push({ currency: r.currency, amount: fromMinor(minor) });
+            out.set(r.contactId, list);
         }
         return out;
     }

@@ -29,6 +29,7 @@ import {
     crumbsUnderSell,
     initials,
     kindOf,
+    leadLine,
     owedLine,
     sinceLine,
     tabsFor,
@@ -375,6 +376,11 @@ export function CustomerDetailScreen({
                     onEdit={more.edit}
                     menu={more.menu}
                     starts={starts}
+                    unnamed={
+                        !d.contact.firstName?.trim() &&
+                        !d.contact.lastName?.trim()
+                    }
+                    lead={<LeadLine d={d} now={now} />}
                 />
                 {dataRequest ? (
                     <RequestBanner
@@ -445,6 +451,28 @@ export function CustomerDetailScreen({
                 />
             ) : null}
         </>
+    );
+}
+
+/**
+ * What they owe and how they buy, in one line under the header (DEC-276):
+ * "Owes ₹2,150 on 2 invoices · 1 open order · last bought 21 Nov". Only
+ * what this viewer reads; nothing when there is nothing to say.
+ */
+function LeadLine({ d, now }: { d: CustomerDetail; now: Date }) {
+    const line = leadLine(d, now);
+    if (!line) return null;
+    return (
+        <p
+            data-ph-mask=""
+            className="mb-3 rounded-xl border border-border bg-card px-4 py-3 text-[13.5px]"
+        >
+            {line.owes ? (
+                <span className="font-semibold">{line.owes}</span>
+            ) : null}
+            {line.owes && line.rest ? " · " : null}
+            {line.rest}
+        </p>
     );
 }
 

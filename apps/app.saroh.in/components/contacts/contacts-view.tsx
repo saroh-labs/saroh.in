@@ -17,6 +17,7 @@ import type { ContactListItem } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
 import { contactName, openLeadsLabel, shownEmail } from "@/lib/crm/format";
 import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { Users } from "lucide-react";
 
 /**
@@ -37,8 +38,39 @@ import { Users } from "lucide-react";
 /** A known absence, drawn so it cannot be mistaken for a failed render. */
 const Missing = () => <AbsentValue says="Not set" />;
 
+/** Not seen for this long: someone who has stopped coming (DEC-277). */
+const QUIET_DAYS = 60;
+const DAY = 86_400_000;
+
+/** What they owe, in words: "₹900"; null when nothing. */
+export function owesOf(c: ContactListItem): string | null {
+    const owes = c.owes ?? [];
+    if (owes.length === 0) return null;
+    return owes.map((m) => formatMoneyMajor(m.amount, m.currency)).join(" + ");
+}
+
+/** Last visit, newest first; nobody seen sorts last, then the newest added. */
+export function byLastVisit(rows: ContactListItem[]): ContactListItem[] {
+    const at = (c: ContactListItem) =>
+        c.lastVisitAt ? new Date(c.lastVisitAt).getTime() : -Infinity;
+    return [...rows].sort(
+        (a, b) =>
+            at(b) - at(a) ||
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+}
+
 const FILTERS: DataFilter<ContactListItem>[] = [
     { id: "all", label: "All" },
+    // DEC-277: the two jobs people open this list for.
+    { id: "owes", label: "Owes money", predicate: (c) => owesOf(c) !== null },
+    {
+        id: "quiet",
+        label: `Not seen in ${QUIET_DAYS} days`,
+        predicate: (c) =>
+            !!c.lastVisitAt &&
+            Date.now() - new Date(c.lastVisitAt).getTime() > QUIET_DAYS * DAY,
+    },
     {
         id: "open",
         label: "Open pipeline",
@@ -56,7 +88,10 @@ const FILTERS: DataFilter<ContactListItem>[] = [
     },
 ];
 
-/** The phone's labelled facts about a contact, or nothing. */
+/**
+ * The phone's line under the name (DEC-277): the phone and the last visit
+ * first, then what they owe, then the other facts there are.
+ */
 export function ContactSummary({
     contact: c,
     currency,
@@ -70,6 +105,22 @@ export function ContactSummary({
         formatMoney(c.openLeadValue, currency),
     );
     const parts: { key: string; node: ReactNode }[] = [];
+    parts.push({
+        key: "phone",
+        node: c.phone?.trim() ? phoneLabel(c.phone) : "No phone",
+    });
+    if (c.lastVisitAt) {
+        parts.push({
+            key: "visit",
+            node: (
+                <>
+                    last visit <ViewerDate iso={c.lastVisitAt} />
+                </>
+            ),
+        });
+    }
+    const owes = owesOf(c);
+    if (owes) parts.push({ key: "owes", node: `Owes ${owes}` });
     if (c.company) parts.push({ key: "company", node: c.company });
     if (leads) parts.push({ key: "leads", node: leads });
     if (c.nextBookingAt) {
@@ -112,7 +163,15 @@ export function ContactsView({
     currency: string;
     initialView?: string;
 }) {
-    const columns: DataColumn<ContactListItem>[] = [
+    // Company, Last order and Open pipeline only where the business uses
+    // them (DEC-277): four columns of dashes told a gym nothing.
+    const usesCompany = contacts.some((c) => !!c.company?.trim());
+    const usesOrders = contacts.some((c) => c.lastOrderAt !== null);
+    const usesPipeline = contacts.some((c) => c.openLeadCount > 0);
+    const readsOwes = contacts.some((c) => c.owes !== undefined);
+    const readsVisits = contacts.some((c) => c.lastVisitAt !== undefined);
+    const rows = byLastVisit(contacts);
+    const all: (DataColumn<ContactListItem> | false)[] = [
         {
             id: "name",
             header: "Name",
@@ -143,6 +202,40 @@ export function ContactsView({
             cell: (c) => <ContactSummary contact={c} currency={currency} />,
         },
         {
+            id: "phone",
+            header: "Phone",
+            priority: "detail",
+            sortValue: (c) => c.phone ?? "",
+            // A link a phone can tap to call.
+            cell: (c) =>
+                c.phone?.trim() ? (
+                    <a
+                        href={`tel:${c.phone.replace(/[^\d+]/g, "")}`}
+                        className="relative z-10 whitespace-nowrap tabular-nums underline-offset-4 hover:underline"
+                    >
+                        {phoneLabel(c.phone)}
+                    </a>
+                ) : (
+                    <AbsentValue says="No phone" />
+                ),
+        },
+        readsVisits && {
+            id: "lastVisit",
+            header: "Last visit",
+            priority: "detail",
+            sortValue: (c) =>
+                c.lastVisitAt ? new Date(c.lastVisitAt).getTime() : 0,
+            cell: (c) =>
+                c.lastVisitAt ? (
+                    <ViewerDate
+                        iso={c.lastVisitAt}
+                        className="whitespace-nowrap"
+                    />
+                ) : (
+                    <AbsentValue says="Not yet" />
+                ),
+        },
+        usesCompany && {
             id: "company",
             header: "Company",
             priority: "detail",
@@ -156,7 +249,7 @@ export function ContactsView({
                     <Missing />
                 ),
         },
-        {
+        usesPipeline && {
             id: "pipeline",
             header: "Open pipeline",
             priority: "detail",
@@ -206,7 +299,17 @@ export function ContactsView({
                     <Missing />
                 ),
         },
-        {
+        readsOwes && {
+            id: "owes",
+            header: "Owes",
+            priority: "detail",
+            numeric: true,
+            money: true,
+            sortValue: (c) =>
+                (c.owes ?? []).reduce((n, m) => n + Number(m.amount), 0),
+            cell: (c) => owesOf(c) ?? <AbsentValue says="None" />,
+        },
+        usesOrders && {
             id: "lastOrder",
             header: "Last order",
             priority: "detail",
@@ -289,11 +392,12 @@ export function ContactsView({
             ),
         },
     ];
+    const columns = all.filter((c): c is DataColumn<ContactListItem> => !!c);
 
     return (
         <DataView
             viewId="contacts"
-            rows={contacts}
+            rows={rows}
             columns={columns}
             rowKey={(c) => c.id}
             rowHref={(c) => personHref(c.id)}

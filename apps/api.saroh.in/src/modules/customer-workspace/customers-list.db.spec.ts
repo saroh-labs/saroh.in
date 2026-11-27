@@ -372,9 +372,13 @@ describe("Customers list (DB)", () => {
 
     it("lists who paid or signs in, never a lead, a tombstone, a removed contact or another business's", async () => {
         const page = await list.list(ctx, {});
-        expect(idsOf(page)).toEqual([asha, kiran, meera, ravi].sort());
+        // DEC-275: the paying store customer no contact holds is a row too,
+        // counted apart from everyone linked.
+        expect(idsOf(page)).toEqual(
+            [asha, kiran, meera, ravi, unlinkedCustomer].sort(),
+        );
         expect(page.everyone).toBe(4);
-        expect(page.total).toBe(4);
+        expect(page.total).toBe(5);
         expect(idsOf(page)).not.toContain(crmOnly);
         expect(idsOf(page)).not.toContain(tombstone);
         expect(idsOf(page)).not.toContain(removed);
@@ -391,8 +395,9 @@ describe("Customers list (DB)", () => {
 
     it("gives each chip its count under the search and storefront, not the chip", async () => {
         const page = await list.list(ctx, { chip: "returning" });
-        expect(page.counts).toEqual({
-            all: 4,
+        expect(page.counts).toMatchObject({
+            all: 5,
+            unlinked: 1,
             returning: 1,
             subscribers: 1,
             open: 1,
@@ -462,9 +467,9 @@ describe("Customers list (DB)", () => {
     });
 
     it("searches the account's email of a separate contact, never the placeholder", async () => {
-        expect(idsOf(await list.list(ctx, { q: "kiran@example" }))).toEqual([
-            kiran,
-        ]);
+        expect(idsOf(await list.list(ctx, { q: "kiran@example" }))).toEqual(
+            [kiran, unlinkedCustomer].sort(),
+        );
         expect(idsOf(await list.list(ctx, { q: "account.invalid" }))).toEqual(
             [],
         );
@@ -476,6 +481,18 @@ describe("Customers list (DB)", () => {
     it("names the paying store customer it can't show, and shows them once linked", async () => {
         const before = await list.list(ctx, {});
         expect(before.unlinkedPaying).toBe(1);
+        // A row of its own (DEC-275), with who to link them to.
+        const payer = before.rows.find((r) => r.contactId === unlinkedCustomer);
+        expect(payer?.unlinked).toMatchObject({
+            customerId: unlinkedCustomer,
+            storefront: { id: market, name: "Hill Road" },
+            holder: { contactId: known },
+        });
+        expect(payer?.spent).toEqual([{ currency: "INR", amount: "120.00" }]);
+        expect(payer?.owes).toEqual([]);
+        expect(idsOf(await list.list(ctx, { chip: "unlinked" }))).toEqual([
+            unlinkedCustomer,
+        ]);
         const sheet = await list.unlinked(ctx, {});
         expect(sheet.total).toBe(1);
         expect(sheet.rows[0]).toMatchObject({
@@ -533,8 +550,8 @@ describe("Customers list (DB)", () => {
     it("narrows to who bought at a storefront, and refuses another business's", async () => {
         expect(idsOf(await list.list(ctx, { store: online }))).toEqual([ravi]);
         const market_ = await list.list(ctx, { store: market });
-        expect(idsOf(market_)).toEqual([asha]);
-        expect(market_.counts.all).toBe(1);
+        expect(idsOf(market_)).toEqual([asha, unlinkedCustomer].sort());
+        expect(market_.counts.all).toBe(2);
         expect(market_.storefronts?.map((s) => s.name)).toEqual([
             "Hill Road",
             "Online",
@@ -551,8 +568,9 @@ describe("Customers list (DB)", () => {
     it("sorts by last order, spent and name", async () => {
         const last = await list.list(ctx, {});
         expect(last.sort).toBe("last");
-        expect(last.rows.map((r) => r.contactId).slice(0, 2)).toEqual([
+        expect(last.rows.map((r) => r.contactId).slice(0, 3)).toEqual([
             ravi,
+            unlinkedCustomer, // paid 15 Sep, not linked yet (DEC-275)
             asha,
         ]);
         const spent = await list.list(ctx, { sort: "spent" });
@@ -560,11 +578,12 @@ describe("Customers list (DB)", () => {
         const name = await list.list(ctx, { sort: "name" });
         expect(name.rows.map((r) => r.name)).toEqual([
             "Asha Rao",
+            "Kiran", // the unlinked payer (DEC-275)
             null, // Kiran's separate contact has no name; sorts by its email
             "Meera",
             "Ravi",
         ]);
-        expect(name.rows[1].email).toBe("kiran@example.com");
+        expect(name.rows[2].email).toBe("kiran@example.com");
         expect(last.rows[0].orders?.lastStorefront).toEqual({
             id: online,
             name: "Online",

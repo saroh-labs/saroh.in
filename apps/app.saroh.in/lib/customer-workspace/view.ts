@@ -268,6 +268,38 @@ function joinAnd(list: string[]): string {
 // ---------------------------------------------------------------- orders
 
 /** An order still in the kitchen or on its way. */
+/**
+ * The page's one line under the header (DEC-276): what they owe and on
+ * what, their open orders, when they last bought. "Owes ₹2,150 on 2
+ * invoices · 1 open order · last bought 21 Nov". Only what this viewer
+ * reads; null when there is nothing to say.
+ */
+export function leadLine(
+    d: CustomerDetail,
+    now: Date,
+): { owes: string | null; rest: string | null } | null {
+    const o = d.stats.owes;
+    let owes: string | null = null;
+    if (o && o.totals.length > 0) {
+        const on = [
+            o.invoices ? countOf(o.invoices, "invoice") : null,
+            o.orders ? countOf(o.orders, "order") : null,
+        ].filter(Boolean);
+        owes = `Owes ${totals(o.totals)}${on.length ? ` on ${on.join(" and ")}` : ""}`;
+    }
+    const rows = d.orders?.rows ?? [];
+    const open = rows.filter(isOpen).length;
+    const last = rows.at(0);
+    const rest = [
+        open ? countOf(open, "open order") : null,
+        last
+            ? `last bought ${formatDate(last.placedAt, d.timezone, { now })}`
+            : null,
+    ].filter(Boolean);
+    if (!owes && rest.length === 0) return null;
+    return { owes, rest: rest.length ? rest.join(" · ") : null };
+}
+
 export function isOpen(o: Pick<DetailOrder, "status">): boolean {
     return (
         o.status === "PENDING" ||
@@ -336,15 +368,15 @@ export function orderTiles(d: CustomerDetail, now: Date): Tile[] {
         },
     ];
     if (d.money && d.stats.spent) {
-        const owed = d.stats.owed?.totals ?? [];
+        // Owes is the list's rule (DEC-275): unpaid orders and invoices; an
+        // API before it says only the invoices.
+        const owed = d.stats.owes?.totals ?? d.stats.owed?.totals ?? [];
         tiles.push({
-            label: "Spent",
+            label: "Paid",
             value: totals(d.stats.spent),
             // Net of refunds and credit notes (C14); an order's delivery is
             // part of what they paid.
-            note: owed.length
-                ? `${totals(owed)} still owed`
-                : "Including delivery",
+            note: owed.length ? `Owes ${totals(owed)}` : "Including delivery",
             opens: null,
         });
     }

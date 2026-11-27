@@ -3438,6 +3438,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: the list opened on every status, so archived products filled the first page, and why "73 products" differed from the plan's count was only in a hover (finding 16).
 - Decision: the list opens on **Live and draft**: what is sold or about to be. Archived and All statuses are choices in the Status filter (`?status=ARCHIVED`, `?status=ALL`). The header says, in words, "N of M products count toward your plan · archived don't".
 - Also (finding 17, owner's Q5): a **Sold, 30 days** column — units and money per product on the page, from one grouped read over order lines — for a role that reads orders' money. Not built yet: sorting by it ("Best sellers first") and the product page's Overview line, which need a read across the whole catalogue.
+
 ## DEC-269 One days-late count, in the business's own zone
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Today-Invoices, Invoices, Today-Subscription, Subscription-sheet; selling audit finding 12) · applies DEC-033 to every "days late"
@@ -3463,6 +3464,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Subscriptions' Need you** rows come from the API most days late first, then most owed, before the rest.
 - **The subscription quick look takes the money in place:** Send new link and Record payment happen in the sheet (the page's own actions and Record payment sheet, written as the tab's business), for a role with `subscription:write` and `invoice:write`; the list and the sheet read again. Pause and Cancel stay on the subscription's page.
 - On a phone the invoice page already draws the money card above the paper, as the sheet does.
+
 ## DEC-262 The menu is grouped by the merchant's question, one home per thing
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026, design canvas page "Grouping the menu": "the grouping looks better now") · amends the group-by-purpose menu ("Presence", "Run the business", "Grow", 2026-08-02) and DEC-133's last group "Manage"
@@ -3504,6 +3506,40 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **MCP and v1:** a price of 0 makes a service free (tool and OpenAPI descriptions say so); `list_services` names it "free".
 - **Left alone:** customer messages (they never named a payment for a booking), Home's needs-attention and Insights (they count invoices and holds, which a free booking never has), the Business calendar's subtitle, Home's Today line and the customer page for the few free bookings stored "at the desk" before this decision (new ones store none), and a service with no price at all.
 
+## DEC-275 Customers shows everyone who paid, linked or not; one Paid and one Owes
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Main, Customers-all-unlinked and Customers-phone, Q1) · amends DEC-041 (who the list shows) and C4's unlinked notice; keeps DEC-041's rule that linking is the merchant's own action
+
+- Context: Northwind had 28 customers on the list and 292 people who had paid, unlinked, behind a notice and a Review button; a boutique with 84 payers and none linked read "No customers yet". "Spent" disagreed with the customer's page and nothing said what anyone owed.
+- **A paying store customer no contact holds is a row**, tagged Not linked, with Link (read first: whose email it is, then confirm). No contact is made for them and nothing links on its own. The header counts both: "28 customers · 292 waiting to be linked" (the second part opens the Not linked view); with nobody linked, "84 people have paid you · none linked yet" and the one card that offers Review one by one. "No customers yet" shows only when nobody has paid, signs in or was added.
+- Views gain **Owes money** (`order:read` and `invoice:read`) and **Not linked**. Columns: Name, Phone, Last order, Paid, Owes; on a phone the card says the name, what they owe or have paid, the phone and the last order.
+- **Paid** (the API's `spent`, unchanged rule) is what came in on orders and on invoices that are not an order's own, net of refunds and credit notes; memberships, packs and bookings bill through invoices, so they are in it. **Owes** (`owes.sql.ts`) is real, not cancelled, unpaid orders (never an online checkout waiting to be paid) plus what is left to pay on issued invoices that are not an order's own. One rule, computed in the API, for the Customers list, the customer's page and Contacts.
+- A role that stages orders (`order:stage`, DEC-024) sees the Last order column and the orders' chips and sort, never an amount.
+
+## DEC-276 The customer's page leads with what they owe and how to reach them
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Customer-page, Customer-page-member, Customer-page-phone, Q8) · amends DEC-020 (a Member who stages orders sees a customer's orders, without amounts, DEC-024) and DEC-073's page order
+
+- Under the header, one line: "Owes ₹2,150 on 2 invoices · 1 open order · last bought 21 Nov", only what the viewer reads. Call (a `tel:` link) when there is a phone, beside New order and New booking (module and role gates only, no trade logic).
+- Cards follow what the person does: where they have bought, what they buy comes before the bookings cards, and the bookings card shows only for someone who has booked. The Paid tile replaces "Spent" and says what they owe.
+- A Member with `order:stage` gets the Orders tab, without amounts. A role that only reads is told once, in the header, not again on the Needs attention card.
+- A customer with no name reads "No name" in body size, the email under it, never the email as a three-line heading.
+
+## DEC-277 Contacts and Leads answer who to call: phone, last visit, what they owe; Leads opens on Open
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Contacts, Leads, Lead-page) · amends the Contacts register's columns (UX-051) and the Leads list's default view
+
+- **Contacts:** Name, Phone (a tap calls), Last visit (the latest confirmed booking that started and wasn't a no-show), Next booking, Owes (DEC-275), Source, sorted by last visit; Company, Open pipeline and Last order only when the business has any. Email and Added stay on the table after them (owner, 27 Nov 2026: "keep them"). Views add Owes money and Not seen in 60 days. On a phone the row says the name, the phone and the last visit.
+- **Leads opens on Open leads**; Follow up today, Won, Lost and All (`?view=all`) are views. Columns: the person with the lead's subject under it, Phone, Stage, Next follow-up (the soonest open follow-up; the list sorts by it), Last contact (the team's last note or follow-up done: Saroh records no call on a lead), Age; Worth only when a lead has one. On a phone the age and the next follow-up stay.
+- **A lead's page:** the person's name is the title, once (it opens their page); the subject and the phone sit under it, with Call. Their next booking shows as a card with Open the booking, so a lead at "Trial booked" links its trial.
+
+## DEC-278 Notifications fold repeats and show bookings as a view
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, board Notifications) · amends the inbox of 10 Oct 2026 (one row per notice)
+
+- Notices of one kind on the same day are one row under the newest, with how many times ("Google Calendar is behind · 4 times") and Show more to open the rest; newest first, by the business's day. A booking is never folded: each is its own row.
+- Booking notices (new, moved, cancelled by the customer: `booking.new`, `booking.moved`, `booking.cancelled`) were already produced; a Bookings view sits beside All when there are any. A booking a team member makes, moves or cancels still tells the person it is with ("Bookings with you"), not the whole team, and a no-show makes no notice: adding those is a change to the alert pipeline, left for its own decision.
+
 ## DEC-272 One money answer for a booking, worked out once on the server
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026, approved boards Booking-money and Quick-look) · amends DEC-257 (its payment words are now computed in one place) · builds on DEC-261 (Free) and DEC-173 (paid is the paper's ledger)
@@ -3530,6 +3566,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **A finished class** on the List reads "8 came · 1 didn't · 3 to pay" (or "Not marked") instead of "8 places left", desk and phone; its Money cell says "₹3,600 taken · ₹1,350 to take". Before it starts it still says places left. Opening it lists each person with Came or Didn't come and Awaiting payment. The diary's block for a class says "3 to pay".
 - **The visit line:** under the customer's name in the quick look and on the booking's page, "First visit" or "4th visit · last 12 Sep": their bookings at this business they came to before this one starts, and the last one's day (`GET bookings/:id/visits`, one counted read, `booking:read` and `contact:read`). The phone with Call was already on both.
 - **A desk Member's money:** whoever reads money (`payment:read`) or takes it at the desk (`booking:write` and `invoice:write`) sees what to collect in both places: the List's Money column and the booking's Money card. Anyone else sees neither: the API sends them no `money`, no `snapshot` and no service price on the booking, only the payment word (Awaiting payment, Paid…), which every screen says to them alike.
+
 ## DEC-279 Menu groups fold; everything is open the first time; each person's folds are remembered; Setup is fixed at the foot and folds too; the current page's group is always shown
 
 **Status: Accepted — 2026-11-27** · owner (27 Nov 2026: "Setup should also be collapsible … By default, on the first time, lets keep everything open … and persist their choice"; "then they can open whenever they want and it will also persist"; "this should also update the mobile menu in the app") · amends DEC-262 (the rail's groups) and DEC-263 (the More sheet's groups)
