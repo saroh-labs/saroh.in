@@ -38,7 +38,7 @@ export function useShellLive() {
 
 type NavProps = Pick<
     ComponentProps<typeof AppSidebar>,
-    "role" | "roleKey" | "actions" | "kind"
+    "role" | "roleKey" | "actions" | "kind" | "userId"
 >;
 
 export function ShellSidebar(props: NavProps & { collapsed: boolean }) {

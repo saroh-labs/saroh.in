@@ -234,6 +234,17 @@ export function daysAgo(at: Date, now: Date, zone: string): number {
 }
 
 /**
+ * How many days late a bill due at `dueAt` is (DEC-269): calendar days in
+ * the business's zone, at least 1 once the moment has passed, 0 before.
+ * The workspace counts with the same rule (`daysPastDue`), so Home, the
+ * reminders, the MCP tools and every screen say one number for one bill.
+ */
+export function daysLate(dueAt: Date | null, now: Date, zone: string): number {
+    if (!dueAt || dueAt >= now) return 0;
+    return Math.max(1, daysAgo(dueAt, now, zone));
+}
+
+/**
  * "Reminded yesterday", "Sent today", "Reminded 2 days ago": when a bill
  * was last sent or reminded, as Remind all's skipped list and Home's bill
  * row say it (boards `HARemindD`, `HPSheets`).

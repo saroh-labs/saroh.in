@@ -1,4 +1,5 @@
 import {
+    daysPastDue,
     formatDate,
     formatRelative,
     formatWeekday,
@@ -117,8 +118,8 @@ export function latestInvoiceNote(
             : "Paid";
     }
     if (!inv.dueAt) return "Not paid yet";
-    const late = Math.floor((now.getTime() - Date.parse(inv.dueAt)) / DAY);
-    if (late > 0) return `${count(late, "day")} past due`;
+    const late = daysPastDue(inv.dueAt, now, sub.timezone);
+    if (late > 0) return `${count(late, "day")} late`;
     return `Due ${formatDate(inv.dueAt, sub.timezone, { now })}`;
 }
 
@@ -138,12 +139,12 @@ export function rowInvoice(
             return { id, number, note: `${owed}. Pause or cancel?` };
         }
         const late = chase.dueAt
-            ? Math.floor((now.getTime() - Date.parse(chase.dueAt)) / DAY)
+            ? daysPastDue(chase.dueAt, now, sub.timezone)
             : 0;
         return {
             id,
             number,
-            note: late > 0 ? `${count(late, "day")} past due` : "Past due",
+            note: late > 0 ? `${count(late, "day")} late` : "Late",
         };
     }
     const latest = sub.latestInvoice;

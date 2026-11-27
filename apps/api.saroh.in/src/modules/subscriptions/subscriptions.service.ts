@@ -19,6 +19,7 @@ import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
 import { assertSaleRated } from "../invoices/gst-rate-required";
 import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
+import { daysLate } from "../invoices/overdue-bills";
 import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
 import { loadPriceTerms } from "../invoices/price-terms";
 import type { RatedSale } from "../invoices/sale-price";
@@ -144,9 +145,14 @@ function forViewer(
     ctx: OrganizationContext,
     view: SubscriptionView,
 ): SubscriptionView {
-    if (allows(ctx, "invoice:read")) return view;
+    // A phone is a contact detail: only for `contact:read` (DEC-039).
+    const contact = allows(ctx, "contact:read")
+        ? view.contact
+        : { ...view.contact, phone: null };
+    if (allows(ctx, "invoice:read")) return { ...view, contact };
     return {
         ...view,
+        contact,
         oldestUnpaid: null,
         latestInvoice: null,
         failedCharge: null,
@@ -182,7 +188,8 @@ export interface SubscriptionView {
     id: string;
     status: string;
     plan: { id: string; name: string };
-    contact: { id: string; name: string; email: string };
+    /** `phone` only for a role that may see contact details (`contact:read`). */
+    contact: { id: string; name: string; email: string; phone: string | null };
     /** The typed price they joined at: a price the business set. */
     price: string;
     /**
@@ -236,6 +243,13 @@ export interface SubscriptionView {
      * that invoice, never stored; a cancelled subscription has none.
      */
     paymentFailed: boolean;
+    /**
+     * A charge on that renewal was really tried and declined since it was
+     * issued (D13's RENEWAL_FAILED, but not autopay standing aside for an
+     * open checkout): only then is it "Payment failed"; else "Not paid"
+     * (DEC-270).
+     */
+    chargeFailed: boolean;
     /** That charge — hidden, like every invoice id, without `invoice:read`. */
     failedCharge: {
         id: string;
@@ -370,7 +384,13 @@ const SUBSCRIPTION_SELECT = {
     },
     contactId: true,
     contact: {
-        select: { id: true, firstName: true, lastName: true, email: true },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+        },
     },
     price: true,
     currency: true,
@@ -427,6 +447,8 @@ interface SubscriptionInvoices {
      * RENEWAL_FAILED or MANDATE_LIMIT_LOW), or null.
      */
     chargeFailedAt: Date | null;
+    /** When a charge on it was last declined (a RENEWAL_FAILED that tried). */
+    declinedAt: Date | null;
 }
 
 /** What a period is billed at: the subscription's terms, or its new plan's. */
@@ -634,18 +656,11 @@ export class SubscriptionsService {
             viewTerms(ctx.organizationId, rows),
         ]);
         const now = new Date();
-        return rows.map((r) =>
-            forViewer(ctx, {
-                ...this.view(
-                    r,
-                    invoices.get(r.id),
-                    skips.get(r.id),
-                    now,
-                    terms,
-                ),
-                autopayOn: badges.get(r.id) ?? null,
-            }),
-        );
+        const views = rows.map((r) => ({
+            ...this.view(r, invoices.get(r.id), skips.get(r.id), now, terms),
+            autopayOn: badges.get(r.id) ?? null,
+        }));
+        return needYouFirst(views, now).map((v) => forViewer(ctx, v));
     }
 
     async get(ctx: OrganizationContext, id: string): Promise<SubscriptionView> {
@@ -2570,6 +2585,8 @@ export class SubscriptionsService {
             },
         });
         // Autopay's failures (D13): a failed charge before its due date.
+        // Newest first, so the first of each kind per subscription is its
+        // latest; there are few (one per charge that didn't go).
         const failures = await db.subscriptionEvent.findMany({
             where: {
                 organizationId,
@@ -2577,18 +2594,36 @@ export class SubscriptionsService {
                 kind: { in: ["RENEWAL_FAILED", "MANDATE_LIMIT_LOW"] },
             },
             orderBy: { createdAt: "desc" },
-            distinct: ["subscriptionId"],
-            select: { subscriptionId: true, createdAt: true },
+            select: {
+                subscriptionId: true,
+                createdAt: true,
+                kind: true,
+                data: true,
+            },
         });
-        const failedAt = new Map(
-            failures.map((f) => [f.subscriptionId, f.createdAt]),
-        );
+        const failedAt = new Map<string, Date>();
+        const declinedAt = new Map<string, Date>();
+        for (const f of failures) {
+            if (!failedAt.has(f.subscriptionId)) {
+                failedAt.set(f.subscriptionId, f.createdAt);
+            }
+            // Standing aside for an open checkout tried nothing (DEC-270).
+            const reason = (f.data as { reason?: unknown } | null)?.reason;
+            if (
+                f.kind === "RENEWAL_FAILED" &&
+                reason !== "CHECKOUT_OPEN" &&
+                !declinedAt.has(f.subscriptionId)
+            ) {
+                declinedAt.set(f.subscriptionId, f.createdAt);
+            }
+        }
         for (const r of rows) {
             if (!r.subscriptionId) continue;
             const entry = byId.get(r.subscriptionId) ?? {
                 unpaid: [],
                 latest: null,
                 chargeFailedAt: failedAt.get(r.subscriptionId) ?? null,
+                declinedAt: declinedAt.get(r.subscriptionId) ?? null,
             };
             if (r.status === "ISSUED") entry.unpaid.push(r);
             entry.latest = r;
@@ -2632,6 +2667,7 @@ export class SubscriptionsService {
                 id: row.contact.id,
                 name: contactName(row.contact),
                 email: row.contact.email,
+                phone: row.contact.phone ?? null,
             },
             price: toMoneyString(row.price),
             pay: charge.pay,
@@ -2683,6 +2719,7 @@ export class SubscriptionsService {
                   }
                 : null,
             paymentFailed: failed !== null,
+            chargeFailed: declinedSince(failed, invoices?.declinedAt ?? null),
             failedCharge: failed
                 ? {
                       id: failed.id,
@@ -2746,6 +2783,41 @@ export class SubscriptionsService {
                     : [],
         };
     }
+}
+
+/** A charge was declined on this renewal since it was issued (DEC-270). */
+function declinedSince(
+    failed: InvoiceRowLite | null,
+    declinedAt: Date | null,
+): boolean {
+    if (!failed?.issuedAt || !declinedAt) return false;
+    return declinedAt >= failed.issuedAt;
+}
+
+/**
+ * The list's order (finding 14): the renewals that need the owner first,
+ * the most days late first (DEC-269's count, in each one's zone), then the
+ * most owed; the rest newest first, as read. Worked out before `forViewer`
+ * hides the charge, so every role sees the same order.
+ */
+export function needYouFirst<
+    T extends Pick<
+        SubscriptionView,
+        "paymentFailed" | "failedCharge" | "unpaidTotal" | "timezone"
+    >,
+>(views: readonly T[], now: Date): T[] {
+    const late = (v: T) =>
+        v.failedCharge?.dueAt
+            ? daysLate(new Date(v.failedCharge.dueAt), now, v.timezone)
+            : 0;
+    const need = views
+        .filter((v) => v.paymentFailed)
+        .sort(
+            (a, b) =>
+                late(b) - late(a) ||
+                toCents(b.unpaidTotal) - toCents(a.unpaidTotal),
+        );
+    return [...need, ...views.filter((v) => !v.paymentFailed)];
 }
 
 /**

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { ComponentProps } from "react";
 import { useMemo } from "react";
 
-import { listQueryFrom } from "@/lib/invoices/list-view";
+import { listQueryFrom, withDefaultView } from "@/lib/invoices/list-view";
 import { invoicesAsk } from "@/lib/invoices/queries";
 import { chipFromQuery } from "@/lib/invoices/sources";
 import {
@@ -44,13 +44,19 @@ export function InvoicesContainer({
     | "pending"
 >) {
     const search = useSearchParams();
-    const { params, query, ask } = useMemo(() => {
+    const { params, chosen, ask } = useMemo(() => {
         const p = Object.fromEntries(search);
-        return { params: p, query: listQueryFrom(p), ask: invoicesAsk(p) };
+        return { params: p, chosen: listQueryFrom(p), ask: invoicesAsk(p) };
     }, [search]);
     const list = useInvoicesList(ask);
     const summary = useInvoicesSummary();
     const view = list.data;
+    // Nothing chosen: Overdue when anything is (DEC-271).
+    const invoices = view?.invoices ?? null;
+    const query = useMemo(
+        () => withDefaultView(chosen, params, invoices),
+        [chosen, params, invoices],
+    );
 
     // A failed read is the page failing (`error.tsx`), never an empty list.
     if (list.isError && !view) throw list.error;

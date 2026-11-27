@@ -10,6 +10,7 @@ import {
     readsOnServer,
     shownRows,
     withDateRange,
+    withDefaultView,
     withFigure,
     withSearch,
     withTab,
@@ -117,8 +118,9 @@ describe("the address", () => {
         expect(withFigure(from, { paidFrom: "2026-10-01" }).toString()).toBe(
             "q=vivek&source=MANUAL&paidFrom=2026-10-01",
         );
+        // None: every invoice, said, so the Overdue default gives way.
         expect(withFigure(at("view=cheques&pack=p1"), null).toString()).toBe(
-            "pack=p1",
+            "pack=p1&tab=all",
         );
     });
 
@@ -126,7 +128,9 @@ describe("the address", () => {
         expect(withTab(at("view=owed&since=x"), "due").toString()).toBe(
             "since=x&tab=due",
         );
-        expect(withTab(at("paidFrom=2026-10-01"), "all").toString()).toBe("");
+        expect(withTab(at("paidFrom=2026-10-01"), "all").toString()).toBe(
+            "tab=all",
+        );
     });
 
     it("sets and clears the search", () => {
@@ -255,5 +259,40 @@ describe("the issued date (Orders' ?date=, ?from=, ?to=)", () => {
                 (d) => d,
             ),
         ).toBe("No invoices issued between 1 Aug and 31 Aug");
+    });
+});
+
+describe("where the list opens (DEC-271)", () => {
+    const late = { standing: "OVERDUE", kind: "INVOICE" } as const;
+    const due = { standing: "ISSUED", kind: "INVOICE" } as const;
+
+    it("opens on Overdue when the address chooses nothing and anything is overdue", () => {
+        expect(withDefaultView(ALL, {}, [due, late]).tab).toBe("overdue");
+        // The source alone chooses no view.
+        expect(withDefaultView(ALL, { source: "MANUAL" }, [late]).tab).toBe(
+            "overdue",
+        );
+        expect(figureOn(withDefaultView(ALL, {}, [late]), "overdue", {})).toBe(
+            true,
+        );
+    });
+
+    it("stays on All with nothing overdue, or while the rows are on their way", () => {
+        expect(withDefaultView(ALL, {}, [due])).toBe(ALL);
+        expect(withDefaultView(ALL, {}, null)).toBe(ALL);
+    });
+
+    it("lets the address win", () => {
+        for (const params of [
+            { tab: "all" },
+            { view: "owed" },
+            { q: "vivek" },
+            { paidFrom: "2026-10-01" },
+            { date: "7d" },
+            { since: "x" },
+            { pack: "p1" },
+        ]) {
+            expect(withDefaultView(ALL, params, [late]).tab).toBe("all");
+        }
     });
 });

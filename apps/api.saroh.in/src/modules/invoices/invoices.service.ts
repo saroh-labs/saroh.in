@@ -18,7 +18,7 @@ import { businessTimezone } from "../bookings/staff-availability";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { asksDates, listRange } from "../orders/order-list-filters";
 import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import {
     autopayChargeInProgress,
     chargeUnderWayOn,
@@ -368,16 +368,29 @@ export class InvoicesService {
         const invoice = await this.read(ctx.organizationId, id);
         const owed =
             invoice.standing === "ISSUED" || invoice.standing === "OVERDUE";
-        const [online, payInstructions] = await Promise.all([
+        const [online, payInstructions, phone] = await Promise.all([
             this.online(ctx.organizationId, id),
             // "How to pay us" on the printed paper (#833), as on the PDF:
             // only while something is owed on it.
             owed && invoice.kind !== "CREDIT_NOTE"
                 ? businessPayInstructionsOf(ctx.organizationId)
                 : undefined,
+            // Who to ring (finding 11): a contact detail, so `contact:read`.
+            invoice.contact && allows(ctx, "contact:read")
+                ? prisma.contact
+                      .findFirst({
+                          where: {
+                              id: invoice.contact.id,
+                              organizationId: ctx.organizationId,
+                          },
+                          select: { phone: true },
+                      })
+                      .then((c) => c?.phone ?? null)
+                : null,
         ]);
         return {
             ...invoice,
+            contact: invoice.contact ? { ...invoice.contact, phone } : null,
             online,
             ...(payInstructions !== undefined ? { payInstructions } : {}),
         };

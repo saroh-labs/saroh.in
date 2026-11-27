@@ -3404,6 +3404,31 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Cards are styled per section or for the whole site only;** there is no "This card" (and no per-card storage).
 - **Page rows** in the editor show the first photo on the page (its stored smaller copy), or a plain page icon.
 
+## DEC-269 One days-late count, in the business's own zone
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Today-Invoices, Invoices, Today-Subscription, Subscription-sheet; selling audit finding 12) · applies DEC-033 to every "days late"
+
+- Context: the same unpaid renewal read "17 days past due" on Subscriptions and "18 days late" on Invoices on the same day: one rounded 24-hour blocks down, the other up.
+- Decision: **how late a bill is, is counted in calendar days in the business's zone** (DEC-033), from the day it was due to today, **at least 1 once the moment has passed** and 0 before. One rule, one helper per runtime: `daysPastDue` (`apps/app.saroh.in/lib/format/datetime.ts`) and `daysLate` (`apps/api.saroh.in/src/modules/invoices/overdue-bills.ts`), tested around midnight and in zones ahead of and behind UTC. Subscriptions now say "N days late", as Invoices do.
+- Uses it: the invoice list, sheet, page pill and money card, share line and Remind many rows; Subscriptions' row, quick look, page and renewal notes; Insights' owed bills; Home's "Late · N days" on bills and renewals; the reminder preview; the MCP summary's `days_late`. Not a bill, so not affected: Home's overdue follow-up tasks, which keep whole days since the task's moment.
+
+## DEC-270 "Not paid" until a charge has really failed
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, board Subscription-sheet; selling audit finding 13) · amends the U7 "Payment failed" status (DEC-173 era) and D13's wording
+
+- Context: a renewal invoice simply not paid read "Payment failed" beside "Saroh doesn't charge cards": nothing was tried, and the word sent owners to ask about cards.
+- Decision: a renewal that needs the owner is **"Not paid"**; it is **"Payment failed" only when a charge on that renewal was tried and declined** since it was issued — a `RENEWAL_FAILED` subscription event, not autopay standing aside for an open checkout (`CHECKOUT_OPEN`), and not `MANDATE_LIMIT_LOW` (nothing was charged). The API derives `chargeFailed` beside `paymentFailed` (never stored); the list's badge, the quick look, the page's pill ("due 15 Sep" or "failed 15 Sep"), Plan Detail's subscribers and the quick look's notice all read it (`statusLabel`). The Need you view and its counts are unchanged. The customer is told of a decline only when there was one (`enqueueAutopayFailedNotice`, unchanged).
+- Not in this change: Home's grouped "N payments failed" phrase (Home's area) still counts every renewal that needs the owner; it follows this rule when Home is next touched.
+
+## DEC-271 The invoice tiles are the views, and Overdue leads
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, board Invoices; selling audit findings 11, 14, 20, 21) · amends DEC-173's list (A+C)
+
+- **The list opens on Overdue** when the address chooses nothing and any invoice is overdue, its tile marked; newest first within it. The address always wins (`?tab=`, `?view=`, a search, a date, a figure, a pack or course); every invoice is `?tab=all`, which pressing an on tile, picking All or Clear filters now writes (`withDefaultView`, `withFigure`).
+- **Who to ring:** the invoice details (sheet and page) show a "Billed to" card with the phone, the email and Call (`tel:`) while money is owed and the contact has a phone; "Next step is yours" offers "call" only then. The subscription quick look shows the subscriber's phone and Call when the renewal isn't paid. The phone is on the reads only for a role with `contact:read` (DEC-039), shaped in the API. No WhatsApp chat link: the app has no house one for a contact.
+- **Subscriptions' Need you** rows come from the API most days late first, then most owed, before the rest.
+- **The subscription quick look takes the money in place:** Send new link and Record payment happen in the sheet (the page's own actions and Record payment sheet, written as the tab's business), for a role with `subscription:write` and `invoice:write`; the list and the sheet read again. Pause and Cancel stay on the subscription's page.
+- On a phone the invoice page already draws the money card above the paper, as the sheet does.
 ## DEC-262 The menu is grouped by the merchant's question, one home per thing
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026, design canvas page "Grouping the menu": "the grouping looks better now") · amends the group-by-purpose menu ("Presence", "Run the business", "Grow", 2026-08-02) and DEC-133's last group "Manage"
@@ -3478,3 +3503,13 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 - Notices of one kind on the same day are one row under the newest, with how many times ("Google Calendar is behind · 4 times") and Show more to open the rest; newest first, by the business's day. A booking is never folded: each is its own row.
 - Booking notices (new, moved, cancelled by the customer: `booking.new`, `booking.moved`, `booking.cancelled`) were already produced; a Bookings view sits beside All when there are any. A booking a team member makes, moves or cancels still tells the person it is with ("Bookings with you"), not the whole team, and a no-show makes no notice: adding those is a change to the alert pipeline, left for its own decision.
+## DEC-279 Menu groups fold; everything is open the first time; each person's folds are remembered; Setup is fixed at the foot and folds too; the current page's group is always shown
+
+**Status: Accepted — 2026-11-27** · owner (27 Nov 2026: "Setup should also be collapsible … By default, on the first time, lets keep everything open … and persist their choice"; "then they can open whenever they want and it will also persist"; "this should also update the mobile menu in the app") · amends DEC-262 (the rail's groups) and DEC-263 (the More sheet's groups)
+
+- Context: with every module on, the regrouped menu is about 1,022 px tall against 839 px of rail in a 900 px window, so Setup scrolled out of sight.
+- **Every group label is a button that folds its rows**, on the desk and in the phone's menu alike (the More sheet; the tab bar's own tabs do not fold). The first time, everything is open. **Open and closed are both remembered**: the stored state is each group's last open/closed value, so a group opened again stays open. A folded group shows its row count ("What you offer · 7", read as "What you offer, 7 items, collapsed") and rolls up what is waiting inside with the waiting badge, so a fold never hides work. Folded rows are `hidden`: not focused, not read.
+- **The group holding the current page is always shown open**, without changing the saved value; folding it there hides it while the person stays in that group.
+- **Setup is fixed at the foot**, above Collapse menu and outside the scrolling list; the groups above scroll in what is left, with a fade at the bottom edge while there is more below. Folded, only its label shows.
+- **The icon rail ignores folds** (Collapse menu, and the automatic rail under 1100 px): every icon shows; the folds apply again when the rail widens. No group, order, label, gate or address changed.
+- **Stored in the browser, per person**: `localStorage` key `saroh-nav-folds-v1:<userId>`, a JSON object of `{ "<group label>": true | false }`, read before paint, accepting only the menu's own group labels with boolean values (`apps/app.saroh.in/lib/nav/nav-folds.ts`, the one module the rail and the sheet both call). It survives reloads and signing out and in on that browser; another device starts open. There is no per-user preference store on the API today (`User` has no JSON preferences column), so a server-side store would need: a migration adding `User.uiPreferences Json?` (or a `UserPreference` row keyed by user and name), a `GET/PATCH /me/preferences/nav-folds` scoped to the signed-in user only, validated to the known group labels and booleans with nothing else accepted, and the hook reading it on load (browser value as the fast first paint) and writing through it.

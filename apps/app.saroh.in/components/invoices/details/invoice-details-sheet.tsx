@@ -64,8 +64,8 @@ export function InvoiceDetailsSheet({
     const { previous, next } = neighbours(rows, invoiceId);
     const shown = details?.invoice ?? row;
     const title = shown?.number ?? (shown ? "Draft" : "Invoice");
-    const pill = shown ? headerPill(shown) : null;
     const zone = details ? invoiceZone(details.business) : undefined;
+    const pill = shown ? headerPill(shown, new Date(), zone) : null;
 
     /** The foot: Share and More (once read), then Previous and Next. */
     const walk = (menus: ReactNode) => (

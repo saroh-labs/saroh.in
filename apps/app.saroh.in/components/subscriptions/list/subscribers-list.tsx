@@ -19,8 +19,8 @@ import {
     olderPrice,
     recurringPrice,
     rowWhen,
+    statusLabel,
     subscriptionPay,
-    TAB_LABEL,
     TAB_TONE,
     VIEW_LABEL,
 } from "@/lib/subscriptions/view";
@@ -115,7 +115,7 @@ export function SubscribersList({
                 const tab = listTab(s);
                 return (
                     <StatusBadge tone={TAB_TONE[tab]}>
-                        {TAB_LABEL[tab]}
+                        {statusLabel(s)}
                     </StatusBadge>
                 );
             },

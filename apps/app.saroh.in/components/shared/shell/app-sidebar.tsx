@@ -4,11 +4,22 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverAnchor, PopoverContent } from "@saroh/ui/popover";
 import { Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { Fragment, useCallback, useState, useSyncExternalStore } from "react";
+import {
+    Fragment,
+    useCallback,
+    useEffect,
+    useId,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from "react";
 
+import { NavGroupToggle } from "@/components/shared/navigation/nav-group-toggle";
 import type {
     NavChild,
     NavCounts,
+    NavGroup,
+    NavItem,
     NavRole,
 } from "@/components/shared/navigation/nav-items";
 import {
@@ -18,6 +29,7 @@ import {
     navFor,
     showsGroupLabel,
 } from "@/components/shared/navigation/nav-items";
+import { useNavFolds } from "@/lib/nav/nav-folds";
 import { rememberRail } from "@/lib/nav/rail-cookie";
 import { useNavPathname } from "@/lib/nav/use-nav-pathname";
 import { CountBadge } from "@saroh/ui/count-badge";
@@ -78,7 +90,10 @@ export function AppSidebar({
     collapsed: collapsedAtLoad = false,
     kind,
     pending = false,
+    userId = "",
 }: {
+    /** Whose menu: the groups they fold are remembered per person. */
+    userId?: string;
     /** The modules aren't read yet: rows are drawn as skeleton pieces. */
     pending?: boolean;
     /** What is being set up (DEC-070); see `navFor`. */
@@ -134,6 +149,225 @@ export function AppSidebar({
     // the window closes it without a second render.
     const openFlyout = iconRail ? flyoutFor : null;
 
+    // Groups fold on the full rail (DEC-279); the group you are in is shown.
+    const currentGroup =
+        groups.find((group) =>
+            group.items.some((item) =>
+                isNavSectionActive(pathname, item, rows),
+            ),
+        )?.label ?? null;
+    const folds = useNavFolds(userId, currentGroup);
+    const idBase = useId();
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const more = useMoreBelow(scrollRef);
+    const pinned = pending ? [] : groups.filter((g) => g.pinToBottom);
+    const scrolling = pending ? [] : groups.filter((g) => !g.pinToBottom);
+
+    const renderGroup = (group: NavGroup, index: number) => {
+        const foldable = showsGroupLabel(group) && !iconRail;
+        const open = !foldable || folds.isOpen(group.label ?? "");
+        const rowsId = `${idBase}-group-${index}`;
+        return (
+            <div
+                key={group.label ?? `group-${index}`}
+                className={cn(
+                    "flex flex-col gap-px",
+                    // The pinned group stands on its own rule at the foot.
+                    group.pinToBottom &&
+                        "shrink-0 border-t border-border px-2.5 pb-2 group-data-[collapsed=true]/rail:px-1.5 max-[1100px]:px-1.5",
+                )}
+            >
+                {!showsGroupLabel(group) ? null : foldable ? (
+                    <NavGroupToggle
+                        label={group.label ?? ""}
+                        open={open}
+                        controls={rowsId}
+                        rows={group.items.length}
+                        waiting={groupWaiting(group, counts, unread)}
+                        onToggle={() => folds.toggle(group.label ?? "")}
+                        className="px-2.5 pb-1 pt-3 [@media(max-height:960px)]:pt-2"
+                    />
+                ) : (
+                    // The icon rail: folding does not apply, every icon shows.
+                    <p className="label sr-only px-2.5 pb-1 pt-3">
+                        {group.label}
+                    </p>
+                )}
+                {/* `hidden`, so a folded group's rows are neither focused nor read. */}
+                <div
+                    id={rowsId}
+                    hidden={!open}
+                    className="flex flex-col gap-px"
+                >
+                    {group.items.map((item) => renderItem(item))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderItem = (item: NavItem) => {
+        const active = isNavSectionActive(pathname, item, rows);
+        /*
+         * Only the DEEPEST match says "page" — and the
+         * deepest is now two levels down, since a site's
+         * Content and Settings sit beneath its name.
+         *
+         * The parent matches by prefix, so on /sites/new
+         * both it and the child row claimed
+         * aria-current="page" and a screen reader
+         * announced two current pages. The parent still
+         * LOOKS active — it is the section you are in —
+         * but the child is the page you are on.
+         */
+        const childIsCurrent = Boolean(
+            item.children?.some(
+                (child) =>
+                    isNavChildCurrent(pathname, child.href, item.children) ||
+                    (child.children ?? []).some((leaf) =>
+                        isNavChildCurrent(pathname, leaf.href, child.children),
+                    ),
+            ),
+        );
+        /*
+         * Two states, not one (brand file §13). The
+         * expanded parent is the SECTION you are in —
+         * Saffron label and icon, no surface. The row that
+         * is the PAGE you are on takes the white surface
+         * and the 2px Saffron marker. Never both.
+         */
+        const isPage = active && !childIsCurrent;
+        const isSection = active && childIsCurrent;
+        const Icon = item.icon;
+        // Notifications counts unread; everything else
+        // counts work waiting. Both mean "something here
+        // wants you", so both are drawn the same way.
+        const waiting = navCountFor(item.href, counts, unread);
+        const hasChildren = Boolean(item.children?.length);
+        const flyoutOpen = openFlyout === item.href;
+        return (
+            <Fragment key={item.href}>
+                <Popover
+                    open={flyoutOpen}
+                    onOpenChange={(open) => {
+                        if (!open) setFlyoutFor(null);
+                    }}
+                >
+                    <PopoverAnchor asChild>
+                        <Tip label={item.label}>
+                            <IntentLink
+                                href={item.href}
+                                // On the icon rail a section opens its
+                                // flyout instead of navigating: its
+                                // children have no other path there.
+                                onClick={(e) => {
+                                    if (!iconRail || !hasChildren) return;
+                                    e.preventDefault();
+                                    setFlyoutFor(flyoutOpen ? null : item.href);
+                                }}
+                                aria-expanded={
+                                    iconRail && hasChildren
+                                        ? flyoutOpen
+                                        : undefined
+                                }
+                                aria-current={
+                                    active && !childIsCurrent
+                                        ? "page"
+                                        : undefined
+                                }
+                                className={cn(
+                                    // Tighter rows than the drawer's: this
+                                    // rail is `lg`-and-up only, so it is
+                                    // always driven by a pointer, and the
+                                    // 44px touch target the tab bar needs
+                                    // would only spread twelve items over a
+                                    // screen's worth of height here.
+                                    // `wk-nav` grows a brand bar on the
+                                    // leading edge when this row is the
+                                    // current page (workspace.css). It
+                                    // scales from the centre rather than
+                                    // fading, so changing page reads as the
+                                    // marker travelling down the rail.
+                                    // On a short screen (a 900px laptop) rows give back 2px a side so
+                                    // an open section and Settings still fit without scrolling.
+                                    "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast [@media(max-height:960px)]:py-1.5",
+                                    // The icon rail stacks the glyph over
+                                    // a small label ("Saroh Settings"
+                                    // design, 2026-09-25) and drops the
+                                    // marker's gutter.
+                                    "max-[1100px]:flex-col max-[1100px]:justify-center max-[1100px]:gap-[3px] max-[1100px]:px-0.5 max-[1100px]:py-[7px] max-[1100px]:before:hidden",
+                                    "group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px] group-data-[collapsed=true]/rail:before:hidden",
+                                    // The design system's ring, not
+                                    // Chrome's default blue: the focus ring
+                                    // is a keyboard user's cursor, and it
+                                    // was inconsistent in exactly the place
+                                    // navigation happens most.
+                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                    isPage
+                                        ? "bg-card font-semibold text-foreground shadow-xs"
+                                        : isSection
+                                          ? "font-semibold text-brand hover:bg-accent"
+                                          : // Idle rows sit a step back
+                                            // from Ink, so the section and
+                                            // the page read louder.
+                                            "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
+                                )}
+                            >
+                                <Icon className="size-[19px] shrink-0" />
+                                <span className="flex-1 group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2] max-[1100px]:w-full max-[1100px]:flex-none max-[1100px]:text-center max-[1100px]:text-[10.5px] max-[1100px]:leading-[1.2]">
+                                    {item.label}
+                                </span>
+                                {locked.includes(item.href) ? (
+                                    <Lock
+                                        role="img"
+                                        aria-label="Not in your plan"
+                                        className="size-3.5 shrink-0 text-muted-foreground group-data-[collapsed=true]/rail:hidden max-[1100px]:hidden"
+                                    />
+                                ) : null}
+                                {waiting > 0 ? (
+                                    /* The brand file's waiting count: a
+                                                   Saffron-tinted pill with 700 text.
+                                                   It is a count, not a status, so it
+                                                   does not borrow Warning's hue. */
+                                    <CountBadge
+                                        count={waiting}
+                                        tone="strong"
+                                        aria-label={`${waiting} waiting`}
+                                        className="group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only"
+                                    />
+                                ) : null}
+                            </IntentLink>
+                        </Tip>
+                    </PopoverAnchor>
+                    {item.children?.length ? (
+                        <NavFlyout
+                            label={item.label}
+                            children={item.children}
+                            pathname={pathname}
+                            onLeave={() => setFlyoutFor(null)}
+                            counts={counts}
+                        />
+                    ) : null}
+                </Popover>
+                {/* A section expands because you are in
+                                        it, not because you toggled it (brand
+                                        file §13) — so its screens render right
+                                        under it, only for the section you are
+                                        in, with no chevron. Removed outright on
+                                        the icon rail, never hidden: invisible
+                                        rows left in the tab order are the worse
+                                        outcome. The flyout is their path at
+                                        that width. */}
+                {!iconRail && hasChildren && active ? (
+                    <SiteTree
+                        children={item.children ?? []}
+                        pathname={pathname}
+                        counts={counts}
+                    />
+                ) : null}
+            </Fragment>
+        );
+    };
+
     return (
         // Sticky so the rail stays put on a long page. Without
         // it the aside is only as tall as the flex row, and navigation scrolls
@@ -163,234 +397,30 @@ export function AppSidebar({
              * separating things that were never in different categories. A
              * heading earns the space above it; a lone item does not.
              */}
-            <nav
-                aria-label="Primary"
-                className="flex flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2.5 py-3 group-data-[collapsed=true]/rail:px-1.5 max-[1100px]:px-1.5"
-            >
-                {pending ? <RowsLoading /> : null}
-                {(pending ? [] : groups).map((group, index) => (
-                    <Fragment key={group.label ?? `group-${index}`}>
-                        {/*
-                         * The pinned group's space is a spacer, not `mt-auto`:
-                         * it grows to push Manage to the foot of the rail,
-                         * and keeps its 10px when the rail is full and scrolls.
-                         */}
-                        {group.pinToBottom && (
-                            <div aria-hidden className="min-h-[10px] flex-1" />
-                        )}
+            {/*
+             * Setup is fixed at the foot, above Collapse menu, outside the
+             * scrolling list (DEC-279): the groups above scroll in what is
+             * left, with a fade at the edge while there is more below.
+             */}
+            <nav aria-label="Primary" className="flex min-h-0 flex-1 flex-col">
+                <div className="relative flex min-h-0 flex-1 flex-col">
+                    <div
+                        ref={scrollRef}
+                        className="flex flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2.5 py-3 group-data-[collapsed=true]/rail:px-1.5 max-[1100px]:px-1.5"
+                    >
+                        {pending ? <RowsLoading /> : null}
+                        {scrolling.map(renderGroup)}
+                    </div>
+                    {more ? (
                         <div
-                            className={cn(
-                                "flex flex-col gap-px",
-                                // Space belongs to headings, not to every group.
-                                // The heading's own 12px of padding is the space
-                                // above a group; the pinned group's spacer sits
-                                // above its rule.
-                                group.pinToBottom && "border-t border-border",
-                            )}
-                        >
-                            {showsGroupLabel(group) && (
-                                <p className="label px-2.5 pb-1 pt-3 group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only [@media(max-height:960px)]:pt-2">
-                                    {group.label}
-                                </p>
-                            )}
-                            {group.items.map((item) => {
-                                const active = isNavSectionActive(
-                                    pathname,
-                                    item,
-                                    rows,
-                                );
-                                /*
-                                 * Only the DEEPEST match says "page" — and the
-                                 * deepest is now two levels down, since a site's
-                                 * Content and Settings sit beneath its name.
-                                 *
-                                 * The parent matches by prefix, so on /sites/new
-                                 * both it and the child row claimed
-                                 * aria-current="page" and a screen reader
-                                 * announced two current pages. The parent still
-                                 * LOOKS active — it is the section you are in —
-                                 * but the child is the page you are on.
-                                 */
-                                const childIsCurrent = Boolean(
-                                    item.children?.some(
-                                        (child) =>
-                                            isNavChildCurrent(
-                                                pathname,
-                                                child.href,
-                                                item.children,
-                                            ) ||
-                                            (child.children ?? []).some(
-                                                (leaf) =>
-                                                    isNavChildCurrent(
-                                                        pathname,
-                                                        leaf.href,
-                                                        child.children,
-                                                    ),
-                                            ),
-                                    ),
-                                );
-                                /*
-                                 * Two states, not one (brand file §13). The
-                                 * expanded parent is the SECTION you are in —
-                                 * Saffron label and icon, no surface. The row that
-                                 * is the PAGE you are on takes the white surface
-                                 * and the 2px Saffron marker. Never both.
-                                 */
-                                const isPage = active && !childIsCurrent;
-                                const isSection = active && childIsCurrent;
-                                const Icon = item.icon;
-                                // Notifications counts unread; everything else
-                                // counts work waiting. Both mean "something here
-                                // wants you", so both are drawn the same way.
-                                const waiting = navCountFor(
-                                    item.href,
-                                    counts,
-                                    unread,
-                                );
-                                const hasChildren = Boolean(
-                                    item.children?.length,
-                                );
-                                const flyoutOpen = openFlyout === item.href;
-                                return (
-                                    <Fragment key={item.href}>
-                                        <Popover
-                                            open={flyoutOpen}
-                                            onOpenChange={(open) => {
-                                                if (!open) setFlyoutFor(null);
-                                            }}
-                                        >
-                                            <PopoverAnchor asChild>
-                                                <Tip label={item.label}>
-                                                    <IntentLink
-                                                        href={item.href}
-                                                        // On the icon rail a section opens its
-                                                        // flyout instead of navigating: its
-                                                        // children have no other path there.
-                                                        onClick={(e) => {
-                                                            if (
-                                                                !iconRail ||
-                                                                !hasChildren
-                                                            )
-                                                                return;
-                                                            e.preventDefault();
-                                                            setFlyoutFor(
-                                                                flyoutOpen
-                                                                    ? null
-                                                                    : item.href,
-                                                            );
-                                                        }}
-                                                        aria-expanded={
-                                                            iconRail &&
-                                                            hasChildren
-                                                                ? flyoutOpen
-                                                                : undefined
-                                                        }
-                                                        aria-current={
-                                                            active &&
-                                                            !childIsCurrent
-                                                                ? "page"
-                                                                : undefined
-                                                        }
-                                                        className={cn(
-                                                            // Tighter rows than the drawer's: this
-                                                            // rail is `lg`-and-up only, so it is
-                                                            // always driven by a pointer, and the
-                                                            // 44px touch target the tab bar needs
-                                                            // would only spread twelve items over a
-                                                            // screen's worth of height here.
-                                                            // `wk-nav` grows a brand bar on the
-                                                            // leading edge when this row is the
-                                                            // current page (workspace.css). It
-                                                            // scales from the centre rather than
-                                                            // fading, so changing page reads as the
-                                                            // marker travelling down the rail.
-                                                            // On a short screen (a 900px laptop) rows give back 2px a side so
-                                                            // an open section and Settings still fit without scrolling.
-                                                            "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast [@media(max-height:960px)]:py-1.5",
-                                                            // The icon rail stacks the glyph over
-                                                            // a small label ("Saroh Settings"
-                                                            // design, 2026-09-25) and drops the
-                                                            // marker's gutter.
-                                                            "max-[1100px]:flex-col max-[1100px]:justify-center max-[1100px]:gap-[3px] max-[1100px]:px-0.5 max-[1100px]:py-[7px] max-[1100px]:before:hidden",
-                                                            "group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px] group-data-[collapsed=true]/rail:before:hidden",
-                                                            // The design system's ring, not
-                                                            // Chrome's default blue: the focus ring
-                                                            // is a keyboard user's cursor, and it
-                                                            // was inconsistent in exactly the place
-                                                            // navigation happens most.
-                                                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                                            isPage
-                                                                ? "bg-card font-semibold text-foreground shadow-xs"
-                                                                : isSection
-                                                                  ? "font-semibold text-brand hover:bg-accent"
-                                                                  : // Idle rows sit a step back
-                                                                    // from Ink, so the section and
-                                                                    // the page read louder.
-                                                                    "font-medium text-neutral-700 hover:bg-accent dark:text-muted-foreground",
-                                                        )}
-                                                    >
-                                                        <Icon className="size-[19px] shrink-0" />
-                                                        <span className="flex-1 group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2] max-[1100px]:w-full max-[1100px]:flex-none max-[1100px]:text-center max-[1100px]:text-[10.5px] max-[1100px]:leading-[1.2]">
-                                                            {item.label}
-                                                        </span>
-                                                        {locked.includes(
-                                                            item.href,
-                                                        ) ? (
-                                                            <Lock
-                                                                role="img"
-                                                                aria-label="Not in your plan"
-                                                                className="size-3.5 shrink-0 text-muted-foreground group-data-[collapsed=true]/rail:hidden max-[1100px]:hidden"
-                                                            />
-                                                        ) : null}
-                                                        {waiting > 0 ? (
-                                                            /* The brand file's waiting count: a
-                                                   Saffron-tinted pill with 700 text.
-                                                   It is a count, not a status, so it
-                                                   does not borrow Warning's hue. */
-                                                            <CountBadge
-                                                                count={waiting}
-                                                                tone="strong"
-                                                                aria-label={`${waiting} waiting`}
-                                                                className="group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only"
-                                                            />
-                                                        ) : null}
-                                                    </IntentLink>
-                                                </Tip>
-                                            </PopoverAnchor>
-                                            {item.children?.length ? (
-                                                <NavFlyout
-                                                    label={item.label}
-                                                    children={item.children}
-                                                    pathname={pathname}
-                                                    onLeave={() =>
-                                                        setFlyoutFor(null)
-                                                    }
-                                                    counts={counts}
-                                                />
-                                            ) : null}
-                                        </Popover>
-                                        {/* A section expands because you are in
-                                        it, not because you toggled it (brand
-                                        file §13) — so its screens render right
-                                        under it, only for the section you are
-                                        in, with no chevron. Removed outright on
-                                        the icon rail, never hidden: invisible
-                                        rows left in the tab order are the worse
-                                        outcome. The flyout is their path at
-                                        that width. */}
-                                        {!iconRail && hasChildren && active ? (
-                                            <SiteTree
-                                                children={item.children ?? []}
-                                                pathname={pathname}
-                                                counts={counts}
-                                            />
-                                        ) : null}
-                                    </Fragment>
-                                );
-                            })}
-                        </div>
-                    </Fragment>
-                ))}
+                            aria-hidden
+                            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background to-transparent"
+                        />
+                    ) : null}
+                </div>
+                {pinned.map((group) =>
+                    renderGroup(group, groups.indexOf(group)),
+                )}
             </nav>
             {/*
              * Collapse to icons and back (2026-09-25). Only where the full
@@ -424,6 +454,60 @@ export function AppSidebar({
             </div>
         </aside>
     );
+}
+
+/** What is waiting inside a group: its rows' counts and their pages'. */
+function groupWaiting(
+    group: NavGroup,
+    counts: NavCounts | undefined,
+    unread: number,
+): number {
+    const pages = (children: NavChild[] = []): number =>
+        children.reduce(
+            (sum, child) =>
+                sum +
+                (child.href ? (counts?.[child.href] ?? 0) : 0) +
+                pages(child.children),
+            0,
+        );
+    return group.items.reduce(
+        (sum, item) =>
+            sum + navCountFor(item.href, counts, unread) + pages(item.children),
+        0,
+    );
+}
+
+/** Whether the list scrolls on past its bottom edge (the fade's cue). */
+function useMoreBelow(ref: React.RefObject<HTMLDivElement | null>): boolean {
+    const [more, setMore] = useState(false);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const check = () =>
+            setMore(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+        check();
+        el.addEventListener("scroll", check, { passive: true });
+        // Rows come and go (a fold, a read landing): measure again.
+        const observer =
+            typeof ResizeObserver === "undefined"
+                ? null
+                : new ResizeObserver(check);
+        observer?.observe(el);
+        for (const child of Array.from(el.children)) observer?.observe(child);
+        const mutations = new MutationObserver(check);
+        mutations.observe(el, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["hidden"],
+        });
+        return () => {
+            el.removeEventListener("scroll", check);
+            observer?.disconnect();
+            mutations.disconnect();
+        };
+    }, [ref]);
+    return more;
 }
 
 /** The rail's rows while the modules are read: the rows' own height. */
