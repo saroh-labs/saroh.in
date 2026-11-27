@@ -707,14 +707,21 @@ export function chargeRow(
     c: SubscriptionCharge,
     timeZone: string,
     now: Date,
+    /**
+     * The subscription, to tell a declined charge from an unpaid one
+     * (DEC-270): only its `failedCharge`, when `chargeFailed`, is
+     * "Payment failed"; any other late renewal is "Not paid".
+     */
+    sub?: Pick<Subscription, "chargeFailed" | "failedCharge">,
 ): ChargeRow {
+    const declined = !!sub?.chargeFailed && sub.failedCharge?.id === c.id;
     const [result, tone]: [string, Tone] =
         c.kind === "CREDIT_NOTE"
             ? ["Credit", "off"]
             : c.standing === "PAID"
               ? ["Paid", "ok"]
               : c.standing === "OVERDUE"
-                ? ["Failed", "bad"]
+                ? [declined ? "Payment failed" : "Not paid", "bad"]
                 : c.standing === "ISSUED"
                   ? ["Due", "accent"]
                   : c.standing === "CREDITED"

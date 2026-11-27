@@ -68,6 +68,7 @@ const PAGE = {
     share: null,
 };
 
+let page: typeof PAGE = PAGE;
 let release: () => void;
 const reads: string[] = [];
 
@@ -83,12 +84,15 @@ beforeEach(() => {
             reads.push(url);
             const body = url.startsWith("/api/orders/options")
                 ? { filters: null, openByStore: null }
-                : (await gate, PAGE);
+                : (await gate, page);
             return new Response(JSON.stringify(body), { status: 200 });
         }),
     );
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+    vi.unstubAllGlobals();
+    page = PAGE;
+});
 
 const tick = (ms = 20) => act(() => new Promise((r) => setTimeout(r, ms)));
 
@@ -162,6 +166,38 @@ describe("Orders before its first page", () => {
             ),
         ).toBe(true);
         release();
+        unmount();
+    });
+});
+
+describe("Orders with nothing open in the last month (DEC-265)", () => {
+    it("no open order at all keeps the empty state", async () => {
+        page = { ...PAGE, rows: [], counts: { all: 4, open: 0, refunded: 0 } };
+        const { host, unmount } = open();
+        release();
+        await tick(50);
+        expect(host.textContent).toContain("Nothing left to fulfil");
+        expect(host.textContent).not.toContain("open over a month");
+        unmount();
+    });
+
+    it("only month-old open orders shows the fold, never 'Nothing left to fulfil'", async () => {
+        page = {
+            ...PAGE,
+            rows: [],
+            counts: {
+                all: 4,
+                open: 3,
+                refunded: 0,
+                stale: 3,
+            } as typeof PAGE.counts,
+        };
+        const { host, unmount } = open();
+        release();
+        await tick(50);
+        expect(host.textContent).not.toContain("Nothing left to fulfil");
+        expect(host.textContent).toContain("3 orders open over a month");
+        expect(host.textContent).toContain("Close them");
         unmount();
     });
 });

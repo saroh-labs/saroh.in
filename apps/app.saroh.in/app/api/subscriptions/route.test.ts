@@ -98,6 +98,7 @@ import {
     subscriptionSettingsServer,
     subscriptionsListServer,
 } from "@/lib/subscriptions/access-server";
+import type { Subscription } from "@/lib/subscriptions/service";
 
 import { GET as PLAN } from "../plans/[planId]/route";
 import { GET as ONE } from "./[subscriptionId]/route";
@@ -124,8 +125,11 @@ const LEAKY_SUB = {
         id: "c_1",
         name: "Asha Rao",
         email: "asha@example.com",
+        phone: "+910000028783",
         providerCustomerId: "cust_RZP1",
     },
+    paymentFailed: true,
+    chargeFailed: false,
     price: "800.00",
     currency: "INR",
     interval: "MONTH",
@@ -281,6 +285,18 @@ describe("/api/subscriptions", () => {
 
     it("is the section's gate", async () => {
         await expectAuthzMatrix(READ_GATE, list);
+    });
+
+    // The quick look's Call card and its one word for an unpaid renewal
+    // come from this read, not the page's (DEC-269, DEC-270).
+    it("carries the subscriber's phone and whether a charge was declined", async () => {
+        const body = (await (await list()).json()) as {
+            subscriptions: Subscription[];
+        };
+        const [row] = body.subscriptions;
+        expect(row.contact.phone).toBe("+910000028783");
+        expect(row.paymentFailed).toBe(true);
+        expect(row.chargeFailed).toBe(false);
     });
 
     it("takes no params and no other method", async () => {

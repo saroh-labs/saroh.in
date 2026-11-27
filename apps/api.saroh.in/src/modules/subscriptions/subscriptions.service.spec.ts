@@ -105,6 +105,8 @@ jest.mock("@saroh/database", () => {
             // D13: autopay's failures and a charge under way.
             subscriptionEvent: { findMany: jest.fn() },
             paymentIntent: { findMany: jest.fn() },
+            // The list's "UPI Autopay · …" badges (D14).
+            paymentMandate: { findMany: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },
@@ -2133,6 +2135,15 @@ describe("a failed charge", () => {
             actions: resolveCapabilities("front-desk", ["subscription:read"]),
         };
         expect((await service.get(desk, "sub_1")).contact.phone).toBeNull();
+        // The list feeds the quick look's Call card (DEC-269): same rule.
+        db.paymentMandate!.findMany!.mockResolvedValue([]);
+        db.customerSubscription!.findMany!.mockResolvedValue([
+            await db.customerSubscription!.findFirst!(),
+        ]);
+        expect((await service.list(owner, {}))[0]?.contact.phone).toBe(
+            "+919876543210",
+        );
+        expect((await service.list(desk, {}))[0]?.contact.phone).toBeNull();
     });
 
     it("retries by making a new pay link for that invoice", async () => {

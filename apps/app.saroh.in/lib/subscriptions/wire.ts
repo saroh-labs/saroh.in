@@ -60,7 +60,9 @@ const SUBSCRIPTION = {
     id: ANY,
     status: ANY,
     plan: { id: ANY, name: ANY },
-    contact: { id: ANY, name: ANY, email: ANY },
+    // The API sends a phone only to `contact:read` (DEC-039); the sheet's
+    // Call card needs it (DEC-269).
+    contact: { id: ANY, name: ANY, email: ANY, phone: ANY },
     autopay: {
         state: ANY,
         method: ANY,
@@ -97,6 +99,7 @@ const SUBSCRIPTION = {
         paidAt: ANY,
     },
     paymentFailed: ANY,
+    chargeFailed: ANY,
     failedCharge: { ...INVOICE_REF, dueAt: ANY, total: ANY },
     collection: {
         weekday: ANY,

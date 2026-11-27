@@ -250,7 +250,7 @@ export function SubscriptionDetail({
     const rows = collectionRows(sub, now);
     const chargeRows =
         charges.state === "ok"
-            ? sortCharges(charges.data).map((c) => chargeRow(c, tz, now))
+            ? sortCharges(charges.data).map((c) => chargeRow(c, tz, now, sub))
             : [];
     const footer = [
         ran?.text,

@@ -12,7 +12,10 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OrgProvider } from "@/lib/query/org";
-import type { Subscription } from "@/lib/subscriptions/service";
+import type {
+    Subscription,
+    SubscriptionCharge,
+} from "@/lib/subscriptions/service";
 import { SubscriptionSaveProvider } from "@/lib/subscriptions/use-subscriptions";
 
 import { SubscriptionQuickLook } from "./subscription-quick-look";
@@ -108,7 +111,14 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-function show(sub: Subscription, { canPayLink = true, canWrite = true } = {}) {
+function show(
+    sub: Subscription,
+    {
+        canPayLink = true,
+        canWrite = true,
+        charges = [] as SubscriptionCharge[],
+    } = {},
+) {
     act(() =>
         root.render(
             <QueryClientProvider client={new QueryClient()}>
@@ -119,7 +129,10 @@ function show(sub: Subscription, { canPayLink = true, canWrite = true } = {}) {
                             sub={sub}
                             onClose={() => undefined}
                             plans={[]}
-                            charges={{ state: "ok", data: {} }}
+                            charges={{
+                                state: "ok",
+                                data: { [sub.id]: charges },
+                            }}
                             canWrite={canWrite}
                             canPayLink={canPayLink}
                             now={NOW}
@@ -153,6 +166,35 @@ describe("a renewal that isn't paid", () => {
         show(unpaid({ chargeFailed: true }));
         expect(page().textContent).toContain("Payment failed");
         expect(page().textContent).toContain("The charge was declined");
+    });
+
+    it("lists the unpaid renewal as Not paid in Last charges, as the header says (DEC-270)", () => {
+        const late: SubscriptionCharge = {
+            id: "inv_412",
+            number: "INV/26-27/0412",
+            status: "ISSUED",
+            standing: "OVERDUE",
+            kind: "INVOICE",
+            total: "900.00",
+            currency: "INR",
+            issuedAt: "2026-11-01T04:30:00.000Z",
+            dueAt: "2026-11-08T18:29:59.999Z",
+            paidAt: null,
+            periodStart: "2026-11-01T00:00:00.000Z",
+            periodEnd: "2026-12-01T00:00:00.000Z",
+            payment: null,
+            createdAt: "2026-11-01T04:30:00.000Z",
+        } as SubscriptionCharge;
+        show(unpaid(), { charges: [late] });
+        const row = page().querySelector('a[href="/billing/invoices/inv_412"]');
+        expect(row?.textContent).toContain("Not paid");
+        expect(row?.textContent).not.toContain("Failed");
+
+        show(unpaid({ chargeFailed: true }), { charges: [late] });
+        expect(
+            page().querySelector('a[href="/billing/invoices/inv_412"]')
+                ?.textContent,
+        ).toContain("Payment failed");
     });
 
     it("shows who to ring with a phone, and no card without one", () => {
