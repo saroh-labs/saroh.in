@@ -403,14 +403,36 @@ describe("charges", () => {
         });
     });
 
-    it("calls an overdue renewal failed", () => {
-        const row = chargeRow(
-            charge({ status: "ISSUED", standing: "OVERDUE", payment: null }),
-            TZ,
-            NOW,
-        );
-        expect(row.result).toBe("Failed");
+    it("calls an overdue renewal not paid, and failed only once declined (DEC-270)", () => {
+        const late = charge({
+            status: "ISSUED",
+            standing: "OVERDUE",
+            payment: null,
+        });
+        const row = chargeRow(late, TZ, NOW);
+        expect(row.result).toBe("Not paid");
         expect(row.note).toContain("due 8 Sep");
+        const failedCharge = {
+            id: late.id,
+            number: null,
+            dueAt: null,
+            total: "1200.00",
+        };
+        expect(
+            chargeRow(late, TZ, NOW, { chargeFailed: false, failedCharge })
+                .result,
+        ).toBe("Not paid");
+        expect(
+            chargeRow(late, TZ, NOW, { chargeFailed: true, failedCharge })
+                .result,
+        ).toBe("Payment failed");
+        // Declined is about that renewal, not an older unpaid one.
+        expect(
+            chargeRow(late, TZ, NOW, {
+                chargeFailed: true,
+                failedCharge: { ...failedCharge, id: "other" },
+            }).result,
+        ).toBe("Not paid");
     });
 
     it("finds how it pays, and whether renewals are tax invoices", () => {

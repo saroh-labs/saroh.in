@@ -7424,6 +7424,7 @@ the person.
 route the apps' servers call for everyone isn't held to a per-address
 count. Tested in `packages/auth/src/sign-in-code.test.ts`.
 **Category**: limits · `packages/auth`
+
 ## check:draft-words held a page that had stopped being held (27 Nov 2026)
 
 **Symptom**: 26 Nov 2026: `pnpm run check:draft-words` failed three times
@@ -7447,3 +7448,24 @@ unit test that runs in CI: `docs-content.test.ts` ("check:draft-words'
 held page is held on today's content") fails the moment the held page
 would build.
 **Category**: testing · `saroh.in`
+
+## A read route's field list dropped what the sheet drew (27 Nov 2026)
+
+**Symptom**: 27 Nov 2026, saroh.io: a membership whose renewal wasn't
+paid opened its quick look with Not paid, Send new link and Record payment,
+but no Subscriber card with Call, though the Owner may read contacts and
+the contact has a phone. "Payment failed" never showed either, even after
+a declined charge.
+**Cause**: the API sent `contact.phone` and `chargeFailed`, but the app's
+read routes pass on only the fields named in `lib/subscriptions/wire.ts`
+(DEC-259), and neither was named. The quick look's tests built the
+subscription by hand, so they never went through the route's list.
+**Fix**: `phone` and `chargeFailed` added to the subscription's shape. The
+API still sends a phone only to `contact:read` (`forViewer`), now tested
+on the list as well as the page.
+**Rule**: when a screen starts drawing a new field, the read route's
+field list gets it too, and the route test says the field arrives
+(`app/api/subscriptions/route.test.ts`, "carries the subscriber's phone
+and whether a charge was declined"). A component test with a hand-built
+object doesn't prove the read carries the field.
+**Category**: data · `app.saroh.in`

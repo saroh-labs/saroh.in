@@ -234,6 +234,9 @@ export function OrdersScreen({
     // the Open view (DEC-265); their own list is a press away.
     const stale = page?.counts.stale ?? 0;
     const folded = foldsOlder(query) && stale > 0 ? stale : 0;
+    // When every open order is folded, the fold line is the one message:
+    // the empty state would say "Nothing left to fulfil" above it.
+    const allFolded = rows.length === 0 && folded > 0;
     const range = page ? pageRange(query, rows.length, total) : null;
     const firstStore = stores.length === 1 ? stores[0] : undefined;
     // Anything narrowed, a search with words in it included: the toolbar
@@ -474,7 +477,7 @@ export function OrdersScreen({
                         shape="rows"
                         label="Loading orders"
                     />
-                ) : rows.length === 0 ? (
+                ) : allFolded ? null : rows.length === 0 ? (
                     <OrdersEmpty
                         query={query}
                         everything={page.counts.all}

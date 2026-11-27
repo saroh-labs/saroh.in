@@ -212,7 +212,7 @@ function Body({
     const mine = charges.state === "ok" ? (charges.data[sub.id] ?? []) : [];
     const last = sortCharges(mine)
         .slice(0, 3)
-        .map((c) => chargeRow(c, tz, now));
+        .map((c) => chargeRow(c, tz, now, sub));
 
     return (
         <>
