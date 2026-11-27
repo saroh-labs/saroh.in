@@ -467,6 +467,26 @@ export function formatRelative(at: Instant, now: Instant = new Date()): string {
     return ago(Math.floor(gap / MS_PER_DAY), "day");
 }
 
+/**
+ * How many days late something due at `dueAt` is (DEC-269): calendar days
+ * in the business's zone (DEC-033), from the day it was due to today, and
+ * at least 1 once the moment has passed; 0 before it. Every screen that says
+ * "N days late" or "N days past due" counts with this, as the API's
+ * `daysLate` (`overdue-bills.ts`) does, so one bill never reads two numbers.
+ */
+export function daysPastDue(
+    dueAt: Instant,
+    now: Instant,
+    timeZone: string,
+): number {
+    if (new Date(dueAt).getTime() >= new Date(now).getTime()) return 0;
+    const [y1, m1, d1] = localDateKey(dueAt, timeZone).split("-").map(Number);
+    const [y2, m2, d2] = localDateKey(now, timeZone).split("-").map(Number);
+    const days =
+        (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / MS_PER_DAY;
+    return Math.max(1, days);
+}
+
 /** Whole days between two instants; negative when `iso` is in the past. */
 export function daysUntil(iso: string | Date, now: Date = new Date()): number {
     return Math.round((new Date(iso).getTime() - now.getTime()) / MS_PER_DAY);

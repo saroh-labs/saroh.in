@@ -15,6 +15,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/subscriptions/actions", () => ({}));
 vi.mock("@/lib/gst-rates/actions", () => ({}));
+// The quick look records a payment and makes a link (finding 21).
+vi.mock("@/lib/invoices/actions", () => ({}));
+vi.mock("@/lib/invoices/link-actions", () => ({}));
 
 import { renderWithQuery } from "@/lib/query/test-utils";
 

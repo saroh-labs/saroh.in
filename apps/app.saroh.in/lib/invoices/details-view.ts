@@ -221,21 +221,23 @@ export function nextLabel(tab: InvoiceTab): string {
 
 /**
  * The line at the top of "What happened" while money is owed here and this
- * person can act on it (INVPageA): what comes next is theirs.
+ * person can act on it (INVPageA): what comes next is theirs. It offers a
+ * call only with a number to call (finding 11).
  */
 export function nextStep(
     i: Pick<Invoice, "standing" | "kind" | "order"> &
-        Partial<Pick<Invoice, "partlyPaid">>,
+        Partial<Pick<Invoice, "partlyPaid" | "contact">>,
     who: string,
     canWrite: boolean,
 ): { what: string; sub: string } | null {
     if (!canWrite || i.kind === "CREDIT_NOTE" || i.order) return null;
     if (i.standing !== "ISSUED" && i.standing !== "OVERDUE") return null;
     const first = who.split(" ")[0] || who;
+    const rest = i.partlyPaid ? "record the rest" : "record the payment";
     return {
         what: "Next step is yours",
-        sub: i.partlyPaid
-            ? `Share it, call ${first}, or record the rest`
-            : `Share it, call ${first}, or record the payment`,
+        sub: i.contact?.phone
+            ? `Share it, call ${first}, or ${rest}`
+            : `Share it or ${rest}`,
     };
 }

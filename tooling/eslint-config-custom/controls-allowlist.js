@@ -217,6 +217,8 @@ export const RAW_ALLOWED = {
     "components/settings/activity/activity-list.tsx": ["button"],
     // button: a control styled by its screen's own helper, an option in a list; input: a field its screen draws itself
     "components/shared/navigation/settings-search.tsx": ["button", "input"],
+    // button: a menu group's label as its fold (aria-expanded, DEC-279), on the rail and in the More sheet
+    "components/shared/navigation/nav-group-toggle.tsx": ["button"],
     // button: a row or card that is one button
     "components/shared/shell/app-sidebar.tsx": ["button"],
     // button: Other rate, a chip-shaped disclosure (aria-expanded) beside the rates (DEC-176)

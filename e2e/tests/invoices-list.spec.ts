@@ -118,7 +118,21 @@ test.describe("invoices list: Rye & Co., read only", () => {
         ).toHaveCount(0);
 
         const overdue = figure(page, "overdue");
-        await expect(overdue).toHaveAttribute("aria-pressed", "false");
+        // With anything overdue the list opens on it, the tile marked
+        // (DEC-271); pressed, it gives way to every invoice (`?tab=all`).
+        const late = summary.overdue.count > 0;
+        await expect(overdue).toHaveAttribute(
+            "aria-pressed",
+            late ? "true" : "false",
+        );
+        if (late) {
+            await pressUntil(
+                overdue,
+                async () =>
+                    (await overdue.getAttribute("aria-pressed")) === "false",
+            );
+            await expect(page).toHaveURL(/[?&]tab=all\b/);
+        }
         await pressUntil(
             overdue,
             async () => (await overdue.getAttribute("aria-pressed")) === "true",
