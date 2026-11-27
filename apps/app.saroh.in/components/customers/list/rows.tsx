@@ -260,6 +260,7 @@ function Row({
             {cells}
             <span
                 aria-hidden
+                data-ph-unmask=""
                 className="hidden text-right text-[12.5px] text-muted-foreground sm:block"
             >
                 Open
@@ -330,6 +331,7 @@ function LinkPayer({ row, canLink }: { row: CustomerRow; canLink: boolean }) {
                             <>
                                 {" ("}
                                 <TextLink
+                                    data-ph-unmask=""
                                     href={customerHref(
                                         payer.storefront.id,
                                         payer.customerId,

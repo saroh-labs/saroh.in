@@ -302,7 +302,9 @@ test.describe("customer detail", () => {
 });
 
 test.describe("customer detail, as a Member", () => {
-    test("a Member sees no billing tabs and no money", async ({ page }) => {
+    test("a Member sees their orders, no billing tabs and no money", async ({
+        page,
+    }) => {
         await signIn(page, RYE, "member");
         await page.goto(`/customers/${PRIYA}`);
         await expect(
@@ -321,8 +323,13 @@ test.describe("customer detail, as a Member", () => {
         // A Member reads no leads: no Leads or Enquiries tab.
         for (const name of [/^Leads/, /^Enquiries/])
             await expect(tab(page, name)).toHaveCount(0);
-        for (const name of [/^Invoices/, /^Subscriptions/, /^Orders/])
+        for (const name of [/^Invoices/, /^Subscriptions/])
             await expect(tab(page, name)).toHaveCount(0);
+        // A Member who hands orders over sees this customer's orders, with
+        // no amounts (DEC-276, DEC-024).
+        await expect(tab(page, /^Orders/)).toBeVisible();
+        await expect(page.getByRole("main")).not.toContainText("₹");
+        await tab(page, /^Orders/).click();
         await expect(page.getByRole("main")).not.toContainText("₹");
         await expect(
             page.getByRole("button", { name: "Edit details" }),
