@@ -51,7 +51,7 @@ export function OrdersHeading({
 }) {
     return (
         <PageHeader
-            breadcrumb={["Sell", "Orders"]}
+            breadcrumb={["Orders"]}
             title="Orders"
             count={count}
             className="mb-3"

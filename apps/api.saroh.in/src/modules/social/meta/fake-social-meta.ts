@@ -69,6 +69,7 @@ export class FakeSocialMeta implements SocialMetaPort {
         this.calls.length = 0;
         this.containers.clear();
         this.failures.length = 0;
+        this.revoked.length = 0;
     }
 
     available(): boolean {
@@ -209,6 +210,14 @@ export class FakeSocialMeta implements SocialMetaPort {
             (p) => p.accountId === accountId && p.caption.includes(ref),
         );
         return hit ? { id: hit.id, permalink: hit.permalink } : null;
+    }
+
+    /** Who had their permissions taken back, in order. */
+    readonly revoked: string[] = [];
+
+    async revoke(kind: PageKind, platformUserId: string): Promise<void> {
+        this.take("revoke", kind);
+        this.revoked.push(platformUserId);
     }
 
     private keep(

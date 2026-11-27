@@ -113,6 +113,7 @@ import type { ServiceView } from "./service-fields";
 import {
     assertDepositPriced,
     assertServiceChargeTakes,
+    isFreeService,
     toServiceView,
 } from "./service-fields";
 import { businessZone } from "./staff-availability";
@@ -1474,6 +1475,23 @@ export class BookingsService {
         // Who can book it: "Your team" (Q5). The booking page reads only
         // its own tick.
         assertBookableByTeam(service);
+        // A free service (DEC-261) is booked with nothing to pay: no pack
+        // or membership is spent on it and nothing is taken. "Pays at the
+        // visit" from an older client is taken as no way at all.
+        const free = isFreeService(service);
+        if (
+            free &&
+            (withPack ||
+                withMembership ||
+                !!dto.paidBy ||
+                dto.paidWith === "PAID")
+        ) {
+            throw new BadRequestException({
+                message:
+                    "This service is free, so nothing is paid for it: no class pack, membership or payment.",
+                field: "paidWith",
+            });
+        }
         // A treatment is sold as one order (E9, DEC-050), paid on it: never
         // with a pack or a membership, and never without a storefront.
         const treatment = isTreatment(service);
@@ -1566,7 +1584,7 @@ export class BookingsService {
         const paidBy = dto.paidBy ?? null;
         const paidWith: PaidWith | null = withPack
             ? "PACK"
-            : paidBy
+            : paidBy || free
               ? null
               : (dto.paidWith ?? null);
 

@@ -336,6 +336,36 @@ describe("AdminPeopleService", () => {
             );
         });
 
+        it("the person the change is about can't confirm it", async () => {
+            requests.findFirst.mockResolvedValue({
+                id: "ocr_1",
+                userId: "staff_2",
+                kind: "ROLE",
+                role: "OWNER",
+                reason: "Owner asked by email",
+                requestedByUserId: "staff_1",
+            });
+            const { service, members, audit } = build();
+            await expect(
+                service.confirmOwnerChange({
+                    staff: other,
+                    organizationId: "org_1",
+                    requestId: "ocr_1",
+                    reason: "Checked with the owner",
+                }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect(members.updateRole).not.toHaveBeenCalled();
+            expect(requests.updateMany).not.toHaveBeenCalled();
+            expect(audit.write).toHaveBeenCalledWith(
+                prisma,
+                expect.objectContaining({
+                    outcome: "DENIED",
+                    actorUserId: "staff_2",
+                    metadata: { requestId: "ocr_1", subjectConfirm: true },
+                }),
+            );
+        });
+
         it("a second staff member applies it, marks it and tells the Owners", async () => {
             requests.findFirst.mockResolvedValue({
                 id: "ocr_1",

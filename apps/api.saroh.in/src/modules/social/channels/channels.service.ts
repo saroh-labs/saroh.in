@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
     ForbiddenException,
     Inject,
@@ -8,7 +10,7 @@ import {
     ServiceUnavailableException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { prisma, runInOrgContext } from "@saroh/database";
+import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 
 import { appBase } from "../../../common/app-url";
@@ -20,6 +22,7 @@ import { MetaNotSetUpError } from "../meta/meta-clients";
 import type {
     ChannelKind,
     ConnectedAccount,
+    PageKind,
     SocialMetaPort,
 } from "../meta/social-meta.port";
 import { isMetaError, SOCIAL_META } from "../meta/social-meta.port";
@@ -30,10 +33,19 @@ import {
 } from "../shared/jobs";
 import { settlePostsInTx } from "../shared/status";
 import type { StateRefusal } from "./connect-state";
-import { signState, verifyState } from "./connect-state";
+import {
+    newNonce,
+    signState,
+    STATE_TTL_MS,
+    verifyState,
+} from "./connect-state";
 import type { ChannelView, PageChoiceView } from "./dto";
 import { CHANNEL_ORDER, channelView, kindPath } from "./dto";
 import { seal, tokenColumns, unseal } from "./sealing";
+
+/** A consent's state is good once: its nonce is kept here until used. */
+const stateKey = (kind: ChannelKind, nonce: string) =>
+    `social-consent-state:${kind}:${nonce}`;
 
 /** How long a Threads grant lasts from a connect, or a refresh that extends it. */
 export const THREADS_GRANT_MS = 90 * 86_400_000;
@@ -95,8 +107,19 @@ export class SocialChannelsService {
     async list(ctx: OrganizationContext): Promise<ChannelView[]> {
         await this.access.assertOn(ctx, "social:read");
         const [rows, waiting] = await Promise.all([
+            // Never the token columns: only what `channelView` shows.
             prisma.socialChannel.findMany({
                 where: { organizationId: ctx.organizationId },
+                select: {
+                    kind: true,
+                    status: true,
+                    handle: true,
+                    avatarUrl: true,
+                    connectedAt: true,
+                    attentionReason: true,
+                    attentionAt: true,
+                    grantExpiresAt: true,
+                },
             }),
             prisma.socialDelivery.groupBy({
                 by: ["kind"],
@@ -138,11 +161,35 @@ export class SocialChannelsService {
     ): Promise<{ url: string }> {
         await this.access.assertOn(ctx, "social:post");
         const meta = this.metaFor(kind);
-        const state = signState({
-            organizationId: ctx.organizationId,
-            userId: ctx.userId,
-            kind,
-        });
+        // One consent at a time per person and channel: an older one is spent.
+        await outsideOrgContext(() =>
+            prisma.verification.deleteMany({
+                where: {
+                    identifier: { startsWith: stateKey(kind, "") },
+                    value: ctx.userId,
+                },
+            }),
+        );
+        const nonce = newNonce();
+        const state = signState(
+            {
+                organizationId: ctx.organizationId,
+                userId: ctx.userId,
+                kind,
+            },
+            new Date(),
+            nonce,
+        );
+        await outsideOrgContext(() =>
+            prisma.verification.create({
+                data: {
+                    id: randomUUID(),
+                    identifier: stateKey(kind, nonce),
+                    value: ctx.userId,
+                    expiresAt: new Date(Date.now() + STATE_TTL_MS),
+                },
+            }),
+        );
         return {
             url: meta.authorizeUrl(kind, {
                 redirectUri: this.redirectUri(ctx.edition ?? null, kind),
@@ -178,6 +225,10 @@ export class SocialChannelsService {
         if (state.userId !== signedInUserId) {
             return this.back(edition, kind, "someone-else");
         }
+        // Good once: a second use of the same state is refused.
+        if (!(await this.useState(kind, state.nonce, signedInUserId))) {
+            return this.back(edition, kind, "expired");
+        }
         if (query.error || !query.code) {
             return this.back(edition, kind, "denied");
         }
@@ -193,6 +244,24 @@ export class SocialChannelsService {
             );
             return this.back(edition, kind, outcomeOf(error));
         }
+    }
+
+    /** Spend a consent state's nonce: true only the first time, for its own person. */
+    private async useState(
+        kind: ChannelKind,
+        nonce: string,
+        userId: string,
+    ): Promise<boolean> {
+        const { count } = await outsideOrgContext(() =>
+            prisma.verification.deleteMany({
+                where: {
+                    identifier: stateKey(kind, nonce),
+                    value: userId,
+                    expiresAt: { gt: new Date() },
+                },
+            }),
+        );
+        return count > 0;
     }
 
     /** Keep Meta's grant: the account and its sealed token, or the Page choice. */
@@ -300,13 +369,15 @@ export class SocialChannelsService {
      * Stop posting to a channel (U4): its token and row go; deliveries
      * still waiting for it fail as "disconnected", and its posts are
      * otherwise kept. Never refused for a plan or a closing business: only
-     * `social:post` is asked.
+     * `social:post` is asked. A Facebook or Instagram channel first takes
+     * Saroh's permissions back at Meta (`revokeAtMeta`).
      */
     async disconnect(
         ctx: OrganizationContext,
         kind: ChannelKind,
     ): Promise<void> {
         authorize(ctx, "social:post");
+        if (kind !== "THREADS") await this.revokeAtMeta(ctx, kind);
         await prisma.$transaction(async (tx) => {
             const row = await tx.socialChannel.findUnique({
                 where: {
@@ -322,6 +393,48 @@ export class SocialChannelsService {
             await dropWaitingJob(tx, row.refreshJobId);
             await tx.socialChannel.delete({ where: { id: row.id } });
         });
+    }
+
+    /**
+     * Take back the permissions of the person who connected this channel,
+     * when nothing else of Saroh's uses their sign-in: no other Facebook or
+     * Instagram channel, in any business, with the same Meta person (a
+     * revoke covers all of them). A failure is logged and the disconnect
+     * goes on: the token is dropped here either way, and Meta's grant is
+     * then the person's to remove in their Facebook settings.
+     */
+    private async revokeAtMeta(
+        ctx: OrganizationContext,
+        kind: PageKind,
+    ): Promise<void> {
+        if (!this.meta) return;
+        const row = await prisma.socialChannel.findUnique({
+            where: {
+                organizationId_kind: {
+                    organizationId: ctx.organizationId,
+                    kind,
+                },
+            },
+            select: { id: true, platformUserId: true },
+        });
+        if (!row) return;
+        const others = await outsideOrgContext(() =>
+            prisma.socialChannel.count({
+                where: {
+                    id: { not: row.id },
+                    kind: { in: ["FACEBOOK", "INSTAGRAM"] },
+                    platformUserId: row.platformUserId,
+                },
+            }),
+        );
+        if (others > 0) return;
+        try {
+            await this.meta.revoke(kind, row.platformUserId);
+        } catch (error) {
+            this.logger.warn(
+                `social_meta_revoke_failed org=${ctx.organizationId} kind=${kind} reason=${isMetaError(error) ? error.kind : error instanceof Error ? error.name : "error"}`,
+            );
+        }
     }
 
     /**

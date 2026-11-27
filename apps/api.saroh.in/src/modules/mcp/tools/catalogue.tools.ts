@@ -66,18 +66,22 @@ const productItem = (p: ProductView) => ({
     })),
 });
 
+/** "free" for a price of 0 (DEC-261), else the amount; null for no price. */
+const servicePrice = (s: ServiceView) =>
+    s.price ? (s.price.amountMinor === 0 ? "free" : money(s.price)) : null;
+
 const serviceItem = (s: ServiceView) => ({
     service_id: s.id,
     name: s.name,
     duration_minutes: s.durationMinutes,
-    price: s.price ? money(s.price) : null,
+    price: servicePrice(s),
     capacity: s.capacity,
     status: s.status,
     timezone: s.timezone,
 });
 
 const serviceLine = (s: ServiceView) =>
-    `${JSON.stringify(s.name)} (service_id ${s.id}): ${s.durationMinutes} min, ${s.price ? money(s.price) : "no price"}${s.capacity > 1 ? `, class of ${s.capacity}` : ""}, ${s.status}`;
+    `${JSON.stringify(s.name)} (service_id ${s.id}): ${s.durationMinutes} min, ${servicePrice(s) ?? "no price"}${s.capacity > 1 ? `, class of ${s.capacity}` : ""}, ${s.status}`;
 
 const more = (next: string | null) =>
     next ? `More: call again with cursor ${next}.` : "That's all.";
@@ -385,7 +389,7 @@ export function catalogueTools(catalogue: CatalogueV1Controller): McpTool[] {
             name: "create_service",
             title: "Add a service",
             description:
-                'Use this when the person offers something new that customers book. Example: name "Haircut", duration_minutes 45, price 500. Capacity above 1 makes it a class. Then set when it can be booked with set_hours. Not for products (create_product).',
+                'Use this when the person offers something new that customers book. Example: name "Haircut", duration_minutes 45, price 500. Price 0 makes it free: customers book it with nothing to pay. Capacity above 1 makes it a class. Then set when it can be booked with set_hours. Not for products (create_product).',
             contract: createServiceTool,
             capability: "service:write",
             module: "APPOINTMENTS",
@@ -423,7 +427,7 @@ export function catalogueTools(catalogue: CatalogueV1Controller): McpTool[] {
             name: "update_service",
             title: "Change a service",
             description:
-                "Use this when the person changes a service's name, length, price, description or class size. Send only what changes. Example: service_id from list_services, duration_minutes 60. For when it can be booked use set_hours.",
+                "Use this when the person changes a service's name, length, price, description or class size. Send only what changes. Price 0 makes it free; bookings already made keep their price. Example: service_id from list_services, duration_minutes 60. For when it can be booked use set_hours.",
             contract: updateServiceTool,
             capability: "service:write",
             module: "APPOINTMENTS",

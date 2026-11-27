@@ -14,7 +14,7 @@ export default function Error({
         <SectionError
             error={error}
             retry={retry}
-            heading="Subscriptions"
+            heading="Memberships"
             things="subscriptions"
             reassurance="Every membership is still running, and renewals still go out."
         />

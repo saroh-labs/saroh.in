@@ -14,9 +14,8 @@ export default function NotFoundPage() {
         <PageContainer width="full">
             <PageHeader
                 breadcrumb={[
-                    "Payments",
                     <IntentLink data-ph-unmask="" key="plans" href={PLANS_HREF}>
-                        Plans
+                        Membership plans
                     </IntentLink>,
                     "Not found",
                 ]}

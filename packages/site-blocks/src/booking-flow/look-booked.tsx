@@ -23,6 +23,7 @@ import {
     changeRules,
     changeText,
     firstVisitText,
+    FREE_BOOKED_TEXT,
     googleCalendarHref,
     MOVE_OR_CANCEL,
     payLaterText,
@@ -105,9 +106,11 @@ export function LookBooked({
             ? phase.rest
                 ? `Paid a ${phase.price ?? ""} deposit. The rest (${phase.rest}) is paid at ${business}.`
                 : `Paid ${phase.price ?? ""} online.`
-            : phase.price
-              ? payLaterText(phase.price, booking.online, business)
-              : "Nothing to pay in advance.");
+            : phase.free
+              ? FREE_BOOKED_TEXT
+              : phase.price
+                ? payLaterText(phase.price, booking.online, business)
+                : "Nothing to pay in advance.");
     const payAhead =
         !phase.paid && !phase.creditText && phase.price
             ? payInstructionsOf(booking.payInstructions)

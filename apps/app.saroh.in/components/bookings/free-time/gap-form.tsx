@@ -117,6 +117,8 @@ export function GapForm({
     const chosen = offered.find((s) => s.id === serviceId) ?? null;
     const at = (chosen ? fitOf(chosen).at : null) ?? free[0];
     const extra = canHours ? extraHoursAt(staff, date, free[0]) : null;
+    // A free service (DEC-261): nothing to pay, so no way to pay is asked.
+    const chosenFree = chosen?.priceCents === 0;
     const amount =
         chosen && money
             ? formatMoney(chosen.payCents ?? chosen.priceCents, chosen.currency)
@@ -161,7 +163,7 @@ export function GapForm({
             ? PICK_A_SERVICE
             : step >= 2 && !bookerFor(pick)
               ? PICK_WHO
-              : step === 3
+              : step === 3 && !chosenFree
                 ? payProblem(pay, paidBy)
                 : null;
 
@@ -185,7 +187,7 @@ export function GapForm({
                         startAt,
                         idempotencyKey: attempt,
                         staffId: staff.id,
-                        ...payInput(pay, paidBy),
+                        ...(chosenFree ? {} : payInput(pay, paidBy)),
                         ...booker,
                     },
                     ...org,
@@ -217,7 +219,10 @@ export function GapForm({
             setRefusal(res.error);
             return;
         }
-        const link = pay === "LINK" ? await makePayLink(res.data.id) : null;
+        const link =
+            pay === "LINK" && !chosenFree
+                ? await makePayLink(res.data.id)
+                : null;
         setSaving(false);
         setBooked({
             bookingId: res.data.id,
@@ -233,6 +238,7 @@ export function GapForm({
             amount,
             link,
             business,
+            free: chosenFree,
         });
         refresh();
     }
@@ -343,21 +349,31 @@ export function GapForm({
                                         onService={() => go(1)}
                                         onCustomer={() => go(2)}
                                     />
-                                    <PayChoice
-                                        value={pay}
-                                        onChange={setPay}
-                                        paidBy={paidBy}
-                                        onPaidByChange={setPaidBy}
-                                        offerLink={linkShown(
-                                            people,
-                                            chosen.priceCents,
-                                        )}
-                                        canTakePayment={
-                                            people.canTakePayment !== false
-                                        }
-                                        amount={amount}
-                                        invalid={tried}
-                                    />
+                                    {chosenFree ? (
+                                        <p
+                                            data-ph-unmask=""
+                                            className="m-0 text-sm text-muted-foreground"
+                                        >
+                                            It&apos;s free, so there&apos;s
+                                            nothing to pay.
+                                        </p>
+                                    ) : (
+                                        <PayChoice
+                                            value={pay}
+                                            onChange={setPay}
+                                            paidBy={paidBy}
+                                            onPaidByChange={setPaidBy}
+                                            offerLink={linkShown(
+                                                people,
+                                                chosen.priceCents,
+                                            )}
+                                            canTakePayment={
+                                                people.canTakePayment !== false
+                                            }
+                                            amount={amount}
+                                            invalid={tried}
+                                        />
+                                    )}
                                 </>
                             ) : null}
                             <Refusal>{refusal}</Refusal>

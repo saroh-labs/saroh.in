@@ -15,7 +15,8 @@ export type MessagePay =
     | { kind: "visit"; amount: string | null }
     | { kind: "link"; amount: string | null; url: string | null }
     | { kind: "paid"; amount: string | null }
-    | { kind: "pack" };
+    | { kind: "pack" }
+    | { kind: "free" };
 
 export interface BookingMessageInput {
     /** The customer, by full name: "Zara Ahmed". */
@@ -66,6 +67,8 @@ function payLine(pay: MessagePay): string {
                 : "It's paid, thank you.";
         case "pack":
             return "It uses one class from your class pack.";
+        case "free":
+            return "It's free, there's nothing to pay.";
     }
 }
 

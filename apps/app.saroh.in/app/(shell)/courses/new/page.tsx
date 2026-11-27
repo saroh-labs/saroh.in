@@ -52,7 +52,6 @@ export default async function NewCoursePage() {
                 <PageHeader
                     className="mb-0"
                     breadcrumb={[
-                        "Bookings",
                         <IntentLink
                             data-ph-unmask=""
                             key="courses"

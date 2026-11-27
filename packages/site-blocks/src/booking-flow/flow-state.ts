@@ -39,6 +39,8 @@ export type Phase =
           booking: BookResult;
           paid: boolean;
           price: string | null;
+          /** A free service (DEC-261): it says so, and nothing about paying. */
+          free?: boolean;
           /** Paid a deposit: what is left for the visit (E8). */
           rest?: string | null;
           /** Paid with a class credit (A10): "Used 1 credit from…". */

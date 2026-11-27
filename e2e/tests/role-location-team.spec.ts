@@ -33,7 +33,7 @@ import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
  * The role reads the business, its team, its modules, its locations and
  * products, and works the orders of the locations the person is on
  * (`STOREFRONT_TEAM_ACTIONS`; the API's `orders/order-location.ts`). The
- * menu offers the work: Sell with Orders alone (`sellOrdersOnly`).
+ * menu offers the work: of what was Sell, Orders alone (`sellOrdersOnly`).
  *
  * `storefront-team-orders.spec.ts` moves an order as her. Here the orders
  * are only read, on two the owner makes for the test, one at each location.
@@ -48,17 +48,13 @@ const ONLINE_LINE = "E2E Online Line";
 
 /**
  * `NAV_GROUPS` (`components/shared/navigation/nav-items.tsx`) for the role's
- * permissions, then `sellOrdersOnly`: Sell lands on Orders and holds only
- * that. Website, Bookings and Contacts are modules out of the role's reach.
+ * permissions, then `sellOrdersOnly`: of what was Sell, Orders alone.
+ * Website, Bookings and Contacts are modules out of the role's reach.
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
     { label: "Business calendar", href: "/calendar" },
-    {
-        label: "Sell",
-        href: "/commerce/orders",
-        pages: [{ label: "Orders", href: "/commerce/orders" }],
-    },
+    { label: "Orders", href: "/commerce/orders" },
     { label: "Settings", href: "/settings" },
 ];
 

@@ -10,11 +10,15 @@ import { env } from "../env";
 
 interface Source {
     ACCOUNTS_URL?: string;
+    ADMIN_URL?: string;
     BETTER_AUTH_URL?: string;
     NODE_ENV?: string;
 }
 
-const LOCAL_ACCOUNTS = "https://accounts.saroh.localhost";
+const LOCAL = {
+    accounts: "https://accounts.saroh.localhost",
+    admin: "https://admin.saroh.localhost",
+} as const;
 
 function originOf(url: string | undefined): string | null {
     if (!url) return null;
@@ -41,15 +45,36 @@ export function accountsOrigins(
     apiHost?: string | null,
     source: Source = env,
 ): string[] {
+    return appOrigins("accounts", source.ACCOUNTS_URL, apiHost, source);
+}
+
+/**
+ * The admin console of each edition, in this API's environment, found as
+ * {@link accountsOrigins} finds accounts, from `ADMIN_URL`: the only origins
+ * an `/admin` write is taken from (`assertAdminWriteOrigin`).
+ */
+export function adminOrigins(
+    apiHost?: string | null,
+    source: Source = env,
+): string[] {
+    return appOrigins("admin", source.ADMIN_URL, apiHost, source);
+}
+
+function appOrigins(
+    app: keyof typeof LOCAL,
+    url: string | undefined,
+    apiHost: string | null | undefined,
+    source: Source,
+): string[] {
     const own =
-        originOf(source.ACCOUNTS_URL) ??
-        (source.NODE_ENV === "development" ? LOCAL_ACCOUNTS : null);
+        originOf(url) ??
+        (source.NODE_ENV === "development" ? LOCAL[app] : null);
     const found = new Set<string>(own ? [own] : []);
     const anchor = own ?? originOf(source.BETTER_AUTH_URL);
     const environment = anchor ? environmentOfHost(new URL(anchor).host) : null;
     if (environment) {
         for (const edition of EDITIONS) {
-            found.add(urlOf(hostsFor(edition, environment).accounts));
+            found.add(urlOf(hostsFor(edition, environment)[app]));
         }
     }
     const edition = apiHost ? editionOfHost(apiHost) : null;

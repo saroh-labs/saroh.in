@@ -366,7 +366,7 @@ const LISTED: Shot[] = [
         {
             viewport: { width: 1100, height: 1500 },
             steps: [
-                { hide: '[data-moment="new-ai-apps"]' },
+                { hide: '[data-moment^="new-"]' },
                 {
                     click: '[data-home-layout="desk"] [data-need-group]:has-text("unpaid") button[aria-label="Show the rows"]',
                 },
@@ -532,7 +532,7 @@ const LISTED: Shot[] = [
         "Needs you on the Home of Wrenfield Dental (demo clinic): unpaid invoices, a note to answer and what to set up",
         {
             viewport: { width: 1100, height: 1500 },
-            steps: [{ hide: '[data-moment="new-ai-apps"]' }],
+            steps: [{ hide: '[data-moment^="new-"]' }],
             clip: {
                 selector:
                     '[data-home-layout="desk"] section:has(h2:text-is("Needs you"))',
@@ -546,7 +546,7 @@ const LISTED: Shot[] = [
         "Today on the Home of Wrenfield Dental (demo clinic): the day's patients in order, with their dentist and flags",
         {
             viewport: { width: 1100, height: 1500 },
-            steps: [{ hide: '[data-moment="new-ai-apps"]' }],
+            steps: [{ hide: '[data-moment^="new-"]' }],
             clip: {
                 selector:
                     '[data-home-layout="desk"] section:has(h2:text-is("Today"))',
@@ -561,7 +561,7 @@ const LISTED: Shot[] = [
         {
             viewport: { width: 1100, height: 1500 },
             steps: [
-                { hide: '[data-moment="new-ai-apps"]' },
+                { hide: '[data-moment^="new-"]' },
                 {
                     click: '[data-home-layout="desk"] [data-need-group]:has-text("unpaid") button[aria-label="Show the rows"]',
                 },
@@ -586,7 +586,7 @@ const LISTED: Shot[] = [
         "/commerce/orders",
         "Orders at Wrenfield Dental (demo clinic): treatments of several visits, each with where it's up to",
         {
-            steps: [{ hide: '[data-moment="new-ai-apps"]' }],
+            steps: [{ hide: '[data-moment^="new-"]' }],
         },
     ),
     clinic(

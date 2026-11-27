@@ -11,7 +11,7 @@ export default function Loading() {
             shape="money-list"
             width="full"
             compactOnPhone
-            breadcrumb={["Payments", "Invoices"]}
+            breadcrumb={["Invoices"]}
             title="Invoices"
             label="Loading invoices"
         />

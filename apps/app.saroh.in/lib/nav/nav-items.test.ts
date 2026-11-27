@@ -5,6 +5,7 @@ import type {
     NavRole,
 } from "@/components/shared/navigation/nav-items";
 import {
+    MEMBERSHIP_PLANS_HREF,
     NAV_GROUPS,
     NOTIFICATIONS_NAV,
     SETTINGS_PAGES,
@@ -70,6 +71,9 @@ function hrefs(groups: NavGroup[]): string[] {
     }
     return out;
 }
+
+/** `hrefs`, for describes that name their own `hrefs`. */
+const allHrefs = hrefs;
 
 /**
  * The module keys the API would hand each role.
@@ -239,7 +243,7 @@ describe("what each role is offered", () => {
         ).not.toContain("/commerce/stock");
     });
 
-    it("offers a Storefront team holder Sell with Orders alone (DEC-074)", () => {
+    it("offers a Storefront team holder Orders alone of what was Sell (DEC-074)", () => {
         const storefrontTeam = [
             "org:read",
             "member:read",
@@ -266,14 +270,7 @@ describe("what each role is offered", () => {
         ]) {
             expect(offered).not.toContain(other);
         }
-        // Sell lands on Orders, not on the Storefronts it no longer offers.
-        const sell = groups
-            .flatMap((g) => g.items)
-            .find((i) => i.label === "Sell");
-        expect(sell?.href).toBe("/commerce/orders");
-        expect(sell?.children?.map((c) => c.href)).toEqual([
-            "/commerce/orders",
-        ]);
+        expect(offered).not.toContain("/commerce/locations");
         // The same permissions in any other role keep Sell as it was.
         expect(
             hrefs(
@@ -403,9 +400,9 @@ describe("what each role is offered", () => {
             moduleKeys: AVAILABLE_TO.REVIEWER,
             sites: SITES,
         });
-        // The last group ("Manage" now) held five destinations, all of them refused. A heading
+        // The last group (Setup) held destinations all of them refused. A heading
         // over an empty list names something the reader does not have.
-        expect(groups.map((g) => g.label)).toEqual([undefined, "Presence"]);
+        expect(groups.map((g) => g.label)).toEqual(["Today", "Online"]);
         for (const group of groups)
             expect(group.items.length).toBeGreaterThan(0);
     });
@@ -567,10 +564,8 @@ describe("navFor — an invented role", () => {
  * answers them with a refusal.
  */
 describe("Sell → Orders is offered to roles that read orders or move them", () => {
-    const childHrefs = (groups: ReturnType<typeof navFor>) =>
-        groups.flatMap((g) =>
-            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
-        );
+    // Every row is its own since the regroup (DEC-262): rows at any depth.
+    const childHrefs = (groups: ReturnType<typeof navFor>) => allHrefs(groups);
     const sites: { id: string; name: string }[] = [];
 
     it.each(["OWNER", "ADMIN", "MEMBER"] as const)(
@@ -626,10 +621,8 @@ describe("Sell → Orders is offered to roles that read orders or move them", ()
 });
 
 describe("the storefront rows follow store:read", () => {
-    const childHrefs = (groups: ReturnType<typeof navFor>) =>
-        groups.flatMap((g) =>
-            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
-        );
+    // Every row is its own since the regroup (DEC-262): rows at any depth.
+    const childHrefs = (groups: ReturnType<typeof navFor>) => allHrefs(groups);
     const sites: { id: string; name: string }[] = [];
     // Customers follows contact:read (matrix W-1, B16), below.
     const storefront = ["/commerce/products", "/commerce/locations"];
@@ -669,10 +662,8 @@ describe("the storefront rows follow store:read", () => {
 });
 
 describe("each Sell row follows its own read (matrix W-1, B16)", () => {
-    const childHrefs = (groups: ReturnType<typeof navFor>) =>
-        groups.flatMap((g) =>
-            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
-        );
+    // Every row is its own since the regroup (DEC-262): rows at any depth.
+    const childHrefs = (groups: ReturnType<typeof navFor>) => allHrefs(groups);
     const sites: { id: string; name: string }[] = [];
 
     it("offers Customers on contact:read, a Member's floor included", () => {
@@ -748,10 +739,8 @@ describe("each Sell row follows its own read (matrix W-1, B16)", () => {
 });
 
 describe("Sell → Discounts follows discount:read", () => {
-    const childHrefs = (groups: ReturnType<typeof navFor>) =>
-        groups.flatMap((g) =>
-            g.items.flatMap((i) => (i.children ?? []).map((c) => c.href)),
-        );
+    // Every row is its own since the regroup (DEC-262): rows at any depth.
+    const childHrefs = (groups: ReturnType<typeof navFor>) => allHrefs(groups);
     const sites: { id: string; name: string }[] = [];
 
     it.each(["OWNER", "ADMIN"] as const)("offers it to %s", (role) => {
@@ -819,74 +808,53 @@ describe("Payments (ADR-007)", () => {
         expect(offered).toContain("/billing/invoices");
     });
 
-    it("puts Subscriptions beside Invoices; Plans is a tab, not a row (D3)", () => {
+    it("puts Memberships beside Invoices and Membership plans under What you offer (DEC-262)", () => {
         const groups = navFor({
             role: "OWNER",
             moduleKeys: AVAILABLE_TO.OWNER,
         });
-        const offered = hrefs(groups);
-        expect(offered).toContain("/billing/subscriptions");
-        expect(offered).not.toContain("/billing/plans");
-        // A plan's own page lights Subscriptions, whose tab it is.
-        const here = navPathname("/billing/plans/p_1", groups);
-        expect(here).toBe("/billing/subscriptions");
-        const siblings = [
-            { href: "/billing/subscriptions" },
-            { href: "/billing/invoices" },
-        ];
+        const money = groups.find((g) => g.label === "Money");
+        expect(money?.items.map((i) => i.label)).toEqual([
+            "Invoices",
+            "Memberships",
+        ]);
+        const offer = groups.find((g) => g.label === "What you offer");
         expect(
-            isNavChildCurrent(here, "/billing/subscriptions", siblings),
-        ).toBe(true);
-        expect(isNavChildCurrent(here, "/billing/invoices", siblings)).toBe(
-            false,
+            offer?.items.find((i) => i.label === "Membership plans")?.href,
+        ).toBe(MEMBERSHIP_PLANS_HREF);
+        // A plan's own page lights Membership plans, and only it.
+        const here = navPathname("/billing/plans/p_1", groups);
+        expect(here).toBe(MEMBERSHIP_PLANS_HREF);
+        const rows = groups.flatMap((g) => g.items);
+        const lit = rows.filter((r) => isNavSectionActive(here, r, rows));
+        expect(lit.map((r) => r.label)).toEqual(["Membership plans"]);
+        const list = rows.filter((r) =>
+            isNavSectionActive("/billing/subscriptions", r, rows),
         );
+        expect(list.map((r) => r.label)).toEqual(["Memberships"]);
     });
 
-    it("marks Payments on every Payments page, Invoices included", () => {
-        const payments = navFor({
-            role: "OWNER",
-            moduleKeys: AVAILABLE_TO.OWNER,
-        })
-            .flatMap((g) => g.items)
-            .find((i) => i.label === "Payments");
-        const href = payments?.href ?? "";
-        expect(href).toBe("/billing");
-        for (const page of [
-            "/billing/subscriptions",
-            "/billing/plans",
-            "/billing/invoices/inv_1",
-        ]) {
-            expect(isNavItemActive(page, href)).toBe(true);
-        }
-    });
-
-    it("offers Payments to no one without it, and Invoices a row of their own (DEC-070)", () => {
+    it("offers Memberships to no one without Payments, and Invoices still (DEC-070)", () => {
         const groups = navFor({
             role: "OWNER",
             moduleKeys: ["COMMERCE", "CRM"],
         });
         const items = groups.flatMap((g) => g.items);
-        expect(items.map((i) => i.label)).not.toContain("Payments");
         expect(hrefs(groups)).not.toContain("/billing/subscriptions");
-        // A top-level row, not a page under a section.
-        const invoices = items.find((i) => i.label === "Invoices");
-        expect(invoices?.href).toBe("/billing/invoices");
-        expect(invoices?.children).toBeUndefined();
+        const invoices = items.filter((i) => i.label === "Invoices");
+        expect(invoices).toHaveLength(1);
+        expect(invoices[0]?.href).toBe("/billing/invoices");
         expect(
             isNavItemActive("/billing/invoices/inv_1", "/billing/invoices"),
         ).toBe(true);
     });
 
-    it("keeps Invoices under Payments while it's on, with no second row", () => {
+    it("draws one Invoices row while Payments is on", () => {
         const items = navFor({
             role: "OWNER",
             moduleKeys: AVAILABLE_TO.OWNER,
         }).flatMap((g) => g.items);
-        expect(items.map((i) => i.label)).not.toContain("Invoices");
-        const payments = items.find((i) => i.label === "Payments");
-        expect(payments?.children?.map((c) => c.href)).toContain(
-            "/billing/invoices",
-        );
+        expect(items.filter((i) => i.label === "Invoices")).toHaveLength(1);
     });
 
     it("gives a site for my work no Invoices row of its own; Payments still holds it (UX-074)", () => {
@@ -919,12 +887,12 @@ describe("Payments (ADR-007)", () => {
         expect(offered).toContain("/billing/invoices");
     });
 
-    it("shows Payments' own Invoices, not the stand-in row, while availability is unknown", () => {
+    it("draws one Invoices row while availability is unknown", () => {
         const items = navFor({ role: "OWNER", moduleKeys: null }).flatMap(
             (g) => g.items,
         );
-        expect(items.filter((i) => i.label === "Invoices")).toHaveLength(0);
-        expect(items.map((i) => i.label)).toContain("Payments");
+        expect(items.filter((i) => i.label === "Invoices")).toHaveLength(1);
+        expect(items.map((i) => i.label)).toContain("Memberships");
     });
 
     it("does not offer the Invoices row to a role without invoice:read", () => {
@@ -941,16 +909,15 @@ describe("Payments (ADR-007)", () => {
         expect(offered).not.toContain("/billing/invoices");
     });
 
-    it("drops the section when every page in it is refused, rather than an empty heading", () => {
+    it("drops Money when every row in it is refused, rather than an empty heading", () => {
         // An invented role in a business with Payments on, granted payments
-        // but no invoices: Payments would be a row that opens onto nothing.
+        // but no invoices or memberships.
         const groups = navFor({
             role: "MEMBER",
             actions: ["payment:read"],
             moduleKeys: ["PAYMENTS"],
         });
-        const labels = groups.flatMap((g) => g.items.map((i) => i.label));
-        expect(labels).not.toContain("Payments");
+        expect(groups.map((g) => g.label)).not.toContain("Money");
     });
 
     it("keeps Website when a business has no sites yet", () => {
@@ -999,7 +966,7 @@ describe("Courses (ADR-007), its own module", () => {
     });
 });
 
-describe("Class packs (ADR-007), a page under Bookings", () => {
+describe("Class packs (ADR-007), under What you offer", () => {
     it("offers an owner Class packs where Class packs is on, after Courses", () => {
         const offered = hrefs(
             navFor({
@@ -1013,17 +980,14 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
         );
     });
 
-    it("sits in the Bookings section beside the diary and Services", () => {
-        const bookings = navFor({
+    it("sits under What you offer beside Services and Courses (DEC-262)", () => {
+        const offer = navFor({
             role: "OWNER",
-            moduleKeys: ["APPOINTMENTS", "CLASS_PACKS"],
-        })
-            .flatMap((g) => g.items)
-            .find((i) => i.label === "Bookings");
-        expect(bookings?.children?.map((c) => c.href)).toEqual([
-            "/bookings",
+            moduleKeys: ["APPOINTMENTS", "COURSES", "CLASS_PACKS"],
+        }).find((g) => g.label === "What you offer");
+        expect(offer?.items.map((i) => i.href)).toEqual([
             "/services",
-            "/bookings/availability",
+            "/courses",
             "/class-packs",
         ]);
     });
@@ -1100,72 +1064,87 @@ describe("Class packs (ADR-007), a page under Bookings", () => {
     });
 });
 
-describe("Bookings, a section across two modules", () => {
-    const bookingsOf = (groups: NavGroup[]) =>
-        groups.flatMap((g) => g.items).find((i) => i.label === "Bookings");
+describe("one home per thing (DEC-262)", () => {
+    const EVERY = [
+        "WEBSITE",
+        "CRM",
+        "APPOINTMENTS",
+        "COURSES",
+        "CLASS_PACKS",
+        "COMMERCE",
+        "PAYMENTS",
+        "INSIGHTS",
+    ];
+    const ownerGroups = () =>
+        navFor({ role: "OWNER", moduleKeys: EVERY, stockTracked: true });
 
-    it("replaces the four rows it used to be", () => {
-        const labels = navFor({
-            role: "OWNER",
-            moduleKeys: ["APPOINTMENTS", "COURSES"],
-        }).flatMap((g) => g.items.map((i) => i.label));
-        expect(labels).toContain("Bookings");
-        for (const gone of ["Schedule", "Services", "Courses", "Class packs"]) {
-            expect(labels).not.toContain(gone);
-        }
+    it("groups the rows by the merchant's question, daily work first", () => {
+        expect(
+            ownerGroups().map((g) => [g.label, g.items.map((i) => i.label)]),
+        ).toEqual([
+            ["Today", ["Home", "Business calendar", "Orders", "Bookings"]],
+            ["People", ["Customers", "Leads", "Contacts"]],
+            ["Money", ["Invoices", "Memberships"]],
+            [
+                "What you offer",
+                [
+                    "Products",
+                    "Stock",
+                    "Services",
+                    "Courses",
+                    "Class packs",
+                    "Membership plans",
+                    "Discount codes",
+                ],
+            ],
+            ["Online", ["Website", "Social"]],
+            ["Insights", ["Insights"]],
+            ["Setup", ["Location", "Hours and time off", "Settings"]],
+        ]);
     });
 
-    it("keeps every address it holds", () => {
-        const offered = hrefs(
-            navFor({
-                role: "OWNER",
-                moduleKeys: ["APPOINTMENTS", "COURSES", "CLASS_PACKS"],
-            }),
-        );
+    it("draws each row once, with no sections in the rail", () => {
+        const rows = ownerGroups().flatMap((g) => g.items);
+        expect(new Set(rows.map((r) => r.href)).size).toBe(rows.length);
+        expect(rows.filter((r) => r.children?.length)).toEqual([]);
+    });
+
+    it("keeps every address it held", () => {
+        const offered = hrefs(ownerGroups());
         for (const href of [
             "/bookings",
             "/services",
             "/courses",
             "/class-packs",
+            "/bookings/availability",
+            "/commerce/orders",
+            "/commerce/products",
+            "/commerce/stock",
+            "/commerce/customers",
+            "/commerce/discounts",
+            "/commerce/locations",
+            "/billing/subscriptions",
+            "/billing/invoices",
+            "/contacts",
+            "/leads",
         ]) {
             expect(offered).toContain(href);
         }
     });
 
-    it("lands on Courses where only Courses is on", () => {
-        const bookings = bookingsOf(
-            navFor({ role: "OWNER", moduleKeys: ["COURSES"] }),
-        );
-        expect(bookings?.href).toBe("/courses");
-        expect(bookings?.children?.map((c) => c.href)).toEqual(["/courses"]);
+    it("lights only the deepest row: Hours and time off, not Bookings", () => {
+        const rows = ownerGroups().flatMap((g) => g.items);
+        const lit = (path: string) =>
+            rows
+                .filter((r) => isNavSectionActive(path, r, rows))
+                .map((r) => r.label);
+        expect(lit("/bookings/availability")).toEqual(["Hours and time off"]);
+        expect(lit("/bookings/all")).toEqual(["Bookings"]);
+        expect(lit("/services/s_1")).toEqual(["Services"]);
+        expect(lit("/class-packs/purchases")).toEqual(["Class packs"]);
     });
 
-    it("is not offered at all without Appointments or Courses", () => {
-        expect(
-            bookingsOf(navFor({ role: "OWNER", moduleKeys: ["COMMERCE"] })),
-        ).toBeUndefined();
-    });
-
-    it("marks Bookings on its pages outside /bookings", () => {
-        const bookings = bookingsOf(
-            navFor({
-                role: "OWNER",
-                moduleKeys: ["APPOINTMENTS", "COURSES", "CLASS_PACKS"],
-            }),
-        );
-        if (!bookings) throw new Error("Bookings missing");
-        for (const page of [
-            "/bookings",
-            "/services/s_1",
-            "/courses",
-            "/class-packs/purchases",
-        ]) {
-            expect(isNavSectionActive(page, bookings)).toBe(true);
-        }
-        expect(isNavSectionActive("/commerce/orders", bookings)).toBe(false);
-    });
-
-    it("tells Modules which rows Appointments, Courses, Class packs and Payments own", () => {
+    it("tells Modules which rows each module owns", () => {
         expect(navRowsForModule("APPOINTMENTS")).toEqual([
             "Bookings",
             "Services",
@@ -1173,11 +1152,60 @@ describe("Bookings, a section across two modules", () => {
         ]);
         expect(navRowsForModule("COURSES")).toEqual(["Courses"]);
         expect(navRowsForModule("CLASS_PACKS")).toEqual(["Class packs"]);
+        expect(navRowsForModule("COMMERCE")).toEqual([
+            "Orders",
+            "Products",
+            "Stock",
+            "Discount codes",
+            "Location",
+        ]);
+        expect(navRowsForModule("CRM")).toEqual(["Leads", "Contacts"]);
         // Invoices keep a row of their own with Payments off (DEC-070).
         expect(navRowsForModule("PAYMENTS")).toEqual([
-            "Payments",
-            "Subscriptions",
+            "Memberships",
+            "Membership plans",
         ]);
+    });
+
+    it("offers Leads to whoever reads the pipeline, landing on the board", () => {
+        const board = navFor({
+            role: "MEMBER",
+            actions: ["pipeline:read"],
+            moduleKeys: ["CRM"],
+        })
+            .flatMap((g) => g.items)
+            .find((i) => i.label === "Leads");
+        expect(board?.href).toBe("/pipeline");
+        const owner = ownerGroups().flatMap((g) => g.items);
+        expect(owner.find((i) => i.label === "Leads")?.href).toBe("/leads");
+        expect(owner.map((i) => i.label)).not.toContain("Pipeline");
+        expect(navPathname("/pipeline", ownerGroups())).toBe("/leads");
+    });
+});
+
+describe("Customers, whenever the business takes money (DEC-264)", () => {
+    const offered = (moduleKeys: string[] | null) =>
+        hrefs(navFor({ role: "OWNER", moduleKeys }));
+
+    it.each(["COMMERCE", "PAYMENTS", "APPOINTMENTS", "COURSES", "CLASS_PACKS"])(
+        "is offered with %s on",
+        (key) => {
+            expect(offered([key])).toContain("/commerce/customers");
+        },
+    );
+
+    it("is offered to a gym with Sell off", () => {
+        expect(offered(["APPOINTMENTS", "PAYMENTS", "CLASS_PACKS"])).toContain(
+            "/commerce/customers",
+        );
+    });
+
+    it("is not offered where nothing takes money, and fails open on unknown", () => {
+        expect(offered(["WEBSITE", "CRM"])).not.toContain(
+            "/commerce/customers",
+        );
+        expect(offered([])).not.toContain("/commerce/customers");
+        expect(offered(null)).toContain("/commerce/customers");
     });
 });
 
@@ -1206,10 +1234,24 @@ describe("the person page sits in the section that holds people (#869)", () => {
         expect(navPathname("/contacts/c_1", groups)).toBe("/contacts");
     });
 
-    it("is Sell › Customers where the rail has no Contacts", () => {
+    it("is Customers where the rail has no Contacts", () => {
         const groups = groupsWith(["COMMERCE"]);
         expect(navPathname("/contacts/c_1", groups)).toBe(
             "/commerce/customers",
+        );
+    });
+
+    it("is the one the person came from (DEC-264)", () => {
+        const groups = groupsWith(["CRM", "COMMERCE"]);
+        expect(
+            navPathname("/contacts/c_1", groups, "/commerce/customers"),
+        ).toBe("/commerce/customers");
+        expect(navPathname("/contacts/c_1", groups, "/contacts")).toBe(
+            "/contacts",
+        );
+        // Somewhere else: the first home the rail holds.
+        expect(navPathname("/contacts/c_1", groups, "/bookings")).toBe(
+            "/contacts",
         );
     });
 

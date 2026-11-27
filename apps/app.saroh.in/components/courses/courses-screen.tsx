@@ -135,7 +135,7 @@ export function CoursesScreen({
     return (
         <>
             <PageHeader
-                breadcrumb={["Bookings", "Courses"]}
+                breadcrumb={["Courses"]}
                 title="Courses"
                 count={
                     courses ? (

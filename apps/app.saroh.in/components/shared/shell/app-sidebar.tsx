@@ -4,7 +4,6 @@ import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverAnchor, PopoverContent } from "@saroh/ui/popover";
 import { Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { usePathname } from "next/navigation";
 import { Fragment, useCallback, useState, useSyncExternalStore } from "react";
 
 import type {
@@ -17,10 +16,10 @@ import {
     isNavSectionActive,
     navCountFor,
     navFor,
-    navPathname,
     showsGroupLabel,
 } from "@/components/shared/navigation/nav-items";
 import { rememberRail } from "@/lib/nav/rail-cookie";
+import { useNavPathname } from "@/lib/nav/use-nav-pathname";
 import { CountBadge } from "@saroh/ui/count-badge";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { Tip } from "@saroh/ui/tooltip";
@@ -116,7 +115,8 @@ export function AppSidebar({
         stockTracked,
         kind,
     });
-    const pathname = navPathname(usePathname(), groups);
+    const pathname = useNavPathname(groups);
+    const rows = groups.flatMap((group) => group.items);
     const [collapsed, setCollapsed] = useState(collapsedAtLoad);
     const [flyoutFor, setFlyoutFor] = useState<string | null>(null);
     // Icons, either because the window is narrow or because they asked.
@@ -197,6 +197,7 @@ export function AppSidebar({
                                 const active = isNavSectionActive(
                                     pathname,
                                     item,
+                                    rows,
                                 );
                                 /*
                                  * Only the DEEPEST match says "page" — and the

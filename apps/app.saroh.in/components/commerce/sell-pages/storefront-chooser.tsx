@@ -55,7 +55,6 @@ export function StorefrontChooser<S extends ChooserStore>({
             <PageHeader
                 holdsData={false}
                 breadcrumb={[
-                    "Sell",
                     <IntentLink
                         key="section"
                         href={sectionHref}

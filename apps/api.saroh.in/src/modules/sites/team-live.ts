@@ -90,8 +90,15 @@ export function liveTeamSection(
         }
         const live = chosen.get(id);
         if (!live) continue;
-        // The profile's photo and words, never the page's own copies.
-        const { image: _image, imageBrief: _brief, bio: _bio, ...rest } = m;
+        // The profile's photo and words, never the page's own copies; and
+        // never the internal id, which the public page doesn't use.
+        const {
+            image: _image,
+            imageBrief: _brief,
+            bio: _bio,
+            staffId: _staffId,
+            ...rest
+        } = m;
         kept.push({
             ...rest,
             name: live.name,

@@ -1,14 +1,13 @@
 import { IntentLink } from "@saroh/ui/intent-link";
 
 /**
- * "Sell › Storefronts › Hill Road" — the breadcrumb every Sell page below a
- * list uses, with each step but the last a link back.
+ * "Location › Hill Road" — the breadcrumb every page that was Sell's uses below
+ * a list, with each step but the last a link back (no section crumb, DEC-262).
  */
 export function sellCrumbs(
     ...steps: ({ label: string; href: string } | string)[]
 ) {
     return [
-        "Sell",
         ...steps.map((step) =>
             typeof step === "string" ? (
                 step

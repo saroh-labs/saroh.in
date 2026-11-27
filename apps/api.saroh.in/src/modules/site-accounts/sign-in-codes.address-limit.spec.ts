@@ -58,6 +58,7 @@ describe("SignInCodesService past the address limit, with no challenge configure
             {
                 assertOffered: () => Promise.resolve(),
                 emailAllowed: () => Promise.resolve(true),
+                effective: () => Promise.resolve(["EMAIL"]),
                 view: () =>
                     Promise.resolve({
                         effective: ["EMAIL"],

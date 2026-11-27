@@ -81,7 +81,6 @@ export default async function SocialPage({
                     holdsData={false}
                     compactOnPhone
                     breadcrumb={[
-                        "Grow",
                         <IntentLink key="social" href="/social">
                             {SOCIAL_WORDS.social}
                         </IntentLink>,

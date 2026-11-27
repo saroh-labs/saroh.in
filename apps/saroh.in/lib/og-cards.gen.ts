@@ -83,6 +83,10 @@ export const HELP_CARDS: Record<
         area: "Website",
         title: "Verify your site and add analytics",
     },
+    "where-things-are-in-the-menu": {
+        area: "Getting started",
+        title: "Where things are in the menu",
+    },
 };
 
 export const INTEGRATION_CARDS: Record<

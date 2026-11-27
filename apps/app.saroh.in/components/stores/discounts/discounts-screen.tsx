@@ -118,7 +118,7 @@ export function DiscountsScreen({
     return (
         <>
             <PageHeader
-                breadcrumb={["Sell", "Discount codes"]}
+                breadcrumb={["Discount codes"]}
                 title="Discount codes"
                 count={
                     discounts ? (

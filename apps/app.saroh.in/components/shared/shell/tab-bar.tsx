@@ -3,15 +3,15 @@
 import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoreHorizontal } from "lucide-react";
-import { usePathname } from "next/navigation";
 
 import type {
     NavCounts,
     NavRole,
 } from "@/components/shared/navigation/nav-items";
-import { navFor, navPathname } from "@/components/shared/navigation/nav-items";
+import { navFor } from "@/components/shared/navigation/nav-items";
 import type { MobileTab } from "@/lib/nav/mobile-nav";
 import { buildMobileNav } from "@/lib/nav/mobile-nav";
+import { useNavPathname } from "@/lib/nav/use-nav-pathname";
 import { CountBadge } from "@saroh/ui/count-badge";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { TabBarSheet } from "./tab-bar-sheet";
@@ -27,7 +27,7 @@ import { TabBarSheet } from "./tab-bar-sheet";
  *
  * Built from `navFor` like the rail and the command menu, so role, permission
  * and module filtering are the same everywhere; `buildMobileNav` only decides
- * which rows get a seat. The shell pads its scroll container by
+ * which rows get a seat, in one order on every page (DEC-263). The shell pads its scroll container by
  * `--tab-bar-inset` (workspace.css) so nothing ends up underneath it.
  */
 export function TabBar({
@@ -73,7 +73,7 @@ export function TabBar({
     });
     const nav = buildMobileNav({
         groups,
-        pathname: navPathname(usePathname(), groups),
+        pathname: useNavPathname(groups),
         counts,
         unread,
     });

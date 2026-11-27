@@ -33,6 +33,19 @@ function isDepositMode(value: string): value is DepositMode {
 }
 
 /**
+ * A free service (DEC-261): a price of exactly 0. It is booked with nothing
+ * to pay: never a deposit, a payment, a hold for payment, a credit or a
+ * desk payment. No price at all (null) is not free.
+ */
+export function isFreeService(service: { priceCents: number | null }): boolean {
+    return service.priceCents === 0;
+}
+
+/** Said when a free service is asked to be paid for (DEC-261). */
+export const FREE_NOTHING_TO_PAY =
+    "This is free, so there is nothing to pay. Book it without a payment.";
+
+/**
  * What is paid at booking, in minor units, worked out from the price —
  * rounded to the paisa, half up — or null when nothing is. The client never
  * sends it. A mode the column should never hold reads as no deposit.

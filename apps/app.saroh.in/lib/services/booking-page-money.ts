@@ -11,6 +11,7 @@ import {
     refundLine,
     refundPolicyLine,
 } from "@/lib/services/booking-money";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { methodWord } from "@/lib/services/desk-pay";
 
 /** One line of the Money card. */
@@ -38,6 +39,9 @@ export function moneyRows(
     const rows: MoneyRow[] = [];
     if (m.priceCents !== null && m.priceCents > 0) {
         rows.push({ key: "price", label: "Price", text: format(m.priceCents) });
+    } else if (m.priceCents === 0) {
+        // Booked free (DEC-261): said once, and nothing is ever to take.
+        rows.push({ key: "price", label: "Price", text: BOOKING_WORDS.free });
     }
     if (m.paidOnlineCents > 0) {
         rows.push({

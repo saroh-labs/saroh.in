@@ -90,7 +90,6 @@ export default async function CustomerPage({
                     holdsData
                     className="mb-0"
                     breadcrumb={[
-                        "Sell",
                         <IntentLink
                             data-ph-unmask=""
                             key="customers"

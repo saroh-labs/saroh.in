@@ -158,7 +158,7 @@ export function ReviewsView({
     return (
         <div className="space-y-5">
             <PageHeader
-                breadcrumb={["Sell", "Products"]}
+                breadcrumb={["Products"]}
                 title="Products"
                 className="mb-0"
                 actions={inviteAction}

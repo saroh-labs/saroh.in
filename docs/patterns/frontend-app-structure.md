@@ -58,10 +58,32 @@ components/shared/             app shell, navigation, command menu
   `components/shared/navigation/nav-items.tsx` feeds the sidebar, the phone tab bar (below 760px) and the
   command menu, and lists only routes that exist; `pnpm run check:routes` fails
   on a link that would 404.
+- **Current** — **The menu is grouped by the merchant's question, one home
+  per thing** (DEC-262, 26 Nov 2026). Today (Home, Business calendar,
+  Orders, Bookings) · People (Customers, Leads, Contacts) · Money (Invoices,
+  Memberships) · What you offer (Products, Stock, Services, Courses, Class
+  packs, Membership plans, Discount codes) · Online (Website, Social) ·
+  Insights · Setup (Location, Hours and time off, Settings) at the foot.
+  Every destination is one flat row in one group, whatever module built it;
+  daily work comes before setup. Groups are never chosen by trade: a row
+  leaves the menu only by the gates it already had (module, role, plan,
+  edition, switch). A new destination joins the group whose question it
+  answers, never a module's section. Rows keep their addresses: the
+  grouping is presentation only. The deepest matching row is the one lit
+  (`isNavSectionActive` with the rail's rows), and a page with no row of its
+  own names its home in `NAV_HOMES`; the person page follows the list the
+  person came from (`useNavPathname`). A page's breadcrumb starts at its
+  row, never a group name ("Orders › #1042", not "Sell › Orders").
+- **Current** — **The phone's tab bar has one order** (DEC-263): Home,
+  Business calendar, Orders and Insights when the actor has them, the rail's
+  next rows in any seat left, drawn in the rail's order on every page. The
+  More sheet lists the rest under the rail's group names, in its order.
 - **Current** — **Capability gating in the UI is an aid, not a permission.** A
   section's `layout.tsx` renders `ModuleGate` (`ModuleOffState` when the
-  module is off, so a deep link is covered once), and nav groups carry a
-  `moduleKey`. Both fail open when availability is unknown; the API enforces.
+  module is off, so a deep link is covered once), and nav rows carry a
+  `moduleKey` (or `anyModule`, for Customers: any paying module, DEC-264,
+  whose page steps round Sell's gate in `commerce/layout.tsx`). Both fail
+  open when availability is unknown; the API enforces.
   See `saroh-product.md` and `.agents/skills/saroh-module-capability/SKILL.md`.
 - **Current** — **One person, one page** (UX-050, #869). Everyone the
   business knows opens at `/contacts/<contactId>`: Customer Detail's screen

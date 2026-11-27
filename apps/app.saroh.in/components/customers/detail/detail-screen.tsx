@@ -48,6 +48,7 @@ import { runAction } from "@/lib/api/run-action";
 import type { DataRequestRow } from "@/lib/customer-workspace/data-requests-view";
 import { requestsHref } from "@/lib/customer-workspace/data-requests-view";
 import { useCustomerSave } from "@/lib/customers/use-customers";
+import { cameFrom } from "@/lib/nav/use-nav-pathname";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
 import { Header, Tabs } from "./header";
@@ -55,6 +56,7 @@ import { MessagesTab } from "./messages-tab";
 import { Notes } from "./notes";
 import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";
+
 import { Overview } from "./overview";
 import type { PackSale } from "./packs-tab";
 import { useCustomerPacks } from "./packs-tab";
@@ -353,7 +355,11 @@ export function CustomerDetailScreen({
         <>
             <div className="px-[26px] pt-5">
                 <Header
-                    sells={crumbsSell ?? crumbsUnderSell(sells, d)}
+                    sells={
+                        crumbsFromList(cameFrom()) ??
+                        crumbsSell ??
+                        crumbsUnderSell(sells, d)
+                    }
                     name={name}
                     initials={initials(name)}
                     tag={tagFor(d)}
@@ -440,4 +446,15 @@ export function CustomerDetailScreen({
             ) : null}
         </>
     );
+}
+
+/**
+ * The crumbs follow the list the person was opened from (DEC-264):
+ * Customers › name from Customers, Contacts › name from Contacts; null
+ * when they came from elsewhere, and the page's own rule decides.
+ */
+function crumbsFromList(from: string | null): boolean | null {
+    if (from === "/commerce/customers") return true;
+    if (from === "/contacts") return false;
+    return null;
 }

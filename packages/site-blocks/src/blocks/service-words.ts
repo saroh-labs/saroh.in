@@ -50,12 +50,14 @@ export interface ServicesFeed {
 
 /**
  * A service's price as the list shows it: the price the business typed,
- * with "+ GST" after it when GST comes on top. Null for none to show.
+ * with "+ GST" after it when GST comes on top; "Free" for a free service
+ * (DEC-261), never "₹0". Null for none to show.
  */
 export function servicePriceWords(
     service: Pick<PublicService, "priceCents" | "currency" | "gst">,
     locale?: string,
 ): string | null {
+    if (service.priceCents === 0) return "Free";
     const price = formatPrice(service.priceCents, service.currency, locale);
     return price === null
         ? null
@@ -64,15 +66,13 @@ export function servicePriceWords(
 
 /**
  * A price as the looks say it (DEC-172, VD01, VA01): a free service is
- * "Free", never "₹0". Classic keeps {@link servicePriceWords}.
+ * "Free", never "₹0" — and since DEC-261 Classic says it too.
  */
 export function lookPriceWords(
     service: Pick<PublicService, "priceCents" | "currency" | "gst">,
     locale?: string,
 ): string | null {
-    return service.priceCents === 0
-        ? "Free"
-        : servicePriceWords(service, locale);
+    return servicePriceWords(service, locale);
 }
 
 /** "30 min", "1 hr", "1 hr 30 min". */

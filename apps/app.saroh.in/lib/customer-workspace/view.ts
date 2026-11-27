@@ -4,7 +4,7 @@ import { count as countOf } from "@/lib/format/plural";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import { methodLabel } from "@/lib/payments/method-words";
 import type { Review } from "@/lib/product-reviews/service";
-import { outcomeWord } from "@/lib/services/booking-words";
+import { BOOKING_WORDS, outcomeWord } from "@/lib/services/booking-words";
 import { recurringPrice, subscriptionPay } from "@/lib/subscriptions/view";
 import { absentText } from "@saroh/ui/lib/absent";
 
@@ -525,6 +525,10 @@ export function payText(b: DetailBooking): string {
     // desk" stayed after the desk took it (UX-049).
     const paid = paidText(b.paid);
     if (paid) return paid;
+    // Free (DEC-261): the one payment word, never "Pays at the desk".
+    if (b.free && (b.paidWith === null || b.paidWith === "DESK")) {
+        return BOOKING_WORDS.free;
+    }
     switch (b.paidWith) {
         case "MEMBERSHIP":
             return "Membership credit";

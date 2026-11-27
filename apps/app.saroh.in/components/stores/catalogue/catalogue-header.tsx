@@ -136,7 +136,7 @@ export function CatalogueHeader({
         ) : undefined;
     return (
         <PageHeader
-            breadcrumb={["Sell", "Products"]}
+            breadcrumb={["Products"]}
             title="Products"
             count={count}
             className="mb-0"
