@@ -48,7 +48,7 @@ async function readVisits(
 ): Promise<PeekPerson["visits"]> {
     try {
         const res = await apiFetch(
-            `${base}/bookings/${encodeURIComponent(bookingId)}/visits`,
+            `${base}/services/bookings/${encodeURIComponent(bookingId)}/visits`,
         );
         if (!res.ok) return null;
         const body = (await res.json()) as {
