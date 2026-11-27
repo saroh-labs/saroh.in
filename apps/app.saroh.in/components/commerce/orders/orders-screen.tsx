@@ -20,7 +20,6 @@ import { useArrivals } from "@/components/shared/live-refresh/use-arrivals";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
 import { StorefrontFilter } from "@/components/stores/locations/storefront-filter";
 import type { CustomerPick } from "@/lib/customers/picker";
-import { count } from "@/lib/format/plural";
 import type {
     OrderFilterOptions,
     OrderListPage,
@@ -230,8 +229,9 @@ export function OrdersScreen({
 
     // Unknown until the page is read: Export waits, and no pages are drawn.
     const total = page ? viewTotal(query, page.counts) : 0;
-    // Open orders placed a month ago or more, folded under one line on
-    // the Open view (DEC-265); their own list is a press away.
+    // Open orders placed a month ago or more: listed with the rest, and
+    // one line above the list counts them, with their own list a press
+    // away to close them (DEC-265; owner, 27 Nov 2026).
     const stale = page?.counts.stale ?? 0;
     const folded = foldsOlder(query) && stale > 0 ? stale : 0;
     // When every open order is folded, the fold line is the one message:
@@ -467,6 +467,23 @@ export function OrdersScreen({
             ) : null}
 
             <PendingRegion pending={dim} className="pt-3.5">
+                {folded > 0 ? (
+                    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[11px] border border-border bg-muted px-3.5 py-2.5 text-[13px]">
+                        <span className="min-w-0 flex-1 font-semibold">
+                            {folded === 1
+                                ? "1 of these was placed over a month ago"
+                                : `${folded} of these were placed over a month ago`}
+                        </span>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => go({ older: true })}
+                        >
+                            {selectable ? "Close them" : "See only them"}
+                        </Button>
+                    </div>
+                ) : null}
                 {attentionUnread ? (
                     <OrdersAttentionPartial onRetry={onRetry} />
                 ) : null}
@@ -545,21 +562,6 @@ export function OrdersScreen({
                         </ul>
                     </>
                 )}
-                {folded > 0 ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[11px] border border-border bg-muted px-3.5 py-2.5 text-[13px]">
-                        <span className="min-w-0 flex-1 font-semibold">
-                            {count(folded, "order")} open over a month
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => go({ older: true })}
-                        >
-                            {selectable ? "Close them" : "See them"}
-                        </Button>
-                    </div>
-                ) : null}
                 {selectable ? (
                     <BulkBar
                         selected={pick.selected}

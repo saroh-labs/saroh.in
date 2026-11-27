@@ -181,23 +181,24 @@ describe("Orders with nothing open in the last month (DEC-265)", () => {
         unmount();
     });
 
-    it("only month-old open orders shows the fold, never 'Nothing left to fulfil'", async () => {
+    it("lists month-old open orders with the rest, counted above them (owner, 27 Nov 2026)", async () => {
         page = {
             ...PAGE,
-            rows: [],
             counts: {
                 all: 4,
-                open: 3,
+                open: PAGE.rows.length,
                 refunded: 0,
-                stale: 3,
+                stale: PAGE.rows.length,
             } as typeof PAGE.counts,
         };
         const { host, unmount } = open();
         release();
         await tick(50);
         expect(host.textContent).not.toContain("Nothing left to fulfil");
-        expect(host.textContent).toContain("3 orders open over a month");
-        expect(host.textContent).toContain("Close them");
+        expect(host.textContent).toContain(PAGE.rows[0].customer.name);
+        expect(host.textContent).toMatch(
+            /of these (was|were) placed over a month ago/,
+        );
         unmount();
     });
 });
