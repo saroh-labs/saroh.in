@@ -507,8 +507,9 @@ describe("Business Calendar month (DB)", () => {
             ["Physio · Booked Physio", "booked"],
             ["Physio · Holding Physio", "held"],
         ]);
-        // Both are to be paid online; only the confirmed one has been.
-        expect(bookings[0].subtitle).toBe("Paid online");
+        // Only the confirmed one is paid. It is marked paid with no payment
+        // recorded, so how it was paid isn't known: "Paid" (DEC-272).
+        expect(bookings[0].subtitle).toBe("Paid");
         expect(bookings[1].subtitle).toBeNull();
         expect(day?.layers.bookings?.kinds).toEqual({ booked: 1, held: 1 });
 
