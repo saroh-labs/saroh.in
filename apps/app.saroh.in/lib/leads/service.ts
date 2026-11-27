@@ -40,6 +40,11 @@ export interface LeadListItem {
     createdAt: string;
     contact: LeadContact | null;
     stage: LeadStage | null;
+    /**
+     * The team's last note or follow-up done on it (DEC-277); absent from
+     * an API before it.
+     */
+    lastContact?: { at: string; kind: "NOTE" | "FOLLOW_UP" } | null;
 }
 
 export interface LeadActivity {
@@ -67,6 +72,16 @@ export interface LeadDetail {
     activities: LeadActivity[];
     /** What they wrote through a form, newest first (UX-002); empty for a hand-made lead. */
     enquiries?: EnquiryEntry[];
+    /**
+     * Their next booking (DEC-277), so a lead at "Trial booked" links the
+     * trial; null without one, or without `booking:read`.
+     */
+    nextBooking?: {
+        id: string;
+        startAt: string;
+        timezone: string;
+        service: string;
+    } | null;
 }
 
 export interface CreateLeadInput {

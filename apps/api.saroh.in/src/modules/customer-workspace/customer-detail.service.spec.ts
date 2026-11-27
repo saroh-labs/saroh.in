@@ -194,6 +194,11 @@ function isOrdersPart(sql: { sql: string }): boolean {
     return sql.sql.includes('JOIN "Order" o');
 }
 
+/** The Owes read (DEC-275, `owes.sql.ts`), not one of Spent's parts. */
+function isOwesRead(sql: { sql: string }): boolean {
+    return sql.sql.includes("w.part");
+}
+
 /** The Spent reads made, of one part. */
 function spentReads(
     db: { $queryRaw: jest.Mock },
@@ -201,6 +206,7 @@ function spentReads(
 ): { sql: string; values: unknown[] }[] {
     return db.$queryRaw.mock.calls
         .map((c: [{ sql: string; values: unknown[] }]) => c[0])
+        .filter((sql) => !isOwesRead(sql))
         .filter((sql) => isOrdersPart(sql) === (part === "orders"));
 }
 
@@ -323,15 +329,16 @@ function make(views: Views = ALL_ON) {
         },
         // Spent's two parts (`customer-spent.ts`), net of refunds and
         // credit notes in the database: orders 450, invoices 1,200.
-        $queryRaw: jest
-            .fn()
-            .mockImplementation((sql: { sql: string }) =>
-                Promise.resolve(
-                    isOrdersPart(sql)
-                        ? [{ currency: "INR", sum: "450" }]
-                        : [{ currency: "INR", sum: "1200" }],
-                ),
+        $queryRaw: jest.fn().mockImplementation((sql: { sql: string }) =>
+            Promise.resolve(
+                // Owes: one unpaid invoice of 300 (DEC-275).
+                isOwesRead(sql)
+                    ? [{ currency: "INR", part: "invoice", amount: "300" }]
+                    : isOrdersPart(sql)
+                      ? [{ currency: "INR", sum: "450" }]
+                      : [{ currency: "INR", sum: "1200" }],
             ),
+        ),
         packPurchase: { findMany: jest.fn().mockResolvedValue([PACK]) },
         businessProfile: {
             findUnique: jest
@@ -465,6 +472,12 @@ describe("CustomerDetailService", () => {
                 totals: [{ currency: "INR", amount: "300.00" }],
                 unpaidCount: 1,
                 overdueCount: 1,
+            },
+            // Owes (DEC-275): the list's rule, unpaid orders and invoices.
+            owes: {
+                totals: [{ currency: "INR", amount: "300.00" }],
+                invoices: 1,
+                orders: 0,
             },
         });
     });
@@ -785,9 +798,14 @@ describe("CustomerDetailService", () => {
         expect(detail).not.toHaveProperty("invoices");
         expect(detail).not.toHaveProperty("subscriptions");
         expect(detail).not.toHaveProperty("packs");
-        // DEC-020: no orders either — a Member reads the diary, not the till.
-        expect(detail).not.toHaveProperty("orders");
+        // DEC-276 (amends DEC-020): a Member who stages orders sees them,
+        // without amounts (DEC-024).
+        for (const o of detail.orders?.rows ?? []) {
+            expect(o).not.toHaveProperty("total");
+            expect(o).not.toHaveProperty("currency");
+        }
         expect(detail.stats).not.toHaveProperty("spent");
+        expect(detail.stats).not.toHaveProperty("owes");
         expect(detail.stats).not.toHaveProperty("owed");
         expect(detail.stats).not.toHaveProperty("classesLeft");
         expect(db.invoice.findMany).not.toHaveBeenCalled();

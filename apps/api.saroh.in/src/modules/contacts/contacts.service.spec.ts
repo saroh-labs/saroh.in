@@ -4,7 +4,21 @@ jest.mock("../outbound-webhooks/emitter");
 // Postgres. The lead/booking delegates are here because the list rollup reads
 // them — see ContactListItem.
 jest.mock("@saroh/database", () => {
+    // Enough of `Prisma.sql` for the owes read (DEC-275) to build its query.
+    type Sql = { sql: string; values: unknown[] };
+    const sql = (strings: TemplateStringsArray, ...values: unknown[]): Sql => ({
+        sql: strings.join("?"),
+        values,
+    });
     return {
+        Prisma: {
+            sql,
+            empty: { sql: "", values: [] },
+            join: (parts: Sql[], sep = ", ") => ({
+                sql: parts.map((p) => p.sql).join(sep),
+                values: parts.flatMap((p) => p.values),
+            }),
+        },
         prisma: {
             contact: {
                 findMany: jest.fn(),
@@ -77,6 +91,13 @@ const auditCreate = prisma.auditEvent.create as jest.Mock;
 const create = prisma.contact.create as jest.Mock;
 const leadGroupBy = prisma.lead.groupBy as jest.Mock;
 const bookingGroupBy = prisma.booking.groupBy as jest.Mock;
+
+/** The next-booking aggregate answers `rows`; the last visit's, nothing. */
+function nextBookings(rows: unknown[]) {
+    bookingGroupBy.mockImplementation(async (args: { _min?: unknown }) =>
+        args._min ? rows : [],
+    );
+}
 const linkFindMany = prisma.customerIdentityLink.findMany as jest.Mock;
 const customerFindMany = prisma.customer.findMany as jest.Mock;
 const orderGroupBy = prisma.order.groupBy as jest.Mock;
@@ -172,9 +193,7 @@ describe("ContactsService.list", () => {
             { contactId: "c_1", _sum: { value: 4500000 }, _count: { _all: 2 } },
         ]);
         const startAt = new Date("2026-08-06T09:00:00.000Z");
-        bookingGroupBy.mockResolvedValue([
-            { contactId: "c_1", _min: { startAt } },
-        ]);
+        nextBookings([{ contactId: "c_1", _min: { startAt } }]);
 
         const [row] = await service.list(ctx());
 
@@ -224,7 +243,8 @@ describe("ContactsService.list", () => {
         await service.list(ctx());
 
         expect(leadGroupBy).toHaveBeenCalledTimes(1);
-        expect(bookingGroupBy).toHaveBeenCalledTimes(1);
+        // The next booking and the last visit (DEC-277): one each.
+        expect(bookingGroupBy).toHaveBeenCalledTimes(2);
         expect(leadGroupBy).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({
@@ -414,7 +434,7 @@ describe("ContactsService.list", () => {
         // carry a lead's value or what someone has bought.
         const service = new ContactsService();
         findMany.mockResolvedValue([CONTACT]);
-        bookingGroupBy.mockResolvedValue([
+        nextBookings([
             { contactId: "c_1", _min: { startAt: new Date("2026-10-01") } },
         ]);
 
@@ -428,13 +448,36 @@ describe("ContactsService.list", () => {
         expect(orderGroupBy).not.toHaveBeenCalled();
     });
 
+    it("says each one's last visit and what they owe (DEC-277, DEC-275)", async () => {
+        const service = new ContactsService();
+        findMany.mockResolvedValue([CONTACT]);
+        const visit = new Date("2026-11-20T02:00:00.000Z");
+        bookingGroupBy.mockImplementation(async (args: { _max?: unknown }) =>
+            args._max ? [{ contactId: "c_1", _max: { startAt: visit } }] : [],
+        );
+        (prisma.$queryRaw as jest.Mock).mockResolvedValueOnce([
+            { contactId: "c_1", currency: "INR", amount: "900.00" },
+        ]);
+
+        const [row] = await service.list(ctx());
+
+        expect(row?.lastVisitAt).toEqual(visit);
+        expect(row?.owes).toEqual([{ currency: "INR", amount: "900.00" }]);
+        // A no-show is not a visit.
+        expect(bookingGroupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    OR: [{ outcome: null }, { outcome: { not: "NO_SHOW" } }],
+                }),
+            }),
+        );
+    });
+
     it("drops bookings that belong to no contact", async () => {
         // A walk-in books without a Contact, so the groupBy key is null.
         const service = new ContactsService();
         findMany.mockResolvedValue([CONTACT]);
-        bookingGroupBy.mockResolvedValue([
-            { contactId: null, _min: { startAt: new Date() } },
-        ]);
+        nextBookings([{ contactId: null, _min: { startAt: new Date() } }]);
 
         const [row] = await service.list(ctx());
 

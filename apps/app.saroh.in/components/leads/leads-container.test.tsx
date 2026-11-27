@@ -178,9 +178,9 @@ describe("a lead's page", () => {
         expect(host.querySelector("h1")).toBeNull();
         release();
         await tick(50);
-        expect(host.querySelector("h1")?.textContent).toContain(
-            "Wedding flowers",
-        );
+        // The person once, as the heading; the subject under it (DEC-277).
+        expect(host.querySelector("h1")?.textContent).toContain("Asha Rao");
+        expect(host.textContent).toContain("Wedding flowers");
         unmount();
     });
 });

@@ -582,7 +582,7 @@ describe("a hand-built table takes the one look", () => {
                         lastAt: null,
                         lastStorefront: null,
                     },
-                    spent: [],
+                    spent: [{ currency: "INR", amount: "300.00" }],
                 },
             ],
             total: 1,
@@ -617,7 +617,7 @@ describe("a hand-built table takes the one look", () => {
         );
         // Figures: right-aligned, tabular.
         expect(out).toMatch(
-            /class="[^"]*text-right[^"]*tabular-nums[^"]*"[^>]*>3</,
+            /class="[^"]*text-right[^"]*tabular-nums[^"]*"[^>]*>₹300</,
         );
     });
 

@@ -2,9 +2,11 @@
 
 import { formatMoney } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
+import { Phone } from "lucide-react";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -21,10 +23,13 @@ import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { readOnlyLine } from "@/components/shared/states/who-can-change";
 import { personHref } from "@/lib/contacts/person-href";
 import { contactName, LEAD_STATUS } from "@/lib/crm/format";
+import { formatDateTime } from "@/lib/format/datetime";
 import type { LeadAsk } from "@/lib/leads/queries";
+import { leadSubject } from "@/lib/leads/subject";
 import { useLead } from "@/lib/leads/use-leads";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import type { MessageChannel } from "@/lib/messages/constants";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { ReadFailed } from "@/lib/query/client";
 
 /**
@@ -78,6 +83,11 @@ export function LeadDetailContainer({
     const amount = formatMoney(lead.value, currency, { decimals: "always" });
     // Timeline newest-first for reading; the API returns it oldest-first.
     const timeline = [...lead.activities].reverse();
+    // The person once, as the heading (DEC-277); what the lead is about
+    // under it, never the name again.
+    const who = lead.contact ? contactName(lead.contact) : null;
+    const subject = who ? leadSubject(lead.title, who) : "";
+    const phone = lead.contact?.phone?.trim() ? lead.contact.phone : null;
 
     return (
         <PageContainer>
@@ -86,20 +96,27 @@ export function LeadDetailContainer({
                     <IntentLink data-ph-unmask="" key="leads" href="/leads">
                         Leads
                     </IntentLink>,
-                    lead.title,
+                    who ?? lead.title,
                 ]}
                 holdsData
-                title={lead.title}
+                // The person, once: their name opens their page.
+                title={
+                    lead.contact && who ? (
+                        <IntentLink
+                            href={personHref(lead.contact.id)}
+                            className="hover:underline"
+                        >
+                            {who}
+                        </IntentLink>
+                    ) : (
+                        lead.title
+                    )
+                }
                 description={
                     lead.contact ? (
                         <>
-                            <IntentLink
-                                href={personHref(lead.contact.id)}
-                                className="hover:underline"
-                            >
-                                {contactName(lead.contact)}
-                            </IntentLink>
-                            {" · "}
+                            {subject ? `${subject} · ` : null}
+                            {phone ? `${phoneLabel(phone)} · ` : null}
                             {lead.contact.email}
                             {amount ? ` · Worth: ${amount}` : ""}
                         </>
@@ -109,6 +126,18 @@ export function LeadDetailContainer({
                 }
                 actions={
                     <>
+                        {/* The phone in the header, with Call (DEC-277). */}
+                        {phone ? (
+                            <Button variant="outline" size="sm" asChild>
+                                <a href={`tel:${phone.replace(/[^\d+]/g, "")}`}>
+                                    <Phone
+                                        aria-hidden
+                                        className="mr-1.5 size-4"
+                                    />
+                                    Call
+                                </a>
+                            </Button>
+                        ) : null}
                         {lead.stage && (
                             <Badge variant="neutral">{lead.stage.name}</Badge>
                         )}
@@ -150,6 +179,38 @@ export function LeadDetailContainer({
                 canLog={canLog}
                 canMessage={canMessage}
             />
+
+            {lead.nextBooking ? (
+                // Their next booking (DEC-277): a lead at "Trial booked"
+                // shows the trial itself, and opens it.
+                <section
+                    aria-label="Next booking"
+                    className="mb-8 flex flex-wrap items-center gap-3 rounded-lg border p-4"
+                >
+                    <div className="min-w-0 flex-1">
+                        <p
+                            data-ph-unmask=""
+                            className="text-[12px] text-muted-foreground"
+                        >
+                            {lead.stage?.name ?? "Next booking"}
+                        </p>
+                        <p className="text-[14px] font-semibold">
+                            {lead.nextBooking.service} ·{" "}
+                            {formatDateTime(
+                                lead.nextBooking.startAt,
+                                lead.nextBooking.timezone,
+                            )}
+                        </p>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                        <IntentLink
+                            href={`/bookings/${encodeURIComponent(lead.nextBooking.id)}`}
+                        >
+                            Open the booking
+                        </IntentLink>
+                    </Button>
+                </section>
+            ) : null}
 
             {lead.enquiries && lead.enquiries.length > 0 ? (
                 <div className="mb-8">

@@ -7,10 +7,12 @@ import {
     chipsFor,
     customersText,
     emptyTitle,
+    headerCount,
     isNarrowed,
     lastSub,
     listHref,
     noOrderText,
+    owesText,
     pageCount,
     pageText,
     readListQuery,
@@ -447,5 +449,23 @@ describe("noOrderText (DEC-056, C14)", () => {
         expect(noOrderText(row({ addedByHand: true }))).toBe("Added by hand");
         expect(noOrderText(row({ addedByHand: false }))).toBe("—");
         expect(noOrderText(row())).toBe("—");
+    });
+});
+
+describe("the header's count (DEC-275)", () => {
+    it("says both, and never 'No customers' while people have paid", () => {
+        expect(headerCount({ everyone: 28, unlinkedPaying: 292 })).toEqual({
+            customers: "28 customers",
+            waiting: "292 waiting to be linked",
+        });
+        expect(headerCount({ everyone: 0, unlinkedPaying: 84 })).toEqual({
+            customers: null,
+            waiting: "84 people have paid you · none linked yet",
+        });
+        expect(headerCount({ everyone: 0, unlinkedPaying: 0 })).toBeNull();
+        expect(owesText([])).toBeNull();
+        expect(owesText([{ currency: "INR", amount: "2150.00" }])).toBe(
+            "Owes ₹2,150",
+        );
     });
 });

@@ -3431,6 +3431,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **People › Customers is offered whenever any paying module is on**: Sell, Payments, Appointments, Courses or Class packs (`PAYING_MODULES`), with `contact:read` as before. Its page steps round Sell's gate in `commerce/layout.tsx` when Sell is off and one of those is on; the list itself is unchanged (DEC-041: contacts who paid or sign in), read from the organization-level API, which needs only `contact:read`.
 - A person opened from Customers keeps Customers lit and its crumb ("Customers › name"); from Contacts, Contacts. Opened from anywhere else, the rule before holds (Contacts where the rail has it).
 - **"Memberships"** is the menu's and the page's heading word for Subscriptions (`/billing/subscriptions`), and "Membership plans" for its Plans tab. The page's tabs, columns, statuses and emails keep "Subscriptions" until the owner decides the word everywhere.
+
 ## DEC-261 A service is Free or Paid; a free one is booked straight away, and says "Free"
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026: "book free sessions … give an option to select free or paid … directly book for the free sessions") · amends DEC-257 (its one payment word gains "Free") and DEC-172 (Classic says "Free" too) · follows DEC-098, DEC-088, DEC-089
@@ -3443,3 +3444,37 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Merchant side: the one payment word for it is "Free"** (beside DEC-257's "Awaiting payment", "Paid" and "Pays at the visit"). The List's Money column, the diary block, the List's line, quick look and the booking's Money card say Free; a free booking is never counted as awaiting payment. The diary read sends `free` to everyone who reads bookings (it is not an amount, DEC-098), and reads a free booking stored "at the desk" before this decision as no way to pay. New booking and booking from a free gap skip "how will they pay", send none, and the message says "It's free, there's nothing to pay."
 - **MCP and v1:** a price of 0 makes a service free (tool and OpenAPI descriptions say so); `list_services` names it "free".
 - **Left alone:** customer messages (they never named a payment for a booking), Home's needs-attention and Insights (they count invoices and holds, which a free booking never has), the Business calendar's subtitle, Home's Today line and the customer page for the few free bookings stored "at the desk" before this decision (new ones store none), and a service with no price at all.
+
+## DEC-275 Customers shows everyone who paid, linked or not; one Paid and one Owes
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Main, Customers-all-unlinked and Customers-phone, Q1) · amends DEC-041 (who the list shows) and C4's unlinked notice; keeps DEC-041's rule that linking is the merchant's own action
+
+- Context: Northwind had 28 customers on the list and 292 people who had paid, unlinked, behind a notice and a Review button; a boutique with 84 payers and none linked read "No customers yet". "Spent" disagreed with the customer's page and nothing said what anyone owed.
+- **A paying store customer no contact holds is a row**, tagged Not linked, with Link (read first: whose email it is, then confirm). No contact is made for them and nothing links on its own. The header counts both: "28 customers · 292 waiting to be linked" (the second part opens the Not linked view); with nobody linked, "84 people have paid you · none linked yet" and the one card that offers Review one by one. "No customers yet" shows only when nobody has paid, signs in or was added.
+- Views gain **Owes money** (`order:read` and `invoice:read`) and **Not linked**. Columns: Name, Phone, Last order, Paid, Owes; on a phone the card says the name, what they owe or have paid, the phone and the last order.
+- **Paid** (the API's `spent`, unchanged rule) is what came in on orders and on invoices that are not an order's own, net of refunds and credit notes; memberships, packs and bookings bill through invoices, so they are in it. **Owes** (`owes.sql.ts`) is real, not cancelled, unpaid orders (never an online checkout waiting to be paid) plus what is left to pay on issued invoices that are not an order's own. One rule, computed in the API, for the Customers list, the customer's page and Contacts.
+- A role that stages orders (`order:stage`, DEC-024) sees the Last order column and the orders' chips and sort, never an amount.
+
+## DEC-276 The customer's page leads with what they owe and how to reach them
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Customer-page, Customer-page-member, Customer-page-phone, Q8) · amends DEC-020 (a Member who stages orders sees a customer's orders, without amounts, DEC-024) and DEC-073's page order
+
+- Under the header, one line: "Owes ₹2,150 on 2 invoices · 1 open order · last bought 21 Nov", only what the viewer reads. Call (a `tel:` link) when there is a phone, beside New order and New booking (module and role gates only, no trade logic).
+- Cards follow what the person does: where they have bought, what they buy comes before the bookings cards, and the bookings card shows only for someone who has booked. The Paid tile replaces "Spent" and says what they owe.
+- A Member with `order:stage` gets the Orders tab, without amounts. A role that only reads is told once, in the header, not again on the Needs attention card.
+- A customer with no name reads "No name" in body size, the email under it, never the email as a three-line heading.
+
+## DEC-277 Contacts and Leads answer who to call: phone, last visit, what they owe; Leads opens on Open
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Contacts, Leads, Lead-page) · amends the Contacts register's columns (UX-051) and the Leads list's default view
+
+- **Contacts:** Name, Phone (a tap calls), Last visit (the latest confirmed booking that started and wasn't a no-show), Next booking, Owes (DEC-275), Source, sorted by last visit; Company, Open pipeline and Last order only when the business has any. Email stays searchable and in Grid and List; Added leaves the table (the person's page says when they were added). Views add Owes money and Not seen in 60 days. On a phone the row says the name, the phone and the last visit.
+- **Leads opens on Open leads**; Follow up today, Won, Lost and All (`?view=all`) are views. Columns: the person with the lead's subject under it, Phone, Stage, Next follow-up (the soonest open follow-up; the list sorts by it), Last contact (the team's last note or follow-up done: Saroh records no call on a lead), Age; Worth only when a lead has one. On a phone the age and the next follow-up stay.
+- **A lead's page:** the person's name is the title, once (it opens their page); the subject and the phone sit under it, with Call. Their next booking shows as a card with Open the booking, so a lead at "Trial booked" links its trial.
+
+## DEC-278 Notifications fold repeats and show bookings as a view
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, board Notifications) · amends the inbox of 10 Oct 2026 (one row per notice)
+
+- Notices of one kind on the same day are one row under the newest, with how many times ("Google Calendar is behind · 4 times") and Show more to open the rest; newest first, by the business's day. A booking is never folded: each is its own row.
+- Booking notices (new, moved, cancelled by the customer: `booking.new`, `booking.moved`, `booking.cancelled`) were already produced; a Bookings view sits beside All when there are any. A booking a team member makes, moves or cancels still tells the person it is with ("Bookings with you"), not the whole team, and a no-show makes no notice: adding those is a change to the alert pipeline, left for its own decision.

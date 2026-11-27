@@ -17,12 +17,14 @@ import {
     markNotificationRead,
     undoMarkAllNotificationsRead,
 } from "@/lib/notifications/actions";
+import { groupRepeats, isBookingNotice } from "@/lib/notifications/group";
 import { notificationHref } from "@/lib/notifications/href";
 import type { Notification } from "@/lib/notifications/service";
 import type { NotificationsSave } from "@/lib/notifications/use-notifications";
 import type { NoticeGroup } from "@/lib/notifications/when";
 import { exactWhen, noticeGroup, relativeWhen } from "@/lib/notifications/when";
 import { ListCard, ListRow } from "@saroh/ui/list-card";
+import { TabStrip } from "@saroh/ui/tabs";
 
 const GROUPS: { key: NoticeGroup; label: string }[] = [
     { key: "today", label: "Today" },
@@ -117,6 +119,14 @@ export function NotificationsInbox({
         });
     };
 
+    const [expanded, setExpanded] = useState<ReadonlySet<string>>(NONE);
+    const hasBookings = notifications.some(isBookingNotice);
+    const [view, setView] = useState<"all" | "bookings">("all");
+    const shown =
+        view === "bookings" && hasBookings
+            ? notifications.filter(isBookingNotice)
+            : notifications;
+
     if (notifications.length === 0) {
         return (
             <EmptyState
@@ -128,12 +138,69 @@ export function NotificationsInbox({
         );
     }
 
+    // Newest first, by the business's day, and one kind's repeats as one
+    // row with a count (DEC-278).
     const groups = GROUPS.map((group) => ({
         ...group,
-        rows: notifications.filter(
-            (n) => noticeGroup(n.createdAt, now, zone) === group.key,
+        runs: groupRepeats(
+            shown.filter(
+                (n) => noticeGroup(n.createdAt, now, zone) === group.key,
+            ),
         ),
-    })).filter((group) => group.rows.length > 0);
+    })).filter((group) => group.runs.length > 0);
+
+    const item = (n: Notification, index: number, more = 0) => {
+        const fresh = isUnread(n);
+        const when = relativeWhen(n.createdAt, now, zone);
+        return (
+            <li
+                key={n.id}
+                style={{ "--wk-i": index } as React.CSSProperties}
+                className="wk-item border-b border-border last:border-b-0"
+            >
+                <IntentLink
+                    href={notificationHref(n)}
+                    aria-label={`${n.title}${more ? `, and ${more} more like it` : ""}${fresh ? ", unread" : ""}${n.body ? `. ${n.body}` : ""}. ${when}`}
+                    data-unread={fresh ? "" : undefined}
+                    className={ROW}
+                    onClick={() => open(n)}
+                >
+                    <ListRow
+                        title={
+                            <span className="inline-flex min-w-0 items-center gap-2">
+                                {fresh ? (
+                                    <span
+                                        aria-hidden
+                                        data-unread-dot
+                                        className="size-2 shrink-0 rounded-full bg-foreground"
+                                    />
+                                ) : null}
+                                <span className="min-w-0">
+                                    {n.title}
+                                    {more ? (
+                                        <span className="font-normal text-muted-foreground">
+                                            {` · ${more + 1} times`}
+                                        </span>
+                                    ) : null}
+                                </span>
+                            </span>
+                        }
+                        sub={n.body}
+                        muted={!fresh}
+                        end={
+                            <time
+                                dateTime={n.createdAt}
+                                title={exactWhen(n.createdAt, zone)}
+                                className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground"
+                            >
+                                {when}
+                            </time>
+                        }
+                    />
+                </IntentLink>
+            </li>
+        );
+    };
 
     return (
         <div className="grid gap-3">
@@ -155,6 +222,21 @@ export function NotificationsInbox({
                 </div>
             ) : null}
 
+            {hasBookings ? (
+                <TabStrip
+                    label="Which notifications"
+                    value={view}
+                    onValueChange={setView}
+                    tabs={[
+                        { value: "all", label: "All" },
+                        {
+                            value: "bookings",
+                            label: "Bookings",
+                            count: notifications.filter(isBookingNotice).length,
+                        },
+                    ]}
+                />
+            ) : null}
             {groups.map((group, g) => (
                 <ListCard
                     key={group.key}
@@ -166,57 +248,45 @@ export function NotificationsInbox({
                             : undefined
                     }
                 >
-                    {group.rows.map((n, index) => {
-                        const fresh = isUnread(n);
-                        const when = relativeWhen(n.createdAt, now, zone);
-                        return (
-                            <li
-                                key={n.id}
-                                style={
-                                    { "--wk-i": index } as React.CSSProperties
-                                }
-                                className="wk-item border-b border-border last:border-b-0"
-                            >
-                                <IntentLink
-                                    href={notificationHref(n)}
-                                    aria-label={`${n.title}${fresh ? ", unread" : ""}${n.body ? `. ${n.body}` : ""}. ${when}`}
-                                    data-unread={fresh ? "" : undefined}
-                                    className={ROW}
-                                    onClick={() => open(n)}
+                    {group.runs.flatMap((run, index) => {
+                        const open = expanded.has(run.head.id);
+                        const rows = [
+                            item(run.head, index, open ? 0 : run.rest.length),
+                        ];
+                        if (run.rest.length > 0) {
+                            if (open) {
+                                rows.push(
+                                    ...run.rest.map((n) => item(n, index)),
+                                );
+                            }
+                            rows.push(
+                                <li
+                                    key={`${run.head.id}-more`}
+                                    className="border-b border-border px-4 py-1.5 last:border-b-0"
                                 >
-                                    <ListRow
-                                        title={
-                                            <span className="inline-flex min-w-0 items-center gap-2">
-                                                {fresh ? (
-                                                    <span
-                                                        aria-hidden
-                                                        data-unread-dot
-                                                        className="size-2 shrink-0 rounded-full bg-foreground"
-                                                    />
-                                                ) : null}
-                                                <span className="min-w-0">
-                                                    {n.title}
-                                                </span>
-                                            </span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-expanded={open}
+                                        onClick={() =>
+                                            setExpanded((had) => {
+                                                const next = new Set(had);
+                                                if (open)
+                                                    next.delete(run.head.id);
+                                                else next.add(run.head.id);
+                                                return next;
+                                            })
                                         }
-                                        sub={n.body}
-                                        muted={!fresh}
-                                        end={
-                                            <time
-                                                dateTime={n.createdAt}
-                                                title={exactWhen(
-                                                    n.createdAt,
-                                                    zone,
-                                                )}
-                                                className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground"
-                                            >
-                                                {when}
-                                            </time>
-                                        }
-                                    />
-                                </IntentLink>
-                            </li>
-                        );
+                                    >
+                                        {open
+                                            ? "Show fewer"
+                                            : `Show ${count(run.rest.length, "more", "more")}`}
+                                    </Button>
+                                </li>,
+                            );
+                        }
+                        return rows;
                     })}
                 </ListCard>
             ))}

@@ -3,7 +3,12 @@ import { Prisma } from "@saroh/database";
 import { RESERVED_CONTACT_EMAIL_DOMAINS } from "../contacts/contact-email";
 import { openSql } from "../orders/order-list-filters";
 import type { CustomerChip, CustomerSort } from "./customers-list.dto";
-import { spentLedgerRowsSql, spentRowsSql } from "./spent.sql";
+import { owesRowsSql, unpaidOrderSql } from "./owes.sql";
+import {
+    orderRefundedSql,
+    spentLedgerRowsSql,
+    spentRowsSql,
+} from "./spent.sql";
 
 // Spent's rule lives in `spent.sql.ts` (C14: net of refunds; an invoice's
 // ledger by the money-in rule, DEC-173), which Customer Detail reads too.
@@ -22,6 +27,12 @@ export { spentRowsSql };
  *
  * Every figure comes from one CTE, so the chip counts can never disagree with
  * the rows they count.
+ *
+ * A store customer who has paid but whom no contact holds yet (C2 left them
+ * for the merchant to link, DEC-041) is a row too, marked `unlinked`
+ * (DEC-275): the list never reads "No customers yet" while people have
+ * paid. Their figures are their own orders'; linking them stays the
+ * merchant's action.
  */
 
 /**
@@ -39,7 +50,7 @@ const LIVE_ACCOUNT = ["ACTIVE", "BLOCKED"] as const;
 export const PAID_ORDER = Prisma.sql`o."paymentStatus" IN ('PAID', 'REFUNDED')`;
 
 /** An order that counts at all: never an abandoned checkout (plan B, B1). */
-const REAL_ORDER = Prisma.sql`NOT (o."placedOnline" AND NOT o."payOnHandover" AND o."paymentStatus" = 'UNPAID')`;
+export const REAL_ORDER = Prisma.sql`NOT (o."placedOnline" AND NOT o."payOnHandover" AND o."paymentStatus" = 'UNPAID')`;
 
 /** True when `column` holds one of `contact-email.ts`'s placeholders. */
 function reservedEmail(column: Prisma.Sql): Prisma.Sql {
@@ -105,6 +116,11 @@ export function peopleCte(opts: PeopleOptions): Prisma.Sql {
         FROM (${spentRowsSql(org)}) s
         GROUP BY s."contactId"
     ),
+    owe AS (
+        SELECT w."contactId", SUM(w.amount) AS owes
+        FROM (${owesRowsSql(org, { orders: true, invoices: true })}) w
+        GROUP BY w."contactId"
+    ),
     people AS (
         SELECT c.id, c."firstName", c."lastName", c.email, c.phone,
             c."createdAt",
@@ -116,6 +132,7 @@ export function peopleCte(opts: PeopleOptions): Prisma.Sql {
             COALESCE(ord.at_store, FALSE) AS at_store,
             COALESCE(inv.paid_invoices, 0) AS paid_invoices,
             spent.spent,
+            owe.owes,
             COALESCE(c.source = ${ADDED_AS_CUSTOMER}, FALSE) AS added_by_hand,
             EXISTS (
                 SELECT 1 FROM "CustomerSubscription" s
@@ -140,11 +157,13 @@ export function peopleCte(opts: PeopleOptions): Prisma.Sql {
                 WHERE a."contactId" = c.id AND a."organizationId" = ${org}
                   AND a.status::text = 'ACTIVE' AND a."removedAt" IS NULL
                   AND ${attentionVisible}
-            ) AS attention
+            ) AS attention,
+            FALSE AS unlinked
         FROM "Contact" c
         LEFT JOIN ord ON ord."contactId" = c.id
         LEFT JOIN inv ON inv."contactId" = c.id
         LEFT JOIN spent ON spent."contactId" = c.id
+        LEFT JOIN owe ON owe."contactId" = c.id
         LEFT JOIN LATERAL (
             SELECT ca.email FROM "CustomerAccount" ca
             WHERE ca."contactId" = c.id
@@ -156,18 +175,94 @@ export function peopleCte(opts: PeopleOptions): Prisma.Sql {
         WHERE c."organizationId" = ${org}
           AND ${notRetired("c")}
     ),
+    unl AS (
+        ${unlinkedPeopleSql(org, atStore)}
+    ),
     m AS (
-        SELECT people.*,
-            CASE WHEN ${reservedEmail(Prisma.sql`people.email`)}
-                THEN people.account_email ELSE people.email END AS shown_email
-        FROM people
-        WHERE people.paid_orders > 0
-           OR people.paid_invoices > 0
-           OR people.has_subscription
-           OR people.has_pack
-           OR people.account_email IS NOT NULL
-           OR people.added_by_hand
+        SELECT x.*,
+            CASE WHEN ${reservedEmail(Prisma.sql`x.email`)}
+                THEN x.account_email ELSE x.email END AS shown_email
+        FROM (
+            SELECT ${PEOPLE_COLUMNS} FROM people
+            WHERE people.paid_orders > 0
+               OR people.paid_invoices > 0
+               OR people.has_subscription
+               OR people.has_pack
+               OR people.account_email IS NOT NULL
+               OR people.added_by_hand
+            UNION ALL
+            SELECT ${PEOPLE_COLUMNS} FROM unl
+        ) x
     )`;
+}
+
+/** The columns `people` and `unl` share, in one order, for the UNION. */
+const PEOPLE_COLUMNS = Prisma.raw(
+    [
+        "id",
+        '"firstName"',
+        '"lastName"',
+        "email",
+        "phone",
+        '"createdAt"',
+        "account_email",
+        "orders",
+        "paid_orders",
+        "open_orders",
+        "last_order_at",
+        "at_store",
+        "paid_invoices",
+        "spent",
+        "owes",
+        "added_by_hand",
+        "has_subscription",
+        "subscriber",
+        "has_pack",
+        "offers",
+        "attention",
+        "unlinked",
+    ].join(", "),
+);
+
+/**
+ * The paying store customers no contact holds, as people rows (DEC-275):
+ * the same who `unlinkedCte` counts — paid, a usable email, no link —
+ * with their own orders' figures. Driven from the business's own orders,
+ * so it never reads another business's store customers.
+ */
+function unlinkedPeopleSql(org: string, atStore: Prisma.Sql): Prisma.Sql {
+    return Prisma.sql`SELECT cu.id, cu."firstName", cu."lastName", cu.email,
+            cu.phone, cu."createdAt",
+            NULL::text AS account_email,
+            COUNT(*)::int AS orders,
+            (COUNT(*) FILTER (WHERE ${PAID_ORDER}))::int AS paid_orders,
+            (COUNT(*) FILTER (WHERE ${openSql()}))::int AS open_orders,
+            MAX(o."createdAt") AS last_order_at,
+            ${atStore} AS at_store,
+            0 AS paid_invoices,
+            SUM(CASE WHEN o."paymentStatus" = 'PAID'
+                THEN GREATEST(o.total - ${orderRefundedSql(org)}, 0) END) AS spent,
+            SUM(CASE WHEN ${unpaidOrderSql()} THEN o.total END) AS owes,
+            FALSE AS added_by_hand,
+            FALSE AS has_subscription,
+            FALSE AS subscriber,
+            FALSE AS has_pack,
+            FALSE AS offers,
+            FALSE AS attention,
+            TRUE AS unlinked
+        FROM "Order" o
+        JOIN "Customer" cu ON cu.id = o."customerId"
+        WHERE o."organizationId" = ${org}
+          AND ${REAL_ORDER}
+          AND btrim(COALESCE(cu.email, '')) <> ''
+          AND NOT ${reservedEmail(Prisma.sql`cu.email`)}
+          AND NOT EXISTS (
+            SELECT 1 FROM "CustomerIdentityLink" l
+            WHERE l."customerId" = cu.id
+              AND l."organizationId" = ${org}
+          )
+        GROUP BY cu.id
+        HAVING COUNT(*) FILTER (WHERE ${PAID_ORDER}) > 0`;
 }
 
 /** `%`, `_` and `\` typed into the search are themselves, not wildcards. */
@@ -230,6 +325,10 @@ export function chipSql(chip: CustomerChip, invoicesToo: boolean): Prisma.Sql {
             return Prisma.sql`m.offers`;
         case "attention":
             return Prisma.sql`m.attention`;
+        case "owes":
+            return Prisma.sql`COALESCE(m.owes, 0) > 0`;
+        case "unlinked":
+            return Prisma.sql`m.unlinked`;
         case "all":
             return Prisma.sql`TRUE`;
     }

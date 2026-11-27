@@ -5,7 +5,7 @@ import {
     Optional,
 } from "@nestjs/common";
 import { joinDeliveryPlace } from "@saroh/block-contract";
-import { prisma } from "@saroh/database";
+import { Prisma, prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
@@ -58,6 +58,7 @@ import type { DetailPack } from "./customer-detail-packs";
 import { readContactPacks } from "./customer-detail-packs";
 import { spentPart } from "./customer-spent";
 import { normaliseEmail } from "./duplicates";
+import { owesRowsSql } from "./owes.sql";
 
 export type {
     DetailPack,
@@ -181,9 +182,12 @@ export interface DetailOrder {
     stage: string;
     /** Where a delivery went; null for a collection. */
     delivery: string | null;
-    /** The order's total: `order:read` shows the whole order. */
-    total: string;
-    currency: string;
+    /**
+     * The order's total: `order:read` shows the whole order. Absent for a
+     * role that only stages orders (`order:stage`, DEC-024): no amounts.
+     */
+    total?: string;
+    currency?: string;
     /** The linked store customer this order came through. */
     via: { customerId: string; storefront: Storefront };
 }
@@ -283,6 +287,16 @@ export interface DetailStats {
         allowance: MembershipAllowance | null;
     } | null;
     spent?: MoneyTotal[] | null;
+    /**
+     * What they still owe (DEC-275, `owes.sql.ts`), the rule the Customers
+     * list reads: unpaid orders and invoices, how many of each. With the
+     * reads Spent asks; null when it couldn't be read.
+     */
+    owes?: {
+        totals: MoneyTotal[];
+        invoices: number;
+        orders: number;
+    } | null;
     owed?: {
         totals: MoneyTotal[];
         unpaidCount: number;
@@ -599,8 +613,11 @@ export class CustomerDetailService {
         const money =
             allows(ctx, "invoice:read") &&
             (!commerce || allows(ctx, "order:read"));
+        // A Member at the counter (`order:stage`) sees the orders, without
+        // amounts (DEC-024, DEC-276).
+        const orderAmounts = allows(ctx, "order:read");
         const wants = {
-            orders: commerce && allows(ctx, "order:read"),
+            orders: commerce && (orderAmounts || allows(ctx, "order:stage")),
             bookings: on.has("APPOINTMENTS") && allows(ctx, "booking:read"),
             // Class packs is its own module on Appointments (E12); one Saroh
             // hasn't rolled out is never shown (DEC-057), and it reads as off.
@@ -676,6 +693,7 @@ export class CustomerDetailService {
                             contactId,
                             links,
                             money,
+                            orderAmounts,
                         ),
                     ),
             wants.bookings
@@ -778,6 +796,12 @@ export class CustomerDetailService {
             }
         }
         if (wants.invoices) stats.owed = invoices ? invoices.owed : null;
+        if (money) {
+            stats.owes = await this.readOwes(organizationId, contactId, {
+                orders: wants.orders && orderAmounts,
+                invoices: allows(ctx, "invoice:read"),
+            }).catch(() => null);
+        }
 
         const noteRows = notes?.[0] ?? null;
         return {
@@ -965,6 +989,8 @@ export class CustomerDetailService {
         links: LinkedCustomer[],
         /** Sum what was paid, for Spent. */
         sumPaid: boolean,
+        /** `order:read`: each order's total; without it, none (DEC-024). */
+        amounts = true,
     ): Promise<{
         rows: DetailOrder[];
         count: number;
@@ -1063,11 +1089,39 @@ export class CustomerDetailService {
                           .join(", ") || null
                     : null,
                 // The whole order goes with `order:read` (matrix §1 rule 2).
-                total: toMoneyString(o.total),
-                currency: o.currency,
+                ...(amounts
+                    ? { total: toMoneyString(o.total), currency: o.currency }
+                    : {}),
                 via: { customerId: o.customerId, storefront: o.store },
             })),
         };
+    }
+
+    /** "Owes" (DEC-275): the list's rule, for one person. */
+    private async readOwes(
+        organizationId: string,
+        contactId: string,
+        parts: { orders: boolean; invoices: boolean },
+    ): Promise<NonNullable<DetailStats["owes"]>> {
+        const rows = await this.db.$queryRaw<
+            {
+                currency: string;
+                part: string;
+                amount: { toString(): string } | null;
+            }[]
+        >(
+            Prisma.sql`SELECT w.currency, w.part, w.amount
+                FROM (${owesRowsSql(organizationId, { contactIds: [contactId], ...parts })}) w`,
+        );
+        const purse = new Purse();
+        let invoices = 0;
+        let orders = 0;
+        for (const r of rows) {
+            purse.add(r.currency, r.amount);
+            if (r.part === "invoice") invoices += 1;
+            else orders += 1;
+        }
+        return { totals: purse.totals(), invoices, orders };
     }
 
     private async readBookings(

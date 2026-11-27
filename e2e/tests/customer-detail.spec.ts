@@ -443,9 +443,11 @@ test.describe("needs attention", () => {
         // Reads, but can't change the record.
         const card = page.getByRole("region", { name: "Needs attention" });
         await expect(card.getByRole("button", { name: "Add" })).toHaveCount(0);
-        await expect(card).toContainText(
-            "Your role can read this but not change their record.",
+        // Said once, in the header (DEC-276), not again on the card.
+        await expect(main).toContainText(
+            "Your role can see this customer but not edit them.",
         );
+        await expect(card).not.toContainText("Your role can");
     });
 
     test("an Owner sees the medical note by the name", async ({ page }) => {
