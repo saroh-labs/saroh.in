@@ -143,9 +143,10 @@ export function ordersSort(
 }
 
 /**
- * Whether the open orders placed a month ago or more are folded under one
- * line (DEC-265): on the Open view, while nothing is searched (a search
- * finds them all) and their own list isn't the one open.
+ * Whether the Open view says how many of its orders were placed a month ago
+ * or more, with a way to close them (DEC-265): on the Open view, while
+ * nothing is searched and their own list isn't the one open. They are
+ * listed with the rest (owner, 27 Nov 2026), never folded away.
  */
 export function foldsOlder(
     query: Pick<OrdersQuery, "tab" | "q" | "older">,
@@ -163,7 +164,6 @@ export function viewTotal(
 ): number {
     const stale = counts.stale ?? 0;
     if (query.older) return stale;
-    if (foldsOlder(query)) return Math.max(0, counts.open - stale);
     return counts[query.tab];
 }
 
@@ -246,7 +246,8 @@ export function orderListParams(query: OrdersQuery): OrderListParams {
         page: query.page > 1 ? query.page : undefined,
         size: query.size !== ORDERS_PAGE_SIZE ? query.size : undefined,
         sort: ordersSort(query) === "due" ? "due" : undefined,
-        older: query.older ? "only" : foldsOlder(query) ? "hide" : undefined,
+        // Open lists every open order, month-old ones too (owner, 27 Nov 2026).
+        older: query.older ? "only" : undefined,
     };
 }
 

@@ -45,12 +45,6 @@ const word = z.string().max(100).optional();
 export interface OrdersListView extends OrderListPage {
     moment: MomentView | null;
     share: ShareLink | null;
-    /**
-     * Every open order was placed a month ago or more, so nothing is left
-     * above the fold: the rows are those orders, listed in place of the
-     * fold (DEC-265, owner 27 Nov 2026). Absent otherwise.
-     */
-    allStale?: true;
 }
 
 /** One page of the list, as the address narrows it (`ordersAsk`). */

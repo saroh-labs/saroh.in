@@ -39,13 +39,13 @@ describe("readOrdersQuery", () => {
         expect(readOrdersQuery({ tab: "abandoned" }).tab).toBe("open");
     });
 
-    it("opens on Open, soonest late first, with month-old ones folded (DEC-265)", () => {
+    it("opens on Open, soonest late first, month-old ones listed too (DEC-265; 27 Nov 2026)", () => {
         expect(first.tab).toBe("open");
         expect(orderListParams(first)).toMatchObject({
             tab: "open",
             sort: "due",
-            older: "hide",
         });
+        expect(orderListParams(first).older).toBeUndefined();
         expect(ordersHref(first)).toBe("/commerce/orders");
         // All is written, since it isn't what the bare address opens on.
         expect(ordersHref(first, { tab: "all" })).toBe(
@@ -88,15 +88,15 @@ describe("readOrdersQuery", () => {
         const params = exportParams(readOrdersQuery({ page: "3" }));
         expect(params).toMatchObject({
             tab: "open",
-            older: "hide",
             page: undefined,
         });
+        expect(params.older).toBeUndefined();
         expect(params.sort).toBeUndefined();
     });
 
-    it("pages through what the view holds: Open less the folded ones", () => {
+    it("pages through what the view holds: every open order on Open", () => {
         const counts = { all: 40, open: 20, refunded: 2, stale: 12 };
-        expect(viewTotal(first, counts)).toBe(8);
+        expect(viewTotal(first, counts)).toBe(20);
         expect(viewTotal(readOrdersQuery({ older: "1" }), counts)).toBe(12);
         expect(viewTotal(readOrdersQuery({ tab: "all" }), counts)).toBe(40);
         expect(viewTotal(first, { all: 1, open: 1, refunded: 0 })).toBe(1);

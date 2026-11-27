@@ -66,7 +66,8 @@ async function memberPage(browser: Browser): Promise<Page> {
  * The query the bare list asks (DEC-265): Open, soonest late first, open
  * orders placed a month ago or more folded under one line.
  */
-const OPEN_VIEW = "&tab=open&sort=due&older=hide";
+// Open lists month-old orders too (owner, 27 Nov 2026).
+const OPEN_VIEW = "&tab=open&sort=due";
 
 /** One page of the list, as the screen asks for it. */
 async function list(page: Page, org: string, query = ""): Promise<ListPage> {
@@ -209,7 +210,7 @@ test.describe("orders list", () => {
             ).toContainText(`#${first.orderId}`);
         }
         const fold = page.getByRole("button", {
-            name: /^(Close|See) them$/,
+            name: /^(Close them|See only them)$/,
         });
         if (open.counts.stale === 0) {
             await expect(fold).toHaveCount(0);
@@ -217,7 +218,9 @@ test.describe("orders list", () => {
         }
         await expect(
             page.getByText(
-                `${chipCount(open.counts.stale)} ${open.counts.stale === 1 ? "order" : "orders"} open over a month`,
+                open.counts.stale === 1
+                    ? "1 of these was placed over a month ago"
+                    : `${open.counts.stale} of these were placed over a month ago`,
             ),
         ).toBeVisible();
         await fold.click();
