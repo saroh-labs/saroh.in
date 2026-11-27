@@ -126,7 +126,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { planMeter } from "../billing/metering.service";
 import type { InvoicesService } from "../invoices/invoices.service";
 import { resolveCapabilities } from "../organizations/organization-policy";
-import { SubscriptionsService } from "./subscriptions.service";
+import { needYouFirst, SubscriptionsService } from "./subscriptions.service";
 
 type Mocked = Record<string, jest.Mock>;
 const db = prisma as unknown as Record<string, Mocked> & {
@@ -2070,6 +2070,71 @@ describe("a failed charge", () => {
         });
     });
 
+    it("says Not paid until a charge was really tried and declined (DEC-270)", async () => {
+        const issued = { ...overdue, issuedAt: at("2026-09-01T00:00:00Z") };
+        db.invoice!.findMany!.mockResolvedValue([paid, issued]);
+        db.subscriptionEvent!.findMany!.mockResolvedValue([]);
+        expect(await service.get(owner, "sub_1")).toMatchObject({
+            paymentFailed: true,
+            chargeFailed: false,
+        });
+        // Autopay stood aside for an open checkout: nothing was tried.
+        db.subscriptionEvent!.findMany!.mockResolvedValue([
+            {
+                subscriptionId: "sub_1",
+                kind: "RENEWAL_FAILED",
+                data: { reason: "CHECKOUT_OPEN" },
+                createdAt: at("2026-09-02T00:00:00Z"),
+            },
+        ]);
+        expect((await service.get(owner, "sub_1")).chargeFailed).toBe(false);
+        // A declined debit on this renewal.
+        db.subscriptionEvent!.findMany!.mockResolvedValue([
+            {
+                subscriptionId: "sub_1",
+                kind: "RENEWAL_FAILED",
+                data: { reason: "DECLINED" },
+                createdAt: at("2026-09-02T00:00:00Z"),
+            },
+        ]);
+        expect((await service.get(owner, "sub_1")).chargeFailed).toBe(true);
+        // One declined before this renewal was issued is another renewal's.
+        db.subscriptionEvent!.findMany!.mockResolvedValue([
+            {
+                subscriptionId: "sub_1",
+                kind: "RENEWAL_FAILED",
+                data: {},
+                createdAt: at("2026-08-20T00:00:00Z"),
+            },
+        ]);
+        expect((await service.get(owner, "sub_1")).chargeFailed).toBe(false);
+    });
+
+    it("gives the member's phone only to a role that may see contact details", async () => {
+        db.customerSubscription!.findFirst!.mockResolvedValue(
+            sub({
+                contact: {
+                    id: "c_1",
+                    firstName: "Asha",
+                    lastName: "Rao",
+                    email: "asha@example.com",
+                    phone: "+919876543210",
+                },
+            }),
+        );
+        db.invoice!.findMany!.mockResolvedValue([paid, overdue]);
+        expect((await service.get(owner, "sub_1")).contact.phone).toBe(
+            "+919876543210",
+        );
+        const desk: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["subscription:read"]),
+        };
+        expect((await service.get(desk, "sub_1")).contact.phone).toBeNull();
+    });
+
     it("retries by making a new pay link for that invoice", async () => {
         tx.invoice!.findMany!.mockResolvedValue([paid, overdue]);
         createPayLinkInTx.mockResolvedValue({ token: "tok" });
@@ -3349,5 +3414,42 @@ describe("GST on a plan", () => {
             });
             expect(tx.customerSubscription!.update).not.toHaveBeenCalled();
         });
+    });
+});
+
+describe("the list's order (finding 14)", () => {
+    const now = at("2026-11-26T06:00:00Z");
+    const row = (
+        id: string,
+        dueAt: string | null,
+        unpaidTotal: string,
+        paymentFailed = true,
+    ) => ({
+        id,
+        paymentFailed,
+        unpaidTotal,
+        timezone: "Asia/Kolkata",
+        failedCharge: dueAt
+            ? { id: `inv_${id}`, number: null, dueAt, total: unpaidTotal }
+            : null,
+    });
+
+    it("puts who needs the owner first, most days late, then most owed", () => {
+        const rows = [
+            row("ok", null, "0.00", false),
+            row("two", "2026-11-24T18:29:59.999Z", "900.00"),
+            row("seventeen", "2026-11-08T18:29:59.999Z", "900.00"),
+            row("seven", "2026-11-19T18:29:59.999Z", "900.00"),
+            row("seven-more", "2026-11-19T18:29:59.999Z", "4800.00"),
+            row("autopay", null, "500.00"),
+        ];
+        expect(needYouFirst(rows, now).map((r) => r.id)).toEqual([
+            "seventeen",
+            "seven-more",
+            "seven",
+            "two",
+            "autopay",
+            "ok",
+        ]);
     });
 });

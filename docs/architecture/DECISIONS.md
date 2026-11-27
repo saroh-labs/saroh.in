@@ -3404,6 +3404,31 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Cards are styled per section or for the whole site only;** there is no "This card" (and no per-card storage).
 - **Page rows** in the editor show the first photo on the page (its stored smaller copy), or a plain page icon.
 
+## DEC-269 One days-late count, in the business's own zone
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Today-Invoices, Invoices, Today-Subscription, Subscription-sheet; selling audit finding 12) · applies DEC-033 to every "days late"
+
+- Context: the same unpaid renewal read "17 days past due" on Subscriptions and "18 days late" on Invoices on the same day: one rounded 24-hour blocks down, the other up.
+- Decision: **how late a bill is, is counted in calendar days in the business's zone** (DEC-033), from the day it was due to today, **at least 1 once the moment has passed** and 0 before. One rule, one helper per runtime: `daysPastDue` (`apps/app.saroh.in/lib/format/datetime.ts`) and `daysLate` (`apps/api.saroh.in/src/modules/invoices/overdue-bills.ts`), tested around midnight and in zones ahead of and behind UTC. Subscriptions now say "N days late", as Invoices do.
+- Uses it: the invoice list, sheet, page pill and money card, share line and Remind many rows; Subscriptions' row, quick look, page and renewal notes; Insights' owed bills; Home's "Late · N days" on bills and renewals; the reminder preview; the MCP summary's `days_late`. Not a bill, so not affected: Home's overdue follow-up tasks, which keep whole days since the task's moment.
+
+## DEC-270 "Not paid" until a charge has really failed
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, board Subscription-sheet; selling audit finding 13) · amends the U7 "Payment failed" status (DEC-173 era) and D13's wording
+
+- Context: a renewal invoice simply not paid read "Payment failed" beside "Saroh doesn't charge cards": nothing was tried, and the word sent owners to ask about cards.
+- Decision: a renewal that needs the owner is **"Not paid"**; it is **"Payment failed" only when a charge on that renewal was tried and declined** since it was issued — a `RENEWAL_FAILED` subscription event, not autopay standing aside for an open checkout (`CHECKOUT_OPEN`), and not `MANDATE_LIMIT_LOW` (nothing was charged). The API derives `chargeFailed` beside `paymentFailed` (never stored); the list's badge, the quick look, the page's pill ("due 15 Sep" or "failed 15 Sep"), Plan Detail's subscribers and the quick look's notice all read it (`statusLabel`). The Need you view and its counts are unchanged. The customer is told of a decline only when there was one (`enqueueAutopayFailedNotice`, unchanged).
+- Not in this change: Home's grouped "N payments failed" phrase (Home's area) still counts every renewal that needs the owner; it follows this rule when Home is next touched.
+
+## DEC-271 The invoice tiles are the views, and Overdue leads
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, board Invoices; selling audit findings 11, 14, 20, 21) · amends DEC-173's list (A+C)
+
+- **The list opens on Overdue** when the address chooses nothing and any invoice is overdue, its tile marked; newest first within it. The address always wins (`?tab=`, `?view=`, a search, a date, a figure, a pack or course); every invoice is `?tab=all`, which pressing an on tile, picking All or Clear filters now writes (`withDefaultView`, `withFigure`).
+- **Who to ring:** the invoice details (sheet and page) show a "Billed to" card with the phone, the email and Call (`tel:`) while money is owed and the contact has a phone; "Next step is yours" offers "call" only then. The subscription quick look shows the subscriber's phone and Call when the renewal isn't paid. The phone is on the reads only for a role with `contact:read` (DEC-039), shaped in the API. No WhatsApp chat link: the app has no house one for a contact.
+- **Subscriptions' Need you** rows come from the API most days late first, then most owed, before the rest.
+- **The subscription quick look takes the money in place:** Send new link and Record payment happen in the sheet (the page's own actions and Record payment sheet, written as the tab's business), for a role with `subscription:write` and `invoice:write`; the list and the sheet read again. Pause and Cancel stay on the subscription's page.
+- On a phone the invoice page already draws the money card above the paper, as the sheet does.
 ## DEC-262 The menu is grouped by the merchant's question, one home per thing
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026, design canvas page "Grouping the menu": "the grouping looks better now") · amends the group-by-purpose menu ("Presence", "Run the business", "Grow", 2026-08-02) and DEC-133's last group "Manage"

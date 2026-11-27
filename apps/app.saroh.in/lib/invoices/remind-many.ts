@@ -58,6 +58,7 @@ export function remindable(
 export function pickRowsOf(
     invoices: readonly Invoice[],
     now: Date = new Date(),
+    zone?: string,
 ): PickRow[] {
     return invoices
         .filter(remindable)
@@ -65,7 +66,7 @@ export function pickRowsOf(
             invoiceId: i.id,
             name: billedTo(i).name,
             number: i.number,
-            lateDays: lateBy(i, now),
+            lateDays: lateBy(i, now, zone),
             amountMinor: leftCents(i),
             currency: i.currency,
         }))

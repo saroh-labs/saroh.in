@@ -18,8 +18,8 @@ import {
     listTab,
     olderPrice,
     recurringPrice,
+    statusLabel,
     subscriptionPay,
-    TAB_LABEL,
     TAB_TONE,
 } from "./view";
 
@@ -386,7 +386,7 @@ export function subscriberRows(
                 id: s.id,
                 name: s.contact.name,
                 since: `Since ${d(s.startedAt)}`,
-                status: { label: TAB_LABEL[tab], tone: TAB_TONE[tab] },
+                status: { label: statusLabel(s), tone: TAB_TONE[tab] },
                 // What they pay a period, GST and all.
                 price: recurringPrice(
                     subscriptionPay(s),

@@ -40,6 +40,7 @@ import type {
 import { billedTo } from "../../home/home-money-sources";
 import { HomeService } from "../../home/home.service";
 import { leftToPayCents, OWED_VIEW_WHERE } from "../../invoices/invoice-state";
+import { daysLate } from "../../invoices/overdue-bills";
 import { realOrderWhere } from "../../orders/open-orders";
 import { ts } from "../../orders/order-list-filters";
 import { orderLocationWhere } from "../../orders/order-location";
@@ -411,12 +412,6 @@ function offsetOf(cursor: string | undefined): number {
 
 const money_ = (currency: string, amountMinor: number) =>
     money({ currency, amountMinor });
-
-/** Whole days past due, at least 1 once late, as Home's "Late · N days". */
-export function daysLate(dueAt: Date | null, now: Date): number {
-    if (!dueAt || dueAt >= now) return 0;
-    return Math.max(1, Math.floor((now.getTime() - dueAt.getTime()) / DAY_MS));
-}
 
 const shelfName = (product: string, variant: string | null) =>
     variant ? `${product} · ${variant}` : product;
@@ -810,7 +805,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                                   zone,
                               }).toISODate()
                             : null,
-                        days_late: daysLate(b.dueAt, now),
+                        days_late: daysLate(b.dueAt, now, zone),
                     };
                 });
                 const notShown = seesAmounts ? [] : ["payments"];

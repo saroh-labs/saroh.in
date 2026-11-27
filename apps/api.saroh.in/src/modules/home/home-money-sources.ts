@@ -246,7 +246,7 @@ export async function failedRenewals(
     const evidence: HomeEvidence[] = [];
     for (const inv of current) {
         const { subscriptionId } = inv;
-        const failed = renewalTag(inv, subscriptionId, signals, now);
+        const failed = renewalTag(inv, subscriptionId, signals, now, zone);
         if (!failed) continue;
         const charge = charging.get(inv.id);
         const tag = charge ? chargingTag(charge.at, zone) : failed;
@@ -295,6 +295,7 @@ export function renewalTag(
     subscriptionId: string,
     signals: readonly RenewalSignal[],
     now: Date,
+    zone?: string,
 ): string | null {
     const since = invoice.issuedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
     let latest: RenewalSignal | null = null;
@@ -305,7 +306,7 @@ export function renewalTag(
     }
     if (latest) return signalTag(latest);
     if (isPastDue(invoice, now) && invoice.dueAt)
-        return overdueTag(invoice.dueAt, now);
+        return overdueTag(invoice.dueAt, now, zone);
     return null;
 }
 
@@ -380,7 +381,7 @@ export async function overdueInvoices(
             currency: inv.currency,
             href: `/billing/invoices/${inv.id}`,
             // Always set: the where asked for a due date before now.
-            tag: inv.dueAt ? overdueTag(inv.dueAt, now) : undefined,
+            tag: inv.dueAt ? overdueTag(inv.dueAt, now, zone) : undefined,
             tone: "bad",
             ...(first ? { detail: first } : {}),
             ...(last ? { reminded: heardWords(last, now, zone) } : {}),
