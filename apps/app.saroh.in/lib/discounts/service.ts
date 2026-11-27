@@ -33,6 +33,16 @@ export interface Discount {
     usageLimit: number | null;
     used: number;
     state: DiscountState;
+    /**
+     * What it gave (DEC-267), summed by the API: the money taken off, and,
+     * on one code's read for a role that reads orders' money, what the
+     * orders came to.
+     */
+    usage?: {
+        gaveOff: string;
+        currency: string | null;
+        ordersTotal?: string;
+    };
 }
 
 export interface DiscountInput {

@@ -370,7 +370,8 @@ export type CatalogueView = "all" | "collections" | "inventory" | "needs";
 /** What the Products list asks the catalogue for: one page of it. */
 export interface CatalogueFilter {
     storefront?: string;
-    status?: ProductStatus;
+    /** One status, or "CURRENT": live and draft (DEC-268). */
+    status?: ProductStatus | "CURRENT";
     q?: string;
     view?: CatalogueView;
     category?: string;
@@ -418,6 +419,12 @@ export interface CataloguePage {
         byStorefront: { id: string; name: string; count: number }[];
     };
     needs: CatalogueNeed[];
+    /**
+     * Units and money each product on the page sold in the last 30 days
+     * (finding 17); only for a role that reads orders' money, a product
+     * with none absent.
+     */
+    sold?: Record<string, { units: number; amount: string }>;
 }
 
 /** One page of the catalogue; null with no business active. */

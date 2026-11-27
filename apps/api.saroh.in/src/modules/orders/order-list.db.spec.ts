@@ -203,7 +203,12 @@ describe("paging and counts", () => {
         expect(second.nextCursor).toBeNull();
         const seen = new Set([...first.rows, ...second.rows].map((r) => r.id));
         expect(seen.size).toBe(60);
-        expect(first.counts).toEqual({ all: 60, open: 0, refunded: 0 });
+        expect(first.counts).toEqual({
+            all: 60,
+            open: 0,
+            refunded: 0,
+            stale: 0,
+        });
         expect(second.counts).toEqual(first.counts);
     });
 
@@ -253,7 +258,12 @@ describe("paging and counts", () => {
         expect(hill.rows.every((r) => r.store.id === stores[0])).toBe(true);
         const theirs = await list({ storeId: otherStore });
         expect(theirs.rows).toEqual([]);
-        expect(theirs.counts).toEqual({ all: 0, open: 0, refunded: 0 });
+        expect(theirs.counts).toEqual({
+            all: 0,
+            open: 0,
+            refunded: 0,
+            stale: 0,
+        });
     });
 
     it("refuses a cursor that is not an order of this business", async () => {
@@ -337,7 +347,7 @@ describe("filters, tabs and rows", () => {
     it("counts each tab under every other filter", async () => {
         const all = await list();
         // Open: not delivered, not cancelled, not refunded in full.
-        expect(all.counts).toEqual({ all: 8, open: 6, refunded: 1 });
+        expect(all.counts).toEqual({ all: 8, open: 6, refunded: 1, stale: 0 });
         const open = await list({ tab: "open" });
         expect(open.rows).toHaveLength(6);
         expect(open.rows.map((r) => r.id)).not.toContain(cancelled);
@@ -345,7 +355,12 @@ describe("filters, tabs and rows", () => {
         const refundedTab = await list({ tab: "refunded" });
         expect(refundedTab.rows.map((r) => r.id)).toEqual([refunded]);
         const unpaid = await list({ payment: "UNPAID", tab: "open" });
-        expect(unpaid.counts).toEqual({ all: 3, open: 2, refunded: 0 });
+        expect(unpaid.counts).toEqual({
+            all: 3,
+            open: 2,
+            refunded: 0,
+            stale: 0,
+        });
     });
 
     it("narrows rows and every tab count to orders placed since an instant", async () => {
@@ -357,7 +372,7 @@ describe("filters, tabs and rows", () => {
         expect(page.rows.map((r) => r.id)).toContain(unpaidDelivery);
         expect(page.rows.map((r) => r.id)).toContain(partly);
         expect(page.rows.map((r) => r.id)).not.toContain(refunded);
-        expect(page.counts).toEqual({ all: 3, open: 3, refunded: 0 });
+        expect(page.counts).toEqual({ all: 3, open: 3, refunded: 0, stale: 0 });
         const open = await list({ since, tab: "open" });
         expect(open.rows).toHaveLength(3);
         expect(open.counts).toEqual(page.counts);
@@ -465,6 +480,78 @@ describe("filters, tabs and rows", () => {
             { money: true, contact: false },
         );
         expect(ravis.rows.map((r) => r.id)).toEqual([raviOrder]);
+    });
+
+    it("finds an order by a product on it, for any role (finding 19)", async () => {
+        const cakes = await list(
+            { q: "cAkE" },
+            { money: false, contact: false },
+        );
+        expect(cakes.rows.map((r) => r.id)).toEqual([cakeOrder]);
+    });
+});
+
+describe("soonest late first, and month-old open orders folded (DEC-265)", () => {
+    const DAY = 24 * 60;
+    let dueSoon: string;
+    let dueLater: string;
+    let lateNow: string;
+    let delivered: string;
+    let monthOld: string;
+
+    beforeAll(async () => {
+        // Pick-up turns late after 2 hours, local delivery after 24.
+        dueLater = await order({
+            fulfilment: "LOCAL_DELIVERY",
+            minutesAgo: 60,
+        });
+        dueSoon = await order({ minutesAgo: 100 });
+        lateNow = await order({ minutesAgo: 200 });
+        delivered = await order({
+            minutesAgo: 5,
+            status: "DELIVERED",
+            stage: "COLLECTED",
+        });
+        monthOld = await order({ minutesAgo: 31 * DAY });
+    });
+
+    afterAll(async () => {
+        await prisma.orderItem.deleteMany({});
+        await prisma.order.deleteMany({});
+    });
+
+    it("sorts by when each turns late, what never can last", async () => {
+        const page = await list({ sort: "due" });
+        expect(page.rows.map((r) => r.id)).toEqual([
+            monthOld,
+            lateNow,
+            dueSoon,
+            dueLater,
+            delivered,
+        ]);
+    });
+
+    it("folds open orders placed a month ago, and counts them", async () => {
+        const hidden = await list({ tab: "open", sort: "due", older: "hide" });
+        expect(hidden.rows.map((r) => r.id)).toEqual([
+            lateNow,
+            dueSoon,
+            dueLater,
+        ]);
+        expect(hidden.counts).toEqual({
+            all: 5,
+            open: 4,
+            refunded: 0,
+            stale: 1,
+        });
+        const only = await list({ tab: "open", older: "only" });
+        expect(only.rows.map((r) => r.id)).toEqual([monthOld]);
+    });
+
+    it("refuses a cursor on a list sorted by when orders turn late", async () => {
+        await expect(list({ sort: "due", cursor: dueSoon })).rejects.toThrow(
+            "pages by number",
+        );
     });
 });
 

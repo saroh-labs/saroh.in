@@ -19,6 +19,7 @@ describe("DiscountsController authorization", () => {
     const service = {
         list: jest.fn().mockResolvedValue([]),
         get: jest.fn(),
+        getWithUsage: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
     };
@@ -64,5 +65,32 @@ describe("DiscountsController authorization", () => {
         expect(() => controller.update(clerk, "d_1", {})).toThrow(
             ForbiddenException,
         );
+    });
+});
+
+describe("DiscountsController: one code's figures (DEC-267)", () => {
+    const getWithUsage = jest.fn().mockResolvedValue({});
+    const controller = new DiscountsController({
+        getWithUsage,
+    } as unknown as DiscountsService);
+    const as = (
+        role: OrganizationContext["role"],
+        over: Partial<OrganizationContext> = {},
+    ): OrganizationContext => ({
+        organizationId: "org_1",
+        userId: "u_1",
+        role,
+        ...over,
+    });
+
+    it("adds what the orders came to only for a role that reads orders' money", async () => {
+        await controller.get(as("OWNER"), "d_1");
+        expect(getWithUsage).toHaveBeenLastCalledWith("org_1", "d_1", true);
+        const clerk = as("MEMBER", {
+            roleKey: "till",
+            actions: resolveCapabilities("till", ["discount:read"]),
+        });
+        await controller.get(clerk, "d_1");
+        expect(getWithUsage).toHaveBeenLastCalledWith("org_1", "d_1", false);
     });
 });

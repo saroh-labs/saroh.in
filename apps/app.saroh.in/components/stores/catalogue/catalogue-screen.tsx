@@ -497,6 +497,7 @@ export function CatalogueScreen({
                     columns={catalogueColumns({
                         ratingById,
                         needById,
+                        sold: data?.sold,
                     })}
                     rowKey={(r) => r.key}
                     modes={["table", "list"]}

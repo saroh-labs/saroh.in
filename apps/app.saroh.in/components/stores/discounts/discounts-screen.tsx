@@ -1,7 +1,5 @@
 "use client";
 
-import type { BadgeProps } from "@saroh/ui/badge";
-import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
@@ -12,24 +10,14 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
-import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import {
     FigureLoading,
     PageLoading,
 } from "@/components/shared/page/page-loading";
-import { describeDiscount } from "@/lib/discounts/describe";
-import type { Discount, DiscountState } from "@/lib/discounts/service";
+import { describeDiscount, gaveOffOf } from "@/lib/discounts/describe";
+import type { Discount } from "@/lib/discounts/service";
 
-/** A code used up reads Ended, as one past its date does: it will not work now. */
-const STATE: Record<
-    DiscountState,
-    { label: string; variant: NonNullable<BadgeProps["variant"]> }
-> = {
-    ACTIVE: { label: "Live", variant: "success" },
-    SCHEDULED: { label: "Scheduled", variant: "info" },
-    EXPIRED: { label: "Ended", variant: "neutral" },
-    EXHAUSTED: { label: "Ended", variant: "neutral" },
-};
+import { DiscountEnds } from "./discount-ends";
 
 const FILTERS: DataFilter<Discount>[] = [
     { id: "all", label: "All" },
@@ -48,8 +36,9 @@ const FILTERS: DataFilter<Discount>[] = [
 
 /**
  * Sell → Discounts, as the workspace design draws it: the code in mono with
- * what it does beneath, how often it has been used against its cap, when it
- * ends, and its state.
+ * what it does beneath, how often it has been used against its cap, what
+ * it gave off (DEC-267), and when it runs, which says its state too
+ * ("Ended 25 Nov", finding 26). A row opens the code, read first.
  *
  * A code belongs to the business; what it applies to — everything, some
  * storefronts, categories or products — is part of the code, not a scope
@@ -99,38 +88,30 @@ export function DiscountsScreen({
             ),
         },
         {
+            id: "gave",
+            header: "Gave off",
+            priority: "secondary",
+            width: "120px",
+            numeric: true,
+            sortValue: (d) => Number(d.usage?.gaveOff ?? 0),
+            cell: (d) => {
+                const off = gaveOffOf(d);
+                return off ? (
+                    <span className="tabular-nums">{off}</span>
+                ) : (
+                    <span data-ph-unmask="" className="text-muted-foreground">
+                        None
+                    </span>
+                );
+            },
+        },
+        {
             id: "ends",
             header: "Ends",
             priority: "secondary",
-            width: "150px",
+            width: "190px",
             sortValue: (d) => d.endsAt ?? "9999",
-            cell: (d) =>
-                d.state === "SCHEDULED" && d.startsAt ? (
-                    <span>
-                        Starts <ViewerDate iso={d.startsAt} />
-                    </span>
-                ) : d.endsAt ? (
-                    <span>
-                        {d.state === "EXPIRED" ? "Ended " : "Ends "}
-                        <ViewerDate iso={d.endsAt} />
-                    </span>
-                ) : (
-                    <span data-ph-unmask="" className="text-muted-foreground">
-                        No end date
-                    </span>
-                ),
-        },
-        {
-            id: "state",
-            header: "State",
-            priority: "secondary",
-            width: "112px",
-            sortValue: (d) => d.state,
-            cell: (d) => (
-                <Badge variant={STATE[d.state].variant}>
-                    {STATE[d.state].label}
-                </Badge>
-            ),
+            cell: (d) => <DiscountEnds discount={d} />,
         },
     ];
 
@@ -195,16 +176,23 @@ export function DiscountsScreen({
                     ) : undefined,
                 }}
             />
-            <p
-                data-ph-unmask=""
-                className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground"
-            >
-                A code works on an order you take at the counter and, when your
-                website sells, in your customers&rsquo; bag there, with the same
-                dates, limit and reach, and one count of uses. An expired code
-                keeps its figures: how often something was used is a fact about
-                the past, not a setting.
-            </p>
+            {/* The rules, one press away rather than a paragraph under
+                every list (finding 26, owner). */}
+            <details className="group max-w-[68ch] text-[12.5px]">
+                <summary className="w-fit cursor-pointer rounded-sm text-muted-foreground underline decoration-border-strong underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    How codes work
+                </summary>
+                <p
+                    data-ph-unmask=""
+                    className="mt-1.5 text-pretty leading-[1.45] text-muted-foreground"
+                >
+                    A code works on an order you take at the counter and, when
+                    your website sells, in your customers&rsquo; bag there, with
+                    the same dates, limit and reach, and one count of uses. An
+                    expired code keeps its figures: how often something was used
+                    is a fact about the past, not a setting.
+                </p>
+            </details>
         </>
     );
 }

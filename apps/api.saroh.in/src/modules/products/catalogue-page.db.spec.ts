@@ -383,6 +383,65 @@ describe("Catalogue page (DB)", () => {
         }
     });
 
+    it("opens on live and draft, archived a view of its own (DEC-268)", async () => {
+        await prisma.product.update({
+            where: { id: mug },
+            data: { status: "ARCHIVED" },
+        });
+        try {
+            const current = await page({ status: "CURRENT" });
+            const ids = current.items.map((i) => i.id);
+            expect(ids).toContain(draft);
+            expect(ids).not.toContain(mug);
+            expect(current.counts.all).toBe(current.total);
+            expect(current.storefronts.everywhere).toBe(current.total);
+            const archived = await page({ status: "ARCHIVED" });
+            expect(archived.items.map((i) => i.id)).toEqual([mug]);
+            expect((await page({})).total).toBe(current.total + 1);
+        } finally {
+            await prisma.product.update({
+                where: { id: mug },
+                data: { status: "PUBLISHED" },
+            });
+        }
+    });
+
+    it("says what each product on the page sold in 30 days, only when asked (finding 17)", async () => {
+        const now = new Date();
+        const sell = (quantity: number, daysAgo: number, status = "PENDING") =>
+            prisma.order.create({
+                data: {
+                    storeId: hill,
+                    organizationId: orgId,
+                    orderId: `CP-${tag}-${quantity}-${daysAgo}-${status}`,
+                    subtotal: "0.00",
+                    total: "0.00",
+                    currency: "INR",
+                    status,
+                    paymentStatus: "PAID",
+                    createdAt: new Date(now.getTime() - daysAgo * 86_400_000),
+                    items: {
+                        create: [{ productId: bun, quantity, price: "120.00" }],
+                    },
+                },
+            });
+        await sell(2, 1);
+        await sell(3, 10);
+        // Too old, and cancelled: neither counts.
+        await sell(7, 40);
+        await sell(5, 2, "CANCELLED");
+        const shown = await cataloguePage(
+            products,
+            orgId,
+            { limit: 50 },
+            { sold: true },
+            now,
+        );
+        expect(shown.sold?.[bun]).toEqual({ units: 5, amount: "600.00" });
+        expect(shown.sold?.[rye]).toBeUndefined();
+        expect((await page({})).sold).toBeUndefined();
+    });
+
     it("never drops a product when the one a page ended on has left the view", async () => {
         const first = await page({ view: "needs", limit: 1 });
         expect(first.items.map((i) => i.id)).toEqual([rye]);

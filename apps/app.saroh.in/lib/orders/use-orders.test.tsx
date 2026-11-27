@@ -50,8 +50,9 @@ const PAGE = {
     share: null,
 } as unknown as OrdersListView;
 const OPTIONS = { filters: null, openByStore: null };
-const ALL = ordersAsk(readOrdersQuery({}));
-const OPEN = ordersAsk(readOrdersQuery({ tab: "open" }));
+// The bare list opens on Open (DEC-265); All is a view away.
+const OPEN = ordersAsk(readOrdersQuery({}));
+const ALL = ordersAsk(readOrdersQuery({ tab: "all" }));
 
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 const reads = (path: string) =>
@@ -85,7 +86,7 @@ afterEach(() => vi.unstubAllGlobals());
 /** A browser client that has already read the list (an earlier visit). */
 function hydrated() {
     const server = makeTestClient();
-    server.setQueryData(ordersListRead.options(ORG, ALL).queryKey, PAGE);
+    server.setQueryData(ordersListRead.options(ORG, OPEN).queryKey, PAGE);
     server.setQueryData(ordersOptionsRead.options(ORG, {}).queryKey, OPTIONS);
     const client = makeTestClient();
     hydrate(client, dehydrate(server));
@@ -114,7 +115,7 @@ function Screen({
 describe("the list's reads", () => {
     it("first load reads the page and the filter bar once each, in the browser", async () => {
         const { unmount } = renderWithQuery(
-            <Screen ask={ALL} report={() => undefined} />,
+            <Screen ask={OPEN} report={() => undefined} />,
             { client: makeTestClient(), orgId: ORG },
         );
         await tick();
@@ -125,7 +126,7 @@ describe("the list's reads", () => {
 
     it("a page already read is mounted over without a read", async () => {
         const { unmount } = renderWithQuery(
-            <Screen ask={ALL} report={() => undefined} />,
+            <Screen ask={OPEN} report={() => undefined} />,
             { client: hydrated(), orgId: ORG },
         );
         await tick();
@@ -134,21 +135,21 @@ describe("the list's reads", () => {
     });
 
     it("a tab change reads that page, and not the filter bar again", async () => {
-        expect(OPEN).toEqual({ tab: "open" });
+        expect(ALL).toEqual({ tab: "all" });
         const client = hydrated();
         const view = renderWithQuery(
-            <Screen ask={ALL} report={() => undefined} />,
+            <Screen ask={OPEN} report={() => undefined} />,
             { client, orgId: ORG },
         );
         await tick();
         view.unmount();
         const again = renderWithQuery(
-            <Screen ask={OPEN} report={() => undefined} />,
+            <Screen ask={ALL} report={() => undefined} />,
             { client, orgId: ORG },
         );
         await tick();
         expect(reads("/api/orders")).toBe(1);
-        expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/orders?tab=open");
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/orders?tab=all");
         expect(reads("/api/orders/options")).toBe(0);
         again.unmount();
     });
@@ -170,7 +171,7 @@ describe("a step from the list", () => {
         let step: Step | undefined;
         const client = hydrated();
         const { unmount } = renderWithQuery(
-            <Screen ask={ALL} report={(s) => (step = s)} />,
+            <Screen ask={OPEN} report={(s) => (step = s)} />,
             { client, orgId: ORG },
         );
         await tick();
@@ -192,7 +193,7 @@ describe("a step from the list", () => {
         moveStage.mockResolvedValue({ ok: false, error: "Already ready." });
         let step: Step | undefined;
         const { unmount } = renderWithQuery(
-            <Screen ask={ALL} report={(s) => (step = s)} />,
+            <Screen ask={OPEN} report={(s) => (step = s)} />,
             { client: hydrated(), orgId: ORG },
         );
         await tick();

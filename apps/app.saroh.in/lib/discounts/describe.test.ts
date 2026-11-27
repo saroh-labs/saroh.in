@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { describeDiscount, reachOf } from "./describe";
+import { describeDiscount, gaveOffOf, reachOf, usageWords } from "./describe";
 import type { Discount } from "./service";
 
 const base: Discount = {
@@ -55,5 +55,39 @@ describe("describeDiscount", () => {
         expect(reachOf({ appliesTo: "COLLECTION", targets: [] })).toBe(
             "no category",
         );
+    });
+});
+
+describe("usageWords (DEC-267)", () => {
+    it("answers 'is this code working?' in one line", () => {
+        const used = {
+            ...base,
+            used: 14,
+            usage: {
+                gaveOff: "2100.00",
+                currency: "INR",
+                ordersTotal: "18400.00",
+            },
+        };
+        expect(usageWords(used)).toEqual({
+            lead: "Used on 14 orders · ₹2,100 off",
+            orders: "₹18,400 in those orders",
+        });
+        expect(gaveOffOf(used)).toBe("₹2,100");
+    });
+
+    it("says not used yet, and leaves out what the role may not see", () => {
+        expect(usageWords({ ...base, used: 0 })).toEqual({
+            lead: "Not used yet",
+            orders: null,
+        });
+        expect(gaveOffOf({ ...base, used: 0 })).toBeNull();
+        expect(
+            usageWords({
+                ...base,
+                used: 1,
+                usage: { gaveOff: "50.00", currency: "INR" },
+            }).orders,
+        ).toBeNull();
     });
 });

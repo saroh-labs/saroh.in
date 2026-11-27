@@ -132,7 +132,7 @@ export function rowAge(
         | "ageMinutes"
         | "late"
     > &
-        Partial<Pick<OrderRow, "nextVisit">>,
+        Partial<Pick<OrderRow, "nextVisit" | "lateBy">>,
     now: Date = new Date(),
 ): { text: string; late: boolean } | null {
     if (row.standing === "REFUNDED" || row.standing === "CANCELLED") {
@@ -152,10 +152,14 @@ export function rowAge(
     }
     // With no steps to go by (an old row, O-2), fulfilled is done.
     if (row.steps.length === 0 && row.standing === "FULFILLED") return null;
-    const words = ageWords(row.ageMinutes);
+    // Late is said against when it was due, not since it was placed
+    // (DEC-265): "Late · 2 h", not "Late · 61 d".
     return row.late === true
-        ? { text: `Late · ${words}`, late: true }
-        : { text: words, late: false };
+        ? {
+              text: `Late · ${ageWords(row.lateBy ?? row.ageMinutes)}`,
+              late: true,
+          }
+        : { text: ageWords(row.ageMinutes), late: false };
 }
 
 /**
@@ -220,13 +224,40 @@ export function rowMoney(
     return { total, unpaid, paid: null };
 }
 
-/** "#1042 · 2 items · Hill Road · Pick-up" — the storefront only with several. */
+/**
+ * What is in it, in words (finding 5): the first product, and "+1 more"
+ * for the rest, from the names the API sends; the item count only when it
+ * sent none.
+ */
+export function rowProducts(
+    row: Pick<OrderRow, "itemCount" | "productNames" | "moreProducts">,
+): string {
+    const [first, ...rest] = row.productNames;
+    if (!first) return count(row.itemCount, "item");
+    const more = rest.length + row.moreProducts;
+    return more > 0 ? `${first} · +${more} more` : first;
+}
+
+/**
+ * "Red Polka Dot Midi Dress, S · +1 more · Hill Road · Pick-up" — the
+ * storefront only with several.
+ */
 export function rowSubline(
-    row: Pick<OrderRow, "itemCount" | "store" | "fulfilmentLabel">,
+    row: Pick<
+        OrderRow,
+        | "itemCount"
+        | "productNames"
+        | "moreProducts"
+        | "store"
+        | "fulfilmentLabel"
+    >,
     showStore: boolean,
 ): string {
-    const items = count(row.itemCount, "item");
-    return [items, showStore ? row.store.name : null, row.fulfilmentLabel]
+    return [
+        rowProducts(row),
+        showStore ? row.store.name : null,
+        row.fulfilmentLabel,
+    ]
         .filter(Boolean)
         .join(" · ");
 }

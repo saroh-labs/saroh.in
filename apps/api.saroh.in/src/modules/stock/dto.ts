@@ -239,14 +239,28 @@ export class StockLevelsQueryDto extends StockPageQueryDto {
     @MaxLength(100)
     q?: string;
 
-    /** Only rows that need someone: short, sold out or low. */
+    /**
+     * Only rows that need someone: short, sold out or low. "auto": only
+     * those while any need someone, else every row (DEC-266, the Stock
+     * screen's first view); the answer's `needsShown` says which.
+     */
     @IsOptional()
-    @Transform(
-        ({ value }: { value: unknown }) =>
-            value === true || value === "true" || value === "1",
+    @Transform(({ value }: { value: unknown }) =>
+        value === "auto"
+            ? "auto"
+            : value === true || value === "true" || value === "1",
     )
-    @IsBoolean()
-    needs?: boolean;
+    @IsIn([true, false, "auto"], { message: "needs is true, false or auto" })
+    needs?: boolean | "auto";
+
+    /**
+     * "need": what needs someone first, most urgent first, then the rest,
+     * each in name order (DEC-266). Without it, name order. Not with a
+     * cursor, which walks name order.
+     */
+    @IsOptional()
+    @IsIn(["need"], { message: "Unknown sort" })
+    sort?: "need";
 
     /** The last product of the page before; the next page starts after it. */
     @IsOptional()

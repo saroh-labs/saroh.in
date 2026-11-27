@@ -34,6 +34,17 @@ export const LIST_TABS = ["all", "open", "refunded"] as const;
 export type ListTab = (typeof LIST_TABS)[number];
 
 /**
+ * How the list is ordered (DEC-265): newest placed first, or by when each
+ * order turns late, soonest first (the open view's default).
+ */
+export const LIST_SORTS = ["placed", "due"] as const;
+export type ListSort = (typeof LIST_SORTS)[number];
+
+/** Open orders placed a month ago or more: folded away, or alone. */
+export const LIST_OLDER = ["hide", "only"] as const;
+export type ListOlder = (typeof LIST_OLDER)[number];
+
+/**
  * How the money on an order stands, as one word for the row and the filter.
  * Derived from payments and refunds the way Order Detail's `refundStanding`
  * is, so the list and the order never disagree (`order-list-filters.ts`).
@@ -627,7 +638,24 @@ export class ListOrdersQuery {
     @IsISO8601({ strict: true }, { message: "since is an ISO date and time" })
     since?: string;
 
-    /** An order number or a customer's name; phone or email with `contact:read`. */
+    /** Newest placed first (the default), or by when each turns late. */
+    @IsOptional()
+    @IsIn(LIST_SORTS, { message: "Unknown sort" })
+    sort?: ListSort;
+
+    /**
+     * Open orders placed a month ago or more (DEC-265): "hide" leaves them
+     * out of the rows, "only" lists nothing else. The counts are the same
+     * either way, with `stale` counting them.
+     */
+    @IsOptional()
+    @IsIn(LIST_OLDER, { message: "older is hide or only" })
+    older?: ListOlder;
+
+    /**
+     * An order number, a customer's name or a product on it; phone or
+     * email with `contact:read`.
+     */
     @IsOptional()
     @Transform(blankToUndefined)
     @IsString()

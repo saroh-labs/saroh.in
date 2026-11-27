@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -71,11 +72,18 @@ const HOLD_BUTTON =
 export function BulkBar({
     selected,
     onClear,
+    confirm = null,
 }: {
     /** The selected rows on this page. */
     selected: OrderRow[];
     onClear: () => void;
+    /**
+     * Ask before any move, saying this (DEC-265): the month-old orders,
+     * closed together, move nothing until the person says so.
+     */
+    confirm?: string | null;
 }) {
+    const [asking, setAsking] = useState<BulkAction | null>(null);
     const { orgId, saved } = useOrderSave();
     const [busy, startTransition] = useTransition();
     const [held, setHeld] = useState<Held | null>(null);
@@ -235,7 +243,11 @@ export function BulkBar({
                             >
                                 <button
                                     type="button"
-                                    onClick={() => run(action)}
+                                    onClick={() =>
+                                        confirm
+                                            ? setAsking(action)
+                                            : run(action)
+                                    }
                                     disabled={action.disabled !== null || busy}
                                     aria-disabled={action.disabled !== null}
                                     className={cn(
@@ -283,6 +295,22 @@ export function BulkBar({
                         </button>
                     </div>
                 </div>
+            ) : null}
+            {confirm ? (
+                <ConfirmDialog
+                    open={asking !== null}
+                    onOpenChange={(open) => {
+                        if (!open) setAsking(null);
+                    }}
+                    tone="neutral"
+                    title={`${asking?.label ?? "Move these orders"}?`}
+                    description={confirm}
+                    confirmLabel={asking ? asking.label : "Move them"}
+                    keepLabel="Not now"
+                    onConfirm={() => {
+                        if (asking) run(asking);
+                    }}
+                />
             ) : null}
             {held ? (
                 <HeldCard

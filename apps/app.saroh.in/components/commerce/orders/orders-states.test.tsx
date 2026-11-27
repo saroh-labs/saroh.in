@@ -93,7 +93,7 @@ describe("OrdersEmpty", () => {
         );
 
     it("says No orders yet only for a business with none", () => {
-        const html = empty({}, "Hill Road");
+        const html = empty({ tab: "all" }, "Hill Road");
         expect(html).toContain("No orders yet");
         expect(html).toContain(
             "Orders from your website and counter show here.",
@@ -113,7 +113,9 @@ describe("OrdersEmpty", () => {
                     onNew={noop}
                 />,
             );
-        expect(first({})).toMatch(/<button[^>]*>New order<\/button>/);
+        expect(first({ tab: "all" })).toMatch(
+            /<button[^>]*>New order<\/button>/,
+        );
         // A search that found nothing offers the way back, not a new order.
         expect(first({ q: "zzz" })).not.toContain("New order");
         expect(first({ q: "zzz" })).toContain("Clear search");
@@ -137,18 +139,19 @@ describe("OrdersEmpty", () => {
             );
         // The shop is live: it is what gets shared.
         const shop = share(
-            {},
+            { tab: "all" },
             links("https://rye.saroh.app/shop", "https://rye.saroh.app"),
         );
         expect(shop).toContain("Share your online shop");
         expect(shop).not.toContain("Share your website");
         // Only the website is live.
-        expect(share({}, links(null, "https://rye.saroh.app"))).toContain(
+        const all = { tab: "all" };
+        expect(share(all, links(null, "https://rye.saroh.app"))).toContain(
             "Share your website",
         );
         // Nothing live, or the read unknown: nothing to share, so no button.
-        expect(share({}, links(null, null))).not.toContain("Share your");
-        expect(share({}, null)).not.toContain("Share your");
+        expect(share(all, links(null, null))).not.toContain("Share your");
+        expect(share(all, null)).not.toContain("Share your");
         // Another empty view keeps its own way back.
         const open = share(
             { tab: "open" },
@@ -168,9 +171,25 @@ describe("OrdersEmpty", () => {
     });
 
     it("names a search that found nothing, and offers to clear it", () => {
-        const html = empty({ q: "Asha", tab: "refunded" }, null);
+        const html = empty({ q: "Asha" }, null);
         expect(html).toContain("No orders match “Asha”");
         expect(html).toContain("Clear search");
+        // In one view, every order is a press away (DEC-265).
+        expect(empty({ q: "Asha", tab: "refunded" }, null)).toContain(
+            "Search every order",
+        );
+    });
+
+    it("says No orders yet on the Open view of a business with none", () => {
+        const html = renderToStaticMarkup(
+            <OrdersEmpty
+                query={readOrdersQuery({})}
+                storeName={null}
+                go={noop}
+                everything={0}
+            />,
+        );
+        expect(html).toContain("No orders yet");
     });
 
     it("says the last 24 hours were empty, not the business", () => {

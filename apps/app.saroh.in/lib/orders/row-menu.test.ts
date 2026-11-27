@@ -10,6 +10,7 @@ import {
     arrivalOf,
     orderPageHref,
     payLinkAction,
+    quickBlocked,
     quickNext,
     quickPayment,
     quickSteps,
@@ -451,6 +452,24 @@ describe("quickNext", () => {
                 stage: true,
             }),
         ).toBeNull();
+    });
+});
+
+describe("quickBlocked (finding 15)", () => {
+    it("says to take the money first when that is all that stops it", () => {
+        const unpaid = row({
+            stage: "NEW",
+            stepIndex: 0,
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+            payment: "UNPAID",
+        });
+        expect(quickBlocked(unpaid, OWNER)).toMatch(
+            /^Mark it paid first, then [a-z]/,
+        );
+        // Paid, or nothing this person could move: no reason to give.
+        expect(quickBlocked(row(), OWNER)).toBeNull();
+        expect(quickBlocked(unpaid, { stage: false })).toBeNull();
     });
 });
 

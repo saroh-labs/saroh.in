@@ -11,6 +11,7 @@ import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { useCallback, useState } from "react";
 
 import {
+    ListFilter,
     ListPaging,
     ListToolbar,
     MoreFilters,
@@ -19,13 +20,22 @@ import { useArrivals } from "@/components/shared/live-refresh/use-arrivals";
 import { SinceNotice } from "@/components/shared/notices/since-notice";
 import { StorefrontFilter } from "@/components/stores/locations/storefront-filter";
 import type { CustomerPick } from "@/lib/customers/picker";
+import { count } from "@/lib/format/plural";
 import type {
     OrderFilterOptions,
     OrderListPage,
 } from "@/lib/orders/business-service";
 import { filtersActive, NO_FILTERS } from "@/lib/orders/list-filters";
-import type { OrdersQuery } from "@/lib/orders/list-query";
-import { ordersHref, pageHref, pageRange } from "@/lib/orders/list-query";
+import type { OrdersQuery, OrdersSort } from "@/lib/orders/list-query";
+import {
+    foldsOlder,
+    ORDERS_SORTS,
+    ordersHref,
+    ordersSort,
+    pageHref,
+    pageRange,
+    viewTotal,
+} from "@/lib/orders/list-query";
 import { newOrderStores } from "@/lib/orders/new-order-stores";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import type { ShareLink } from "@/lib/sites/share-links";
@@ -52,6 +62,7 @@ import {
     OrdersEmpty,
     OrdersHeading,
 } from "./orders-states";
+import { useAskedPending } from "./use-asked-pending";
 import { useOrderSelection } from "./use-order-selection";
 
 /**
@@ -94,8 +105,14 @@ export function OrdersScreen({
     can = NO_ABILITIES,
     newOrder = null,
     pending = false,
+    searchContacts = false,
     onRetry,
 }: {
+    /**
+     * `contact:read`: the search finds a customer's phone too, and its
+     * hint says so (the API decides either way).
+     */
+    searchContacts?: boolean;
     /** The page asked for is on its way: the last rows stay, greyed. */
     pending?: boolean;
     /** Read the page again (Needs attention couldn't be read for it). */
@@ -199,15 +216,24 @@ export function OrdersScreen({
     );
     const selectable = can.stage;
 
+    // The rows dim only for a change the person asked for, once it is
+    // slow: never on the first load or a refresh (finding 22).
+    const { dim, ask } = useAskedPending(pending);
     // In place: the address is the list's key (no server render).
     const go = useCallback(
-        (patch: Partial<OrdersQuery>) =>
-            window.history.replaceState(null, "", ordersHref(query, patch)),
-        [query],
+        (patch: Partial<OrdersQuery>) => {
+            ask();
+            window.history.replaceState(null, "", ordersHref(query, patch));
+        },
+        [query, ask],
     );
 
     // Unknown until the page is read: Export waits, and no pages are drawn.
-    const total = page?.counts[query.tab] ?? 0;
+    const total = page ? viewTotal(query, page.counts) : 0;
+    // Open orders placed a month ago or more, folded under one line on
+    // the Open view (DEC-265); their own list is a press away.
+    const stale = page?.counts.stale ?? 0;
+    const folded = foldsOlder(query) && stale > 0 ? stale : 0;
     const range = page ? pageRange(query, rows.length, total) : null;
     const firstStore = stores.length === 1 ? stores[0] : undefined;
     // Anything narrowed, a search with words in it included: the toolbar
@@ -215,7 +241,9 @@ export function OrdersScreen({
     const narrowed =
         filtersActive(query) ||
         query.q.trim() !== "" ||
-        query.tab !== "all" ||
+        query.tab !== "open" ||
+        query.older ||
+        query.sort !== null ||
         query.storefront !== null;
     // Needs attention couldn't be read for this page (B15): the API sends
     // null rather than an empty list, and the page says so.
@@ -288,7 +316,12 @@ export function OrdersScreen({
                 attention toggle, Clear filters, and the range. */}
             <ListToolbar
                 search={
-                    <SearchField query={query} go={go} searching={pending} />
+                    <SearchField
+                        query={query}
+                        go={go}
+                        searching={pending}
+                        phone={searchContacts}
+                    />
                 }
                 // The three most used: the status, the date, the location.
                 filters={
@@ -297,6 +330,16 @@ export function OrdersScreen({
                             query={query}
                             counts={page?.counts ?? null}
                             go={go}
+                        />
+                        {/* Due soonest first on Open (DEC-265). */}
+                        <ListFilter<OrdersSort>
+                            label="Sort orders"
+                            value={ordersSort(query)}
+                            onValueChange={(sort) => go({ sort })}
+                            options={ORDERS_SORTS.map((s) => ({
+                                value: s.id,
+                                label: s.label,
+                            }))}
                         />
                         {/* The desk's; a phone has the date in the sheet. */}
                         <div className="max-[759px]:hidden min-[760px]:contents">
@@ -367,7 +410,9 @@ export function OrdersScreen({
                               go({
                                   ...NO_FILTERS,
                                   q: "",
-                                  tab: "all",
+                                  tab: "open",
+                                  sort: null,
+                                  older: false,
                                   storefront: null,
                               })
                         : undefined
@@ -393,7 +438,32 @@ export function OrdersScreen({
                 </div>
             ) : null}
 
-            <PendingRegion pending={pending} className="pt-3.5">
+            {query.older ? (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-3.5 text-[13px]">
+                    <span className="min-w-0 flex-1 text-pretty">
+                        <strong data-ph-unmask="" className="font-semibold">
+                            Orders open over a month.
+                        </strong>{" "}
+                        <span
+                            data-ph-unmask=""
+                            className="text-muted-foreground"
+                        >
+                            Most were collected and never marked. Select them to
+                            move them on.
+                        </span>
+                    </span>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => go({ older: false })}
+                    >
+                        Back to open orders
+                    </Button>
+                </div>
+            ) : null}
+
+            <PendingRegion pending={dim} className="pt-3.5">
                 {attentionUnread ? (
                     <OrdersAttentionPartial onRetry={onRetry} />
                 ) : null}
@@ -407,6 +477,7 @@ export function OrdersScreen({
                 ) : rows.length === 0 ? (
                     <OrdersEmpty
                         query={query}
+                        everything={page.counts.all}
                         storeName={store?.name ?? firstStore?.name ?? null}
                         options={filterOptions}
                         go={go}
@@ -471,8 +542,32 @@ export function OrdersScreen({
                         </ul>
                     </>
                 )}
+                {folded > 0 ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[11px] border border-border bg-muted px-3.5 py-2.5 text-[13px]">
+                        <span className="min-w-0 flex-1 font-semibold">
+                            {count(folded, "order")} open over a month
+                        </span>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => go({ older: true })}
+                        >
+                            {selectable ? "Close them" : "See them"}
+                        </Button>
+                    </div>
+                ) : null}
                 {selectable ? (
-                    <BulkBar selected={pick.selected} onClear={pick.clear} />
+                    <BulkBar
+                        selected={pick.selected}
+                        onClear={pick.clear}
+                        // Month-old orders move on only once asked (DEC-265).
+                        confirm={
+                            query.older
+                                ? "These were placed over a month ago. Each one that can move on does it now, and the rest stay as they are."
+                                : null
+                        }
+                    />
                 ) : null}
             </PendingRegion>
 
@@ -518,7 +613,7 @@ export function OrdersScreen({
                 page={query.page}
                 total={total}
                 size={query.size}
-                to={(n) => ({ href: pageHref(query, n) })}
+                to={(n) => ({ href: pageHref(query, n), onNavigate: ask })}
                 onSize={(size) => {
                     rememberPageSize("orders", size);
                     go({ size });

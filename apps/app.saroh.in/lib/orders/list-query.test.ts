@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { NO_FILTERS } from "@/lib/orders/list-filters";
 
 import {
+    exportParams,
     orderListParams,
     ordersEmptyCopy,
     ordersHref,
@@ -10,6 +11,7 @@ import {
     pageHref,
     pageRange,
     readOrdersQuery,
+    viewTotal,
 } from "@/lib/orders/list-query";
 
 /** The Orders list's address (plan B, B3): tab, search, storefront, page. */
@@ -28,11 +30,76 @@ describe("readOrdersQuery", () => {
             ...NO_FILTERS,
             page: 1,
             size: 50,
+            sort: null,
+            older: false,
         });
     });
 
-    it("reads an unknown tab as All", () => {
-        expect(readOrdersQuery({ tab: "abandoned" }).tab).toBe("all");
+    it("reads an unknown tab as the view the list opens on", () => {
+        expect(readOrdersQuery({ tab: "abandoned" }).tab).toBe("open");
+    });
+
+    it("opens on Open, soonest late first, with month-old ones folded (DEC-265)", () => {
+        expect(first.tab).toBe("open");
+        expect(orderListParams(first)).toMatchObject({
+            tab: "open",
+            sort: "due",
+            older: "hide",
+        });
+        expect(ordersHref(first)).toBe("/commerce/orders");
+        // All is written, since it isn't what the bare address opens on.
+        expect(ordersHref(first, { tab: "all" })).toBe(
+            "/commerce/orders?tab=all",
+        );
+        expect(orderListParams(readOrdersQuery({ tab: "all" }))).toMatchObject({
+            tab: undefined,
+            sort: undefined,
+            older: undefined,
+        });
+    });
+
+    it("keeps a link that narrows the list about every order, as it always was", () => {
+        expect(readOrdersQuery({ payment: "paid", date: "7d" }).tab).toBe(
+            "all",
+        );
+        expect(readOrdersQuery({ q: "priya" }).tab).toBe("all");
+        // A search typed on Open stays on Open, and says so.
+        expect(ordersHref(first, { q: "priya" })).toBe(
+            "/commerce/orders?tab=open&q=priya",
+        );
+        // A search finds the month-old ones too: nothing is folded.
+        expect(
+            orderListParams(readOrdersQuery({ tab: "open", q: "priya" })).older,
+        ).toBeUndefined();
+    });
+
+    it("reads a chosen sort and the month-old list, and writes them back", () => {
+        const q = readOrdersQuery({ sort: "placed", older: "1" });
+        expect(q).toMatchObject({ tab: "open", sort: "placed", older: true });
+        expect(orderListParams(q)).toMatchObject({
+            sort: undefined,
+            older: "only",
+        });
+        expect(ordersHref(q)).toBe("/commerce/orders?sort=placed&older=1");
+        expect(readOrdersQuery({ sort: "sideways" }).sort).toBeNull();
+    });
+
+    it("exports the view newest first, as the cursor walks it", () => {
+        const params = exportParams(readOrdersQuery({ page: "3" }));
+        expect(params).toMatchObject({
+            tab: "open",
+            older: "hide",
+            page: undefined,
+        });
+        expect(params.sort).toBeUndefined();
+    });
+
+    it("pages through what the view holds: Open less the folded ones", () => {
+        const counts = { all: 40, open: 20, refunded: 2, stale: 12 };
+        expect(viewTotal(first, counts)).toBe(8);
+        expect(viewTotal(readOrdersQuery({ older: "1" }), counts)).toBe(12);
+        expect(viewTotal(readOrdersQuery({ tab: "all" }), counts)).toBe(40);
+        expect(viewTotal(first, { all: 1, open: 1, refunded: 0 })).toBe(1);
     });
 
     it("lands a link from before B3 on the tab it meant", () => {
@@ -69,9 +136,8 @@ describe("since (Home's Last 24 hours, F6)", () => {
 
     it("drops it, and the page, for Show all", () => {
         const q = readOrdersQuery({ since: at, page: "2", tab: "open" });
-        expect(ordersHref(q, { since: null })).toBe(
-            "/commerce/orders?tab=open",
-        );
+        // Open is what the bare address opens on: nothing to write.
+        expect(ordersHref(q, { since: null })).toBe("/commerce/orders");
     });
 
     it("reads a malformed or future instant as no filter", () => {
@@ -150,7 +216,7 @@ describe("paging", () => {
 
 describe("orderListParams", () => {
     it("asks the API only for what narrows the list", () => {
-        expect(orderListParams(first)).toEqual({
+        expect(orderListParams(readOrdersQuery({ tab: "all" }))).toEqual({
             tab: undefined,
             q: undefined,
             storeId: undefined,
@@ -175,6 +241,7 @@ describe("orderListParams", () => {
             since: undefined,
             page: 2,
             size: 25,
+            sort: "due",
         });
     });
 });
@@ -198,8 +265,25 @@ describe("ordersEmptyCopy", () => {
         ).toBe("No refunds");
     });
 
+    it("offers every order when a search in a view found nothing", () => {
+        const copy = ordersEmptyCopy(
+            readOrdersQuery({ tab: "open", q: "zzz" }),
+            null,
+        );
+        expect(copy.action).toBe("show-all");
+        expect(copy.note).toContain("phone numbers, products");
+    });
+
+    it("says the month-old list is empty, with the way back", () => {
+        expect(
+            ordersEmptyCopy(readOrdersQuery({ older: "1" }), null, null, 9),
+        ).toMatchObject({ kind: "older", action: "show-open" });
+    });
+
     it("says No orders yet only for an empty business", () => {
-        expect(ordersEmptyCopy(first, "Hill Road")).toMatchObject({
+        // Open, with orders elsewhere: nothing left to fulfil.
+        expect(ordersEmptyCopy(first, "Hill Road", null, 3).kind).toBe("tab");
+        expect(ordersEmptyCopy(first, "Hill Road", null, 0)).toMatchObject({
             title: "No orders yet",
             note: "Orders from your website and counter show here.",
             action: null,

@@ -183,6 +183,10 @@ export interface OrderListParams {
     /** Or the page by number, from 1, and how many rows it holds. */
     page?: number;
     size?: number;
+    /** Soonest late first (DEC-265); newest placed first without. */
+    sort?: "due";
+    /** Open orders placed a month ago or more: left out, or alone. */
+    older?: "hide" | "only";
     /**
      * This page is read for Export (B16): the API asks `order:export` of
      * it, as a file of every order leaving Saroh is its own power.
@@ -192,8 +196,11 @@ export interface OrderListParams {
 
 export interface OrderListPage {
     rows: OrderRow[];
-    /** Per tab, under every filter but the tab. */
-    counts: { all: number; open: number; refunded: number };
+    /**
+     * Per tab, under every filter but the tab; `stale`: the open ones
+     * placed a month ago or more (DEC-265).
+     */
+    counts: { all: number; open: number; refunded: number; stale?: number };
     nextCursor: string | null;
 }
 

@@ -4,6 +4,7 @@ import { Prisma, prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { businessTimezone } from "../bookings/staff-availability";
 import { canSeeSensitive } from "../customer-workspace/attention-read";
+import type { ListOlder, ListSort } from "./dto";
 import { FULFILMENT_RULES } from "./fulfilment";
 import { lateThresholdsByStore, thresholdsFor } from "./late-thresholds";
 import type { IntentForState } from "./online-payment";
@@ -14,12 +15,15 @@ import type { OrderListFilter, OrderListView } from "./order-list-filters";
 import {
     asksDates,
     computedConditions,
+    dueSql,
     lateSettingsJoin,
     lateSql,
     listRange,
+    olderCondition,
     openSql,
     orderConditions,
     paymentSql,
+    staleSql,
     tabCondition,
     ts,
 } from "./order-list-filters";
@@ -43,8 +47,11 @@ const NO_ATTENTION: OrderAttention = { entries: [], hiddenSensitiveCount: 0 };
 
 export interface OrderListPage {
     rows: OrderRowDto[];
-    /** Per tab, under every filter but the tab (default 87). */
-    counts: { all: number; open: number; refunded: number };
+    /**
+     * Per tab, under every filter but the tab (default 87); `stale`: the
+     * open ones placed a month ago or more (DEC-265), which `older` folds.
+     */
+    counts: { all: number; open: number; refunded: number; stale: number };
     /** Pass as `cursor` for the next page; null on the last. */
     nextCursor: string | null;
     /** How many rows a page holds, as asked or the default. */
@@ -62,6 +69,10 @@ export interface OrderListQuery extends OrderListFilter {
     page?: number;
     /** Rows per page: one of `ORDER_PAGE_SIZES`. */
     size?: number;
+    /** Newest placed first (the default), or soonest late first. */
+    sort?: ListSort;
+    /** Month-old open orders left out, or alone (DEC-265). */
+    older?: ListOlder;
 }
 
 /** Who is looking, and so what each row may say. */
@@ -103,6 +114,12 @@ export async function listOrderRows(
           "UTC";
     const range = listRange(query, zone, now);
 
+    if (query.cursor && query.sort === "due") {
+        throw new BadRequestException({
+            message: "A list sorted by when orders turn late pages by number.",
+            details: { field: "sort" },
+        });
+    }
     if (query.cursor && query.page) {
         throw new BadRequestException({
             message: "Page by a cursor or a page number, not both.",
@@ -132,7 +149,8 @@ export async function listOrderRows(
         SELECT o.id, o."createdAt",
             ${paymentSql()} AS payment,
             ${openSql()} AS open,
-            ${lateSql(now)} AS late
+            ${lateSql(now)} AS late,
+            ${dueSql()} AS due
         FROM "Order" o
         LEFT JOIN "Customer" c ON c.id = o."customerId"
         ${lateSettingsJoin()}
@@ -157,14 +175,21 @@ export async function listOrderRows(
         prisma.$queryRaw<{ id: string }[]>`${matching}
             SELECT m.id FROM m
             WHERE ${kept} AND ${tabCondition(query.tab)} AND ${after}
-            ORDER BY m."createdAt" DESC, m.id DESC
+                AND ${olderCondition(query.older, now)}
+            ORDER BY ${
+                query.sort === "due"
+                    ? // Soonest late first; what never turns late last.
+                      Prisma.sql`m.due ASC NULLS LAST, `
+                    : Prisma.empty
+            }m."createdAt" DESC, m.id DESC
             LIMIT ${size + 1} OFFSET ${skip}`,
         prisma.$queryRaw<
-            { all: number; open: number; refunded: number }[]
+            { all: number; open: number; refunded: number; stale: number }[]
         >`${matching}
             SELECT COUNT(*)::int AS "all",
                 (COUNT(*) FILTER (WHERE m.open))::int AS open,
-                (COUNT(*) FILTER (WHERE m.payment = 'REFUNDED'))::int AS refunded
+                (COUNT(*) FILTER (WHERE m.payment = 'REFUNDED'))::int AS refunded,
+                (COUNT(*) FILTER (WHERE ${staleSql(now)}))::int AS stale
             FROM m WHERE ${kept}`,
     ]);
 

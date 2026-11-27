@@ -239,7 +239,7 @@ describe("the Step filter: what the pill says", () => {
 
     it("counts every tab under the step, and finds nothing for an unknown one", async () => {
         const page = await list({ step: "ready" });
-        expect(page.counts).toEqual({ all: 1, open: 1, refunded: 0 });
+        expect(page.counts).toEqual({ all: 1, open: 1, refunded: 0, stale: 0 });
         const none = await list({ step: "teleported" });
         expect(none.rows).toEqual([]);
         expect(none.counts.all).toBe(0);

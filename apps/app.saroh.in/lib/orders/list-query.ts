@@ -28,6 +28,12 @@ import {
 
 export type OrdersTab = "all" | "open" | "refunded";
 
+/**
+ * Newest placed first, or by when each order turns late, soonest first
+ * (DEC-265). Null in the address: the tab's own order (`ordersSort`).
+ */
+export type OrdersSort = "placed" | "due";
+
 export interface OrdersQuery extends OrdersFilters {
     tab: OrdersTab;
     q: string;
@@ -42,9 +48,34 @@ export interface OrdersQuery extends OrdersFilters {
     page: number;
     /** Rows a page: 10, 25, 50 or 100. */
     size: number;
+    /** The order chosen (`?sort=`); null for the tab's own (`ordersSort`). */
+    sort: OrdersSort | null;
+    /**
+     * Only the open orders placed a month ago or more (`?older=1`), the
+     * line the Open view folds them under, opened (DEC-265).
+     */
+    older: boolean;
 }
 
 type Params = Record<string, string | string[] | undefined>;
+
+/**
+ * The view an address that names none opens on (DEC-265, extending
+ * DEC-163 from Home): the bare list opens on Open, what is still to do,
+ * soonest late first. An address that narrows the list some other way (a
+ * search, a filter, Home's "Last 24 hours", an Insights week) asks about
+ * every order, as such links always have. An address naming a view wins.
+ */
+export function defaultOrdersTab(
+    query: Pick<OrdersQuery, "q" | "since"> & OrdersFilters,
+): OrdersTab {
+    return query.q || query.since || filtersActive(query) ? "all" : "open";
+}
+
+export const ORDERS_SORTS: readonly { id: OrdersSort; label: string }[] = [
+    { id: "due", label: "Due soonest first" },
+    { id: "placed", label: "Newest first" },
+];
 
 export const ORDERS_TABS: readonly { id: OrdersTab; label: string }[] = [
     { id: "all", label: "All" },
@@ -83,19 +114,57 @@ export function readOrdersQuery(
     const tab = one(params, "tab");
     const view = one(params, "view");
     const page = Number(one(params, "page"));
+    const narrowed = {
+        q: one(params, "q") ?? "",
+        // A malformed or future instant is no filter (`sinceParam`).
+        since: sinceParam(params)?.toISOString() ?? null,
+        ...readOrdersFilters(params),
+    };
     return {
         tab:
             ORDERS_TABS.find((t) => t.id === tab)?.id ??
             (view ? LEGACY_VIEW[view] : undefined) ??
-            "all",
-        q: one(params, "q") ?? "",
+            defaultOrdersTab(narrowed),
         storefront: one(params, "storefront") ?? null,
-        // A malformed or future instant is no filter (`sinceParam`).
-        since: sinceParam(params)?.toISOString() ?? null,
-        ...readOrdersFilters(params),
+        ...narrowed,
         page: Number.isInteger(page) && page >= 1 ? page : 1,
         size: readPageSize(one(params, "size"), remembered),
+        sort:
+            ORDERS_SORTS.find((s) => s.id === one(params, "sort"))?.id ?? null,
+        older: one(params, "older") === "1",
     };
+}
+
+/** The order the rows come in: the one chosen, else the tab's own. */
+export function ordersSort(
+    query: Pick<OrdersQuery, "tab" | "sort">,
+): OrdersSort {
+    return query.sort ?? (query.tab === "open" ? "due" : "placed");
+}
+
+/**
+ * Whether the open orders placed a month ago or more are folded under one
+ * line (DEC-265): on the Open view, while nothing is searched (a search
+ * finds them all) and their own list isn't the one open.
+ */
+export function foldsOlder(
+    query: Pick<OrdersQuery, "tab" | "q" | "older">,
+): boolean {
+    return query.tab === "open" && !query.q && !query.older;
+}
+
+/**
+ * How many rows the view holds, for the pages: the tab's count, less the
+ * folded month-old ones, or only those when their list is open.
+ */
+export function viewTotal(
+    query: Pick<OrdersQuery, "tab" | "q" | "older">,
+    counts: { all: number; open: number; refunded: number; stale?: number },
+): number {
+    const stale = counts.stale ?? 0;
+    if (query.older) return stale;
+    if (foldsOlder(query)) return Math.max(0, counts.open - stale);
+    return counts[query.tab];
 }
 
 /** Keys whose change lists something else, so the page number is void. */
@@ -107,6 +176,8 @@ const RELISTING: readonly (keyof OrdersQuery)[] = [
     ...FILTER_KEYS,
     // Another size cuts the list into other pages.
     "size",
+    "sort",
+    "older",
 ];
 
 /**
@@ -126,13 +197,15 @@ export function ordersHref(
         ...patch,
     };
     const q = new URLSearchParams();
-    if (next.tab !== "all") q.set("tab", next.tab);
+    if (next.tab !== defaultOrdersTab(next)) q.set("tab", next.tab);
     if (next.q) q.set("q", next.q);
     if (next.storefront) q.set("storefront", next.storefront);
     if (next.since) q.set("since", next.since);
     writeOrdersFilters(next, q);
     if (next.page > 1) q.set("page", String(next.page));
     if (next.size !== ORDERS_PAGE_SIZE) q.set("size", String(next.size));
+    if (next.sort) q.set("sort", next.sort);
+    if (next.older) q.set("older", "1");
     const s = q.toString();
     return s ? `/commerce/orders?${s}` : "/commerce/orders";
 }
@@ -172,16 +245,35 @@ export function orderListParams(query: OrdersQuery): OrderListParams {
         ...filterParams(query),
         page: query.page > 1 ? query.page : undefined,
         size: query.size !== ORDERS_PAGE_SIZE ? query.size : undefined,
+        sort: ordersSort(query) === "due" ? "due" : undefined,
+        older: query.older ? "only" : foldsOlder(query) ? "hide" : undefined,
+    };
+}
+
+/**
+ * What Export asks for every page of the view: from the top, at the list's
+ * own size, newest first, since the cursor it walks follows when orders
+ * were placed, never when they turn late (DEC-265, which pages by number).
+ */
+export function exportParams(query: OrdersQuery): OrderListParams {
+    return {
+        ...orderListParams({ ...query, page: 1, size: ORDERS_PAGE_SIZE }),
+        sort: undefined,
     };
 }
 
 /** What an empty list says, and what fills it. */
 export interface OrdersEmptyCopy {
-    kind: "search" | "filter" | "tab" | "since" | "first-run";
+    kind: "search" | "filter" | "tab" | "since" | "older" | "first-run";
     title: string;
     note: string;
     action:
-        "clear-search" | "clear-filters" | "show-all" | "clear-since" | null;
+        | "clear-search"
+        | "clear-filters"
+        | "show-all"
+        | "clear-since"
+        | "show-open"
+        | null;
 }
 
 /**
@@ -195,13 +287,22 @@ export function ordersEmptyCopy(
     query: OrdersQuery,
     storeName: string | null,
     options: OrderFilterOptions | null = null,
+    /**
+     * Every order the business has, when read: none at all is the first
+     * run, whichever view the list opened on.
+     */
+    everything: number | null = null,
 ): OrdersEmptyCopy {
     if (query.q) {
+        // Open by default (DEC-265): the order asked about may be done.
+        const all = query.tab === "all";
         return {
             kind: "search",
             title: `No orders match “${query.q}”`,
-            note: "Search covers customer names and order numbers. Clear it to see everything in this view.",
-            action: "clear-search",
+            note: all
+                ? "Search covers names, phone numbers, products and order numbers. Clear it to see every order."
+                : "Search covers names, phone numbers, products and order numbers in this view. Search every order instead.",
+            action: all ? "clear-search" : "show-all",
         };
     }
     if (filtersActive(query)) {
@@ -211,6 +312,17 @@ export function ordersEmptyCopy(
             note: "Nothing in this view matches every filter. Clear them to see the whole list.",
             action: "clear-filters",
         };
+    }
+    if (query.older) {
+        return {
+            kind: "older",
+            title: "No orders open over a month",
+            note: "Every open order here was placed in the last month.",
+            action: "show-open",
+        };
+    }
+    if (everything === 0 && !query.since && query.tab === "open") {
+        return firstRun();
     }
     if (query.tab === "open") {
         return {
@@ -236,6 +348,10 @@ export function ordersEmptyCopy(
             action: "clear-since",
         };
     }
+    return firstRun();
+}
+
+function firstRun(): OrdersEmptyCopy {
     return {
         kind: "first-run",
         title: "No orders yet",
