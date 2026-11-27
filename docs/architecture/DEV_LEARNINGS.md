@@ -7424,3 +7424,26 @@ the person.
 route the apps' servers call for everyone isn't held to a per-address
 count. Tested in `packages/auth/src/sign-in-code.test.ts`.
 **Category**: limits · `packages/auth`
+## check:draft-words held a page that had stopped being held (27 Nov 2026)
+
+**Symptom**: 26 Nov 2026: `pnpm run check:draft-words` failed three times
+on branches that didn't touch saroh.in, naming
+`.next/server/app/gst/salon-and-beauty-services.html` and the words of the
+salon and gym GST pages. The same thing happens on a clean development
+checkout, so it isn't left over from an old `.next`.
+**Cause**: the check's stand-in publish list made
+`/gst/salon-and-beauty-services` live, counting on its unconfirmed facts to
+hold it back. On 15 Nov (ecd6cfcce) every GST fact was confirmed. The page
+then passed its checks, and the build rightly built it. The unit tests had
+been changed then to add a `toConfirm` of their own; the check had not.
+The gym page's "leak" is the salon page's own description, which shares a
+sentence with it. Not a leak: production builds only the pages listed as live in admin.
+**Fix**: the stand-in list lives in `apps/saroh.in/scripts/draft-words-list.mjs`.
+The held page is now `/guides/reduce-no-shows`, which its words' link to a
+tool that isn't live holds back. The sitemap assertion now covers the
+GST, guide and download groups.
+**Rule**: a slow check's fixture that relies on content staying a certain way gets a
+unit test that runs in CI: `docs-content.test.ts` ("check:draft-words'
+held page is held on today's content") fails the moment the held page
+would build.
+**Category**: testing · `saroh.in`

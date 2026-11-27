@@ -383,7 +383,16 @@ export interface InvoiceViewModel {
     /** The order it bills: the order is the ledger, so it has no pay link. */
     order: { id: string; number: string } | null;
     bookingId: string | null;
-    contact: { id: string; name: string; email: string } | null;
+    /**
+     * `phone` is on the detail read only, for a role that may see contact
+     * details (`contact:read`); absent elsewhere.
+     */
+    contact: {
+        id: string;
+        name: string;
+        email: string;
+        phone?: string | null;
+    } | null;
     /** Who it was billed to when it was issued; null on a draft. */
     billTo: {
         name: string | null;

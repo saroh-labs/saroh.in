@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    daysPastDue,
     formatClock,
     formatClockRange,
     formatDate,
@@ -254,5 +255,49 @@ describe("the zone", () => {
 
     it("names it", () => {
         expect(timeZoneName(IST, "shortOffset", now)).toBe("GMT+5:30");
+    });
+});
+
+describe("days past due (DEC-269)", () => {
+    // Due 8 Nov, the end of that day in India (how a due date is stored).
+    const dueIst = "2026-11-08T18:29:59.999Z";
+
+    it("counts calendar days in the business's zone, not 24-hour blocks", () => {
+        // 26 Nov, 10 am in India: 17 days and some hours after the instant,
+        // and 18 days after the day.
+        expect(daysPastDue(dueIst, "2026-11-26T04:30:00.000Z", IST)).toBe(18);
+        // 26 Nov, 11:59 pm in India: still 18.
+        expect(daysPastDue(dueIst, "2026-11-26T18:29:00.000Z", IST)).toBe(18);
+    });
+
+    it("moves on at the business's midnight", () => {
+        // A minute before midnight on 9 Nov in India, then a minute after.
+        expect(daysPastDue(dueIst, "2026-11-09T18:29:00.000Z", IST)).toBe(1);
+        expect(daysPastDue(dueIst, "2026-11-09T18:31:00.000Z", IST)).toBe(2);
+    });
+
+    it("is 0 before the moment and at least 1 just after it", () => {
+        expect(daysPastDue(dueIst, "2026-11-08T12:00:00.000Z", IST)).toBe(0);
+        // Due at 9 am, late at 10 am the same day: already a day late.
+        expect(
+            daysPastDue(
+                "2026-11-08T03:30:00.000Z",
+                "2026-11-08T04:30:00.000Z",
+                IST,
+            ),
+        ).toBe(1);
+    });
+
+    it("reads the same instants by the business's day, ahead of UTC and behind it", () => {
+        const due = "2026-11-08T20:00:00.000Z";
+        const at = "2026-11-10T02:00:00.000Z";
+        // Auckland (UTC+13): due 9 Nov, now 10 Nov.
+        expect(daysPastDue(due, at, "Pacific/Auckland")).toBe(1);
+        // New York (UTC-5): due 8 Nov, now 9 Nov.
+        expect(daysPastDue(due, at, "America/New_York")).toBe(1);
+        // UTC: due 8 Nov, now 10 Nov.
+        expect(daysPastDue(due, at, "UTC")).toBe(2);
+        // Los Angeles (UTC-8): due 8 Nov noon, now 9 Nov 6 pm.
+        expect(daysPastDue(due, at, "America/Los_Angeles")).toBe(1);
     });
 });

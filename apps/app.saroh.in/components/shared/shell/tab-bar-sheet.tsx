@@ -12,7 +12,9 @@ import {
 import { X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
+import { NavGroupToggle } from "@/components/shared/navigation/nav-group-toggle";
 import type { MobileSheetGroup, MobileSheetRow } from "@/lib/nav/mobile-nav";
+import { useNavFolds } from "@/lib/nav/nav-folds";
 import { CountBadge } from "@saroh/ui/count-badge";
 
 /**
@@ -28,12 +30,18 @@ import { CountBadge } from "@saroh/ui/count-badge";
  * closes it, and focus returns to More on the way out. Radix's dialog gives
  * the trap, the Escape and the return through the shared sheet
  * (`@saroh/ui/sheet`, DEC-195); its size and Close are set here.
+ *
+ * Its groups fold as the rail's do, from the same per-person state
+ * (DEC-279): fold Online on the desk and it is folded here too.
  */
 export function TabBarSheet({
     groups,
     note,
     trigger,
+    userId = "",
 }: {
+    /** Whose menu: the folds are this person's (DEC-279). */
+    userId?: string;
     groups: MobileSheetGroup[];
     note: string;
     /** The More tab, drawn by the bar; told whether the sheet is open. */
@@ -41,6 +49,11 @@ export function TabBarSheet({
 }) {
     const [open, setOpen] = useState(false);
     const closeRef = useRef<HTMLButtonElement>(null);
+    const folds = useNavFolds(
+        userId,
+        groups.find((group) => group.rows.some((row) => row.current))?.label ??
+            null,
+    );
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>
@@ -78,6 +91,8 @@ export function TabBarSheet({
                         <SheetGroup
                             key={group.label}
                             group={group}
+                            open={folds.isOpen(group.label)}
+                            onToggle={() => folds.toggle(group.label)}
                             onGo={() => setOpen(false)}
                         />
                     ))}
@@ -92,20 +107,36 @@ export function TabBarSheet({
 
 function SheetGroup({
     group,
+    open,
+    onToggle,
     onGo,
 }: {
     group: MobileSheetGroup;
+    open: boolean;
+    onToggle: () => void;
     onGo: () => void;
 }) {
-    const headingId = useId();
+    const id = useId();
     return (
-        <div role="group" aria-labelledby={headingId}>
-            <p id={headingId} className="label px-2.5 pb-[5px] pt-3">
-                {group.label}
-            </p>
-            {group.rows.map((row) => (
-                <SheetRow key={row.key} row={row} onGo={onGo} />
-            ))}
+        <div role="group" aria-labelledby={`${id}-label`}>
+            {/* The whole label row is the 44px tap target; chevron trailing. */}
+            <div id={`${id}-label`}>
+                <NavGroupToggle
+                    label={group.label}
+                    open={open}
+                    controls={`${id}-rows`}
+                    rows={group.rows.length}
+                    waiting={group.rows.reduce((sum, r) => sum + r.count, 0)}
+                    onToggle={onToggle}
+                    className="min-h-11 px-2.5 pb-[5px] pt-3 focus-visible:ring-offset-card"
+                />
+            </div>
+            {/* `hidden`: a folded group's rows are neither focused nor read. */}
+            <div id={`${id}-rows`} hidden={!open}>
+                {group.rows.map((row) => (
+                    <SheetRow key={row.key} row={row} onGo={onGo} />
+                ))}
+            </div>
         </div>
     );
 }

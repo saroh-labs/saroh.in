@@ -195,7 +195,9 @@ test.describe("invoices", () => {
         const { id } = await draftFor(page, org, "d18");
         await api(page, org).post(`/invoices/${id}/issue`);
 
-        await page.goto("/billing/invoices");
+        // Every invoice: an address that chooses nothing opens on Overdue
+        // when anything is (DEC-271).
+        await page.goto("/billing/invoices?tab=all");
         // What it was for is a kind, not a status: one of the toolbar's
         // dropdown filters.
         const source = page.getByRole("combobox", {

@@ -155,7 +155,7 @@ export function shareLine(
     const left = formatMoneyMajor(leftCents(i) / 100, i.currency);
     const money = paidCents(i) > 0 ? `${left} left of ${total}` : total;
     if (i.standing === "OVERDUE") {
-        return `${who} · ${money} · ${daysLate(lateBy(i, now))}`;
+        return `${who} · ${money} · ${daysLate(lateBy(i, now, timeZone))}`;
     }
     return i.dueAt
         ? `${who} · ${money} · due ${formatDate(i.dueAt, timeZone, { now })}`

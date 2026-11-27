@@ -91,6 +91,7 @@ import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { resolveCapabilities } from "../organizations/organization-policy";
 import { InvoiceInputDto, RecordPaymentDto } from "./dto";
 import type { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicesService } from "./invoices.service";
@@ -665,6 +666,37 @@ describe("who may", () => {
                 where: { id: "inv_other", organizationId: "org_1" },
             }),
         );
+    });
+});
+
+describe("who to ring (finding 11)", () => {
+    it("gives the contact's phone only to a role that may see contact details", async () => {
+        // How it is paid online has its own specs.
+        const online = jest
+            .spyOn(
+                service as unknown as { online: () => Promise<null> },
+                "online",
+            )
+            .mockResolvedValue(null);
+        db.contact.findFirst!.mockResolvedValue({ phone: "+919876543210" });
+        expect((await service.get(owner, "inv_1")).contact).toMatchObject({
+            id: "c_1",
+            phone: "+919876543210",
+        });
+        expect(db.contact.findFirst).toHaveBeenCalledWith({
+            where: { id: "c_1", organizationId: "org_1" },
+            select: { phone: true },
+        });
+        db.contact.findFirst!.mockClear();
+        const books: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "books",
+            actions: resolveCapabilities("books", ["invoice:read"]),
+        };
+        expect((await service.get(books, "inv_1")).contact?.phone).toBeNull();
+        expect(db.contact.findFirst).not.toHaveBeenCalled();
+        online.mockRestore();
     });
 });
 

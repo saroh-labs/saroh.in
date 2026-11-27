@@ -1,4 +1,4 @@
-import { formatDay, localDateKey } from "@/lib/format/datetime";
+import { daysPastDue, formatDay, localDateKey } from "@/lib/format/datetime";
 import { minorOf } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 
@@ -78,16 +78,7 @@ export function owedBills(
         )
         .map((i) => {
             const leftMinor = minorOf(i.leftToPay ?? i.total) ?? 0;
-            const daysLate =
-                i.dueAt && new Date(i.dueAt).getTime() < now.getTime()
-                    ? Math.max(
-                          1,
-                          Math.floor(
-                              (now.getTime() - new Date(i.dueAt).getTime()) /
-                                  DAY_MS,
-                          ),
-                      )
-                    : 0;
+            const daysLate = i.dueAt ? daysPastDue(i.dueAt, now, zone) : 0;
             const day = i.dueAt
                 ? formatDay(localDateKey(new Date(i.dueAt), zone), {
                       year: "never",

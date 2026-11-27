@@ -8,8 +8,15 @@ import { FailedRead } from "@saroh/ui/failed-read";
 import { IntentLink } from "@saroh/ui/intent-link";
 import { cn } from "@saroh/ui/lib/utils";
 
+import { CallThem } from "@/components/invoices/details/call-them";
+import { RecordPaymentSheet } from "@/components/invoices/payments/record-payment-sheet";
 import { QuickLook, QuickLookCard } from "@/components/shared/forms/quick-look";
+import { PayLinkRow } from "@/components/subscriptions/subscription-detail/panels";
+import { useSubscriptionActions } from "@/components/subscriptions/subscription-detail/use-subscription-actions";
+import { InvoiceSaveFor } from "@/lib/invoices/use-invoices";
+import { useSubscriptionSave } from "@/lib/subscriptions/use-subscriptions";
 import { EmptyState } from "@saroh/ui/data-state";
+import { useState } from "react";
 
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import type {
@@ -30,15 +37,19 @@ import {
     pausedText,
     recurringPrice,
     sortCharges,
+    statusLabel,
     subscriptionPay,
-    TAB_LABEL,
     TAB_TONE,
 } from "@/lib/subscriptions/view";
 import { Notice } from "@saroh/ui/notice";
 
 const EYEBROW = "label";
 
-/** The steps a quick look offers, by where the subscription stands. */
+/**
+ * The steps a quick look opens the full page for, by where the subscription
+ * stands. A failed renewal's new link and payment are done here instead
+ * (finding 21), for a role that may; Pause and Cancel stay on the page.
+ */
 const EDITS = {
     active: [
         ["Pause", "pause"],
@@ -57,9 +68,10 @@ const EDITS = {
 /**
  * A row's quick look, after the design, in the shared quick-look sheet:
  * where it stands, the next charge, the next three collections and the last
- * three charges — and ways into the full page. "Change it" opens that page
- * with the step ready (`?do=pause|switch|cancel|restart`); nothing changes
- * from here.
+ * three charges — and ways into the full page. A renewal that isn't paid
+ * shows who to ring and takes a new payment link or a payment right here
+ * (finding 21); "Change it" opens the page with the step ready
+ * (`?do=pause|switch|cancel|restart`) for everything else.
  */
 export function SubscriptionQuickLook({
     sub,
@@ -67,6 +79,7 @@ export function SubscriptionQuickLook({
     plans,
     charges,
     canWrite,
+    canPayLink = false,
     now,
 }: {
     sub: Subscription | null;
@@ -74,6 +87,8 @@ export function SubscriptionQuickLook({
     plans: readonly Plan[];
     charges: Optional<Record<string, SubscriptionCharge[]>>;
     canWrite: boolean;
+    /** A new link and Record payment need `invoice:write` too. */
+    canPayLink?: boolean;
     now: Date;
 }) {
     const onOpenChange = (open: boolean) => (!open ? onClose() : null);
@@ -120,10 +135,12 @@ export function SubscriptionQuickLook({
             }
         >
             <Body
+                key={sub.id}
                 sub={sub}
                 plans={plans}
                 charges={charges}
                 canWrite={canWrite}
+                canPayLink={canPayLink}
                 now={now}
             />
         </QuickLook>
@@ -135,15 +152,30 @@ function Body({
     plans,
     charges,
     canWrite,
+    canPayLink,
     now,
 }: {
     sub: Subscription;
     plans: readonly Plan[];
     charges: Optional<Record<string, SubscriptionCharge[]>>;
     canWrite: boolean;
+    canPayLink: boolean;
     now: Date;
 }) {
     const tab = listTab(sub);
+    // The page's own writes: the list and this sheet read again after each.
+    const { busy, payLink, newPayLink } = useSubscriptionActions(
+        sub,
+        plans,
+        now,
+        () => undefined,
+    );
+    const { saved } = useSubscriptionSave();
+    const [paying, setPaying] = useState(false);
+    const failedId = sub.failedCharge?.id ?? null;
+    // Money is collected here only by a role that may write invoices too.
+    const collectHere = tab === "failed" && canWrite && canPayLink && failedId;
+    const first = sub.contact.name.split(" ")[0] || sub.contact.name;
     const tz = sub.timezone;
     const href = `/billing/subscriptions/${sub.id}`;
     const older = olderPrice(sub, plans);
@@ -187,7 +219,7 @@ function Body({
             <QuickLookCard className="py-3.5">
                 <div className="flex items-center gap-2">
                     <StatusBadge tone={TAB_TONE[tab]}>
-                        {TAB_LABEL[tab]}
+                        {statusLabel(sub)}
                     </StatusBadge>
                     <span className="flex-1" />
                     <span className="text-[12px] text-muted-foreground">
@@ -224,10 +256,54 @@ function Body({
                         data-ph-unmask=""
                         className="mt-[3px] text-[12px] text-foreground/75"
                     >
-                        Saroh doesn&apos;t charge cards. Open it to send a new
-                        payment link, record a payment, pause or cancel.
+                        {sub.chargeFailed
+                            ? "The charge was declined, and Saroh doesn't try again on its own."
+                            : "Saroh doesn't charge cards for it."}{" "}
+                        {collectHere
+                            ? "Send a new payment link, or record what they paid you."
+                            : "Open it to see what can be done."}
                     </div>
+                    {collectHere ? (
+                        <div className="mt-2.5 flex flex-wrap gap-2">
+                            <Button
+                                size="sm"
+                                disabled={busy}
+                                onClick={newPayLink}
+                            >
+                                Send new link
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busy}
+                                onClick={() => setPaying(true)}
+                            >
+                                Record payment
+                            </Button>
+                        </div>
+                    ) : null}
+                    {payLink ? <PayLinkRow url={payLink} name={first} /> : null}
                 </Notice>
+            ) : null}
+            {tab === "failed" && sub.contact.phone ? (
+                <QuickLookCard label="Subscriber" className="py-3">
+                    <CallThem
+                        name={sub.contact.name}
+                        email={sub.contact.email}
+                        phone={sub.contact.phone}
+                    />
+                </QuickLookCard>
+            ) : null}
+            {collectHere ? (
+                // Recorded as Invoices records it; then the list and this
+                // sheet read again, so it moves off Need you in place.
+                <InvoiceSaveFor saved={saved}>
+                    <RecordPaymentSheet
+                        open={paying}
+                        onOpenChange={setPaying}
+                        invoice={{ id: collectHere, who: sub.contact.name }}
+                    />
+                </InvoiceSaveFor>
             ) : null}
             {upcoming.length ? (
                 <QuickLookCard label="Next collections" className="pb-1.5 pt-3">
@@ -297,20 +373,23 @@ function Body({
             {canWrite ? (
                 <QuickLookCard label="Change it" className="py-3">
                     <div className="flex flex-wrap gap-2">
-                        {EDITS[tab].map(([label, step]) => (
-                            <IntentLink
-                                key={label}
-                                href={step ? `${href}?do=${step}` : href}
-                                className={cn(
-                                    "inline-flex h-[38px] items-center rounded-[9px] border border-border bg-card px-4 text-[14px] font-semibold hover:bg-muted coarse:h-11",
-                                    step === "cancel"
-                                        ? "text-destructive-subtle-foreground"
-                                        : "text-foreground",
-                                )}
-                            >
-                                {label}
-                            </IntentLink>
-                        ))}
+                        {EDITS[tab]
+                            // Done above in this sheet, when it can be.
+                            .filter(([, step]) => !(collectHere && step === ""))
+                            .map(([label, step]) => (
+                                <IntentLink
+                                    key={label}
+                                    href={step ? `${href}?do=${step}` : href}
+                                    className={cn(
+                                        "inline-flex h-[38px] items-center rounded-[9px] border border-border bg-card px-4 text-[14px] font-semibold hover:bg-muted coarse:h-11",
+                                        step === "cancel"
+                                            ? "text-destructive-subtle-foreground"
+                                            : "text-foreground",
+                                    )}
+                                >
+                                    {label}
+                                </IntentLink>
+                            ))}
                     </div>
                     <p
                         data-ph-unmask=""

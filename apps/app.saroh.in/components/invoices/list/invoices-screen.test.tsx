@@ -258,7 +258,8 @@ describe("InvoicesScreen: the strip's figures are filters", () => {
         expect(figure("overdue")?.getAttribute("aria-pressed")).toBe("true");
         act(() => figure("overdue")?.click());
         expect(rows()).toEqual(["0105", "0106", "0101", "d1"]);
-        expect(lastAddress()).toBe("/billing/invoices");
+        // Every invoice, said, so the Overdue default gives way (DEC-271).
+        expect(lastAddress()).toBe("/billing/invoices?tab=all");
     });
 });
 
@@ -285,7 +286,8 @@ describe("InvoicesScreen: search", () => {
         expect(s.text()).toContain("No invoices match “zzz”");
         expect(s.text()).not.toContain("No invoices yet");
         s.press("Clear search");
-        expect(lastAddress()).toBe("/billing/invoices");
+        // Every invoice, said, so the Overdue default gives way (DEC-271).
+        expect(lastAddress()).toBe("/billing/invoices?tab=all");
     });
 });
 
@@ -312,7 +314,8 @@ describe("InvoicesScreen: states", () => {
         show({ invoices: [PAID, DRAFT], query: { ...ALL, owed: true } });
         expect(s.text()).toContain("No invoices owed to you");
         s.press("Show all invoices");
-        expect(lastAddress()).toBe("/billing/invoices");
+        // Every invoice, said, so the Overdue default gives way (DEC-271).
+        expect(lastAddress()).toBe("/billing/invoices?tab=all");
     });
 
     it("a role without money sees counts in the strip, no amounts", () => {
@@ -552,6 +555,7 @@ describe("InvoicesScreen: the issued date (Orders' ?date=)", () => {
             document.querySelectorAll<HTMLButtonElement>("button"),
         ).find((b) => b.textContent.trim() === "Clear filters");
         act(() => clear?.click());
-        expect(lastAddress()).toBe("/billing/invoices");
+        // Every invoice, said, so the Overdue default gives way (DEC-271).
+        expect(lastAddress()).toBe("/billing/invoices?tab=all");
     });
 });

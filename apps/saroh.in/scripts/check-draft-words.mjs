@@ -4,15 +4,15 @@
 // and tools alike.
 //
 // It answers the build's publish-list read itself (a stand-in API on a free
-// port) with two /for/ pages and one tool live, and one GST page live with
-// unconfirmed facts (so the build must hold it back), builds the site as a
+// port) with two /for/ pages and one tool live, and one guide live that its
+// checks hold back (`draft-words-list.mjs`), builds the site as a
 // deploy does (`pnpm cf:build`: the prebuild steps, `next build`,
 // OpenNext), and fails if a sentence of any other page, a phrase from a
 // draft tool's component, or a download's file, is anywhere in `.next`,
 // `.open-next`, `public/` or the build's generated copies (`lib/*.gen.ts`).
 // The live /for/ page's words and the live tool's code must be found: the
 // scan proves it can see. The sitemap index and its group sitemaps must be
-// static files, with no group for the held page.
+// static files, with no GST, guide or download group (none is built).
 //
 // Run: pnpm run check:draft-words (prepush --int/--e2e/--all, when saroh.in
 // or @saroh/search-pages changed). It rebuilds apps/saroh.in's .next, so
@@ -25,15 +25,11 @@ import { fileURLToPath } from "node:url";
 
 import { parse } from "yaml";
 
+import { HELD, LIVE, LIVE_FOR, LIVE_TOOL } from "./draft-words-list.mjs";
+
 const APP = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE = path.join(APP, "../../packages/search-pages");
 const LIST = path.join(APP, ".search-pages.json");
-const HELD = "/gst/salon-and-beauty-services";
-const LIVE_FOR = "/for/salons";
-const LIVE_FOR_TOO = "/for/gyms";
-// Its component has words of its own to look for (`codeMarkersOf`).
-const LIVE_TOOL = "/tools/wifi-qr-code-generator";
-const LIVE = [LIVE_FOR, LIVE_FOR_TOO, LIVE_TOOL];
 
 const FENCE = /^---\r?\n([\s\S]*?)\r?\n---/;
 const frontmatter = (file) =>
@@ -274,18 +270,25 @@ try {
             `the live ${LIVE_TOOL}'s code ("${seenTool}") is in no output: the scan can't see`,
         );
     // The sitemap index and its groups are static files (plan U5): one per
-    // group with a live page (/for/salons here), none for the held GST page.
+    // group with a live page (/for/salons here), none for the GST pages,
+    // guides or downloads (the held guide included): none is built.
     const out = (p) => path.join(APP, ".next/server/app", `${p}.body`);
     for (const p of ["sitemap.xml", "sitemap/pages.xml", "sitemap/for.xml"])
         if (!fs.existsSync(out(p)))
             failed.push(`${p} wasn't built as a static file`);
-    if (fs.existsSync(out("sitemap/gst.xml")))
-        failed.push("sitemap/gst.xml was built with no live GST page");
-    if (
-        fs.existsSync(out("sitemap.xml")) &&
-        fs.readFileSync(out("sitemap.xml"), "utf8").includes("/sitemap/gst.xml")
-    )
-        failed.push("the sitemap index names gst.xml with no live GST page");
+    const index = fs.existsSync(out("sitemap.xml"))
+        ? fs.readFileSync(out("sitemap.xml"), "utf8")
+        : "";
+    for (const kind of ["gst", "guides", "downloads"]) {
+        if (fs.existsSync(out(`sitemap/${kind}.xml`)))
+            failed.push(
+                `sitemap/${kind}.xml was built with no live ${kind} page`,
+            );
+        if (index.includes(`/sitemap/${kind}.xml`))
+            failed.push(
+                `the sitemap index names ${kind}.xml with no live ${kind} page`,
+            );
+    }
     const state = path.join(APP, ".open-next");
     if (!fs.existsSync(state)) failed.push(".open-next wasn't written");
 } finally {

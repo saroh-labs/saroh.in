@@ -116,7 +116,8 @@ export interface Subscription {
     id: string;
     status: SubscriptionStatus;
     plan: { id: string; name: string };
-    contact: { id: string; name: string; email: string };
+    /** `phone` only for a role that may see contact details (`contact:read`). */
+    contact: { id: string; name: string; email: string; phone?: string | null };
     /** Autopay (D12); absent from the list and from an API older than D12. */
     autopay?: SubscriptionAutopay | null;
     /** The typed price they joined at: a price the business set. */
@@ -163,6 +164,11 @@ export interface Subscription {
      * by the API, never stored; absent from an API older than U7.
      */
     paymentFailed?: boolean;
+    /**
+     * A charge on that renewal was really tried and declined (DEC-270):
+     * only then "Payment failed"; else "Not paid". Absent from an older API.
+     */
+    chargeFailed?: boolean;
     /** That charge — null without `invoice:read`. */
     failedCharge?: {
         id: string;

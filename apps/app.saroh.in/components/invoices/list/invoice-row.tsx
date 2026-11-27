@@ -75,7 +75,7 @@ export function InvoiceRow({
     after?: ReactNode;
 }) {
     const pill = invoicePill(i);
-    const when = whenLine(i);
+    const when = whenLine(i, new Date(), timeZone);
     const credit = i.kind === "CREDIT_NOTE";
     const nested = credit || i.kind === "SUPPLEMENTARY";
     const who = billedTo(i).name;
