@@ -193,11 +193,13 @@ export function AppSidebar({
                         {group.label}
                     </p>
                 )}
-                {/* `hidden`, so a folded group's rows are neither focused nor read. */}
+                {/* `hidden`, so a folded group's rows are neither focused nor
+                    read; the class too, because `flex` would otherwise draw
+                    them anyway. */}
                 <div
                     id={rowsId}
                     hidden={!open}
-                    className="flex flex-col gap-px"
+                    className={cn("flex flex-col gap-px", !open && "hidden")}
                 >
                     {group.items.map((item) => renderItem(item))}
                 </div>
