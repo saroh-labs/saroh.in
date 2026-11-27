@@ -185,7 +185,7 @@ export function AppSidebar({
                         rows={group.items.length}
                         waiting={groupWaiting(group, counts, unread)}
                         onToggle={() => folds.toggle(group.label ?? "")}
-                        className="px-2.5 pb-1 pt-3 [@media(max-height:960px)]:pt-2"
+                        className="mt-2 px-2.5 py-1 [@media(max-height:960px)]:mt-1"
                     />
                 ) : (
                     // The icon rail: folding does not apply, every icon shows.

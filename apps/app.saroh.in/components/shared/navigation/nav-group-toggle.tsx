@@ -35,7 +35,7 @@ export function NavGroupToggle({
             aria-controls={controls}
             onClick={onToggle}
             className={cn(
-                "label flex w-full items-center gap-1.5 rounded-md text-left transition-colors duration-fast hover:text-foreground",
+                "label flex w-full items-center gap-1.5 rounded-md text-left transition-colors duration-fast hover:bg-accent hover:text-foreground active:bg-accent-active",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 className,
             )}

@@ -128,7 +128,7 @@ function SheetGroup({
                     rows={group.rows.length}
                     waiting={group.rows.reduce((sum, r) => sum + r.count, 0)}
                     onToggle={onToggle}
-                    className="min-h-11 px-2.5 pb-[5px] pt-3 focus-visible:ring-offset-card"
+                    className="mt-1 min-h-11 px-2.5 py-2 focus-visible:ring-offset-card"
                 />
             </div>
             {/* `hidden`: a folded group's rows are neither focused nor read. */}
