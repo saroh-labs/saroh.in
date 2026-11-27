@@ -243,10 +243,29 @@ function Row({
     );
 
     if (payer) {
+        // Not linked yet: the row opens their record at the location they
+        // paid (owner, 27 Nov 2026: a row that does nothing on a press reads
+        // as broken). The link covers the row; Link sits above it.
+        const record = payer.storefront
+            ? customerHref(payer.storefront.id, payer.customerId)
+            : null;
         return (
-            <div className={className}>
+            <div
+                className={cn(
+                    className,
+                    record && "relative",
+                    record && listTable.pressable,
+                )}
+            >
+                {record ? (
+                    <IntentLink
+                        href={record}
+                        aria-label={`Open ${rowName(row)}`}
+                        className="absolute inset-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    />
+                ) : null}
                 {cells}
-                <span className="flex justify-start sm:justify-end">
+                <span className="relative z-[1] flex justify-start sm:justify-end">
                     <LinkPayer row={row} canLink={canLink} />
                 </span>
             </div>
@@ -286,14 +305,15 @@ function LinkPayer({ row, canLink }: { row: CustomerRow; canLink: boolean }) {
     if (!payer) return null;
     if (!holder) {
         // Nobody holds their email: no link is coming until they pay again.
+        // The row itself opens their record; "Open" says so, as on a linked row.
         return payer.storefront ? (
-            <TextLink
+            <span
+                aria-hidden
                 data-ph-unmask=""
-                href={customerHref(payer.storefront.id, payer.customerId)}
-                className="text-[12.5px] coarse:flex coarse:min-h-11 coarse:items-center"
+                className="hidden text-[12.5px] text-muted-foreground sm:block"
             >
                 Open
-            </TextLink>
+            </span>
         ) : null;
     }
     const holderName = rowName(holder);

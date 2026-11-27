@@ -151,6 +151,7 @@ describe("LeaveBusiness", () => {
         expect(buttons.map((b) => b.textContent.trim())).toEqual([
             "Stay",
             "Leave business",
+            "Close",
         ]);
         // Red: it destroys their place here.
         expect(buttons[1]?.className).toContain("destructive");

@@ -6,6 +6,8 @@ export default function Loading() {
             shape="diary"
             width="full"
             breadcrumb={["Bookings"]}
+            // The page's own title, so the crumb is skipped here as there.
+            title="Bookings"
             label="Loading the calendar"
         />
     );

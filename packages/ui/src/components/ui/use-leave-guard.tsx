@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogTitle,
-} from "./alert-dialog";
 import { Button } from "./button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from "./dialog";
 
 import { onLeaveRequest } from "../../lib/leave-request";
 import { holdLiveRefresh } from "../../lib/live-hold";
@@ -253,25 +253,28 @@ export function LeaveDialog({
     const stayRef = useRef<HTMLButtonElement>(null);
     const button = "h-[38px] rounded-[9px] px-4 text-[13px] font-semibold";
     return (
-        <AlertDialog
+        // A press outside, Escape or the close button is Stay, which loses
+        // nothing (owner, 27 Nov 2026: every dialog closes those ways).
+        <Dialog
             open={open}
             onOpenChange={(next) => {
-                if (!next) onStay();
+                if (!next && !saving) onStay();
             }}
         >
-            <AlertDialogContent
+            <DialogContent
+                role="alertdialog"
                 className="max-w-[400px] gap-0 px-[22px] py-5 sm:rounded-[14px]"
                 onOpenAutoFocus={(e) => {
                     e.preventDefault();
                     stayRef.current?.focus();
                 }}
             >
-                <AlertDialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+                <DialogTitle className="pr-8 font-display text-[17px] font-semibold tracking-[-0.02em]">
                     {LEAVE_TITLE}
-                </AlertDialogTitle>
-                <AlertDialogDescription className="mt-[7px] text-pretty text-[13px] leading-[1.55] text-foreground/75">
+                </DialogTitle>
+                <DialogDescription className="mt-[7px] text-pretty text-[13px] leading-[1.55] text-foreground/75">
                     {lost}
-                </AlertDialogDescription>
+                </DialogDescription>
                 <div className="mt-[18px] flex flex-wrap justify-end gap-2">
                     <Button
                         type="button"
@@ -304,7 +307,7 @@ export function LeaveDialog({
                         Stay
                     </Button>
                 </div>
-            </AlertDialogContent>
-        </AlertDialog>
+            </DialogContent>
+        </Dialog>
     );
 }

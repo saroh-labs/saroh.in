@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * The one confirm: it waits for its action, says it is working, can't be
- * dismissed meanwhile, stays open with the reason on a refusal and closes
+ * dismissed meanwhile (else a press outside or Close dismisses it), stays open with the reason on a refusal and closes
  * only on success. Red only when something is destroyed.
  */
 import { act, useState } from "react";
@@ -9,6 +9,7 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { pressOutside } from "../../lib/press-outside.test-kit";
 import type { ConfirmResult } from "./confirm-dialog";
 import { busyOf, CONFIRM_FAILED, ConfirmDialog } from "./confirm-dialog";
 
@@ -92,6 +93,20 @@ function Ask({
 }
 
 describe("ConfirmDialog", () => {
+    it("closes on a press outside and on its close button, as every dialog does", async () => {
+        act(() => root.render(<Ask onConfirm={() => undefined} />));
+        await tick();
+        await pressOutside();
+        expect(closed).toHaveBeenCalledTimes(1);
+        expect(dialog()).toBeNull();
+
+        act(() => root.render(<Ask key="again" onConfirm={() => undefined} />));
+        await tick();
+        act(() => button("Close").click());
+        await tick();
+        expect(closed).toHaveBeenCalledTimes(2);
+    });
+
     it("says what goes, offers Keep first and the verb second, and starts on Keep", async () => {
         act(() => root.render(<Ask onConfirm={() => undefined} />));
         await tick();
@@ -100,6 +115,8 @@ describe("ConfirmDialog", () => {
         expect(buttons().map((b) => b.textContent.trim())).toEqual([
             "Keep page",
             "Delete page",
+            // Every dialog's close button (owner, 27 Nov 2026).
+            "Close",
         ]);
         expect(document.activeElement).toBe(button("Keep page"));
     });

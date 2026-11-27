@@ -56,6 +56,18 @@ describe("PageHeader", () => {
         expect(screen.queryByRole("navigation")).toBeNull();
     });
 
+    it("draws no lone crumb that only says the title again", () => {
+        render(<PageHeader title="Customers" breadcrumb={["Customers"]} />);
+        expect(screen.queryByRole("navigation")).toBeNull();
+    });
+
+    it("keeps a lone crumb that says something else", () => {
+        render(<PageHeader title="Hill Road" breadcrumb={["Location"]} />);
+        expect(
+            screen.getByRole("navigation", { name: "Breadcrumb" }),
+        ).toHaveTextContent("Location");
+    });
+
     it("is the compact bar on a phone when asked: no crumbs, actions on the title's line", () => {
         const { container } = render(
             <PageHeader
