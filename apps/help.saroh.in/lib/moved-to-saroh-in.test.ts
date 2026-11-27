@@ -87,7 +87,6 @@ describe("movedTo", () => {
             "/",
             "/customers",
             "/organisation",
-            "/finding-your-way-around",
             "/what-your-business-needs",
             "/favicon.ico",
             "/no-such-page",
