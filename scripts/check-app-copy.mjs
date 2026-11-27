@@ -63,6 +63,11 @@ const ALLOWED = [
         why: "the API's own refusal, compared with === to tell it apart. Reword both sides together",
     },
     {
+        file: "lib/leads/subject.ts",
+        rule: "em dash",
+        why: "matches the separator the API writes into a form lead's title (enquiry.service.ts), to take the person's name off; never shown. Reword both sides together",
+    },
+    {
         file: "lib/invoices/paper-title.ts",
         rule: "em dash",
         why: "the invoice paper's titles, which the API draws identically on the PDF. Reword both sides together",
