@@ -476,7 +476,7 @@ export async function listRules(
     }
 }
 
-/** A single service's bookings (newest slot first). Empty on any failure. */
+/** A single service's newest 500 bookings (newest slot first). Empty on any failure. */
 export async function listServiceBookings(
     serviceId: string,
 ): Promise<Booking[]> {

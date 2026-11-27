@@ -69,6 +69,7 @@ const providerFindUnique = prisma.communicationProvider.findUnique as jest.Mock;
 const providerUpdate = prisma.communicationProvider.update as jest.Mock;
 const consentUpsert = prisma.consent.upsert as jest.Mock;
 const consentFindUnique = prisma.consent.findUnique as jest.Mock;
+const consentFindMany = prisma.consent.findMany as jest.Mock;
 const messageCreate = prisma.message.create as jest.Mock;
 const messageFindUnique = prisma.message.findUnique as jest.Mock;
 const messageFindMany = prisma.message.findMany as jest.Mock;
@@ -429,6 +430,20 @@ describe("CommunicationsService.listProviders / disconnect", () => {
         await expect(
             service.disconnectProvider(ctx(), "WHATSAPP"),
         ).rejects.toBeInstanceOf(NotFoundException);
+    });
+});
+
+describe("CommunicationsService.listConsents", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("reads the business's newest LIST_LIMIT consents, never all of them", async () => {
+        consentFindMany.mockResolvedValue([]);
+        await new CommunicationsService().listConsents(ctx());
+        expect(consentFindMany).toHaveBeenCalledWith({
+            where: { organizationId: "org_1" },
+            orderBy: { createdAt: "desc" },
+            take: LIST_LIMIT,
+        });
     });
 });
 

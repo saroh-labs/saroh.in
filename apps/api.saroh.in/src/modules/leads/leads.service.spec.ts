@@ -94,15 +94,55 @@ describe("LeadsService.list", () => {
 
         await service.list(ctx(), { pipelineId: "p_1", stageId: "s_1" });
 
-        expect(leadFindMany).toHaveBeenCalledWith({
-            where: {
-                organizationId: "org_1",
-                pipelineId: "p_1",
-                stageId: "s_1",
-            },
+        const where = {
+            organizationId: "org_1",
+            pipelineId: "p_1",
+            stageId: "s_1",
+        };
+        expect(leadFindMany).toHaveBeenNthCalledWith(1, {
+            where: { ...where, status: "OPEN" },
             orderBy: { createdAt: "desc" },
             include: { contact: true, stage: true },
+            take: LIST_LIMIT,
         });
+        expect(leadFindMany).toHaveBeenNthCalledWith(2, {
+            where: { ...where, status: { not: "OPEN" } },
+            orderBy: { createdAt: "desc" },
+            include: { contact: true, stage: true },
+            take: LIST_LIMIT,
+        });
+    });
+
+    it("holds at most LIST_LIMIT: open leads first, then the newest closed in what is left", async () => {
+        const service = makeService();
+        const at = (d: number) => new Date(Date.UTC(2026, 10, d));
+        leadFindMany
+            .mockResolvedValueOnce([
+                { id: "open_new", createdAt: at(20) },
+                { id: "open_old", createdAt: at(1) },
+            ])
+            .mockResolvedValueOnce([{ id: "won", createdAt: at(10) }]);
+
+        const rows = await service.list(ctx());
+
+        expect(leadFindMany.mock.calls[1][0].take).toBe(LIST_LIMIT - 2);
+        // Newest first across both reads.
+        expect(rows.map((r) => r.id)).toEqual(["open_new", "won", "open_old"]);
+    });
+
+    it("skips the closed read when the open leads fill the cap", async () => {
+        const service = makeService();
+        leadFindMany.mockResolvedValueOnce(
+            Array.from({ length: LIST_LIMIT }, (_, i) => ({
+                id: `l${i}`,
+                createdAt: new Date(0),
+            })),
+        );
+
+        const rows = await service.list(ctx());
+
+        expect(rows).toHaveLength(LIST_LIMIT);
+        expect(leadFindMany).toHaveBeenCalledTimes(1);
     });
 
     it("denies a MEMBER (lead:read is OWNER/ADMIN-only) before any I/O", async () => {
