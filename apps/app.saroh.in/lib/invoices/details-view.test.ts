@@ -526,14 +526,36 @@ describe("historyLines with who did it (U9 #1140)", () => {
 });
 
 describe("nextStep", () => {
+    const ringable = {
+        contact: {
+            id: "c_1",
+            name: "Vivek Nair",
+            email: "vivek@example.com",
+            phone: "+919876543210",
+        },
+    };
+
     it("is said while money is owed here and this person can act", () => {
-        expect(nextStep(invoice(), "Vivek Nair", true)).toEqual({
+        expect(nextStep(invoice(ringable), "Vivek Nair", true)).toEqual({
             what: "Next step is yours",
             sub: "Share it, call Vivek, or record the payment",
         });
         expect(
-            nextStep(invoice({ partlyPaid: true }), "Vivek Nair", true)?.sub,
+            nextStep(
+                invoice({ ...ringable, partlyPaid: true }),
+                "Vivek Nair",
+                true,
+            )?.sub,
         ).toBe("Share it, call Vivek, or record the rest");
+    });
+
+    it("offers no call with no number to call (finding 11)", () => {
+        expect(nextStep(invoice(), "Vivek Nair", true)?.sub).toBe(
+            "Share it or record the payment",
+        );
+        expect(
+            nextStep(invoice({ partlyPaid: true }), "Vivek Nair", true)?.sub,
+        ).toBe("Share it or record the rest");
     });
 
     it("isn't, for a reader, an order's paper, a credit note, or nothing owed", () => {

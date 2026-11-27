@@ -170,7 +170,7 @@ describe("latestInvoiceNote", () => {
                 },
                 NOW,
             ),
-        ).toBe("16 days past due");
+        ).toBe("16 days late");
         expect(
             latestInvoiceNote(
                 {
@@ -378,7 +378,7 @@ describe("rowInvoice", () => {
         ).toEqual({
             id: "i_old",
             number: "INV-0042",
-            note: "16 days past due",
+            note: "16 days late",
         });
     });
 

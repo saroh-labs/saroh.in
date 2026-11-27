@@ -212,7 +212,8 @@ test.describe("Cancel or correct", () => {
         // Its row is found by the whole number: a desk shows it in its own
         // column, a phone shows the tail ("0001") and says the whole one to
         // a screen reader, so a bare first text match is the hidden layout's.
-        await page.goto("/billing/invoices");
+        // Every invoice: the list may open on Overdue (DEC-271).
+        await page.goto("/billing/invoices?tab=all");
         await expect(
             page.locator("[data-invoice-row]").filter({ hasText: noteNumber }),
         ).toBeVisible();

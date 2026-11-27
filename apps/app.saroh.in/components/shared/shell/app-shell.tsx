@@ -212,6 +212,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             />
             <div className="flex min-h-0 flex-1">
                 <ShellSidebar
+                    userId={session.user.id}
                     collapsed={
                         (await cookies()).get(RAIL_COOKIE)?.value ===
                         RAIL_COLLAPSED
@@ -305,6 +306,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             ) : null}
             {/* Below 760px, the rail's place is taken by this. */}
             <ShellTabBar
+                userId={session.user.id}
                 role={role}
                 roleKey={roleKey}
                 actions={actions}

@@ -69,6 +69,7 @@ export function SubscriptionsScreen({
     charges,
     renewalsLate = null,
     canWrite,
+    canPayLink = false,
     initialTab,
     initialView,
     openSubscribe,
@@ -103,6 +104,11 @@ export function SubscriptionsScreen({
      */
     renewalsLate?: string | null;
     canWrite: boolean;
+    /**
+     * A new payment link and Record payment need `invoice:write` too: the
+     * quick look offers them only then (finding 21).
+     */
+    canPayLink?: boolean;
     initialTab: ScreenTab;
     /**
      * `?view=` as the address has it: the list's view on Subscribers, the
@@ -366,6 +372,7 @@ export function SubscriptionsScreen({
                 plans={plans}
                 charges={charges}
                 canWrite={canWrite}
+                canPayLink={canPayLink}
                 now={now}
             />
             {canSubscribe && !loading ? (

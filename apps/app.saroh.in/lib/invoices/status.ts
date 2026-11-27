@@ -1,4 +1,5 @@
-import { formatDate } from "@/lib/format/datetime";
+import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
+import { daysPastDue, formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor, minorOf } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { METHOD_WORD } from "@/lib/payments/method-words";
@@ -52,13 +53,10 @@ function daysLeft(iso: string, now: Date): number {
     return Math.floor((Date.parse(iso) - now.getTime()) / DAY);
 }
 
-function daysLate(iso: string, now: Date): number {
-    return Math.ceil((now.getTime() - Date.parse(iso)) / DAY);
-}
-
 export function invoiceStatus(
     invoice: { standing: InvoiceStanding; dueAt: string | null },
     now: Date = new Date(),
+    zone: string = DEFAULT_BUSINESS_ZONE,
 ): StatusView {
     switch (invoice.standing) {
         case "DRAFT":
@@ -70,7 +68,9 @@ export function invoiceStatus(
         case "CREDITED":
             return { label: "Credited", variant: "neutral", detail: null };
         case "OVERDUE": {
-            const late = invoice.dueAt ? daysLate(invoice.dueAt, now) : 0;
+            const late = invoice.dueAt
+                ? daysPastDue(invoice.dueAt, now, zone)
+                : 0;
             return {
                 label: "Overdue",
                 variant: "error",
@@ -383,6 +383,7 @@ export function paidHow(method: string): string {
 export function whenLine(
     i: ListInvoice,
     now: Date = new Date(),
+    zone: string = DEFAULT_BUSINESS_ZONE,
 ): { before: string; date: string | null; after: string; late: boolean } {
     const none = { date: null, after: "", late: false };
     if (i.kind === "CREDIT_NOTE") {
@@ -396,7 +397,9 @@ export function whenLine(
         case "DRAFT":
             return { ...none, before: "Not issued, no number yet" };
         case "OVERDUE": {
-            const late = i.dueAt ? Math.max(1, daysLate(i.dueAt, now)) : 0;
+            const late = i.dueAt
+                ? Math.max(1, daysPastDue(i.dueAt, now, zone))
+                : 0;
             return {
                 ...none,
                 before: late ? `${count(late, "day")} late` : "Overdue",
@@ -542,9 +545,10 @@ export function invoiceState(
 export function lateBy(
     i: Pick<Invoice, "standing" | "dueAt">,
     now: Date = new Date(),
+    zone: string = DEFAULT_BUSINESS_ZONE,
 ): number {
     if (i.standing !== "OVERDUE") return 0;
-    return i.dueAt ? Math.max(1, daysLate(i.dueAt, now)) : 1;
+    return i.dueAt ? Math.max(1, daysPastDue(i.dueAt, now, zone)) : 1;
 }
 
 /**
@@ -582,10 +586,14 @@ export function headerPill(
     i: Pick<Invoice, "standing" | "source" | "kind" | "dueAt"> &
         Partial<Pick<Invoice, "partlyPaid" | "chequeWaiting">>,
     now: Date = new Date(),
+    zone: string = DEFAULT_BUSINESS_ZONE,
 ): { label: string; variant: PillVariant } {
     const pill = invoicePill(i);
     if (i.kind === "CREDIT_NOTE" || i.standing !== "OVERDUE") return pill;
-    return { ...pill, label: `Overdue · ${count(lateBy(i, now), "day")}` };
+    return {
+        ...pill,
+        label: `Overdue · ${count(lateBy(i, now, zone), "day")}`,
+    };
 }
 
 /**
@@ -597,10 +605,11 @@ export function overdueLine(
     i: Pick<Invoice, "standing" | "kind" | "total" | "currency" | "dueAt"> &
         Partial<Pick<Invoice, "leftToPay">>,
     now: Date = new Date(),
+    zone: string = DEFAULT_BUSINESS_ZONE,
 ): string | null {
     if (i.kind === "CREDIT_NOTE" || i.standing !== "OVERDUE") return null;
     const money = formatMoneyMajor(leftCents(i) / 100, i.currency);
-    return unpaidLine(money, lateBy(i, now));
+    return unpaidLine(money, lateBy(i, now, zone));
 }
 
 export type MoneyTone = "neutral" | "owed" | "late" | "paid" | "waiting";
@@ -710,7 +719,7 @@ export function moneyMessage(
             };
         case "partlyPaid": {
             const paid = money(paidCents(i));
-            const late = lateBy(i, now);
+            const late = lateBy(i, now, timeZone);
             return {
                 title: leftToPayLine(money(leftCents(i))),
                 detail: [
@@ -727,7 +736,7 @@ export function moneyMessage(
             const due = i.dueAt ? `due ${day(i.dueAt)}` : null;
             return {
                 title: toCollect(money(leftCents(i))),
-                detail: [daysLateWords(lateBy(i, now)), due]
+                detail: [daysLateWords(lateBy(i, now, timeZone)), due]
                     .filter(Boolean)
                     .join(" · "),
                 tone: "late",

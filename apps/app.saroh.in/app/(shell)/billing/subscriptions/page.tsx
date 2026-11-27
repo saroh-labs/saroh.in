@@ -85,6 +85,7 @@ export default async function SubscriptionsPage({
                     : null
             }
             canWrite={canWrite}
+            canPayLink={may("invoice:write")}
             initialTab={tab}
             // The view someone chose: the list's on Subscribers (`?view=`,
             // or `?tab=` on an older link), the plans' on Plans.
