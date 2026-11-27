@@ -9,8 +9,23 @@ import { Rows } from "./rows";
 
 // Link's Server Action (DEC-275) is never called here.
 vi.mock("@/lib/api/http", () => ({}));
+vi.mock("@/lib/customers/use-customers", () => ({
+    useCustomerSave: () => ({ orgId: "o1", saved: () => undefined }),
+}));
 vi.mock("next/link", () => ({
-    default: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+    default: ({
+        children,
+        href,
+        "aria-label": label,
+    }: {
+        children?: React.ReactNode;
+        href: string;
+        "aria-label"?: string;
+    }) => (
+        <a href={href} aria-label={label}>
+            {children}
+        </a>
+    ),
 }));
 
 const s = stage();
@@ -42,5 +57,30 @@ describe("Rows: Last order", () => {
             </BusinessZoneProvider>,
         );
         expect(document.body.textContent).toContain("16 Jan");
+    });
+});
+
+describe("Rows: Not linked", () => {
+    it("opens their record at the location they paid", () => {
+        const page = {
+            sees: { orders: true, spent: false },
+            storefronts: [],
+            rows: [
+                {
+                    contactId: "u1",
+                    name: "Madhav Pai",
+                    attention: [],
+                    orders: { count: 4, open: 0, lastAt: null },
+                    unlinked: {
+                        customerId: "sc1",
+                        storefront: { id: "st1", name: "Pulse" },
+                        holder: null,
+                    },
+                },
+            ],
+        } as unknown as CustomersPage;
+        s.render(<Rows page={page} empty={null} />);
+        const link = document.querySelector('a[aria-label="Open Madhav Pai"]');
+        expect(link?.getAttribute("href")).toContain("sc1");
     });
 });

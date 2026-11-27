@@ -3587,3 +3587,10 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **`PageHeader` draws no breadcrumb when it is one crumb equal to the title** (`packages/ui/src/components/ui/page-header.tsx`). The rule lives in the shared header, so every list page, its loading screen, and the admin and accounts consoles follow it at once. Call sites still pass their crumb; it is simply not drawn.
 - **A lone crumb that says something else stays**: a link back ("Products" over the whole-page state "Product") or a different word ("Location" over the location's own name). A trail of two or more ("Orders › #1042") is unchanged and is how a detail page goes back.
 - **The first tab under a title is "All", not the title again**: Customers is All · Requests, Leads is All · Follow-ups, as Products already was (All · Stock · Collections). Addresses and tab values are unchanged (`?tab=requests`, `?tab=follow-ups`).
+
+## DEC-281 A question dialog closes like every dialog; a Not linked customer row opens their record
+
+**Status: Accepted — 2026-11-27** · owner (27 Nov 2026: "when we click the link button there, the dialog opens, but no close button, and never closes when clicked outside, this is not a dialog behaivour"; "when we click on any list item on customers, nothing happens") · follows DEC-275 (Not linked rows) and frontend-forms.md "Ways out"
+
+- **`ConfirmDialog` and the leave prompt (`useLeaveGuard`) are drawn on the shared shadcn `Dialog`, not shadcn's `AlertDialog`.** shadcn's AlertDialog (Radix) never closes on a press outside and has no close button; a question has nothing typed to lose, so it now has the close button, and a press outside, Escape or Close is the "keep" answer (Keep, Stay). While the action runs nothing closes it. Screen readers still hear an `alertdialog`. Every confirmation in the apps follows, since all of them go through these two pieces.
+- **A Not linked row on Customers opens that payer's record at the location they paid** (`/commerce/customers/<id>?storefront=<id>`): the whole row is the link, and Link sits above it. A linked row still opens the person's page.

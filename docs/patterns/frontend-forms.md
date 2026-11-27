@@ -180,6 +180,8 @@ The sheet and the dialog share one set of rules
   (`saveOff` is for a button waiting on something in the overlay, such as
   an upload or a check that is running.)
 - **Ways out.** A press outside closes it only while nothing has changed.
+  A confirm or leave question has nothing typed, so it always closes that
+  way and has a close button (DEC-281); never build one on `AlertDialog`.
   Cancel, Escape and the close button are decisions: they drop the draft
   unasked. There is no "You have changes that are not saved" prompt.
 - **Keyboard.** It starts in the first field and goes back to what opened

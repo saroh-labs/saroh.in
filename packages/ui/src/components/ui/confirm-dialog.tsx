@@ -6,16 +6,16 @@ import type { ReactNode, RefObject } from "react";
 import { useState } from "react";
 import { isRefusal } from "../../lib/refusal";
 import { cn } from "../../lib/utils";
-import {
-    AlertDialog,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "./alert-dialog";
 import { Button } from "./button";
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "./dialog";
 import { showError } from "./toast";
 
 import { Notice } from "./notice";
@@ -128,7 +128,11 @@ export function ConfirmDialog({
     }
 
     return (
-        <AlertDialog
+        // A Dialog, not Radix's AlertDialog: a question with nothing typed
+        // closes on a press outside and has a close button, as every dialog
+        // does (owner, 27 Nov 2026; frontend-forms.md "Ways out"). Still an
+        // alertdialog to a screen reader. Busy, nothing closes it.
+        <Dialog
             open={open}
             onOpenChange={(next) => {
                 if (busy) return;
@@ -137,7 +141,8 @@ export function ConfirmDialog({
                 onOpenChange(next);
             }}
         >
-            <AlertDialogContent
+            <DialogContent
+                role="alertdialog"
                 className="max-w-[420px] gap-0 overflow-hidden p-0 sm:rounded-xl"
                 onEscapeKeyDown={(e) => {
                     if (busy) e.preventDefault();
@@ -151,7 +156,7 @@ export function ConfirmDialog({
                       }
                     : {})}
             >
-                <AlertDialogHeader className="flex-row items-start gap-[13px] space-y-0 px-[22px] pb-1.5 pt-5 text-left">
+                <DialogHeader className="flex-row items-start gap-[13px] space-y-0 px-[22px] pb-1.5 pr-12 pt-5 text-left">
                     <span
                         aria-hidden
                         className={cn(
@@ -164,14 +169,12 @@ export function ConfirmDialog({
                         <Icon className="size-4" />
                     </span>
                     <div className="min-w-0">
-                        <AlertDialogTitle className="mb-1.5">
-                            {title}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="text-[13px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
+                        <DialogTitle className="mb-1.5">{title}</DialogTitle>
+                        <DialogDescription className="text-[13px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
                             {description}
-                        </AlertDialogDescription>
+                        </DialogDescription>
                     </div>
-                </AlertDialogHeader>
+                </DialogHeader>
                 {children ? (
                     <div className="px-[22px] pt-2">{children}</div>
                 ) : null}
@@ -185,10 +188,12 @@ export function ConfirmDialog({
                         {refusal}
                     </Notice>
                 ) : null}
-                <AlertDialogFooter className="px-[22px] py-[18px]">
-                    <AlertDialogCancel disabled={busy}>
-                        {keepLabel}
-                    </AlertDialogCancel>
+                <DialogFooter className="px-[22px] py-[18px]">
+                    <DialogClose asChild>
+                        <Button type="button" variant="outline" disabled={busy}>
+                            {keepLabel}
+                        </Button>
+                    </DialogClose>
                     <Button
                         type="button"
                         variant={destroys ? "destructive" : "default"}
@@ -198,9 +203,9 @@ export function ConfirmDialog({
                     >
                         {confirmLabel}
                     </Button>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

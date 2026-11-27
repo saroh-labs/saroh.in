@@ -174,7 +174,7 @@ describe("useLeaveGuard", () => {
         const names = Array.from(
             dialog()?.querySelectorAll("button") ?? [],
         ).map((b) => b.textContent.trim());
-        expect(names).toEqual(["Leave", "Stay"]);
+        expect(names).toEqual(["Leave", "Stay", "Close"]);
     });
 
     it("puts the keyboard on Stay", () => {
@@ -288,7 +288,7 @@ describe("useLeaveGuard", () => {
         const names = Array.from(
             dialog()?.querySelectorAll("button") ?? [],
         ).map((b) => b.textContent.trim());
-        expect(names).toEqual(["Leave", "Save and leave", "Stay"]);
+        expect(names).toEqual(["Leave", "Save and leave", "Stay", "Close"]);
         act(() => button("Save and leave").click());
         await settle();
         expect(save).toHaveBeenCalledTimes(1);

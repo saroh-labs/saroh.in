@@ -393,12 +393,15 @@ function FolioHero({
                     {proof}
                 </div>
             ) : null}
+            {/* Tighter on a phone than the board's 18px and 20px: a
+                three-line "Next open … Mon 30 Nov at 9:00 am" pushed the
+                photo past 844px (D-04: photo in the first screen). */}
             {card ? (
-                <div className="max-[699px]:order-3 max-[699px]:pt-[18px] min-[700px]:[grid-area:c]">
+                <div className="max-[699px]:order-3 max-[699px]:pt-3 min-[700px]:[grid-area:c]">
                     {card}
                 </div>
             ) : null}
-            <div className="empty:hidden max-[699px]:order-4 max-[699px]:pt-5 min-[700px]:self-end min-[700px]:[grid-area:p]">
+            <div className="empty:hidden max-[699px]:order-4 max-[699px]:pt-3 min-[700px]:self-end min-[700px]:[grid-area:p]">
                 {photo(
                     "aspect-[3/2] min-[700px]:aspect-[4/5]",
                     "(min-width: 700px) 420px, 100vw",
