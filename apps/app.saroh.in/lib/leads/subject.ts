@@ -1,13 +1,15 @@
 /**
  * What a lead is about, without the person's name (DEC-277). A form's lead
- * is titled "‹name› — ‹form›" (`enquiry.service.ts`), and the name is
+ * is titled "‹name›, em dash, ‹form›" (`enquiry.service.ts`), and the name is
  * already the row's and the page's heading; the rest is the subject. A
  * title that doesn't start with the name is the subject as it is.
  */
 export function leadSubject(title: string, name: string | null): string {
     const t = title.trim();
     if (!name) return t;
-    for (const sep of [" — ", " - ", ": "]) {
+    // The em dash is written as its code: it is matched in stored titles,
+    // never shown.
+    for (const sep of [" \u2014 ", " - ", ": "]) {
         const head = `${name}${sep}`;
         if (t.toLowerCase().startsWith(head.toLowerCase())) {
             return t.slice(head.length).trim() || t;
