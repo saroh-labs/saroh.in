@@ -28,6 +28,7 @@ export const DEFAULT_MARKETING_URL = "https://www.saroh.in";
  */
 export const OLD_TO_NEW: Readonly<Record<string, string>> = {
     "/getting-started": "/help/create-your-business",
+    "/finding-your-way-around": "/help/where-things-are-in-the-menu",
     "/selling": "/help/add-your-first-product",
     "/bookings": "/help/set-your-teams-hours",
     "/website": "/help/connect-your-own-domain",

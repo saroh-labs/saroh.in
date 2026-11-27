@@ -78,6 +78,12 @@ components/shared/             app shell, navigation, command menu
   Business calendar, Orders and Insights when the actor has them, the rail's
   next rows in any seat left, drawn in the rail's order on every page. The
   More sheet lists the rest under the rail's group names, in its order.
+- **Current** — **Menu groups fold** (DEC-279): each group label, on the rail
+  and in the More sheet, is a button over its rows; everything is open the
+  first time, each person's open and folded groups are remembered
+  (`lib/nav/nav-folds.ts`, the only reader and writer), the current page's
+  group is always shown, Setup is fixed at the rail's foot, and the icon rail
+  ignores folds.
 - **Current** — **Capability gating in the UI is an aid, not a permission.** A
   section's `layout.tsx` renders `ModuleGate` (`ModuleOffState` when the
   module is off, so a deep link is covered once), and nav rows carry a
