@@ -3415,6 +3415,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Late is said against when it was due**: "Late · 2 h", not the order's age. The quick view keeps the Late chip.
     - Sorting and folding are the API's (`sort=due`, `older=hide|only`, `counts.stale`), so the counts, the pages and the rows agree on any size of business.
 - Consequences: the late-rule notice is one notice naming every location it is about, and only for someone who can change the rule (finding 9). Search also finds a product on the order, and a phone for a role that reads contacts (finding 19).
+- Amended (owner, 27 Nov 2026): **Open lists every open order, month-old ones too.** The filter says Open, so nothing open is folded away. One line above the list counts the ones placed over a month ago ("2 of these were placed over a month ago") with **Close them**, which opens their own list to move them on ("See only them" for a role that can't change orders).
 
 ## DEC-266 Stock opens on what needs you
 
