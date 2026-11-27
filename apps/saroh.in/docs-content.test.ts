@@ -15,6 +15,7 @@ import {
     writeDocs,
     writeSearchContent,
 } from "./docs-content.config";
+import { LIVE as DRAFT_WORDS_LIVE, HELD } from "./scripts/draft-words-list.mjs";
 
 const TODAY = "2026-10-31";
 const pages = embeddedDocs.all();
@@ -225,6 +226,17 @@ describe("planDocs: links must land (U12)", () => {
 
     it("a GST page whose only links are its rail tools, trade page and related pins builds alone", () => {
         expect(plan(live(GST)).built).toEqual([GST]);
+    });
+
+    // check:draft-words fails as a leak when its held page builds (26 Nov 2026: the salon page, confirmed 15 Nov).
+    it("check:draft-words' held page is held on today's content", () => {
+        const p = planDocs(
+            { preview: false, live: [...DRAFT_WORDS_LIVE, HELD], takenOff: [] },
+            pages,
+            { production: true },
+        );
+        expect(p.built).toEqual([]);
+        expect(p.held.map((h) => h.path)).toEqual([HELD]);
     });
 });
 
