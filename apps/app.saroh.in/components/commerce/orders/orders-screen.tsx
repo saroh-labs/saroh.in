@@ -121,7 +121,7 @@ export function OrdersScreen({
     notices?: React.ReactNode;
     query: OrdersQuery;
     /** The page on screen; null until the first one is read. */
-    page: OrderListPage | null;
+    page: (OrderListPage & { allStale?: true }) | null;
     /**
      * What the filter bar offers (B4); null when it couldn't be read, and
      * the bar leaves out the menus it would fill.
@@ -233,7 +233,10 @@ export function OrdersScreen({
     // Open orders placed a month ago or more, folded under one line on
     // the Open view (DEC-265); their own list is a press away.
     const stale = page?.counts.stale ?? 0;
-    const folded = foldsOlder(query) && stale > 0 ? stale : 0;
+    // Every open order is a month old: the read lists them in place of
+    // the fold (DEC-265), under the month-old note.
+    const allStale = page?.allStale === true;
+    const folded = foldsOlder(query) && stale > 0 && !allStale ? stale : 0;
     // When every open order is folded, the fold line is the one message:
     // the empty state would say "Nothing left to fulfil" above it.
     const allFolded = rows.length === 0 && folded > 0;
@@ -441,7 +444,7 @@ export function OrdersScreen({
                 </div>
             ) : null}
 
-            {query.older ? (
+            {query.older || allStale ? (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-3.5 text-[13px]">
                     <span className="min-w-0 flex-1 text-pretty">
                         <strong data-ph-unmask="" className="font-semibold">
@@ -455,14 +458,16 @@ export function OrdersScreen({
                             move them on.
                         </span>
                     </span>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => go({ older: false })}
-                    >
-                        Back to open orders
-                    </Button>
+                    {query.older ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => go({ older: false })}
+                        >
+                            Back to open orders
+                        </Button>
+                    ) : null}
                 </div>
             ) : null}
 
@@ -556,7 +561,7 @@ export function OrdersScreen({
                             size="sm"
                             onClick={() => go({ older: true })}
                         >
-                            {selectable ? "Close them" : "See them"}
+                            {selectable ? "Show and close them" : "Show them"}
                         </Button>
                     </div>
                 ) : null}

@@ -197,7 +197,29 @@ describe("Orders with nothing open in the last month (DEC-265)", () => {
         await tick(50);
         expect(host.textContent).not.toContain("Nothing left to fulfil");
         expect(host.textContent).toContain("3 orders open over a month");
-        expect(host.textContent).toContain("Close them");
+        expect(host.textContent).toContain("Show and close them");
+        unmount();
+    });
+
+    it("lists the month-old orders under the note when nothing newer is open (owner, 27 Nov 2026)", async () => {
+        page = {
+            ...PAGE,
+            allStale: true,
+            counts: {
+                all: 4,
+                open: PAGE.rows.length,
+                refunded: 0,
+                stale: PAGE.rows.length,
+            } as typeof PAGE.counts,
+        } as typeof page;
+        const { host, unmount } = open();
+        release();
+        await tick(50);
+        expect(host.textContent).toContain("Orders open over a month.");
+        expect(host.textContent).toContain(PAGE.rows[0].customer.name);
+        // No fold line and no way "back": these are the open orders.
+        expect(host.textContent).not.toContain("open over a month Show");
+        expect(host.textContent).not.toContain("Back to open orders");
         unmount();
     });
 });

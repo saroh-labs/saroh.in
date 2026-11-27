@@ -26,6 +26,7 @@ import {
 } from "./kitchen-service";
 import {
     defaultOrdersTab,
+    foldsOlder,
     orderListParams,
     readOrdersQuery,
 } from "./list-query";
@@ -76,10 +77,24 @@ export async function mayReadOrders(): Promise<boolean> {
  */
 export async function readOrdersList(ask: OrdersAsk): Promise<OrdersListView> {
     const query = readOrdersQuery(ask);
-    const [page, viewer] = await Promise.all([
+    const [first, viewer] = await Promise.all([
         listOrderRows(orderListParams(query)),
         activeOrganizationOnce(),
     ]);
+    // The fold would hide every open order: list those instead, so the
+    // page is never an empty list above one line (DEC-265, 27 Nov 2026).
+    const allStale =
+        foldsOlder(query) &&
+        first.rows.length === 0 &&
+        (first.counts.stale ?? 0) > 0;
+    const page = allStale
+        ? {
+              ...(await listOrderRows(
+                  orderListParams({ ...query, older: true }),
+              )),
+              counts: first.counts,
+          }
+        : first;
     // Nothing narrows it: Open or All with no search, filter or fold open.
     const unnarrowed =
         defaultOrdersTab(query) === "open" &&
@@ -100,7 +115,9 @@ export async function readOrdersList(ask: OrdersAsk): Promise<OrdersListView> {
               )
             : null,
     ]);
-    return { ...page, moment, share };
+    return allStale
+        ? { ...page, moment, share, allStale: true }
+        : { ...page, moment, share };
 }
 
 function newestFirst<R extends { placedAt: string }>(rows: R[]): R[] {
