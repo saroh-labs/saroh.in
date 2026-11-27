@@ -344,12 +344,13 @@ describe("InvoicesScreen: states", () => {
 });
 
 describe("InvoicesScreen: the breadcrumb", () => {
-    const crumbs = () => document.querySelector("nav")?.textContent ?? "";
+    const crumbs = () =>
+        document.querySelector('nav[aria-label="Breadcrumb"]')?.textContent ??
+        "";
 
-    it("names no Payments section while Payments is on (DEC-262)", () => {
+    it("draws none while Payments is on: it would only say Invoices again", () => {
         show({ invoices: [DUE], summary: SUMMARY });
-        expect(crumbs()).toContain("Invoices");
-        expect(crumbs()).not.toContain("Payments");
+        expect(crumbs()).toBe("");
     });
 
     it("names no Payments while it is off (DEC-070)", () => {

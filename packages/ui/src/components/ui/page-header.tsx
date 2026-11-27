@@ -56,8 +56,12 @@ export interface PageHeaderProps extends Omit<
      */
     actions?: React.ReactNode;
     /**
-     * Where this page sits, above the title: "Workspace › Team". The last
-     * crumb is the page itself and reads in Ink; the rest are muted.
+     * Where this page sits, above the title: "Orders › #1042". The last
+     * crumb is the page itself and reads in Ink; the rest are muted. A lone
+     * crumb that is the title's own word is not drawn: it only says the
+     * title again (owner, 27 Nov 2026), so a top-level list page shows none.
+     * A lone link back ("Products" over "Product") or a different word
+     * ("Location" over "Hill Road") still is.
      */
     breadcrumb?: React.ReactNode[];
     /**
@@ -111,56 +115,58 @@ export function PageHeader({
         holdsData === true || holdsData === part
             ? { "data-ph-mask": "" }
             : { "data-ph-unmask": "" };
-    const crumbs = breadcrumb?.length ? (
-        <nav
-            aria-label="Breadcrumb"
-            className={cn(
-                "mb-[9px] flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground [&_a:active]:text-muted-foreground [&_a:hover]:text-foreground [&_a]:rounded-sm [&_a]:transition-colors",
-                // The phone's compact bar has none: the shell's top bar
-                // already says where this is.
-                compactOnPhone && "max-sm:hidden",
-            )}
-        >
-            {breadcrumb.map((crumb, i) => (
-                <React.Fragment key={i}>
-                    {i > 0 ? (
-                        <svg
-                            aria-hidden
-                            viewBox="0 0 24 24"
-                            className="size-3 shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+    const echoesTitle = breadcrumb?.length === 1 && breadcrumb[0] === title;
+    const crumbs =
+        breadcrumb?.length && !echoesTitle ? (
+            <nav
+                aria-label="Breadcrumb"
+                className={cn(
+                    "mb-[9px] flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground [&_a:active]:text-muted-foreground [&_a:hover]:text-foreground [&_a]:rounded-sm [&_a]:transition-colors",
+                    // The phone's compact bar has none: the shell's top bar
+                    // already says where this is.
+                    compactOnPhone && "max-sm:hidden",
+                )}
+            >
+                {breadcrumb.map((crumb, i) => (
+                    <React.Fragment key={i}>
+                        {i > 0 ? (
+                            <svg
+                                aria-hidden
+                                viewBox="0 0 24 24"
+                                className="size-3 shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M9 6 L15 12 L9 18" />
+                            </svg>
+                        ) : null}
+                        <span
+                            // The crumbs before the page are Saroh's sections
+                            // ("Sell › Customers"): readable. The last is the
+                            // page itself and follows the title's mark. A crumb
+                            // that is a record's ("Courses › Yoga basics ›
+                            // Edit") says `data-ph-mask` on its own element.
+                            {...(i === breadcrumb.length - 1
+                                ? mark("title")
+                                : { "data-ph-unmask": "" })}
+                            aria-current={
+                                i === breadcrumb.length - 1 ? "page" : undefined
+                            }
+                            className={cn(
+                                i === breadcrumb.length - 1
+                                    ? "min-w-0 truncate text-foreground"
+                                    : "shrink-0",
+                            )}
                         >
-                            <path d="M9 6 L15 12 L9 18" />
-                        </svg>
-                    ) : null}
-                    <span
-                        // The crumbs before the page are Saroh's sections
-                        // ("Sell › Customers"): readable. The last is the
-                        // page itself and follows the title's mark. A crumb
-                        // that is a record's ("Courses › Yoga basics ›
-                        // Edit") says `data-ph-mask` on its own element.
-                        {...(i === breadcrumb.length - 1
-                            ? mark("title")
-                            : { "data-ph-unmask": "" })}
-                        aria-current={
-                            i === breadcrumb.length - 1 ? "page" : undefined
-                        }
-                        className={cn(
-                            i === breadcrumb.length - 1
-                                ? "min-w-0 truncate text-foreground"
-                                : "shrink-0",
-                        )}
-                    >
-                        {crumb}
-                    </span>
-                </React.Fragment>
-            ))}
-        </nav>
-    ) : null;
+                            {crumb}
+                        </span>
+                    </React.Fragment>
+                ))}
+            </nav>
+        ) : null;
 
     return (
         <div

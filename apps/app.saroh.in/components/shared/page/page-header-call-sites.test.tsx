@@ -28,14 +28,20 @@ vi.mock("next/link", () => ({
 /**
  * One screen of each kind, moved onto the one page header: a list, a record,
  * a Settings section, an editor, Home and a whole-page state. Each draws one
- * `<h1>` at the page title's size, with its breadcrumb above it.
+ * `<h1>` at the page title's size, with its breadcrumb above it (a list has
+ * none: its one crumb would be its title).
  */
 const h1s = (html: string) => html.match(/<h1[\s>]/g) ?? [];
 const TITLE = "text-[30px]";
 
-function isPageHeader(html: string) {
+function isPageHeader(html: string, crumbs = true) {
     expect(h1s(html)).toHaveLength(1);
     expect(html).toContain(TITLE);
+    if (!crumbs) {
+        // A list's lone crumb would only say its title again (27 Nov 2026).
+        expect(html).not.toContain('aria-label="Breadcrumb"');
+        return;
+    }
     expect(html).toContain('aria-label="Breadcrumb"');
     expect(html.indexOf('aria-label="Breadcrumb"')).toBeLessThan(
         html.indexOf("<h1"),
@@ -50,9 +56,8 @@ describe("a list: Customers", () => {
                 actions={<button type="button">New customer</button>}
             />,
         );
-        isPageHeader(html);
+        isPageHeader(html, false);
         expect(html).toMatch(/data-slot="page-count"[^>]*>12 customers</);
-        // The crumb is the row's own name, not a section (DEC-262).
         expect(html).not.toContain("Sell");
     });
 
@@ -65,7 +70,7 @@ describe("a list: Customers", () => {
 describe("a list: Orders", () => {
     it("says how many orders beside the title, in its own word", () => {
         const html = renderToStaticMarkup(<OrdersHeading count="3 orders" />);
-        isPageHeader(html);
+        isPageHeader(html, false);
         expect(html).toMatch(/data-slot="page-count"[^>]*>3 orders</);
     });
 });
