@@ -8,7 +8,7 @@ const FIRST = { page: 1, size: 50 };
 function at(over: Partial<StockAddress> = {}): StockAddress {
     return {
         tab: "levels",
-        show: "all",
+        show: "",
         q: "",
         kind: "all",
         store: "all",

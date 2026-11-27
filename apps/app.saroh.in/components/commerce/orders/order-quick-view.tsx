@@ -18,18 +18,20 @@ import { attentionLines } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
 import { deliveryPlace, goesToAddress } from "@/lib/orders/lifecycle";
 import { loadOrderQuickView } from "@/lib/orders/list-actions";
-import { rowCustomer } from "@/lib/orders/list-row";
+import { rowAge, rowCustomer } from "@/lib/orders/list-row";
 import { kitchenPayment } from "@/lib/orders/pay-on-handover";
 import type { OrderRead } from "@/lib/orders/read";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import {
     orderPageHref,
+    quickBlocked,
     quickNext,
     quickPayment,
     quickSteps,
 } from "@/lib/orders/row-menu";
 import { quickVisitsText } from "@/lib/orders/visits";
 
+import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { Notice } from "@saroh/ui/notice";
 import { useOrderStep } from "./use-order-step";
 
@@ -136,6 +138,10 @@ export function OrderQuickView({
     const order = read.state === "ready" ? read.order : null;
     const next = order ? quickNext(order, can) : null;
     const customer = rowCustomer(row);
+    // What the row says and the panel used to drop (finding 15): how late,
+    // and why there is no next step when it is the money.
+    const age = rowAge(row);
+    const blocked = order && !next ? quickBlocked(row, can) : null;
 
     return (
         <QuickLook
@@ -220,7 +226,11 @@ export function OrderQuickView({
                     </div>
                 </Notice>
             ) : order ? (
-                <QuickViewBody order={order} />
+                <QuickViewBody
+                    order={order}
+                    late={age?.late ? age.text : null}
+                    blocked={blocked}
+                />
             ) : (
                 <div className="grid gap-3" role="status" aria-busy="true">
                     <span className="sr-only">Loading order {ref}</span>
@@ -241,7 +251,17 @@ export function OrderQuickView({
 const CUSTOMER_LINK =
     "cursor-pointer rounded-sm text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function QuickViewBody({ order }: { order: OrderRead }) {
+export function QuickViewBody({
+    order,
+    late = null,
+    blocked = null,
+}: {
+    order: OrderRead;
+    /** "Late · 2 h", as the row says it; null when it isn't late. */
+    late?: string | null;
+    /** Why no next step is offered: "Mark it paid first, then …". */
+    blocked?: string | null;
+}) {
     const money = order.money;
     const currency = money?.currency ?? "INR";
     const format = (a: string | number) => formatMoneyMajor(a, currency);
@@ -278,9 +298,16 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
     const reach = c
         ? [c.phone, c.email].filter(Boolean).join(" · ")
         : (walkIn?.phone ?? "");
+    // Only with `contact:read`: the API sends no phone otherwise.
+    const phone = c ? c.phone : walkIn?.phone;
 
     return (
         <>
+            {late ? (
+                <div>
+                    <StatusBadge tone="error">{late}</StatusBadge>
+                </div>
+            ) : null}
             <ol aria-label="Steps" className="flex flex-wrap gap-1">
                 {quickSteps(order).map((s) => (
                     <li
@@ -295,6 +322,9 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                     </li>
                 ))}
             </ol>
+            {blocked ? (
+                <p className="text-[12.5px] text-muted-foreground">{blocked}</p>
+            ) : null}
 
             {/* Needs attention (B15): what the API let this viewer see. */}
             {attentionLines(order.attention).map((a) => (
@@ -413,6 +443,18 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                         <span className="block break-words text-muted-foreground">
                             {reach}
                         </span>
+                    ) : null}
+                    {phone ? (
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="mt-1.5"
+                        >
+                            <a href={`tel:${phone.replace(/[^\d+]/g, "")}`}>
+                                Call
+                            </a>
+                        </Button>
                     ) : null}
                 </dd>
                 {address ? (

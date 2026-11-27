@@ -4,8 +4,7 @@ import {
     HttpStatus,
     NotFoundException,
 } from "@nestjs/common";
-import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { Prisma, prisma } from "@saroh/database";
 import { Type } from "class-transformer";
 import {
     IsIn,
@@ -20,11 +19,11 @@ import {
 import { pausedByCut } from "../billing/over-limit";
 import { overLimit } from "../billing/over-limit.service";
 import { categoryTree } from "../collections/collections.service";
+import { realOrderSql } from "../orders/open-orders";
 import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { businessTracksStock, COUNTING_ROWS } from "../stock/tracking";
 import type { CatalogueNeed } from "./catalogue-needs";
 import { needsFrom } from "./catalogue-needs";
-import type { ProductStatus } from "./dto";
 import { PRODUCT_STATUSES } from "./dto";
 import type { ProductsService } from "./products.service";
 import { listedAt, openStores } from "./products.service";
@@ -82,10 +81,20 @@ export const CATALOGUE_PAGE_SIZES = [10, 25, 50, 100] as const;
 /** `?category=none`: the products with no category (Uncategorized). */
 export const UNCATEGORIZED = "none";
 
+/**
+ * The list's statuses: one, or "CURRENT" — live and draft, what is sold or
+ * about to be (DEC-268, the Products list's first view).
+ */
+export const CATALOGUE_STATUSES = [...PRODUCT_STATUSES, "CURRENT"] as const;
+export type CatalogueStatus = (typeof CATALOGUE_STATUSES)[number];
+
+/** How far back "Sold, 30 days" looks (finding 17). */
+export const SOLD_DAYS = 30;
+
 export class CatalogueQueryDto {
     @IsOptional()
-    @IsIn(PRODUCT_STATUSES, { message: "Unknown status" })
-    status?: ProductStatus;
+    @IsIn(CATALOGUE_STATUSES, { message: "Unknown status" })
+    status?: CatalogueStatus;
 
     /** Only what this storefront sells (a filter by listing). */
     @IsOptional()
@@ -177,6 +186,12 @@ export interface CataloguePageDto {
      * first — judged shelf by shelf, as the Stock screen judges them.
      */
     needs: CatalogueNeed[];
+    /**
+     * What each product on the page sold in the last {@link SOLD_DAYS}
+     * days (finding 17): units, and what they came to. Only for a caller
+     * who reads orders' money; a product with no sales is absent.
+     */
+    sold?: Record<string, { units: number; amount: string }>;
 }
 
 const ARCHIVED = "ARCHIVED";
@@ -292,8 +307,19 @@ export async function cataloguePage(
     products: ProductsService,
     organizationId: string,
     query: CatalogueQueryDto,
+    /** `order:read`: the page's sales in the last 30 days. */
+    caller: { sold: boolean } = { sold: false },
+    now: Date = new Date(),
 ): Promise<CataloguePageDto> {
-    const { status, storefront } = query;
+    const { storefront } = query;
+    // Live and draft is a status of the list's, not a product's (DEC-268).
+    const current = query.status === "CURRENT";
+    const status = query.status === "CURRENT" ? undefined : query.status;
+    const byStatus: Prisma.ProductWhereInput = current
+        ? { status: { not: ARCHIVED } }
+        : status
+          ? { status }
+          : {};
     const sorted = query.sort && query.sort !== "newest";
     if (query.cursor && sorted) {
         throw new BadRequestException({
@@ -311,7 +337,7 @@ export async function cataloguePage(
     const base: Prisma.ProductWhereInput = {
         organizationId,
         ...(storefront ? listedAt(storefront) : {}),
-        ...(status ? { status } : {}),
+        ...byStatus,
     };
     const [tree, collections, tracks] = await Promise.all([
         categoryTree(organizationId),
@@ -348,7 +374,7 @@ export async function cataloguePage(
         base,
     );
 
-    const narrow: Prisma.ProductWhereInput[] = [];
+    const narrow: Prisma.ProductWhereInput[] = current ? [byStatus] : [];
     const q = query.q?.trim();
     if (q) narrow.push(searchWhere(q));
     if (query.view === "collections") narrow.push(inCollections);
@@ -444,14 +470,14 @@ export async function cataloguePage(
             prisma.product.count({ where: { AND: [base, inCollections] } }),
             prisma.product.count({ where: { AND: [base, tracked] } }),
             prisma.product.count({
-                where: { organizationId, ...(status ? { status } : {}) },
+                where: { organizationId, ...byStatus },
             }),
             prisma.productListing.groupBy({
                 by: ["storeId"],
                 where: {
                     organizationId,
                     storeId: { in: stores.map((s) => s.id) },
-                    ...(status ? { product: { status } } : {}),
+                    ...(current || status ? { product: byStatus } : {}),
                 },
                 _count: { _all: true },
             }),
@@ -462,6 +488,13 @@ export async function cataloguePage(
     const perStore = new Map(listed.map((l) => [l.storeId, l._count._all]));
     const more = page.length > take;
     const items = more ? page.slice(0, take) : page;
+    const sold = caller.sold
+        ? await soldLately(
+              organizationId,
+              items.map((i) => i.id),
+              now,
+          )
+        : undefined;
     return {
         items,
         nextCursor: more ? (items[items.length - 1]?.id ?? null) : null,
@@ -477,7 +510,38 @@ export async function cataloguePage(
             })),
         },
         needs,
+        ...(sold ? { sold } : {}),
     };
+}
+
+/**
+ * Units and money each of `productIds` sold in the last {@link SOLD_DAYS}
+ * days (finding 17): ONE grouped read over the business's order lines, for
+ * the page's products only. Cancelled orders and abandoned checkouts don't
+ * count; a line's amount is its price times its quantity.
+ */
+export async function soldLately(
+    organizationId: string,
+    productIds: string[],
+    now: Date,
+): Promise<Record<string, { units: number; amount: string }>> {
+    if (productIds.length === 0) return {};
+    const since = new Date(now.getTime() - SOLD_DAYS * 24 * 60 * 60 * 1000);
+    const rows = await prisma.$queryRaw<
+        { productId: string; units: number; amount: string }[]
+    >(Prisma.sql`SELECT oi."productId", SUM(oi.quantity)::int AS units,
+            SUM(oi.price * oi.quantity)::numeric(14, 2)::text AS amount
+        FROM "OrderItem" oi
+        JOIN "Order" o ON o.id = oi."orderId"
+        WHERE o."organizationId" = ${organizationId}
+            AND oi."productId" = ANY(${productIds})
+            AND o."createdAt" >= ${since.toISOString().replace("Z", "")}::timestamp
+            AND o.status::text <> 'CANCELLED'
+            AND ${realOrderSql()}
+        GROUP BY oi."productId"`);
+    return Object.fromEntries(
+        rows.map((r) => [r.productId, { units: r.units, amount: r.amount }]),
+    );
 }
 
 /**

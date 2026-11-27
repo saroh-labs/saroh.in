@@ -187,7 +187,7 @@ export interface HomeTodayItem {
     time: string;
     /** "Cleaning · Farah Khan", "Morning Yoga class", "Pick-up · Anika Rao". */
     what: string;
-    /** "With Dr. Arun · pays at the desk", "Order #1042 · Ready". */
+    /** "With Dr. Arun · pays at the visit", "Order #1042 · Ready". */
     who: string | null;
     /** The person a booking is for, for "Farah Khan arrived."; else null. */
     person: string | null;

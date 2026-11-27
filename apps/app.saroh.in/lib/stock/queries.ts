@@ -38,7 +38,8 @@ export const stockLevelsRead = defineRead<StockLevels>()({
         params: {
             storefront: id,
             q: z.string().max(100).optional(),
-            needs: z.literal("1").optional(),
+            needs: z.enum(["1", "auto"]).optional(),
+            sort: z.literal("need").optional(),
             page,
             size,
         },
@@ -116,7 +117,9 @@ export function stockView(
 ): StockView {
     const tab: StockTab =
         params.tab === "log" || params.tab === "checks" ? params.tab : "levels";
-    const show = one(params, "show") ?? "all";
+    // None chosen: what needs you while anything does, else everything
+    // (DEC-266); the levels read says which (`needsShown`).
+    const show = one(params, "show") ?? "";
     const q = (one(params, "q") ?? "").trim().slice(0, 100);
     const kind = logKindId(one(params, "kind"));
     const store = one(params, "store");
@@ -139,7 +142,11 @@ export function stockView(
         levels: {
             storefront: known(show),
             q: q || undefined,
-            needs: show === "needs" ? "1" : undefined,
+            // A search looks through everything, as the shelf might be fine.
+            needs:
+                show === "needs" ? "1" : show === "" && !q ? "auto" : undefined,
+            // Out first, then low, then the rest (DEC-266).
+            sort: "need",
             ...pages.levels,
         },
         log: {

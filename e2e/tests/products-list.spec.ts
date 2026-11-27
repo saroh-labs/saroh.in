@@ -66,8 +66,12 @@ test.describe("Products list", () => {
         });
 
         try {
-            // Search reaches it by name; the row opens the quick look.
-            await page.goto(`/commerce/products?q=${encodeURIComponent(name)}`);
+            // Search reaches it by name; the row opens the quick look. Every
+            // status: it is archived below, and the list opens on live and
+            // draft (DEC-268).
+            await page.goto(
+                `/commerce/products?q=${encodeURIComponent(name)}&status=ALL`,
+            );
             // The row's own button — its name leads; "More actions for …"
             // beside it only contains it.
             // From the keyboard: the title takes focus, not the first

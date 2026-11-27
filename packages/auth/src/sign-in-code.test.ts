@@ -53,19 +53,24 @@ function stack(
         verification: [] as Rows,
         rateLimit: [] as Rows,
     };
+    const options = authOptions({
+        sendVerificationOTP: (mail) => {
+            sent.push(mail);
+        },
+        ...extra.hooks,
+    });
     const auth = betterAuth({
-        ...authOptions({
-            sendVerificationOTP: (mail) => {
-                sent.push(mail);
-            },
-            ...extra.hooks,
-        }),
+        ...options,
         baseURL: BASE,
         trustedOrigins: [ORIGIN],
         database: memoryAdapter(db),
         // Off outside production by default, like every local stack, so
         // the tests that are not about the limiter never meet it.
-        rateLimit: { enabled: extra.rateLimit ?? false, storage: "memory" },
+        rateLimit: {
+            ...options.rateLimit,
+            enabled: extra.rateLimit ?? false,
+            storage: "memory",
+        },
         logger: { disabled: true },
     });
     async function post(
@@ -96,10 +101,20 @@ function stack(
             > | null,
         };
     }
+    /** A GET from one address; only the status matters here. */
+    async function get(path: string, from = "203.0.113.7") {
+        const response = await auth.handler(
+            new Request(`${BASE}/api/auth${path}`, {
+                headers: { origin: ORIGIN, "x-forwarded-for": from },
+            }),
+        );
+        return response.status;
+    }
     return {
         db,
         sent,
         post,
+        get,
         ask: (email: string, from?: string, token?: string) =>
             post(
                 "/email-otp/send-verification-otp",
@@ -410,6 +425,21 @@ describe("sign up and sign in with an emailed code", () => {
     });
 
     describe("the limiter (on in production)", () => {
+        it("never counts session reads by address: one address carries many people", async () => {
+            const s = stack({ rateLimit: true });
+            const from = "198.51.100.40";
+            // Past Better Auth's default 100 per 10 s for one address.
+            for (let i = 0; i < 120; i++) {
+                expect(await s.get("/get-session", from)).toBe(200);
+            }
+            // Other routes from that address are still counted.
+            let last = 0;
+            for (let i = 0; i < 120 && last !== 429; i++) {
+                last = await s.get("/ok", from);
+            }
+            expect(last).toBe(429);
+        });
+
         it(`sends ${CODE_LIMIT_MAX} codes to one caller, then refuses with the wait`, async () => {
             const s = stack({ rateLimit: true });
             const from = "198.51.100.20";

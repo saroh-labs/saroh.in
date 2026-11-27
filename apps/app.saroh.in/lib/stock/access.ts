@@ -31,7 +31,10 @@ export { stockTrackingOnce } from "./service";
 export const stockLevelsServer: ServerRead<StockLevelsAsk, StockLevels> = {
     read: stockLevelsRead,
     service: ({ needs, ...ask }) =>
-        getStockLevels({ ...ask, needs: needs === "1" }),
+        getStockLevels({
+            ...ask,
+            needs: needs === "auto" ? "auto" : needs === "1",
+        }),
 };
 
 export const stockLogServer: ServerRead<StockLogAsk, StockLogView> = {

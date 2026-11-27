@@ -1,5 +1,6 @@
 import type { BookingOutcome, BookingStatus } from "./booking-state";
 import type { DeskTake } from "./desk-pay";
+import type { BookingPay } from "./money-answer";
 
 /**
  * The bookings calendar read (U4), as the API sends it, and the pure shaping
@@ -86,6 +87,11 @@ export interface DiaryBooking {
      * something to take, never how much (DEC-098). Absent from an older API.
      */
     toTake?: boolean;
+    /**
+     * The one money answer (DEC-272): the payment word for everyone, the
+     * amounts only for a viewer who reads money. Absent from an older API.
+     */
+    pay?: BookingPay;
 }
 
 /** One start of a class: places, who holds them and how each paid. */

@@ -389,13 +389,16 @@ describe("a discount code, for someone who reads discounts", () => {
         expect(said).not.toMatch(/<input|<form|discount-form|>Save/);
     });
 
-    it("is the form for someone who may change it", async () => {
-        expect(
-            await drawn({
-                options: { STOREFRONT: [], COLLECTION: [], PRODUCT: [] },
-                defaultCurrency: "INR",
-            }),
-        ).toContain("discount-form");
+    it("reads first for someone who may change it, with Edit to the form (DEC-267)", async () => {
+        const said = await drawn({
+            options: { STOREFRONT: [], COLLECTION: [], PRODUCT: [] },
+            defaultCurrency: "INR",
+        });
+        expect(said).not.toMatch(/<input|<form|discount-form|>Save/);
+        expect(said).not.toContain("Your role can read this code");
+        expect(said).toMatch(
+            /href="\/commerce\/discounts\/disc_1\?edit=1"[^>]*>Edit</,
+        );
     });
 });
 

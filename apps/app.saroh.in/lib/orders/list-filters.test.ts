@@ -121,7 +121,10 @@ describe("the filters in the address", () => {
         expect(ordersHref(q, { late: true })).toBe(
             "/commerce/orders?payment=paid&late=true",
         );
-        expect(ordersHref(q, { ...NO_FILTERS })).toBe("/commerce/orders");
+        // The filters asked about every order: clearing them keeps that.
+        expect(ordersHref(q, { ...NO_FILTERS })).toBe(
+            "/commerce/orders?tab=all",
+        );
     });
 });
 

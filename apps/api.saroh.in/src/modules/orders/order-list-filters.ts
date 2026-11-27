@@ -196,7 +196,7 @@ export function ts(at: Date): Prisma.Sql {
 
 /**
  * The search: an order number (with or without "#", its number before P3
- * renumbered it too) or a customer's name;
+ * renumbered it too), a customer's name or a product on the order;
  * their email or phone only with `contact:read`, so a caller without it
  * cannot learn whether a number belongs to a customer.
  */
@@ -210,6 +210,15 @@ export function searchSql(q: string, view: OrderListView): Prisma.Sql {
         Prisma.sql`CONCAT_WS(' ', c."firstName", c."lastName") ILIKE ${pattern}`,
         // A walk-in is found by the name they gave (B13).
         Prisma.sql`o."walkInName" ILIKE ${pattern}`,
+        // A product or service on one of its lines ("who ordered the red
+        // dress"). Bounded: the outer query is already one business's
+        // orders, and each order's lines are read through
+        // `OrderItem(orderId)`, joined to the product or service by its key.
+        Prisma.sql`EXISTS (SELECT 1 FROM "OrderItem" oi
+            LEFT JOIN "Product" p ON p.id = oi."productId"
+            LEFT JOIN "Service" sv ON sv.id = oi."serviceId"
+            WHERE oi."orderId" = o.id
+                AND COALESCE(p.name, sv.name) ILIKE ${pattern})`,
     ];
     if (view.contact) {
         parts.push(Prisma.sql`c.email ILIKE ${pattern}`);
@@ -335,17 +344,56 @@ export { openSql };
  * Never stored; `now` is bound so a page and its counts use one clock.
  */
 export function lateSql(now: Date): Prisma.Sql {
+    const threshold = thresholdSql();
+    return Prisma.sql`(${canBeLateSql(threshold)}
+        AND o."createdAt" < ${ts(now)} - make_interval(mins => ${threshold}))`;
+}
+
+/** The order's storefront's threshold for its type, in minutes; NULL never. */
+function thresholdSql(): Prisma.Sql {
     const whens = lateStoredValues().map(([stored, type]) => {
         const column = Prisma.raw(`ss."${LATE_THRESHOLD_COLUMNS[type]}"`);
         return Prisma.sql`WHEN ${stored} THEN COALESCE(${column}, ${DEFAULT_LATE_THRESHOLDS[type]}::int)`;
     });
-    const threshold = Prisma.sql`(CASE o.fulfilment::text ${Prisma.join(whens, " ")} END)`;
-    // The same open-and-not-handed-over lists `lateOf` reads for one order.
-    return Prisma.sql`(o.status::text = ANY(${[...LATE_STATUSES]})
+    return Prisma.sql`(CASE o.fulfilment::text ${Prisma.join(whens, " ")} END)`;
+}
+
+/** The same open-and-not-handed-over lists `lateOf` reads for one order. */
+function canBeLateSql(threshold: Prisma.Sql): Prisma.Sql {
+    return Prisma.sql`o.status::text = ANY(${[...LATE_STATUSES]})
         AND o."paymentStatus" <> 'REFUNDED'
         AND o.stage::text = ANY(${[...LATE_STAGES]})
-        AND ${threshold} IS NOT NULL
-        AND o."createdAt" < ${ts(now)} - make_interval(mins => ${threshold}))`;
+        AND ${threshold} IS NOT NULL`;
+}
+
+/**
+ * When the order turns late (DEC-265): placed plus its threshold, by the
+ * rule {@link lateSql} judges; NULL for one that never can be (handed
+ * over, cancelled, refunded, digital, an appointment), which a list
+ * sorted by it puts last.
+ */
+export function dueSql(): Prisma.Sql {
+    const threshold = thresholdSql();
+    return Prisma.sql`(CASE WHEN ${canBeLateSql(threshold)}
+        THEN o."createdAt" + make_interval(mins => ${threshold}) END)`;
+}
+
+/** Open orders placed this many days ago or more fold under one line (DEC-265). */
+export const STALE_DAYS = 30;
+
+/** Open and placed {@link STALE_DAYS} or more ago, over the list's CTE. */
+export function staleSql(now: Date): Prisma.Sql {
+    return Prisma.sql`(m.open AND m."createdAt" < ${ts(now)} - make_interval(days => ${STALE_DAYS}))`;
+}
+
+/** Month-old open orders folded away, alone, or neither (DEC-265). */
+export function olderCondition(
+    older: "hide" | "only" | undefined,
+    now: Date,
+): Prisma.Sql {
+    if (older === "hide") return Prisma.sql`NOT ${staleSql(now)}`;
+    if (older === "only") return staleSql(now);
+    return Prisma.sql`TRUE`;
 }
 
 /**

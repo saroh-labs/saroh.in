@@ -20,11 +20,16 @@ const ANY = "";
 /** `?category=none`: the products with no category. */
 const UNCATEGORIZED = "none";
 
-const STATUSES: { value: ProductStatus | typeof ANY; label: string }[] = [
-    { value: ANY, label: "All statuses" },
+/** Live and draft first, what the list opens on (DEC-268). */
+const STATUSES: {
+    value: ProductStatus | "ALL" | typeof ANY;
+    label: string;
+}[] = [
+    { value: ANY, label: "Live and draft" },
     { value: "PUBLISHED", label: PRODUCT_STATUS_WORD.PUBLISHED },
     { value: "DRAFT", label: PRODUCT_STATUS_WORD.DRAFT },
     { value: "ARCHIVED", label: PRODUCT_STATUS_WORD.ARCHIVED },
+    { value: "ALL", label: "All statuses" },
 ];
 
 interface ToolbarProps {
@@ -79,7 +84,7 @@ export function CatalogueFilters({
     const many = list.length > 1;
     return (
         <>
-            <ListFilter<ProductStatus | typeof ANY>
+            <ListFilter<ProductStatus | "ALL" | typeof ANY>
                 label="Status"
                 value={query.status ?? ANY}
                 onValueChange={(status) => go({ status: status || null })}

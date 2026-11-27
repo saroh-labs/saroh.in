@@ -458,7 +458,8 @@ describe("a list filtered on the server through DataView: Products", () => {
     it('every unnarrowed filter reads "All {plural}": one way, never "Any"', () => {
         const out = filters(readProductsQuery({}));
         expect(says(out, "Location")).toBe("All locations");
-        expect(says(out, "Status")).toBe("All statuses");
+        // Products opens on live and draft (DEC-268), said as such.
+        expect(says(out, "Status")).toBe("Live and draft");
         expect(says(out, "Category")).toBe("All categories");
         expect(out).not.toMatch(/>Any /);
         expect(says(filters(), "Status")).toBe("Draft");

@@ -167,7 +167,7 @@ describe("who still owes", () => {
                     booking({ id: "s4", status: "CANCELLED" }),
                 ]),
             ),
-        ).toBe("2 awaiting payment");
+        ).toBe("2 to pay");
         expect(
             toPayText(one("x", 540, 600, { status: "CANCELLED" })),
         ).toBeNull();

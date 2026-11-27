@@ -92,7 +92,7 @@ describe("the pill a booking wears", () => {
     });
 
     it("says how many places owe on a class", () => {
-        expect(dayPill(klass(8, 8, 2))).toBe("2 awaiting payment");
+        expect(dayPill(klass(8, 8, 2))).toBe("2 to pay");
         expect(dayPill(klass(6, 8))).toBeNull();
     });
 });

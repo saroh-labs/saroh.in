@@ -18,13 +18,15 @@ import type { PeekAttention, PeekPerson } from "./peek";
  */
 export async function readPeekPerson(
     contactId: string,
+    bookingId?: string,
 ): Promise<PeekPerson | null> {
     const base = await orgBase();
     if (!base) return null;
-    const [contact, attention, notices] = await Promise.all([
+    const [contact, attention, notices, visits] = await Promise.all([
         getContact(contactId).catch(() => null),
         readAttention(base, contactId),
         readNoticeReach(contactId),
+        bookingId ? readVisits(base, bookingId) : null,
     ]);
     if (!contact) return null;
     return {
@@ -32,7 +34,36 @@ export async function readPeekPerson(
         attention,
         reach: notices?.reach ?? null,
         emailTo: notices?.to ?? null,
+        visits,
     };
+}
+
+/**
+ * Which visit a booking is for its customer (DEC-274, `GET
+ * bookings/:id/visits`); null when it can't be read, so nothing is said.
+ */
+async function readVisits(
+    base: string,
+    bookingId: string,
+): Promise<PeekPerson["visits"]> {
+    try {
+        const res = await apiFetch(
+            `${base}/bookings/${encodeURIComponent(bookingId)}/visits`,
+        );
+        if (!res.ok) return null;
+        const body = (await res.json()) as {
+            before?: unknown;
+            lastAt?: unknown;
+        } | null;
+        return typeof body?.before === "number"
+            ? {
+                  before: body.before,
+                  lastAt: typeof body.lastAt === "string" ? body.lastAt : null,
+              }
+            : null;
+    } catch {
+        return null;
+    }
 }
 
 /** Needs attention for one contact; null when it can't be read. The

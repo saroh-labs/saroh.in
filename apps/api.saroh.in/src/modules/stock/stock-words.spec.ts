@@ -1,5 +1,6 @@
 import {
     adjustDelta,
+    byNeed,
     cantReverse,
     countMismatched,
     HAND_MADE_KINDS,
@@ -118,5 +119,33 @@ describe("a refusal names the size (UX-026)", () => {
 
     it("names a product without variants alone", () => {
         expect(sellLineName("Rye loaf", null)).toBe("Rye loaf");
+    });
+});
+
+/**
+ * Stock opens on what needs you (DEC-266): short first, then out, then
+ * low, then the rest, each kept in the name order it came in.
+ */
+describe("byNeed", () => {
+    const group = (id: string, needs: ("short" | "out" | "low" | null)[]) => ({
+        productId: id,
+        rows: [{ cells: needs.map((need) => ({ need })) }],
+    });
+
+    it("puts the most urgent need first and keeps name order inside each", () => {
+        const sorted = byNeed([
+            group("apple", [null]),
+            group("bread", ["low"]),
+            group("cake", ["out", null]),
+            group("dates", [null, "short"]),
+            group("eggs", ["out"]),
+        ]);
+        expect(sorted.map((g) => g.productId)).toEqual([
+            "dates",
+            "cake",
+            "eggs",
+            "bread",
+            "apple",
+        ]);
     });
 });

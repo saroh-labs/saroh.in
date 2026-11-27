@@ -58,21 +58,35 @@ export class LeadsService {
      * The org's leads, newest first, each with its contact + current stage.
      * Authorizes `lead:read`. Optional `pipelineId` / `stageId` narrow the list
      * (used by the board to load one pipeline's leads).
+     *
+     * At most `LIST_LIMIT`: the open leads first (the board's cards), then the
+     * newest won and lost ones in what is left. The screens say so at the cap.
      */
     async list(
         ctx: OrganizationContext,
         filter: LeadListFilter = {},
     ): Promise<(Lead & { lastContact: LeadLastContact | null })[]> {
         authorize(ctx, "lead:read");
-        const leads = await prisma.lead.findMany({
-            where: {
-                organizationId: ctx.organizationId,
-                ...(filter.pipelineId ? { pipelineId: filter.pipelineId } : {}),
-                ...(filter.stageId ? { stageId: filter.stageId } : {}),
-            },
-            orderBy: { createdAt: "desc" },
-            include: { contact: true, stage: true },
-        });
+        const where = {
+            organizationId: ctx.organizationId,
+            ...(filter.pipelineId ? { pipelineId: filter.pipelineId } : {}),
+            ...(filter.stageId ? { stageId: filter.stageId } : {}),
+        };
+        const read = (status: string | { not: string }, take: number) =>
+            prisma.lead.findMany({
+                where: { ...where, status },
+                orderBy: { createdAt: "desc" },
+                include: { contact: true, stage: true },
+                take,
+            });
+        const open = await read("OPEN", LIST_LIMIT);
+        const closed =
+            open.length >= LIST_LIMIT
+                ? []
+                : await read({ not: "OPEN" }, LIST_LIMIT - open.length);
+        const leads = [...open, ...closed].sort(
+            (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+        );
         const last = await this.lastContacts(
             ctx.organizationId,
             leads.map((l) => l.id),

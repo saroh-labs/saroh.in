@@ -16,6 +16,7 @@ import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { readOnlyLine } from "@/components/shared/states/who-can-change";
 import { contactName } from "@/lib/crm/format";
 import { useLeadsList } from "@/lib/leads/use-leads";
+import { LIST_LIMIT } from "@/lib/lists/capped";
 
 /**
  * Leads on React Query (DEC-259): the same header, tabs, list and
@@ -110,14 +111,28 @@ export function LeadsContainer({
                         )}
                     />
                 ) : (
-                    <LeadsView
-                        leads={view.leads}
-                        currency={currency}
-                        initialView={initialView}
-                        tasks={view.tasks}
-                    />
+                    <>
+                        <LeadsView
+                            leads={view.leads}
+                            currency={currency}
+                            initialView={initialView}
+                            tasks={view.tasks}
+                        />
+                        <LeadsCapNote count={view.leads.length} />
+                    </>
                 )}
             </div>
         </>
+    );
+}
+
+/** The API holds at most LIST_LIMIT leads, open ones first; the board says the same. */
+export function LeadsCapNote({ count }: { count: number }) {
+    if (count < LIST_LIMIT) return null;
+    return (
+        <p className="mt-3 max-w-[68ch] text-[12px] text-muted-foreground">
+            Showing {LIST_LIMIT} leads: every open one first, then the newest
+            won and lost.
+        </p>
     );
 }

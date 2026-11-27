@@ -9,15 +9,20 @@ import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { howPaid } from "../bookings/booking-calendar";
 import { holdsPlace } from "../bookings/booking-hold";
+import type {
+    BookingPay,
+    PayFacts,
+    PayHow,
+    PayWord,
+} from "../bookings/booking-money";
 import {
-    bookingDueCents,
+    bookingPay,
     bookingPrice,
     isFreeBooking,
     shownPaidWith,
 } from "../bookings/booking-money";
-import type { BookingPaperRow } from "../bookings/desk-take";
-import { paidAtDesk, paidOnPaperCents } from "../bookings/desk-take";
 import { ownBookingsWhere, ownDiaryOf } from "../bookings/own-diary";
 import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
@@ -292,26 +297,75 @@ function bookerLabel(b: {
     return "Booking";
 }
 
-/** How a booking was paid (U3), as the day panel says it. */
-const PAID_WITH: Record<string, string> = {
-    MEMBERSHIP: "Membership",
+/** The one payment word (DEC-272), as the day panel says it. */
+const PAY_WORD: Record<PayWord, string> = {
+    FREE: "Free",
+    PAID: "Paid",
+    AWAITING_PAYMENT: "Awaiting payment",
+    PAYS_AT_VISIT: "Pays at the visit",
     PACK: "Class pack",
-    PAID: "Paid online",
-    DESK: "At the desk",
+    MEMBERSHIP: "Membership",
+    ON_ORDER: "On its order",
+    WITH_COURSE: "With the course",
+    NOTHING_TO_PAY: "Nothing to pay",
 };
 
-/**
- * How a booking was paid, in the day panel's words: "Free" for one booked
- * at a price of 0 (DEC-261), never "At the desk"; null when nobody said.
- */
-export function paidWords(b: {
-    paidWith: string | null;
-    snapshot: unknown;
-    service: { priceCents: number | null };
-}): string | null {
+/** "Paid online", "Paid at the desk": PAID with how, when it is known. */
+const PAID_HOW: Partial<Record<NonNullable<PayHow>, string>> = {
+    ONLINE: "Paid online",
+    DESK: "Paid at the desk",
+    ONLINE_AND_DESK: "Paid online and at the desk",
+};
+
+/** A booking's money, as the day panel reads it: the one answer. */
+export function payOf(
+    b: {
+        status: string;
+        outcome: string | null;
+        endAt: Date;
+        paidWith: string | null;
+        packRedemption?: { reversedAt: Date | null } | null;
+        subscriptionId?: string | null;
+        orderId?: string | null;
+        courseEnrollmentId?: string | null;
+        snapshot: unknown;
+        service: { priceCents: number | null };
+        invoices: PayFacts["paper"];
+    },
+    now: Date,
+): BookingPay {
     const free = isFreeBooking(b.snapshot, b.service.priceCents);
-    const paid = shownPaidWith(b.paidWith, free);
-    return paid ? (PAID_WITH[paid] ?? null) : free ? "Free" : null;
+    return bookingPay(
+        {
+            ...b,
+            paidWith: shownPaidWith(
+                howPaid({
+                    paidWith: b.paidWith,
+                    packRedemption: b.packRedemption ?? null,
+                    subscriptionId: b.subscriptionId ?? null,
+                }),
+                free,
+            ),
+            free,
+            priceCents:
+                bookingPrice(b.snapshot).priceCents ?? b.service.priceCents,
+            paper: b.invoices,
+        },
+        now,
+    );
+}
+
+/**
+ * How a booking stands for its money, in the day panel's words (DEC-272):
+ * "Paid online", "Awaiting payment", "Free"; null when there is nothing to
+ * say.
+ */
+export function paidWords(
+    pay: Pick<BookingPay, "word" | "how">,
+): string | null {
+    if (!pay.word) return null;
+    if (pay.word === "PAID" && pay.how) return PAID_HOW[pay.how] ?? "Paid";
+    return PAY_WORD[pay.word];
 }
 
 type Unavailable = CalendarUnavailable[];
@@ -1297,6 +1351,11 @@ export class CalendarService {
                 status: true,
                 outcome: true,
                 paidWith: true,
+                // How else it is paid, for the one answer (DEC-272).
+                subscriptionId: true,
+                orderId: true,
+                courseEnrollmentId: true,
+                packRedemption: { select: { reversedAt: true } },
                 snapshot: true,
                 bookerName: true,
                 bookerEmail: true,
@@ -1334,8 +1393,8 @@ export class CalendarService {
             const held = b.status === "PENDING";
             const date = dayOf(b.startAt, zone);
             const { priceCents, currency } = bookingPrice(b.snapshot);
-            const owes = this.bookingOwes(b, held, date >= today);
-            const desk = paidAtDesk(b.invoices);
+            const pay = payOf(b, now);
+            const owes = this.bookingOwes(b, pay, held, date >= today);
             return {
                 layer: "bookings" as const,
                 date,
@@ -1357,11 +1416,7 @@ export class CalendarService {
                     subtitle:
                         [
                             b.staff ? `With ${b.staff.name}` : null,
-                            held
-                                ? null
-                                : desk.cents > 0
-                                  ? "Paid at the desk"
-                                  : paidWords(b),
+                            held ? null : paidWords(pay),
                         ]
                             .filter(Boolean)
                             .join(" · ") || null,
@@ -1388,32 +1443,15 @@ export class CalendarService {
      * link still open is the invoice's Due, not the booking's too.
      */
     private bookingOwes(
-        b: {
-            status: string;
-            outcome: string | null;
-            paidWith: string | null;
-            snapshot: unknown;
-            invoices: (BookingPaperRow & {
-                paymentIntents: { amountCents: number }[];
-            })[];
-        },
+        b: { snapshot: unknown },
+        pay: BookingPay,
         held: boolean,
         ahead: boolean,
     ): DatedItem["owes"] {
-        if (held || !ahead || b.outcome === "NO_SHOW") return undefined;
-        const own = b.invoices.filter((i) => i.kind === "INVOICE");
-        if (own.some((i) => i.status === "ISSUED")) return undefined;
-        const paidOnline = own
-            .filter((i) => i.status === "PAID" || i.status === "CREDITED")
-            .flatMap((i) => i.paymentIntents)
-            .reduce((n, p) => n + p.amountCents, 0);
-        // Paid is what the paper's ledger holds (DEC-173): online, at the
-        // desk (P2) or recorded by hand on Invoices.
-        const due = bookingDueCents(
-            b,
-            paidOnline,
-            paidOnPaperCents(b.invoices),
-        );
+        if (held || !ahead || pay.how === "LINK") return undefined;
+        // The one answer's still to take (DEC-272): paid is what the
+        // paper's ledger holds (DEC-173), "Paid now" with no paper is paid.
+        const due = pay.dueCents;
         const { currency } = bookingPrice(b.snapshot);
         return due && currency
             ? { kind: "booking_due", currency, cents: due }

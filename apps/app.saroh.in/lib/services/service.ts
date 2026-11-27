@@ -127,6 +127,7 @@ import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { BookingMoney, CancelMoney } from "./booking-money";
 import type { BookingOutcome, BookingStatus } from "./booking-state";
 import type { DeskPayment, DeskPaymentInput } from "./desk-pay";
+import type { BookingPay } from "./money-answer";
 
 /** A cancelled booking, and what the cancel did with its money (E8). */
 export type CancelledBooking = Booking & { money?: CancelMoney };
@@ -235,6 +236,11 @@ export interface BookingDetail extends Omit<Booking, "contact"> {
     } | null;
     /** Paid online, due at the visit and any refund (E8); the API's sums. */
     money?: BookingMoney;
+    /**
+     * The one money answer (DEC-272): the payment word for everyone, the
+     * amounts beside `money` only for a viewer who reads money (DEC-274).
+     */
+    pay?: BookingPay;
     /** A visit of a treatment (E10); absent from an older API. */
     treatment?: TreatmentView | null;
 }
@@ -470,7 +476,7 @@ export async function listRules(
     }
 }
 
-/** A single service's bookings (newest slot first). Empty on any failure. */
+/** A single service's newest 500 bookings (newest slot first). Empty on any failure. */
 export async function listServiceBookings(
     serviceId: string,
 ): Promise<Booking[]> {

@@ -89,8 +89,12 @@ export function LevelsPanel({
         { value: "all", label: "All locations" },
         ...allStorefronts.map((s) => ({ value: s.id, label: s.name })),
     ];
-    const show_ = (id: string) =>
-        go(href({ show: id === "all" ? undefined : id }));
+    // Written as chosen: with none, the list opens on Needs you while
+    // anything needs you (DEC-266), so "all" is a choice of its own.
+    const show_ = (id: string) => go(href({ show: id }));
+    const needsOn =
+        show === "needs" || (show === "" && levels?.needsShown === true);
+    const everything = !needsOn && !storefrontView;
 
     const soldOutWords = (ids: string[] | undefined) => {
         if (!ids?.length) return null;
@@ -128,7 +132,7 @@ export function LevelsPanel({
                     ) : null
                 }
                 onClear={
-                    q || show !== "all"
+                    q || show !== ""
                         ? () => go(href({ q: undefined, show: undefined }))
                         : undefined
                 }
@@ -136,10 +140,8 @@ export function LevelsPanel({
                     <AttentionToggle
                         label="Needs you"
                         count={needsYou}
-                        on={show === "needs"}
-                        onToggle={() =>
-                            show_(show === "needs" ? "all" : "needs")
-                        }
+                        on={needsOn}
+                        onToggle={() => show_(needsOn ? "all" : "needs")}
                     />
                 }
             />
@@ -160,7 +162,7 @@ export function LevelsPanel({
                     values={values}
                     onValue={onValue}
                     empty={
-                        show === "needs" && !q ? (
+                        needsOn && !q ? (
                             <EmptyState
                                 size="panel"
                                 title="Nothing needs you"
@@ -174,7 +176,7 @@ export function LevelsPanel({
                                 query={q}
                                 onClear={() => search("")}
                             />
-                        ) : show === "all" ? (
+                        ) : everything ? (
                             <EmptyState
                                 size="panel"
                                 icon={<Boxes />}

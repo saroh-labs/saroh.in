@@ -15,6 +15,7 @@ import {
     cancelledLine,
     lengthWord,
     moneyCell,
+    payBadge,
     ROW_STATUS,
 } from "@/lib/services/all-bookings";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
@@ -85,7 +86,7 @@ export function BookingRow({
     /** "Kabir Singh · today, 11:30 am". */
     heading: string;
     triggerRef?: (el: HTMLButtonElement | null) => void;
-    /** `payment:read`: the Money column (owners and admins, DEC-098). */
+    /** Reads money (DEC-098, DEC-274): the Money column. */
     showMoney: boolean;
     /** The row's press: its quick look, as on the Calendar. */
     onOpen: () => void;
@@ -100,6 +101,11 @@ export function BookingRow({
             : "didnt"
         : status;
     const badge = ROW_STATUS[shownStatus];
+    // Money still owed sits beside how it went, never instead (DEC-273).
+    const owed = payBadge(b, shownStatus);
+    const owedBadge = owed ? (
+        <StatusBadge tone={owed.tone}>{owed.label}</StatusBadge>
+    ) : null;
 
     const money = showMoney ? moneyCell(b) : null;
     const moneyWords = money
@@ -108,8 +114,9 @@ export function BookingRow({
 
     // Status: the badge, or the question once the visit has ended unmarked.
     const outcome = marked ? (
-        <span className="flex items-center gap-2 text-[12.5px] text-muted-foreground max-[759px]:min-h-11">
+        <span className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground max-[759px]:min-h-11">
             <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+            {owedBadge}
             {marked.undo ? (
                 <Button
                     type="button"
@@ -162,10 +169,14 @@ export function BookingRow({
             ) : (
                 <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
             )}
+            {owedBadge}
         </span>
     ) : (
         <span className="grid justify-items-start gap-0.5">
-            <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+            <span className="flex flex-wrap items-center gap-1.5">
+                <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+                {owedBadge}
+            </span>
             {shownStatus === "cancelled" ? (
                 <span className="text-[12px] text-muted-foreground">
                     {cancelledLine(b, zone).replace("Cancelled · ", "")}

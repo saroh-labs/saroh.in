@@ -1,4 +1,5 @@
 import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { Discount } from "./service";
 
@@ -45,4 +46,30 @@ export function describeDiscount(d: Discount): string {
         reachOf(d),
         d.usageLimit === null ? "no cap" : `capped at ${d.usageLimit}`,
     ].join(" · ");
+}
+
+/** "₹2,100" off across its orders; null before anyone used it. */
+export function gaveOffOf(d: Pick<Discount, "used" | "usage">): string | null {
+    if (!d.usage || d.used === 0) return null;
+    return formatMoneyMajor(d.usage.gaveOff, d.usage.currency);
+}
+
+/**
+ * A code read first (DEC-267): "Used on 14 orders · ₹2,100 off", or "Not
+ * used yet"; and "₹18,400 in those orders" when the read carries it.
+ */
+export function usageWords(d: Pick<Discount, "used" | "usage">): {
+    lead: string;
+    orders: string | null;
+} {
+    const off = gaveOffOf(d);
+    if (!off) return { lead: "Not used yet", orders: null };
+    const total = d.usage?.ordersTotal;
+    return {
+        lead: `Used on ${count(d.used, "order")} · ${off} off`,
+        orders:
+            total === undefined
+                ? null
+                : `${formatMoneyMajor(total, d.usage?.currency)} in those orders`,
+    };
 }

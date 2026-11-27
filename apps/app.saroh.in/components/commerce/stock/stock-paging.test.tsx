@@ -38,7 +38,7 @@ function hrefAt(tab: "levels" | "checks", page: number, size: number) {
         stockHref(
             {
                 tab,
-                show: "all",
+                show: "",
                 q: "",
                 kind: "all",
                 store: "all",
@@ -93,7 +93,7 @@ function drawLevels(of: StockLevels, page = 1, size = 10) {
             levels={of}
             allStorefronts={of.storefronts}
             needsYou={0}
-            show="all"
+            show=""
             q=""
             href={hrefAt("levels", page, size)}
             counting={false}

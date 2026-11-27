@@ -62,6 +62,8 @@ export interface StockLevels {
     total?: number;
     /** Rows that need someone across the business (short, sold out, low). */
     needsYou?: number;
+    /** Only the rows that need someone are listed (asked, or "auto"). */
+    needsShown?: boolean;
     /** The business's time zone. */
     timezone?: string;
 }
@@ -202,8 +204,13 @@ export async function getStockLevels(
         product?: string;
         /** Name or SKU. */
         q?: string;
-        /** Only rows that need someone. */
-        needs?: boolean;
+        /**
+         * Only rows that need someone; "auto": only those while any do
+         * (DEC-266, the answer's `needsShown`).
+         */
+        needs?: boolean | "auto";
+        /** "need": out first, then low, then the rest. */
+        sort?: "need";
         /** The page by its number, from 1, at `size` products. */
         page?: number;
         size?: number;
@@ -215,7 +222,10 @@ export async function getStockLevels(
     if (!base) return null;
     const { needs, ...rest } = filter;
     return getJson<StockLevels>(
-        `${base}/stock${query({ ...rest, needs: needs ? "true" : undefined })}`,
+        `${base}/stock${query({
+            ...rest,
+            needs: needs === "auto" ? "auto" : needs ? "true" : undefined,
+        })}`,
     );
 }
 

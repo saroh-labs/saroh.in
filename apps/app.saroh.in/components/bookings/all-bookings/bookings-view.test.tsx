@@ -121,9 +121,28 @@ function rows(): DiaryBooking[] {
     return [
         booking(-3, "Ananya"), // ended this morning, not marked
         booking(-50, "Kavya"), // Saturday, not marked
-        booking(-2, "Rohan", { outcome: "ATTENDED" }),
-        booking(-0.5, "Kabir", { take: { cents: 40000, byLink: false } }),
-        booking(5.5, "Priya", { status: "PENDING" }),
+        booking(-2, "Rohan", {
+            outcome: "ATTENDED",
+            pay: { word: "PAID", how: "ONLINE", paidCents: 80000, dueCents: 0 },
+        }),
+        booking(-0.5, "Kabir", {
+            take: { cents: 40000, byLink: false },
+            pay: {
+                word: "PAYS_AT_VISIT",
+                how: null,
+                paidCents: 0,
+                dueCents: 40000,
+            },
+        }),
+        booking(5.5, "Priya", {
+            status: "PENDING",
+            pay: {
+                word: "AWAITING_PAYMENT",
+                how: null,
+                paidCents: 0,
+                dueCents: 80000,
+            },
+        }),
         booking(20, "Dev", {
             staff: { id: "st_arjun", name: "Arjun" },
             service: {
@@ -736,7 +755,7 @@ describe.each([
         });
         expect(text()).toContain("Nothing awaiting payment");
         expect(text()).toContain(
-            "Nobody owes you for a booking. Anyone sent a payment link shows here until they pay.",
+            "Nobody owes you for a booking. Anyone who still has to pay, at the desk or by link, shows here.",
         );
         press(byText("button, a", "Show all bookings"));
         await flush();
@@ -786,6 +805,31 @@ describe.each([
             "Nobody else today",
         );
         expect(text()).toContain("1 cancelled");
+    });
+
+    it("says Came beside Awaiting payment once a visit ended unpaid, and counts it (DEC-273)", () => {
+        n = 0;
+        draw({
+            bookings: [
+                booking(-3, "Mohan", {
+                    outcome: "ATTENDED",
+                    paidWith: "DESK",
+                    pay: {
+                        word: "AWAITING_PAYMENT",
+                        how: null,
+                        paidCents: 0,
+                        dueCents: 50000,
+                    },
+                }),
+            ],
+            initialView: "unconfirmed",
+        });
+        const row = rowOf("Mohan")?.textContent ?? "";
+        expect(row).toContain("Came");
+        expect(row).toContain("Awaiting payment");
+        expect(row).toContain("₹500");
+        expect(row).not.toContain("Pays at the visit");
+        expect(text()).not.toContain("Nobody owes you");
     });
 
     it("shows the Money column to those who read money, never to a Member", () => {
@@ -957,7 +1001,8 @@ describe("a row's press on the List", () => {
         await flush();
         const look = document.querySelector('[role="dialog"]');
         expect(look?.textContent).toContain("Kabir Singh");
-        expect(look?.textContent).toContain("Awaiting payment");
+        // The same money answer as the row (DEC-272).
+        expect(look?.textContent).toContain("Pays at the visit ₹400");
     });
 
     it("draws one line: time over length, a bar, who, what, how it stands", () => {

@@ -226,12 +226,25 @@ describe("/api/orders", () => {
             moment: first,
             share: null,
         });
+        // Open is what the list opens on (DEC-265): the moment shows there
+        // too; another view isn't the whole list.
         expect(await (await list({ tab: "open" })).json()).toMatchObject({
+            moment: first,
+        });
+        expect(await (await list({ tab: "refunded" })).json()).toMatchObject({
             moment: null,
         });
         expect(h.links).not.toHaveBeenCalled();
 
+        // A view that is empty while the business has orders shares nothing.
         h.list.mockResolvedValue({ rows: [], counts: PAGE.counts });
+        expect(await (await list()).json()).toMatchObject({ share: null });
+        expect(h.links).not.toHaveBeenCalled();
+
+        h.list.mockResolvedValue({
+            rows: [],
+            counts: { all: 0, open: 0, refunded: 0 },
+        });
         expect(await (await list()).json()).toMatchObject({
             share: { kind: "shop", url: "https://rye.saroh.app/shop" },
         });

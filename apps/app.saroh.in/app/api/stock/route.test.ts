@@ -124,6 +124,26 @@ const ROUTES = {
     "/api/stock/checks": checksRoute.GET,
 };
 
+describe("Stock opens on what needs you (DEC-266)", () => {
+    const levelsOf = (params: Record<string, string>) =>
+        stockView(params, { levels: 50 }, [{ id: "s1" }]).levels;
+
+    it("asks for Needs you while anything needs you, out first, when nothing is chosen", () => {
+        expect(levelsOf({})).toMatchObject({ needs: "auto", sort: "need" });
+        // A search looks through everything.
+        expect(levelsOf({ q: "rye" }).needs).toBeUndefined();
+    });
+
+    it("lets the address win: Everything, Needs you, or one location", () => {
+        expect(levelsOf({ show: "all" }).needs).toBeUndefined();
+        expect(levelsOf({ show: "needs" }).needs).toBe("1");
+        expect(levelsOf({ show: "s1" })).toMatchObject({
+            storefront: "s1",
+            needs: undefined,
+        });
+    });
+});
+
 describe("/api/stock/*", () => {
     it("answers what the page's prefetch holds, for what the address asks", async () => {
         const view = stockView(

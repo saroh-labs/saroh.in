@@ -3404,6 +3404,41 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Cards are styled per section or for the whole site only;** there is no "This card" (and no per-card storage).
 - **Page rows** in the editor show the first photo on the page (its stored smaller copy), or a plain page icon.
 
+## DEC-265 Orders opens on Open, soonest late first, with month-old orders folded
+
+**Status: Accepted — 2026-11-26, built** · owner (26 Nov 2026, UX audit of the selling screens, board "Orders", Q3) · extends DEC-163 from Home to the Orders list
+
+- Context: the list opened on every order, newest placed first, so at a boutique every row read "Late · 61 d" and the order due in an hour sat among two-month-old ones nobody marked collected (finding 6).
+- Decision:
+    - **The bare list opens on Open**, sorted by when each order turns late (placed plus its location's threshold for its type), soonest first; what can never turn late goes last. All and Refunded stay one choice away, with a visible sort ("Due soonest first", "Newest first"). An address naming a view (`?tab=`, `?view=`) or an order (`?sort=`) wins; an address that narrows the list another way (a search, a filter, Home's "Last 24 hours", an Insights week) still asks about every order, as such links always have.
+    - **Open orders placed 30 days ago or more fold** under one line, "N orders open over a month · Close them", which opens their own list (`?older=1`). Closing them is the existing bulk bar's moves, and in that list every move asks first.
+    - **Late is said against when it was due**: "Late · 2 h", not the order's age. The quick view keeps the Late chip.
+    - Sorting and folding are the API's (`sort=due`, `older=hide|only`, `counts.stale`), so the counts, the pages and the rows agree on any size of business.
+- Consequences: the late-rule notice is one notice naming every location it is about, and only for someone who can change the rule (finding 9). Search also finds a product on the order, and a phone for a role that reads contacts (finding 19).
+
+## DEC-266 Stock opens on what needs you
+
+**Status: Accepted — 2026-11-26, built** · owner (26 Nov 2026, board "Stock") · as DEC-153 did for Subscriptions
+
+- Context: the Levels tab said 10 products needed someone while the list under it opened A to Z on healthy shelves, "Needs you" a switch left off (finding 7).
+- Decision: with no `?show=` chosen, Levels opens on Needs you while anything needs you, else on everything; the switch shows which. Either way the rows come short first, then out, then low, then the rest, each in name order. A search looks through everything; an address with `?show=` wins. The API decides it in one read (`needs=auto`, `sort=need`, `needsShown`).
+
+## DEC-267 A discount code is read first, with what it gave
+
+**Status: Accepted — 2026-11-26, built** · owner (26 Nov 2026, board "Discount code", Q9) · follows the owner rule of 19 Oct (read-first rows, edit on request)
+
+- Context: opening a code landed in its form, an ended code one keystroke from a change, and nothing said whether the code worked (finding 8).
+- Decision: a code opens on what it did ("Used on 14 orders · ₹2,100 off", "₹18,400 in those orders", when it ran) and its facts; **Edit** opens the existing form (`?edit=1`) for whoever may change codes. The list gains **Gave off** and one **Ends** column that carries the state ("Ended 25 Nov", "Live until 31 Dec", "Used up"), and the policy paragraph under it became "How codes work", one press away (finding 26).
+- The figures are summed in the database, scoped to the business: what came off from the code's redemptions (`discount:read`), and what those orders came to only for a role that reads orders' money (`order:read`).
+
+## DEC-268 Products opens on Live and Draft
+
+**Status: Accepted — 2026-11-26, built** · owner (26 Nov 2026, board "Products", Q7)
+
+- Context: the list opened on every status, so archived products filled the first page, and why "73 products" differed from the plan's count was only in a hover (finding 16).
+- Decision: the list opens on **Live and draft**: what is sold or about to be. Archived and All statuses are choices in the Status filter (`?status=ARCHIVED`, `?status=ALL`). The header says, in words, "N of M products count toward your plan · archived don't".
+- Also (finding 17, owner's Q5): a **Sold, 30 days** column — units and money per product on the page, from one grouped read over order lines — for a role that reads orders' money. Not built yet: sorting by it ("Best sellers first") and the product page's Overview line, which need a read across the whole catalogue.
+
 ## DEC-269 One days-late count, in the business's own zone
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026, boards Today-Invoices, Invoices, Today-Subscription, Subscription-sheet; selling audit finding 12) · applies DEC-033 to every "days late"
@@ -3429,6 +3464,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Subscriptions' Need you** rows come from the API most days late first, then most owed, before the rest.
 - **The subscription quick look takes the money in place:** Send new link and Record payment happen in the sheet (the page's own actions and Record payment sheet, written as the tab's business), for a role with `subscription:write` and `invoice:write`; the list and the sheet read again. Pause and Cancel stay on the subscription's page.
 - On a phone the invoice page already draws the money card above the paper, as the sheet does.
+
 ## DEC-262 The menu is grouped by the merchant's question, one home per thing
 
 **Status: Accepted — 2026-11-26** · owner (26 Nov 2026, design canvas page "Grouping the menu": "the grouping looks better now") · amends the group-by-purpose menu ("Presence", "Run the business", "Grow", 2026-08-02) and DEC-133's last group "Manage"
@@ -3503,6 +3539,34 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 - Notices of one kind on the same day are one row under the newest, with how many times ("Google Calendar is behind · 4 times") and Show more to open the rest; newest first, by the business's day. A booking is never folded: each is its own row.
 - Booking notices (new, moved, cancelled by the customer: `booking.new`, `booking.moved`, `booking.cancelled`) were already produced; a Bookings view sits beside All when there are any. A booking a team member makes, moves or cancels still tells the person it is with ("Bookings with you"), not the whole team, and a no-show makes no notice: adding those is a change to the alert pipeline, left for its own decision.
+
+## DEC-272 One money answer for a booking, worked out once on the server
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, approved boards Booking-money and Quick-look) · amends DEC-257 (its payment words are now computed in one place) · builds on DEC-261 (Free) and DEC-173 (paid is the paper's ledger)
+
+- Context: one booking (Pulse Fitness, personal training, 30 Jul) read "₹1,200 · Paid" on the List, "₹1,200 paid online" in the quick look and "Still to take ₹1,200" on its page. It was booked "Paid now" by hand with no payment on paper. The List was right (the desk could not take anything for it); the quick look guessed "online" from "Paid"; the page's sum ignored "Paid now" and asked for the whole price.
+- **The rule (`bookingPay`, `apps/api.saroh.in/src/modules/bookings/booking-money.ts`), in order:** cancelled says Paid with what it had paid (the refund is on the booking), else Nothing to pay; a price of 0 is Free (DEC-261); a treatment's visit, a course's session, a class pack and a membership say so, with no amount; no price says Paid if marked paid, else nothing. Otherwise _paid_ is what the booking's own paper holds (online, at the desk, by hand on Invoices); marked "Paid now" with nothing on paper is paid in full. Nothing left: **Paid** (online, at the desk, or both; just "Paid" when not recorded). Money left: a hold or a pay link out is **Awaiting payment**; didn't come is Nothing to pay (the desk can still take a fee); a visit that has ended is **Awaiting payment** (DEC-273); before it, **Pays at the visit**.
+- **Every read says it from the same function:** the diary and List read (`pay` on each booking), the quick look, the booking's page (`pay` beside `money`), the Business calendar's day panel and its Due, Home's Today line, the customer page's bookings. Each sends the word and how to everyone who reads bookings, and the amounts paid and still to take only to a viewer who reads money (DEC-098).
+- **Not affected:** MCP and v1 booking tools and the data export send no payment word (they send the stored record); customer messages never named a payment for a booking.
+
+## DEC-273 After the visit, money still to take is "Awaiting payment", and it is counted
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026: "extending DEC-257's one payment word to past bookings") · amends DEC-257
+
+- Context: a desk-paid visit that ended unpaid read "Came · Pays at the visit" on the List, while the Awaiting payment view said "Nobody owes you for a booking".
+- **One set of words before and after the visit:** Pays at the visit (still to come), Awaiting payment (ended, or a pay link out, or a hold), Paid online / Paid at the desk, Free.
+- **Attendance stays its own fact.** "Came" or "Not marked yet" keeps its badge; "Awaiting payment" sits beside it. A booking whose person didn't come is not owed.
+- **The Awaiting payment view counts every booking owed**, not only pay links and holds. Its empty line: "Nobody owes you for a booking. Anyone who still has to pay, at the desk or by link, shows here."
+- The diary's block wears Awaiting payment only when owed now; one still to come says "pays at the visit" in its line.
+
+## DEC-274 A finished class says who came and who owes; the visit line; a desk Member's money in both places or neither
+
+**Status: Accepted — 2026-11-26** · owner (26 Nov 2026, approved boards Past-class and Quick-look, sticky 3) · follows DEC-260 (sessions · people) · amends DEC-257 and DEC-098 (who sees the List's Money column)
+
+- **A finished class** on the List reads "8 came · 1 didn't · 3 to pay" (or "Not marked") instead of "8 places left", desk and phone; its Money cell says "₹3,600 taken · ₹1,350 to take". Before it starts it still says places left. Opening it lists each person with Came or Didn't come and Awaiting payment. The diary's block for a class says "3 to pay".
+- **The visit line:** under the customer's name in the quick look and on the booking's page, "First visit" or "4th visit · last 12 Sep": their bookings at this business they came to before this one starts, and the last one's day (`GET bookings/:id/visits`, one counted read, `booking:read` and `contact:read`). The phone with Call was already on both.
+- **A desk Member's money:** whoever reads money (`payment:read`) or takes it at the desk (`booking:write` and `invoice:write`) sees what to collect in both places: the List's Money column and the booking's Money card. Anyone else sees neither: the API sends them no `money`, no `snapshot` and no service price on the booking, only the payment word (Awaiting payment, Paid…), which every screen says to them alike.
+
 ## DEC-279 Menu groups fold; everything is open the first time; each person's folds are remembered; Setup is fixed at the foot and folds too; the current page's group is always shown
 
 **Status: Accepted — 2026-11-27** · owner (27 Nov 2026: "Setup should also be collapsible … By default, on the first time, lets keep everything open … and persist their choice"; "then they can open whenever they want and it will also persist"; "this should also update the mobile menu in the app") · amends DEC-262 (the rail's groups) and DEC-263 (the More sheet's groups)

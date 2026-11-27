@@ -203,8 +203,9 @@ export async function readReassignCandidates(
  */
 export async function readBookingPerson(
     contactId: string,
+    bookingId?: string,
 ): Promise<PeekPerson | null> {
-    return readPeekPerson(contactId);
+    return readPeekPerson(contactId, bookingId);
 }
 
 /** Record how an appointment went (#241). */

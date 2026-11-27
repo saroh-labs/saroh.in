@@ -110,6 +110,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
+import { LIST_LIMIT } from "../../common/store-list-query";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { validationPipeOptions } from "../../common/validation";
 import { planMeter } from "../billing/metering.service";
@@ -3146,6 +3147,8 @@ describe("the bookings calendar in one read (U4)", () => {
             await new BookingsService().listBookings(calendarOnly);
             expect(bookingFindMany).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    // The newest LIST_LIMIT slots, never every booking.
+                    take: LIST_LIMIT,
                     where: expect.objectContaining({
                         organizationId: "org_SVC",
                         AND: [

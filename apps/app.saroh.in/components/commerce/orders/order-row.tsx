@@ -14,6 +14,7 @@ import {
     rowCustomer,
     rowInitials,
     rowMoney,
+    rowProducts,
     rowProgress,
     rowSubline,
 } from "@/lib/orders/list-row";
@@ -475,6 +476,10 @@ export function OrderCard({
             }
             meta={
                 <>
+                    {/* What to pack, on its own line (finding 5). */}
+                    <span className="min-w-0 basis-full truncate text-foreground">
+                        {rowProducts(row)}
+                    </span>
                     <span className="font-mono">{v.ref}</span>
                     <StepPill progress={v.progress} dot={false} />
                     <span>{row.fulfilmentLabel}</span>

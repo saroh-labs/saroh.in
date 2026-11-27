@@ -150,6 +150,22 @@ export function quickNext(
     return blocked ? null : step;
 }
 
+/**
+ * Why the quick view offers no next step, when it is the money (finding
+ * 15): "Mark it paid first, then start preparing." Null when there is a
+ * step to take, nothing left, or nothing this person could do about it.
+ */
+export function quickBlocked(
+    row: MenuRow,
+    can: Pick<OrderAbilities, "stage">,
+): string | null {
+    if (!can.stage || isAppointment(row.fulfilmentType)) return null;
+    const next = rowNext(row);
+    if (!next.step || next.disabled !== "Not paid yet.") return null;
+    const step = next.step.label;
+    return `Mark it paid first, then ${step.charAt(0).toLowerCase()}${step.slice(1)}.`;
+}
+
 export type RowMenuItem =
     | {
           kind: "next";

@@ -77,6 +77,16 @@ export function mayTakeDeskPayment(ctx: OrganizationContext): boolean {
     return allows(ctx, "booking:write") && allows(ctx, "invoice:write");
 }
 
+/**
+ * Whether this person reads a booking's amounts (DEC-098, DEC-272):
+ * `payment:read`, or taking payment at the desk (they take the sum). The
+ * diary, the List's Money column and the booking's page all ask this, so a
+ * desk Member sees what to collect in every place or in none.
+ */
+export function readsMoney(ctx: OrganizationContext): boolean {
+    return allows(ctx, "payment:read") || mayTakeDeskPayment(ctx);
+}
+
 /** Spending or giving back a holder's class on a booking. */
 export const CANT_USE_PACKS =
     "Your role can't pay for bookings with class packs.";

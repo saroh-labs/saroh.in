@@ -33,7 +33,11 @@ import {
     pageOrigin,
     pageWhat,
 } from "@/lib/services/booking-page";
-import { moneyNotes, moneyRows } from "@/lib/services/booking-page-money";
+import {
+    moneyNotes,
+    moneyRows,
+    payRow,
+} from "@/lib/services/booking-page-money";
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import { localDateOf } from "@/lib/services/diary";
 import { joinLink } from "@/lib/services/meeting-link";
@@ -309,11 +313,21 @@ export function BookingDetailView({
             <PageNote key="retired" kind="retired" service={service.name} />,
         );
     }
-    if (money || pack) {
+    // No amounts for a viewer who reads no money (DEC-274): the payment
+    // word alone, as the List and the quick look say it to them.
+    const wordOnly =
+        !money && booking.pay && !cancelled ? payRow(booking.pay, null) : null;
+    if (money || pack || wordOnly) {
         after.push(
             <MoneyCard
                 key="money"
-                rows={money ? moneyRows(money, format, cancelled) : []}
+                rows={
+                    money
+                        ? moneyRows(money, format, cancelled)
+                        : wordOnly
+                          ? [wordOnly]
+                          : []
+                }
                 lines={
                     money
                         ? moneyNotes(money, {
@@ -420,6 +434,7 @@ export function BookingDetailView({
                     }
                     person={person}
                     note={booking.intakeNote?.trim() ?? null}
+                    zone={timezone}
                     className="min-[760px]:col-start-2 min-[760px]:[grid-row:1/span_var(--column-rows)]"
                     style={
                         {

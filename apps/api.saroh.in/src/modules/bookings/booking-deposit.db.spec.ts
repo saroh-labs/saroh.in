@@ -198,6 +198,14 @@ describe("a deposit at booking (E8, real database)", () => {
             paidAtDeskCents: 0,
             deskMethod: null,
             take: { cents: 40_000, byLink: false },
+            // The one money answer (DEC-272): half paid online, the rest at
+            // the visit.
+            pay: {
+                word: "PAYS_AT_VISIT",
+                how: "ONLINE",
+                paidCents: 40_000,
+                dueCents: 40_000,
+            },
         });
     });
 

@@ -12,7 +12,7 @@ import { productLines } from "./product-lines";
 import type { StockReader } from "./stock-access";
 import { stockWindow } from "./stock-paging";
 import type { ShelfNeed } from "./stock-words";
-import { shortBy } from "./stock-words";
+import { byNeed, shortBy } from "./stock-words";
 import { businessTracksStock } from "./tracking";
 
 /**
@@ -107,6 +107,11 @@ export interface StockLevelsView {
      * orders already placed: it is hidden from the site (`productLines`).
      */
     needsYou: number;
+    /**
+     * Whether only the rows that need someone are listed: as asked, or,
+     * asked "auto", while any do (DEC-266).
+     */
+    needsShown: boolean;
     /** The business's zone, for the screen's "today at 07:12". */
     timezone: string;
 }
@@ -406,11 +411,13 @@ export async function readLevels(
     }
 
     // Filter, then page by product.
+    const needsShown =
+        query.needs === true || (query.needs === "auto" && needsYou > 0);
     let kept = groups
         .filter((g) => !matching || matching.has(g.productId))
         .map((g) => {
             let rows = g.rows;
-            if (query.needs) rows = rows.filter((r) => rowNeedsYou(r.cells));
+            if (needsShown) rows = rows.filter((r) => rowNeedsYou(r.cells));
             // One storefront's view: what it sells or still holds. Left
             // out here, not by the screen, so `total` counts what is drawn.
             if (query.storefront) {
@@ -422,6 +429,10 @@ export async function readLevels(
         })
         .filter((g) => g.rows.length > 0);
     const total = kept.length;
+    // What needs someone first, most urgent first (DEC-266): short, then
+    // out, then low, then the rest, each in name order. A read by cursor
+    // walks name order, so it keeps it.
+    if (query.sort === "need" && !query.cursor) kept = byNeed(kept);
     if (query.cursor) {
         // After the cursor in name order — whether or not the filters
         // still keep the cursor's own product.
@@ -457,6 +468,7 @@ export async function readLevels(
         total,
         pageSize: take ?? null,
         needsYou,
+        needsShown,
         timezone,
     };
 }

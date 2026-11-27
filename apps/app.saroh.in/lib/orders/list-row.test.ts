@@ -154,6 +154,12 @@ describe("rowAge", () => {
         });
     });
 
+    it("says how late against when it was due, not since placed (DEC-265)", () => {
+        expect(
+            rowAge(row({ ageMinutes: 61 * 24 * 60, late: true, lateBy: 130 })),
+        ).toEqual({ text: "Late · 2 h", late: true });
+    });
+
     it("says nothing once it is done, refunded or cancelled", () => {
         expect(rowAge(row({ stepIndex: 3 }))).toBeNull();
         expect(rowAge(row({ standing: "REFUNDED" }))).toBeNull();
@@ -322,9 +328,27 @@ describe("rowMoney for the kitchen (UX-010)", () => {
 
 describe("rowSubline", () => {
     it("names the storefront only when there are several to tell apart", () => {
-        expect(rowSubline(row(), true)).toBe("2 items · Hill Road · Pick-up");
+        expect(rowSubline(row(), true)).toBe(
+            "Sourdough loaf · Hill Road · Pick-up",
+        );
         expect(rowSubline(row({ itemCount: 1 }), false)).toBe(
-            "1 item · Pick-up",
+            "Sourdough loaf · Pick-up",
+        );
+    });
+
+    it("leads with the first product and counts the rest (finding 5)", () => {
+        expect(
+            rowSubline(
+                row({
+                    productNames: ["Red Polka Dot Midi Dress, S", "Stole"],
+                    moreProducts: 2,
+                }),
+                false,
+            ),
+        ).toBe("Red Polka Dot Midi Dress, S · +3 more · Pick-up");
+        // No names sent: the count, as before.
+        expect(rowSubline(row({ productNames: [] }), false)).toBe(
+            "2 items · Pick-up",
         );
     });
 });

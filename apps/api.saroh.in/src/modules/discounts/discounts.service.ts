@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
+import { toMoneyString } from "../../common/money";
 import { workspaceAction } from "../analytics/product-milestones";
 import type { DiscountInputDto } from "./dto";
 import type {
@@ -15,8 +16,11 @@ import type {
     OrderView,
 } from "./redeem";
 import { codeRefusalMessage, redeem } from "./redeem";
-import type { DiscountView } from "./serialize";
+import type { DiscountUsage, DiscountView } from "./serialize";
 import { DISCOUNT_INCLUDE, serializeDiscount } from "./serialize";
+
+/** A code nobody has used yet. */
+const NO_USAGE: DiscountUsage = { gaveOff: "0.00", currency: null };
 
 /** A refusal the form can put on the field it is about. */
 function fieldError(
@@ -84,7 +88,77 @@ export class DiscountsService {
             include: DISCOUNT_INCLUDE,
         });
         const now = new Date();
-        return rows.map((r) => serializeDiscount(r, now));
+        const usage = await this.usage(
+            organizationId,
+            rows.map((r) => r.id),
+        );
+        return rows.map((r) => ({
+            ...serializeDiscount(r, now),
+            usage: usage.get(r.id) ?? NO_USAGE,
+        }));
+    }
+
+    /**
+     * One code, read first (DEC-267): with what it gave, and — for a role
+     * that reads orders' money — what the orders it was used on came to.
+     */
+    async getWithUsage(
+        organizationId: string,
+        id: string,
+        orders: boolean,
+    ): Promise<DiscountView> {
+        const view = await this.get(organizationId, id);
+        const [usage, total] = await Promise.all([
+            this.usage(organizationId, [id]),
+            orders
+                ? prisma.order.aggregate({
+                      where: {
+                          organizationId,
+                          discountRedemption: { is: { discountId: id } },
+                      },
+                      _sum: { total: true },
+                  })
+                : null,
+        ]);
+        return {
+            ...view,
+            usage: {
+                ...(usage.get(id) ?? NO_USAGE),
+                ...(total
+                    ? { ordersTotal: toMoneyString(total._sum.total ?? 0) }
+                    : {}),
+            },
+        };
+    }
+
+    /**
+     * What each code took off, summed in the database: one grouped read
+     * over the business's redemptions, never the orders themselves.
+     */
+    private async usage(
+        organizationId: string,
+        ids: string[],
+    ): Promise<Map<string, DiscountUsage>> {
+        if (ids.length === 0) return new Map();
+        const sums = await prisma.discountRedemption.groupBy({
+            by: ["discountId", "currency"],
+            where: { organizationId, discountId: { in: ids } },
+            _sum: { amount: true },
+        });
+        const out = new Map<string, DiscountUsage>();
+        for (const s of sums) {
+            const was = out.get(s.discountId);
+            // shortcut: a business sells in one currency; a code used in
+            // two adds them under the first, until a business sells in two.
+            const amount = new Prisma.Decimal(was?.gaveOff ?? 0).plus(
+                s._sum.amount ?? 0,
+            );
+            out.set(s.discountId, {
+                gaveOff: toMoneyString(amount),
+                currency: was?.currency ?? s.currency,
+            });
+        }
+        return out;
     }
 
     async get(organizationId: string, id: string): Promise<DiscountView> {

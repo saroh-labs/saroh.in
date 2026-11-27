@@ -569,9 +569,14 @@ export function payText(b: DetailBooking): string {
         case "PAID":
             return "Paid";
         case "DESK":
-            return "Pays at the desk";
+            // Ended unpaid (DEC-273): owed, as Bookings says it.
+            return b.payWord === "AWAITING_PAYMENT"
+                ? BOOKING_WORDS.awaitingPayment
+                : "Pays at the desk";
         default:
-            return "";
+            return b.payWord === "AWAITING_PAYMENT"
+                ? BOOKING_WORDS.awaitingPayment
+                : "";
     }
 }
 

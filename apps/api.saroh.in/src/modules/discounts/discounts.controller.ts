@@ -15,7 +15,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { DiscountsService } from "./discounts.service";
 import { DiscountInputDto } from "./dto";
 
@@ -46,7 +46,12 @@ export class DiscountsController {
         @Param("discountId") id: string,
     ) {
         authorize(ctx, "discount:read");
-        return this.discounts.get(ctx.organizationId, id);
+        // What the orders came to is order money: `order:read`'s alone.
+        return this.discounts.getWithUsage(
+            ctx.organizationId,
+            id,
+            allows(ctx, "order:read"),
+        );
     }
 
     @Post()

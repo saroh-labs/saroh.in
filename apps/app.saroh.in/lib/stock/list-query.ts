@@ -89,7 +89,10 @@ export function readStockPages(
  */
 export interface StockAddress extends DateRange {
     tab: StockTab;
-    /** Levels: "all", "needs" or a storefront's id. */
+    /**
+     * Levels: "all", "needs" or a storefront's id; "" for none chosen,
+     * which opens on what needs you while anything does (DEC-266).
+     */
     show: string;
     /** Levels: the search. */
     q: string;
@@ -145,7 +148,7 @@ export function stockHref(at: StockAddress, change: StockChange = {}): string {
 
     const next: Record<string, string | null | undefined> = {
         tab: at.tab === "levels" ? undefined : at.tab,
-        show: at.show === "all" ? undefined : at.show,
+        show: at.show || undefined,
         q: at.q || undefined,
         kind: at.kind === "all" ? undefined : at.kind,
         store: at.store === "all" ? undefined : at.store,

@@ -159,12 +159,45 @@ test.describe("Stock screen", () => {
         }
     });
 
+    test("opens on what needs you while anything does, and Everything is a press away (DEC-266)", async ({
+        page,
+    }) => {
+        // Read only, on Rye: nothing is changed.
+        await signIn(page, rye.member);
+        await page.goto(`/open/${rye.org}`);
+        const res = await page.request.get(
+            `${urls.API_URL}/organizations/${rye.org}/stock?needs=auto&sort=need&page=1&size=50`,
+            { headers: { "x-organization-id": rye.org, origin: urls.APP_URL } },
+        );
+        expect(res.ok()).toBe(true);
+        const levels = (await res.json()) as {
+            needsYou: number;
+            needsShown: boolean;
+        };
+        expect(levels.needsShown).toBe(levels.needsYou > 0);
+
+        await page.goto("/commerce/stock");
+        const toggle = page
+            .getByRole("button", { name: /^Needs you/ })
+            .filter({ visible: true });
+        await expect(toggle).toHaveAttribute(
+            "aria-pressed",
+            String(levels.needsShown),
+        );
+        if (!levels.needsShown) return;
+        await toggle.click();
+        await expect(page).toHaveURL(/show=all/);
+        await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    });
+
     test("a role that can't count sees no Count stock", async ({ page }) => {
         // Rye's counter (a Member) reads the catalogue, so reads stock, but
         // can't change it. Read-only: nothing is saved on the demo store.
         await signIn(page, rye.member);
         await page.goto(`/open/${rye.org}`);
-        await page.goto("/commerce/stock");
+        // Everything: with none chosen the list opens on what needs you
+        // (DEC-266).
+        await page.goto("/commerce/stock?show=all");
         await expect(
             page.getByRole("heading", { name: "Stock", level: 1 }),
         ).toBeVisible();
@@ -207,7 +240,7 @@ test.describe("Stock screen", () => {
                         ),
                 );
 
-        await page.goto("/commerce/stock");
+        await page.goto("/commerce/stock?show=all");
         const levels = page.getByRole("list", { name: "Stock levels" });
         await expect(levels).toBeVisible();
         // A beans size Online sells: its Online line is on screen, whole.

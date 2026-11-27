@@ -57,7 +57,9 @@ export const productsListRead = defineRead<CataloguePage>()({
                 .optional(),
             q: searchText,
             storefront: id,
-            status: z.enum(["PUBLISHED", "DRAFT", "ARCHIVED"]).optional(),
+            status: z
+                .enum(["PUBLISHED", "DRAFT", "ARCHIVED", "CURRENT"])
+                .optional(),
             category: id,
             option: id,
             collection: id,
