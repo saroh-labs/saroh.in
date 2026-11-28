@@ -196,6 +196,24 @@ export type BookingDetailShown =
           pay: Pick<BookingMoney["pay"], "word" | "how">;
       });
 
+/**
+ * A refund line as a viewer who reads no money sees it: what happened
+ * ("Refunded to how they paid"), never how much or the refund's id.
+ */
+function withoutRefundMoney<E extends { type: string; data: unknown }>(
+    event: E,
+): E {
+    if (event.type !== "REFUNDED" && event.type !== "REFUND_FAILED") {
+        return event;
+    }
+    const data = event.data as { outcome?: unknown } | null;
+    return {
+        ...event,
+        data:
+            data && typeof data === "object" ? { outcome: data.outcome } : null,
+    };
+}
+
 /** {@link BookingDetailShown} of a booking, for this viewer. */
 export function detailFor(
     ctx: OrganizationContext,
@@ -205,6 +223,7 @@ export function detailFor(
     const { snapshot: _terms, money, ...shown } = view;
     return {
         ...shown,
+        events: shown.events.map(withoutRefundMoney),
         service: { ...shown.service, priceCents: null, gstRate: null },
         pay: payWords(money.pay),
     };

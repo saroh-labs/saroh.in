@@ -43,6 +43,7 @@ import {
     installTelemetry,
 } from "./common/observability/posthog";
 import { BodyDepthPipe } from "./common/pipes/body-depth.pipe";
+import { NulPipe } from "./common/pipes/nul.pipe";
 import { robotsNoindex } from "./common/robots-header";
 import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
@@ -183,6 +184,8 @@ async function bootstrap() {
     app.useGlobalPipes(
         // A body nested too deeply is a 400 before anything walks it.
         new BodyDepthPipe(),
+        // A NUL character anywhere is a 400, never a failed query (I-1).
+        new NulPipe(),
         // Shared with DTO specs, so what a test accepts is what the API accepts
         // (#286). Read common/validation.ts on implicit boolean conversion.
         new ValidationPipe(validationPipeOptions),

@@ -752,6 +752,17 @@ describe("PaymentsService.getWebhookSecret", () => {
         ).resolves.toBeNull();
     });
 
+    it("refuses (null, so a 401) a secret sealed under another key, never throws a 500 (B-01)", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue({
+            ...connectedRow({ keyId: "k", keySecret: "s" }),
+            credentialsAuthTag: Buffer.alloc(16).toString("base64"),
+        });
+        await expect(
+            service.getWebhookSecret("org_1", "RAZORPAY"),
+        ).resolves.toBeNull();
+    });
+
     it("verifies Cashfree with its key secret when no webhook secret was saved (DEC-063)", async () => {
         // Cashfree signs webhooks with the client secret, so a connection
         // without a separate one must still verify — it used to refuse

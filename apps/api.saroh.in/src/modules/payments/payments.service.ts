@@ -828,14 +828,27 @@ export class PaymentsService {
             },
         });
         if (!row) return null;
-        const json = decryptSecret({
-            ciphertext: row.encryptedCredentials,
-            iv: row.credentialsIv,
-            authTag: row.credentialsAuthTag,
-        });
+        let parsed: SealedCredentials;
+        try {
+            const json = decryptSecret({
+                ciphertext: row.encryptedCredentials,
+                iv: row.credentialsIv,
+                authTag: row.credentialsAuthTag,
+            });
+            parsed = JSON.parse(json) as SealedCredentials;
+        } catch {
+            // Sealed under a key this API no longer holds (a rotation gone
+            // wrong): refuse the delivery as unverifiable (401), never a 500
+            // anyone can provoke, and say so loudly, since every delivery for
+            // this business now fails until the key is put back (pentest
+            // 28 Nov 2026, B-01).
+            this.logger.error(
+                `webhook_secret_unreadable org=${organizationId} provider=${name}`,
+            );
+            return null;
+        }
         // Razorpay's own webhook secret; Cashfree's key secret when none
         // was saved, since Cashfree signs with it (DEC-063).
-        const parsed = JSON.parse(json) as SealedCredentials;
         return webhookSecretFrom(name, parsed);
     }
 

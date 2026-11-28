@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 
 import { CollectionsService } from "../collections/collections.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { STOREFRONT_TEAM_ROLE_KEY } from "../organizations/storefront-team-role";
 import { readLevels } from "../stock/levels-read";
 import type { StockReader } from "../stock/stock-access";
 import { StoresService } from "../stores/stores.service";
@@ -440,6 +441,22 @@ describe("Catalogue page (DB)", () => {
         expect(shown.sold?.[bun]).toEqual({ units: 5, amount: "600.00" });
         expect(shown.sold?.[rye]).toBeUndefined();
         expect((await page({})).sold).toBeUndefined();
+        // A location's team counts only its storefronts' orders (DEC-074):
+        // someone on no storefront sees no sales, never every location's.
+        const team = await cataloguePage(
+            products,
+            orgId,
+            { limit: 50 },
+            {
+                sold: true,
+                who: {
+                    roleKey: STOREFRONT_TEAM_ROLE_KEY,
+                    userId: "on-no-storefront",
+                },
+            },
+            now,
+        );
+        expect(team.sold?.[bun]).toBeUndefined();
     });
 
     it("never drops a product when the one a page ended on has left the view", async () => {

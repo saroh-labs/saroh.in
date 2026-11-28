@@ -16,10 +16,12 @@ import {
     Min,
 } from "class-validator";
 
+import type { OrganizationContext } from "../../common/types/organization-context";
 import { pausedByCut } from "../billing/over-limit";
 import { overLimit } from "../billing/over-limit.service";
 import { categoryTree } from "../collections/collections.service";
 import { realOrderSql } from "../orders/open-orders";
+import { orderLocationSql } from "../orders/order-location";
 import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { businessTracksStock, COUNTING_ROWS } from "../stock/tracking";
 import type { CatalogueNeed } from "./catalogue-needs";
@@ -308,7 +310,11 @@ export async function cataloguePage(
     organizationId: string,
     query: CatalogueQueryDto,
     /** `order:read`: the page's sales in the last 30 days. */
-    caller: { sold: boolean } = { sold: false },
+    caller: {
+        sold: boolean;
+        /** Who asks: a location's team counts only its storefronts' orders (DEC-074). */
+        who?: Pick<OrganizationContext, "roleKey" | "userId">;
+    } = { sold: false },
     now: Date = new Date(),
 ): Promise<CataloguePageDto> {
     const { storefront } = query;
@@ -493,6 +499,7 @@ export async function cataloguePage(
               organizationId,
               items.map((i) => i.id),
               now,
+              caller.who,
           )
         : undefined;
     return {
@@ -524,6 +531,7 @@ export async function soldLately(
     organizationId: string,
     productIds: string[],
     now: Date,
+    who?: Pick<OrganizationContext, "roleKey" | "userId">,
 ): Promise<Record<string, { units: number; amount: string }>> {
     if (productIds.length === 0) return {};
     const since = new Date(now.getTime() - SOLD_DAYS * 24 * 60 * 60 * 1000);
@@ -537,7 +545,7 @@ export async function soldLately(
             AND oi."productId" = ANY(${productIds})
             AND o."createdAt" >= ${since.toISOString().replace("Z", "")}::timestamp
             AND o.status::text <> 'CANCELLED'
-            AND ${realOrderSql()}
+            AND ${realOrderSql()}${orderLocationSql(who, "o")}
         GROUP BY oi."productId"`);
     return Object.fromEntries(
         rows.map((r) => [r.productId, { units: r.units, amount: r.amount }]),
