@@ -10,10 +10,13 @@ export const PRICING_COPY = {
     title: "Start free. Move up when you need more.",
     intro: "Put your site up for nothing, and move to a paid plan when you need more. Each plan below says what it includes.",
     closer: "Start your site for free.",
-    /** Below the plan cards, after Vercel's usage table (owner, 14 Oct 2026). */
-    usageTitle: "Usage beyond your plan",
+    /** Below the plan cards, after Vercel's usage table (owner, 14 Oct 2026; retitled by the 22 Nov boards). */
+    usageTitle: "Past your allowance",
     usageLead:
         "What each plan includes, and what more costs each billing period.",
+    /** Under the cards (owner, 20 Nov 2026: an email, no call). */
+    talk: "A chain of places, or something set up for you? We'll price it with you.",
+    faqTitle: "Questions about paying",
 } as const;
 
 /** The search-result line: what each plan is for, never what it costs. */

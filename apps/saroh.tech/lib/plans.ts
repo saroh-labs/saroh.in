@@ -308,6 +308,7 @@ export function pricingModel(
         plans: model.views["month-excl"].plans.map(words),
         usage: null,
         footnote: limits ? "" : PRICING.footnote,
+        notice: null,
     };
     return {
         ...model,

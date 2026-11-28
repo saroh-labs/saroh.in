@@ -4,9 +4,14 @@ import { PricingPage } from "@/components/pricing/pricing-page";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { PRICING_COPY, PRICING_DESCRIPTION } from "@/content/pricing";
 import { readLivePricingVersion } from "@/lib/pricing";
+import { pricingQuestions } from "@/lib/pricing-faq";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { pageMetadata, pageTitle } from "@/lib/seo";
-import { breadcrumbLd, softwareApplicationLd } from "@/lib/structured-data";
+import {
+    breadcrumbLd,
+    faqPageLd,
+    softwareApplicationLd,
+} from "@/lib/structured-data";
 
 /**
  * `/pricing` (plans catalogue U24): the Pricing design, drawn from the
@@ -28,6 +33,7 @@ export default async function PricingRoute() {
     const model = read
         ? pricingPageModel(read.catalog, read.offers)
         : placeholderPricingModel();
+    const questions = read ? pricingQuestions(read.catalog, read.offers) : [];
     return (
         <>
             <JsonLd
@@ -37,9 +43,10 @@ export default async function PricingRoute() {
                         { name: "Home", path: "/" },
                         { name: "Pricing", path: "/pricing" },
                     ]),
+                    ...(questions.length ? [faqPageLd(questions)] : []),
                 ]}
             />
-            <PricingPage model={model} />
+            <PricingPage model={model} questions={questions} />
         </>
     );
 }

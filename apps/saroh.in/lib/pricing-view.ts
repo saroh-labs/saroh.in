@@ -1,5 +1,6 @@
 import type { Catalog } from "@saroh/pricing-catalog";
 import {
+    autopayCharges,
     formatCount,
     formatInr,
     GST_PERCENT,
@@ -23,6 +24,7 @@ import {
     PRICE_PLACEHOLDER,
 } from "@/content/types";
 import { featuresOff } from "./feature-switches";
+import { formatDay } from "./format/day";
 
 export { viewKey } from "@saroh/marketing/pricing-model";
 export type {
@@ -48,7 +50,18 @@ export const PRICING_SITE: PricingSite = {
         footnoteIncl: `Prices include ${GST_PERCENT}% GST.`,
         noteExcl: `Prices are before GST. ${GST_PERCENT}% GST is added to your bill.`,
         noteIncl: `Prices include ${GST_PERCENT}% GST.`,
+        toggleOn: `With ${GST_PERCENT}% GST`,
     },
+    // The offer's last day in India (an instant, read as India's date).
+    date: (iso) =>
+        formatDay(
+            new Date(Date.parse(iso) + 330 * 60_000).toISOString().slice(0, 10),
+            { month: "short", year: true },
+        ),
+    paidNote: (catalog, yearly) =>
+        yearly
+            ? "One payment for the year, no autopay. Cancel or move down any time, and your records stay."
+            : `Approve autopay once. It covers ${autopayCharges(catalog)} monthly charges. Cancel or move down any time, and your records stay.`,
 };
 
 /** The pricing page for a catalogue, in this site's money and words. */

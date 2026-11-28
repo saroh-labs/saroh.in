@@ -28,6 +28,7 @@ export function PlanTable<L extends LineRow>({
     cell,
     headClassName,
     cellClassName,
+    phoneShows,
 }: {
     /** The region's name, for a screen reader. */
     label: string;
@@ -43,8 +44,15 @@ export function PlanTable<L extends LineRow>({
         cell: L["cells"][number],
         row: L,
     ) => string | false | undefined;
+    /**
+     * On a phone, only these plans' columns (by index): the rest stay in
+     * the page, hidden below 760px, and the table fits the screen.
+     */
+    phoneShows?: readonly number[];
 }) {
     const tint = (featured: boolean) => (featured ? "bg-mk-tint" : undefined);
+    const off = (j: number) =>
+        phoneShows && !phoneShows.includes(j) && "max-[759px]:hidden";
     return (
         <div
             role="region"
@@ -52,28 +60,54 @@ export function PlanTable<L extends LineRow>({
             tabIndex={0}
             className={`relative min-w-0 overflow-x-auto rounded-[18px] border border-border bg-card ${ring()}`}
         >
-            <table className="w-full min-w-[680px] table-fixed border-collapse text-[15px]">
+            <table
+                className={cn(
+                    "w-full table-fixed border-collapse text-[15px] max-[759px]:text-[14.5px]",
+                    phoneShows ? "min-[760px]:min-w-[680px]" : "min-w-[680px]",
+                )}
+            >
                 {caption ? (
                     <caption className="sr-only">{caption}</caption>
                 ) : null}
                 <thead>
                     <tr className="text-left">
-                        <th scope="col" className="w-[34%] px-[22px] py-[18px]">
+                        <th
+                            scope="col"
+                            className="w-[40%] px-3.5 py-[18px] min-[760px]:w-[30%] min-[760px]:px-[22px]"
+                        >
                             <span className="sr-only">{corner}</span>
                         </th>
-                        {plans.map((p) => (
+                        {plans.map((p, j) => (
                             <th
                                 key={p.id}
                                 scope="col"
                                 className={cn(
-                                    "px-4 py-[18px] text-base font-semibold",
+                                    "px-2.5 py-[18px] align-top text-base font-semibold min-[760px]:px-4",
                                     tint(p.featured),
+                                    off(j),
                                 )}
                             >
                                 {p.name}
                                 <div className="text-mk-note font-medium text-muted-foreground">
                                     {p.price}
+                                    {p.was ? (
+                                        <>
+                                            {" "}
+                                            <s>
+                                                <span className="sr-only">
+                                                    regular price{" "}
+                                                </span>
+                                                {p.was}
+                                            </s>
+                                        </>
+                                    ) : null}
+                                    {p.per ? ` ${p.per}` : null}
                                 </div>
+                                {p.then ? (
+                                    <div className="text-[13px] font-semibold text-brand-700">
+                                        {p.then}
+                                    </div>
+                                ) : null}
                             </th>
                         ))}
                     </tr>
@@ -84,14 +118,21 @@ export function PlanTable<L extends LineRow>({
                             <tr key={`g-${r.label}`}>
                                 <th
                                     scope="rowgroup"
-                                    colSpan={plans.length + 1}
+                                    colSpan={phoneShows ? 3 : plans.length + 1}
                                     className={eyebrowClasses({
                                         className:
-                                            "border-t border-mk-line-soft px-[22px] pb-2 pt-[22px] text-left",
+                                            "border-t border-mk-line-soft px-3.5 pb-2 pt-5 text-left min-[760px]:px-[22px] min-[760px]:pt-[26px]",
                                     })}
                                 >
                                     {r.label}
                                 </th>
+                                {/* The desk's other columns; a phone's row spans its two plans. */}
+                                {phoneShows && plans.length > 2 ? (
+                                    <td
+                                        colSpan={plans.length - 2}
+                                        className="border-t border-mk-line-soft max-[759px]:hidden"
+                                    />
+                                ) : null}
                             </tr>
                         ) : (
                             <tr
@@ -101,7 +142,7 @@ export function PlanTable<L extends LineRow>({
                                 <th
                                     scope="row"
                                     className={cn(
-                                        "px-[22px] py-3.5 text-left font-medium text-foreground",
+                                        "px-3.5 py-3 text-left font-medium text-foreground min-[760px]:px-[22px] min-[760px]:py-3.5",
                                         headClassName,
                                     )}
                                 >
@@ -111,9 +152,10 @@ export function PlanTable<L extends LineRow>({
                                     <td
                                         key={plans[j]?.id ?? j}
                                         className={cn(
-                                            "px-4 py-3.5 align-top text-mk-copy",
+                                            "px-2.5 py-3 align-top text-mk-copy [overflow-wrap:anywhere] min-[760px]:px-4 min-[760px]:py-3.5",
                                             tint(plans[j]?.featured ?? false),
                                             cellClassName?.(c, r),
+                                            off(j),
                                         )}
                                     >
                                         {cell(c, r)}

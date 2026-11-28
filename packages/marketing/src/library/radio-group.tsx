@@ -1,10 +1,9 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
-import { useId, useRef } from "react";
+import { useId } from "react";
 
 import { ChoiceChip } from "../fields/choice-chip";
-import { nextIndex } from "../roving";
+import { useRovingChoice } from "../roving";
 import type { LibraryControl } from "./types";
 
 /**
@@ -22,20 +21,14 @@ export function RadioGroup({
     onChange: (value: string) => void;
 }) {
     const labelId = useId();
-    const refs = useRef<(HTMLButtonElement | null)[]>([]);
     const options = control.options;
+    const { refs, onKeyDown } = useRovingChoice(options.length, (i) =>
+        onChange(options[i].value),
+    );
     const chosen = Math.max(
         0,
         options.findIndex((o) => o.value === value),
     );
-
-    const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
-        const next = nextIndex(e.key, i, options.length);
-        if (next === null) return;
-        e.preventDefault();
-        onChange(options[next].value);
-        refs.current[next]?.focus();
-    };
 
     return (
         <div className="grid min-w-0 gap-2">

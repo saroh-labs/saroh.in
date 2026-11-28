@@ -906,6 +906,10 @@ export async function automaticOffers(
                 discountPaise: row.discountPaise,
                 months: row.months,
                 ...(row.percentOff ? { percentOff: row.percentOff } : {}),
+                // The page says until when a visitor can still start on it.
+                ...(row.expiresAt
+                    ? { endsAt: row.expiresAt.toISOString() }
+                    : {}),
             });
         }
     }

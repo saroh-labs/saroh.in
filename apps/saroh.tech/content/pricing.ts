@@ -43,6 +43,13 @@ export const PRICING = {
     usageTitle: "What each plan includes",
     usageLead:
         "How much each plan includes, and what happens when you reach it.",
+    /** Under the cards (owner, 20 Nov 2026: an email, no call). */
+    talk: "A chain of places, or something set up for you? Tell us what you need.",
+    faqTitle: "Questions about paying",
+    freeFaq: {
+        q: "Is Free really free?",
+        a: "Yes. Free has no end date and needs no card.",
+    },
     /** What a screen reader hears in a table cell with no catalogue. */
     priceNote: "Prices aren't available right now",
     usageNotes: [

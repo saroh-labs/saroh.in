@@ -22,13 +22,13 @@ describe("pricingMarkdown", () => {
         expect(b).toBeGreaterThan(a);
         expect(c).toBeGreaterThan(b);
         expect(md).toContain(
-            `- Monthly: **${formatInr(0)}** a month (Free for good)`,
+            `- Monthly: **${formatInr(0)}** a month (Free with no end date. No card needed.)`,
         );
         expect(md).toContain(
-            `- Monthly: **${formatInr(11_100)}** a month (+ GST)`,
+            `- Monthly: **${formatInr(11_100)}** a month + GST`,
         );
         expect(md).toContain(
-            `- Monthly: **${formatInr(22_200)}** a month (+ GST)`,
+            `- Monthly: **${formatInr(22_200)}** a month + GST`,
         );
         // Plan A's card lines, in the catalogue's order.
         const planA = md.slice(a, b);

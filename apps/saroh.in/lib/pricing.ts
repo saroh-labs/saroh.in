@@ -45,10 +45,8 @@ export function parseOffers(raw: unknown): PlanOffer[] {
     if (!Array.isArray(raw)) return [];
     return raw.flatMap((o: unknown) => {
         if (!o || typeof o !== "object") return [];
-        const { planId, discountPaise, months, percentOff } = o as Record<
-            string,
-            unknown
-        >;
+        const { planId, discountPaise, months, percentOff, endsAt } =
+            o as Record<string, unknown>;
         if (
             typeof planId !== "string" ||
             !whole(discountPaise) ||
@@ -56,10 +54,14 @@ export function parseOffers(raw: unknown): PlanOffer[] {
         ) {
             return [];
         }
+        const ends =
+            typeof endsAt === "string" && !Number.isNaN(Date.parse(endsAt))
+                ? { endsAt }
+                : {};
         return [
             whole(percentOff)
-                ? { planId, discountPaise, months, percentOff }
-                : { planId, discountPaise, months },
+                ? { planId, discountPaise, months, percentOff, ...ends }
+                : { planId, discountPaise, months, ...ends },
         ];
     });
 }

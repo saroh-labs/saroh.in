@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { formatInr, withGstPaise } from "@saroh/pricing-catalog";
+import { formatInr, GST_PERCENT, withGstPaise } from "@saroh/pricing-catalog";
 import {
     cleanup,
     fireEvent,
@@ -88,19 +88,19 @@ describe("PricingPlans", () => {
         ).toBe("true");
     });
 
-    it("Show prices with GST adds it, in the cards and the table", () => {
+    it("With GST adds it, in the cards and the table", () => {
         const { container } = render(
             <PricingPlans model={pricingPageModel(fakeCatalog())} />,
         );
         fireEvent.click(
-            screen.getByRole("checkbox", { name: "Show prices with GST" }),
+            screen.getByRole("radio", { name: `With ${GST_PERCENT}% GST` }),
         );
         const withGst = formatInr(withGstPaise(11_100));
         expect(
             card(container, "grow").getByText(withGst, { exact: false }),
         ).toBeTruthy();
         const table = screen.getByRole("table");
-        expect(within(table).getByText(withGst)).toBeTruthy();
+        expect(within(table).getByText(withGst, { exact: false })).toBeTruthy();
         expect(gtag).toHaveBeenCalledWith("event", "pricing_toggle", {
             control: "gst",
             value: true,
@@ -132,7 +132,9 @@ describe("PricingPlans", () => {
                 )}
             />,
         );
-        expect(screen.queryByRole("radiogroup")).toBeNull();
+        expect(
+            screen.queryByRole("radiogroup", { name: "Billing" }),
+        ).toBeNull();
     });
 
     it("usage beyond the plan: a table with the plans as columns, its notes, the GST switch", () => {
@@ -154,18 +156,18 @@ describe("PricingPlans", () => {
         if (!section) throw new Error("no usage section");
         const s = within(section);
         expect(
-            s.getByRole("heading", { name: "Usage beyond your plan" }),
+            s.getByRole("heading", { name: "Past your allowance" }),
         ).toBeTruthy();
-        const table = s.getByRole("table", { name: "Usage beyond your plan" });
+        const table = s.getByRole("table", { name: "Past your allowance" });
         expect(
             within(table)
                 .getAllByRole("columnheader")
                 .map((h) => h.textContent),
         ).toEqual([
             "What you use",
-            `Plan A${formatInr(0)}`,
-            `Plan B${formatInr(11_100)}`,
-            `Plan C${formatInr(22_200)}`,
+            `Plan A${formatInr(0)} a month`,
+            `Plan B${formatInr(11_100)} a month + GST`,
+            `Plan C${formatInr(22_200)} a month + GST`,
         ]);
         expect(
             within(table).getByRole("columnheader", { name: /Plan B/ })
@@ -185,7 +187,9 @@ describe("PricingPlans", () => {
         expect(s.getAllByRole("listitem").at(-1)?.textContent).toMatch(
             /^Prices are before GST/,
         );
-        fireEvent.click(screen.getByRole("checkbox"));
+        fireEvent.click(
+            screen.getByRole("radio", { name: `With ${GST_PERCENT}% GST` }),
+        );
         expect(
             within(products).getByText(
                 `3 included, then ${formatInr(withGstPaise(11_100))} per 3`,
@@ -207,7 +211,7 @@ describe("PricingPlans", () => {
         const { container } = render(
             <PricingPlans model={placeholderPricingModel()} />,
         );
-        expect(screen.queryByRole("checkbox")).toBeNull();
+        expect(screen.queryByRole("radio")).toBeNull();
         expect(screen.queryByRole("radiogroup")).toBeNull();
         expect(container.textContent).not.toMatch(NO_PRICE);
         expect(card(container, "grow").getByRole("link").textContent).toBe(
@@ -234,7 +238,7 @@ describe("PricingPlans with what changed marked", () => {
         );
         const grow = card(container, "grow");
         expect(grow.getByText("Many items").textContent).toBe(
-            "✓Many items (changed)",
+            "Many items (changed)",
         );
         expect(card(container, "free").queryByText(/\(changed\)/)).toBeNull();
         const table = screen.getByRole("region", {

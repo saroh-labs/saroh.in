@@ -1,24 +1,25 @@
 "use client";
 
-import { ring } from "@saroh/marketing/ring";
+import { SegmentToggle } from "@saroh/marketing/billing-toggle";
 
-/** The Pricing design's "Show prices with GST" box; its default comes from the catalogue. */
+/** The Pricing design's Before GST / With GST switch; its default comes from the catalogue. */
 export function GstToggle({
     checked,
+    on,
     onChange,
 }: {
     checked: boolean;
+    /** The "with" side's words, from the model. */
+    on: string;
     onChange: (checked: boolean) => void;
 }) {
     return (
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-mk-copy">
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={(e) => onChange(e.target.checked)}
-                className={`m-0 h-4 w-4 cursor-pointer accent-foreground ${ring()}`}
-            />
-            Show prices with GST
-        </label>
+        <SegmentToggle
+            label="Show prices"
+            value={checked}
+            off="Before GST"
+            on={on}
+            onChange={onChange}
+        />
     );
 }

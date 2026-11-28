@@ -75,7 +75,7 @@ describe("pricingPageModel", () => {
         expect(model.tax).toEqual({ toggle: true, initial: true });
         const incl = model.views["month-incl"];
         expect(incl.plans[1]?.price).toBe("XX22200");
-        expect(incl.plans[1]?.sub).toBe("with LEVY");
+        expect(incl.plans[1]?.per).toBe("a month with LEVY");
         expect(incl.footnote).toBe("Billed monthly. Foot with.");
         expect(incl.usage?.notes.at(-1)).toBe("Note with.");
         const excl = model.views["year-excl"];
@@ -231,5 +231,64 @@ describe("a plan's yearly offer price (DEC-239)", () => {
         expect(plain.views["year-excl"].footnote).toBe(
             `Billed yearly, pay for 10 months and get 12. ${NO_REFUNDS}`,
         );
+    });
+});
+
+describe("the launch offer leads the card (the 22 Nov boards)", () => {
+    const pct = [
+        {
+            planId: "b",
+            discountPaise: 300,
+            months: 3,
+            percentOff: 7,
+            endsAt: "2030-01-01T00:00:00.000Z",
+        },
+    ];
+    const site: PricingSite = {
+        ...NO_TAX,
+        date: () => "THE DAY",
+        paidNote: (_c, yearly) => (yearly ? "YEAR NOTE" : "MONTH NOTE"),
+    };
+
+    it("leads with the offer price, the regular one struck, and says what comes after", () => {
+        const m = pricingPageModel(catalog(), site, [], pct);
+        const card = m.views["month-excl"].plans[1];
+        expect(card).toMatchObject({
+            price: "XX10800",
+            was: "XX11100",
+            tag: "Launch offer",
+            then: "then XX11100 a month",
+            note: "MONTH NOTE",
+        });
+        expect(m.views["month-excl"].plans[0].note).toBeUndefined();
+        expect(m.views["month-excl"].notice).toEqual({
+            title: "Launch offer · ends THE DAY",
+            body: "7% off every paid plan, your first 3 months. No code.",
+        });
+        // A year keeps its price and says the offer as a line.
+        expect(m.views["year-excl"].plans[1]).toMatchObject({
+            price: "XX111000",
+            was: undefined,
+            note: "YEAR NOTE",
+        });
+        expect(m.views["year-excl"].notice).toBeNull();
+    });
+
+    it("no offer, no tag, no notice", () => {
+        const m = pricingPageModel(catalog(), site);
+        expect(m.views["month-excl"].plans[1].tag).toBeUndefined();
+        expect(m.views["month-excl"].plans[1].then).toBeUndefined();
+        expect(m.views["month-excl"].notice).toBeNull();
+    });
+
+    it("a yearly offer is tagged and says its saving against paying monthly", () => {
+        const c = catalog();
+        c.plans[1].yearlyOfferPaise = 66_600;
+        const y = pricingPageModel(c, site, [], pct).views["year-excl"];
+        expect(y.plans[1]).toMatchObject({
+            tag: "Yearly offer",
+            then: "Save XX66600 (50%) against paying monthly",
+        });
+        expect(y.notice?.title).toBe("Yearly offer · Plan B");
     });
 });

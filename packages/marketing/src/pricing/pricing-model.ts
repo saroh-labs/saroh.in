@@ -1,3 +1,5 @@
+import type { Catalog } from "@saroh/pricing-catalog";
+
 /**
  * The pricing page's model: the shapes `pricing-view.ts` fills on the server
  * and the page's client part reads. Kept apart from the builder so the browser
@@ -25,8 +27,17 @@ export interface PlanCardView {
     was?: string;
     /** "a month", "a year, paid once"; empty beside the placeholder. */
     per: string;
-    /** "Free for good", or what the site says about tax and the yearly sum. */
+    /** Free's line, or what the site says about tax and the yearly sum. */
     sub: string;
+    /** "Launch offer" or "Yearly offer" beside the name, when one shows. */
+    tag?: string;
+    /**
+     * After the offer: "then ‹regular› a month" under an offer price, or a
+     * yearly offer's saving against paying monthly.
+     */
+    then?: string;
+    /** Under a paid card's button: how paying works (the site's words). */
+    note?: string;
     /** What the CTA builder needs (KTD-16). */
     cta: {
         plan: string;
@@ -63,6 +74,8 @@ export interface PlanOffer {
     months: number;
     /** A percent coupon's whole percent; absent: an amount off. */
     percentOff?: number;
+    /** When the offer stops being given (ISO); absent: no end set. */
+    endsAt?: string;
 }
 
 /** A usage cell for a plan that leaves the row out: drawn as a dash. */
@@ -92,6 +105,8 @@ export type CompareRow =
           kind: "line";
           label: string;
           soon: boolean;
+          /** The catalogue row's one-line description. */
+          what?: string;
           cells: (({ yes: true; t: string } | { yes: false }) & {
               /** The draft preview's "was …", when this cell changed. */
               was?: string;
@@ -105,6 +120,8 @@ export interface PricingView {
     /** "Usage beyond your plan", or null when nothing can be added. */
     usage: UsageView | null;
     footnote: string;
+    /** The note at the controls' end: the launch or yearly offer, or null. */
+    notice: { title: string; body: string } | null;
 }
 
 export interface PricingPageModel {
@@ -117,7 +134,7 @@ export interface PricingPageModel {
         label: string;
     } | null;
     /** The site's own tax toggle, if it has one, and whether it starts ticked. */
-    tax: { toggle: boolean; initial: boolean };
+    tax: { toggle: boolean; initial: boolean; on?: string };
     views: Record<ViewKey, PricingView>;
     rows: CompareRow[];
 }
@@ -146,6 +163,8 @@ export interface PricingTax {
     /** The sentence the cards' footnote ends with. */
     footnoteExcl: string;
     footnoteIncl: string;
+    /** The tax switch's "with" side ("With N% GST"). */
+    toggleOn?: string;
     /** The last note under the usage table. */
     noteExcl: string;
     noteIncl: string;
@@ -156,6 +175,10 @@ export interface PricingSite {
     money: (minor: number) => string;
     count: (n: number) => string;
     tax: PricingTax | null;
+    /** A date in the site's words and time zone ("20 Feb 2027"). */
+    date?: (iso: string) => string;
+    /** Under a paid card's button: how paying monthly or yearly works. */
+    paidNote?: (catalog: Catalog, yearly: boolean) => string;
 }
 
 /** The page with no catalogue: the plans a site names, and its stand-in words. */

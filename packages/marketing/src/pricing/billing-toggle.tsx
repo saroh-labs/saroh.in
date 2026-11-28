@@ -1,18 +1,13 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
-import { useRef } from "react";
-
 import { cn } from "../cn";
 import { ring } from "../ring";
-import { nextIndex } from "../roving";
+import { useRovingChoice } from "../roving";
 
 /**
  * The Pricing design's Monthly / "Yearly · N months free" (or "save up
- * to X%" with a yearly offer, DEC-239) switch: a
- * radiogroup on white, the chosen side in Ink. Shown only when the
- * catalogue offers yearly billing. One tab stop; the arrow keys move
- * between the two and choose as they go (WAI-ARIA radio group).
+ * to X%" with a yearly offer, DEC-239) switch. Shown only when the
+ * catalogue offers yearly billing.
  */
 export function BillingToggle({
     yearly,
@@ -24,28 +19,52 @@ export function BillingToggle({
     label: string;
     onChange: (yearly: boolean) => void;
 }) {
-    const refs = useRef<(HTMLButtonElement | null)[]>([]);
-    const options = [
-        { yearly: false, label: "Monthly" },
-        { yearly: true, label },
-    ];
+    return (
+        <SegmentToggle
+            label="Billing"
+            value={yearly}
+            off="Monthly"
+            on={label}
+            onChange={onChange}
+        />
+    );
+}
 
-    const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
-        const next = nextIndex(e.key, i, options.length);
-        if (next === null) return;
-        e.preventDefault();
-        onChange(options[next].yearly);
-        refs.current[next]?.focus();
-    };
+/**
+ * Two choices on white, the chosen one in Ink (the Pricing boards'
+ * segment): a radiogroup with one tab stop, the arrow keys moving between
+ * the two and choosing as they go (WAI-ARIA radio group).
+ */
+export function SegmentToggle({
+    label,
+    value,
+    off,
+    on,
+    onChange,
+}: {
+    /** The group's name, for a screen reader. */
+    label: string;
+    value: boolean;
+    off: string;
+    on: string;
+    onChange: (value: boolean) => void;
+}) {
+    const options = [
+        { value: false, label: off },
+        { value: true, label: on },
+    ];
+    const { refs, onKeyDown } = useRovingChoice(options.length, (i) =>
+        onChange(options[i].value),
+    );
 
     return (
         <div
             role="radiogroup"
-            aria-label="Billing"
+            aria-label={label}
             className="flex gap-0.5 rounded-mk-btn border border-border bg-card p-1"
         >
             {options.map((o, i) => {
-                const on = o.yearly === yearly;
+                const chosen = o.value === value;
                 return (
                     <button
                         key={o.label}
@@ -54,13 +73,13 @@ export function BillingToggle({
                         }}
                         type="button"
                         role="radio"
-                        aria-checked={on}
-                        tabIndex={on ? 0 : -1}
-                        onClick={() => onChange(o.yearly)}
+                        aria-checked={chosen}
+                        tabIndex={chosen ? 0 : -1}
+                        onClick={() => onChange(o.value)}
                         onKeyDown={(e) => onKeyDown(e, i)}
                         className={cn(
-                            `h-9 cursor-pointer rounded-mk-control border-none px-4 text-sm font-semibold transition-colors duration-fast ease-out ${ring()} active:scale-[0.98]`,
-                            on
+                            `h-11 min-w-11 cursor-pointer rounded-mk-control border-none px-3 text-sm font-semibold transition-colors duration-fast ease-out min-[760px]:h-10 min-[760px]:px-4 ${ring()} active:scale-[0.98]`,
+                            chosen
                                 ? "bg-foreground text-background"
                                 : "bg-transparent text-mk-copy hover:bg-mk-hover",
                         )}

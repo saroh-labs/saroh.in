@@ -31,10 +31,10 @@ describe("pricingPageModel", () => {
         const m = pricingPageModel(fakeCatalog()).views["month-excl"];
         expect(m.plans[1]).toMatchObject({
             price: formatInr(11_100),
-            per: "a month",
-            sub: "+ GST",
+            per: "a month + GST",
+            sub: "",
         });
-        expect(m.plans[0].sub).toBe("Free for good");
+        expect(m.plans[0].sub).toBe("Free with no end date. No card needed.");
         expect(m.footnote).toBe(
             `Billed monthly. Prices before GST (${GST_PERCENT}%).`,
         );
@@ -43,7 +43,7 @@ describe("pricingPageModel", () => {
     it("with GST: prices include it and the footnote says so", () => {
         const m = pricingPageModel(fakeCatalog()).views["month-incl"];
         expect(m.plans[1].price).toBe(formatInr(withGstPaise(11_100)));
-        expect(m.plans[1].sub).toBe("Incl. GST");
+        expect(m.plans[1].per).toBe("a month incl. GST");
         expect(m.footnote).toContain(`Prices include ${GST_PERCENT}% GST.`);
     });
 
@@ -71,7 +71,7 @@ describe("pricingPageModel", () => {
             }),
         );
         expect(model.yearly).toBeNull();
-        expect(model.views["year-excl"].plans[1].per).toBe("a month");
+        expect(model.views["year-excl"].plans[1].per).toBe("a month + GST");
     });
 
     it("starts with GST shown when the catalogue says so", () => {
@@ -80,7 +80,7 @@ describe("pricingPageModel", () => {
                 c.gst = { show: "incl" };
             }),
         );
-        expect(model.tax).toEqual({ toggle: true, initial: true });
+        expect(model.tax).toMatchObject({ toggle: true, initial: true });
     });
 
     it("a trial: the card says so and the CTA gets its days", () => {

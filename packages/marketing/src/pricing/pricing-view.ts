@@ -11,6 +11,7 @@ import {
     yearlySwitchLabel,
 } from "@saroh/pricing-catalog";
 
+import { sentenceList } from "../sentence-list";
 import type {
     CompareRow,
     PlanCardView,
@@ -53,10 +54,10 @@ function planViews(
         // A yearly offer leads, the regular year struck beside it (DEC-239).
         const yearOffer = year && p.yearlyOfferPaise !== undefined;
         let sub: string;
-        if (!paid) sub = "Free for good";
+        if (!paid) sub = FREE_SUB;
         else if (year) {
             sub = `About ${money(monthlyEquivalentPaise(charge))} a month${after ?? ""}`;
-        } else sub = (withTax ? tax?.subIncl : tax?.subExcl) ?? "";
+        } else sub = "";
         // DEC-093: the offer is monthly only (yearly is one payment), and
         // a first month that costs something is said with its amount.
         const trialOn = paid && !year && p.trial?.on === true;
@@ -67,16 +68,37 @@ function planViews(
             paid && !yearOffer
                 ? offers.find((o) => o.planId === p.id && o.discountPaise > 0)
                 : undefined;
+        // A month's launch offer leads, the regular price struck beside it
+        // (owner, 20 Nov 2026); on a year it stays a line (`offerLine`).
+        const off =
+            offer && !year ? Math.min(offer.discountPaise, p.pricePaise) : 0;
+        const regularYear = taxed(regularYearlyPaise(catalog, p));
+        const monthsAtRegular = taxed(12 * p.pricePaise);
+        const save = monthsAtRegular - charge;
         return {
             id: p.id,
             name: p.name,
             tagline: p.tagline,
             featured: p.featured,
-            price: money(charge),
+            price: money(off ? taxed(p.pricePaise - off) : charge),
             was: yearOffer
-                ? money(taxed(regularYearlyPaise(catalog, p)))
-                : undefined,
-            per: year ? "a year, paid once" : "a month",
+                ? money(regularYear)
+                : off
+                  ? money(charge)
+                  : undefined,
+            tag: yearOffer ? "Yearly offer" : off ? "Launch offer" : undefined,
+            then: off
+                ? `then ${money(charge)}${after ?? ""} a month`
+                : yearOffer && save > 0
+                  ? `Save ${money(save)}${after ?? ""} (${Math.floor((100 * save) / monthsAtRegular)}%) against paying monthly`
+                  : undefined,
+            note: paid ? site.paidNote?.(catalog, year) : undefined,
+            // A month's tax words sit beside it ("a month + GST", the boards).
+            per: year
+                ? "a year, paid once"
+                : paid
+                  ? `a month${after ?? ""}`
+                  : "a month",
             sub,
             cta: {
                 plan: p.id,
@@ -129,6 +151,64 @@ function offerLine(
         : `${each} off a month for your first ${offer.months} months`;
 }
 
+/** Free's line under its price. */
+export const FREE_SUB = "Free with no end date. No card needed.";
+
+/**
+ * The note at the controls' end: the launch offer on a month (its percent
+ * and months when every offer shares them, its end date when set), the
+ * yearly offer on a year; null when neither shows.
+ */
+function notice(
+    catalog: Catalog,
+    yearly: boolean,
+    site: PricingSite,
+    offers: readonly PlanOffer[],
+): PricingView["notice"] {
+    const paid = offeredPlans(catalog).filter((p) => p.pricePaise > 0);
+    if (yearly) {
+        const on = paid.filter((p) => p.yearlyOfferPaise !== undefined);
+        if (!on.length) return null;
+        return {
+            title: `Yearly offer · ${sentenceList(on.map((p) => p.name))}`,
+            body: "One payment for the year. The launch offer doesn't come off it.",
+        };
+    }
+    const mine = offers.filter(
+        (o) => o.discountPaise > 0 && paid.some((p) => p.id === o.planId),
+    );
+    if (!mine.length) return null;
+    const ends = mine
+        .map((o) => o.endsAt)
+        .filter((e): e is string => !!e)
+        .sort()[0];
+    const title =
+        ends && site.date
+            ? `Launch offer · ends ${site.date(ends)}`
+            : "Launch offer";
+    const [first] = mine;
+    const same = mine.every(
+        (o) =>
+            o.percentOff !== undefined &&
+            o.percentOff === first.percentOff &&
+            o.months === first.months,
+    );
+    const names = sentenceList(
+        paid
+            .filter((p) => mine.some((o) => o.planId === p.id))
+            .map((p) => p.name),
+    );
+    const which = mine.length === paid.length ? "every paid plan" : names;
+    const months =
+        first.months === 1 ? "first month" : `first ${first.months} months`;
+    return {
+        title,
+        body: same
+            ? `${first.percentOff}% off ${which}, your ${months}. No code.`
+            : `Off ${which} for your first months. No code.`,
+    };
+}
+
 function compareRows(catalog: Catalog): CompareRow[] {
     const plans = offeredPlans(catalog);
     const rows: CompareRow[] = [];
@@ -143,6 +223,7 @@ function compareRows(catalog: Catalog): CompareRow[] {
                 kind: "line",
                 label: m.name,
                 soon: m.pricing === "soon",
+                what: m.what || undefined,
                 cells: plans.map((p) => {
                     const c = cellOf(m, p.id);
                     return c.inc
@@ -224,6 +305,7 @@ export function pricingPageModel(
                 plans: planViews(catalog, y, withTax, site, offers),
                 usage: usageView(catalog, withTax, site),
                 footnote: footnote(catalog, y, withTax, site),
+                notice: notice(catalog, y, site, offers),
             };
         }
     }
@@ -236,7 +318,11 @@ export function pricingPageModel(
               }
             : null,
         tax: site.tax
-            ? { toggle: true, initial: catalog.gst.show === "incl" }
+            ? {
+                  toggle: true,
+                  initial: catalog.gst.show === "incl",
+                  on: site.tax.toggleOn,
+              }
             : { toggle: false, initial: false },
         views,
         rows: compareRows(catalog),
@@ -274,6 +360,7 @@ export function placeholderPricingModel(
         })),
         usage: null,
         footnote: "",
+        notice: null,
     };
     return {
         placeholder: true,

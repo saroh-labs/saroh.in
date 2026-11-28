@@ -58,6 +58,7 @@ export function PricingCards({
             taxToggle={(checked, onChange) => (
                 <GstToggle
                     checked={checked}
+                    on={model.tax.on ?? "With GST"}
                     onChange={(v) => {
                         onChange(v);
                         track("pricing_toggle", { control: "gst", value: v });

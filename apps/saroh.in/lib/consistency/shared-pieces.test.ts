@@ -145,6 +145,8 @@ const RULES: Rule[] = [
                 "keep (DEC-221): a problem's answer and a day trade's other parts fold, kept in the HTML",
             "packages/marketing/src/solutions/hub-finder.tsx":
                 "keep (DEC-221): the phone's closed A to Z list of every trade",
+            [`${MK}/pricing/plan-cards.tsx`]:
+                "keep: a plan card's phone fold (PRP boards, 22 Nov): its lines past the fourth, in the HTML, open from 760px",
             [`${MK}/feature-pages/reach/fold.tsx`]:
                 "keep: the Reach and Ask pages' phone folds and crop toggles (FWPhone2, FSPhone2, FAPhone2, FMPhone2), content in the HTML",
         },
@@ -263,6 +265,8 @@ const RULES: Rule[] = [
         allow: {
             [`${MK}/pricing/plan-cards.tsx`]:
                 "keep: the staff preview's changed-part highlight, not a badge",
+            [`${MK}/pricing/pricing-cards.tsx`]:
+                "keep: the launch offer's note beside the switches (PRP boards), a sentence, not a badge",
         },
         files: SITE,
     },

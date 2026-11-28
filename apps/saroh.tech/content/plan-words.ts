@@ -85,6 +85,15 @@ export const PLAN_WORDS = {
         on: "Need more than Free includes? Move up to Grow or Pro.",
         off: "You can't buy more yet: paid plans aren't on sale.",
     },
+    /** /pricing's second question (the 22 Nov boards). */
+    pricingFaqQ: {
+        on: "How do I move to a paid plan?",
+        off: "When do paid plans open?",
+    },
+    pricingFaqA: {
+        on: "Choose Grow or Pro above, or in Settings once you're on Saroh. Each card says what the plan includes.",
+        off: "Grow and Pro aren't on sale yet. Press Tell me when on a plan and we'll send one email when they open. Nothing is charged until you choose one.",
+    },
     /** A paid plan's card: its button while on sale, a mark while not. */
     paidCard: { on: "Start on", off: "Coming soon" },
     /** Terms and Billing, "Paying for Saroh". */

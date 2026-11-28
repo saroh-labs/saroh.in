@@ -39,12 +39,13 @@ export function PricingCards({
 }) {
     const { yearly, setYearly, withTax, setWithTax, view } = switches;
     const tax = model.tax.toggle ? taxToggle?.(withTax, setWithTax) : null;
-    const showControls = !!model.yearly || !!tax;
+    const notice = view.notice;
+    const showControls = !!model.yearly || !!tax || !!notice;
 
     return (
-        <div className="grid gap-3.5">
+        <div className="grid gap-5">
             {showControls ? (
-                <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
                     {model.yearly ? (
                         <BillingToggle
                             yearly={yearly}
@@ -57,6 +58,17 @@ export function PricingCards({
                         />
                     ) : null}
                     {tax}
+                    {notice ? (
+                        <p
+                            aria-live="polite"
+                            className="m-0 basis-full rounded-mk-btn bg-mk-soon px-3.5 py-2.5 text-[13.5px] font-semibold leading-[1.45] text-brand-700 min-[760px]:ml-auto min-[760px]:basis-auto min-[760px]:py-1"
+                        >
+                            {notice.title}{" "}
+                            <span className="block font-medium min-[760px]:inline">
+                                {notice.body}
+                            </span>
+                        </p>
+                    ) : null}
                 </div>
             ) : null}
             <PlanCards plans={view.plans} cta={cta} ownHeight={ownHeight} />
