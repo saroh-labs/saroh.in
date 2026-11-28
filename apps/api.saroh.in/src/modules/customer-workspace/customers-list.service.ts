@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Optional } from "@nestjs/common";
+import {
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
+    Optional,
+} from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
@@ -7,6 +12,7 @@ import {
     contactEmailForDisplay,
     isReservedContactEmail,
 } from "../contacts/contact-email";
+import { isLocationScoped } from "../orders/order-location";
 import type { OrgAction } from "../organizations/organization-actions";
 import { allows } from "../organizations/organization-policy";
 import { attentionFor, canSeeSensitive } from "./attention-read";
@@ -263,6 +269,25 @@ function groupTotals(
     return out;
 }
 
+/**
+ * A location's team (DEC-074, DEC-282) reads customers one location at a
+ * time, a storefront it works on: the list and its payers are about where
+ * people bought, and its role sees only its own locations' orders. Given
+ * "See customers", it opens on its first location and may choose another
+ * of its own; on none at all it is refused, never shown every location's.
+ */
+export const ONE_LOCATION_REFUSAL =
+    "Your role sees the customers of your own location, and you work at none.";
+
+/** The storefronts this caller may name: all, or the ones they work on. */
+function ownStores(
+    ctx: Pick<OrganizationContext, "roleKey" | "userId">,
+): Prisma.StoreWhereInput {
+    return isLocationScoped(ctx.roleKey)
+        ? { members: { some: { userId: ctx.userId } } }
+        : {};
+}
+
 @Injectable()
 export class CustomersListService {
     constructor(@Optional() private readonly db: typeof prisma = prisma) {}
@@ -286,9 +311,10 @@ export class CustomersListService {
         }
         // "Bought at" is about orders; a storefront of another business is
         // a 404, as every cross-tenant id.
+        query = { ...query, store: await this.locationOf(ctx, query.store) };
         if (query.store) {
             requireCustomerPower(ctx, "order:read");
-            await this.requireStore(organizationId, query.store);
+            await this.requireStore(ctx, query.store);
         }
         const page = query.page ?? 1;
         const size = query.size ?? CUSTOMERS_PAGE_SIZE;
@@ -326,7 +352,7 @@ export class CustomersListService {
                 this.unlinkedCount(organizationId, query.store),
                 sees.orders
                     ? this.db.store.findMany({
-                          where: { organizationId },
+                          where: { organizationId, ...ownStores(ctx) },
                           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                           select: { id: true, name: true },
                       })
@@ -427,9 +453,10 @@ export class CustomersListService {
         requireCustomerPower(ctx, "contact:read");
         const organizationId = ctx.organizationId;
         // Who paid at a storefront is about orders, as `list`'s filter is.
+        query = { ...query, store: await this.locationOf(ctx, query.store) };
         if (query.store) {
             requireCustomerPower(ctx, "order:read");
-            await this.requireStore(organizationId, query.store);
+            await this.requireStore(ctx, query.store);
         }
         const orders = allows(ctx, "order:read");
         const page = query.page ?? 1;
@@ -508,12 +535,34 @@ export class CustomersListService {
         return row.n;
     }
 
+    /**
+     * The location a list is narrowed to: the one asked for, or, for a
+     * location's team that asked for none, the first it works on.
+     */
+    private async locationOf(
+        ctx: OrganizationContext,
+        store: string | undefined,
+    ): Promise<string | undefined> {
+        if (store || !isLocationScoped(ctx.roleKey)) return store;
+        const first = await this.db.store.findFirst({
+            where: { organizationId: ctx.organizationId, ...ownStores(ctx) },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: { id: true },
+        });
+        if (!first) throw new ForbiddenException(ONE_LOCATION_REFUSAL);
+        return first.id;
+    }
+
     private async requireStore(
-        organizationId: string,
+        ctx: OrganizationContext,
         storeId: string,
     ): Promise<void> {
         const store = await this.db.store.findFirst({
-            where: { id: storeId, organizationId },
+            where: {
+                id: storeId,
+                organizationId: ctx.organizationId,
+                ...ownStores(ctx),
+            },
             select: { id: true },
         });
         if (!store) throw new NotFoundException("Location not found");

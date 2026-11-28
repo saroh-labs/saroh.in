@@ -3594,3 +3594,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 - **`ConfirmDialog` and the leave prompt (`useLeaveGuard`) are drawn on the shared shadcn `Dialog`, not shadcn's `AlertDialog`.** shadcn's AlertDialog (Radix) never closes on a press outside and has no close button; a question has nothing typed to lose, so it now has the close button, and a press outside, Escape or Close is the "keep" answer (Keep, Stay). While the action runs nothing closes it. Screen readers still hear an `alertdialog`. Every confirmation in the apps follows, since all of them go through these two pieces.
 - **A Not linked row on Customers opens that payer's record at the location they paid** (`/commerce/customers/<id>?storefront=<id>`): the whole row is the link, and Link sits above it. A linked row still opens the person's page.
+
+## DEC-282 A location's team reads sales and customers of its own locations only
+
+**Status: Accepted — 2026-11-28** · owner (28 Nov 2026: "ok lets fix these issues", on the pre-release pentest's M-1, L-1, L-2) · extends DEC-074 (a location's team works its location's orders) and DEC-098 (who reads booking money)
+
+- **The products list's "sold lately"** (units and money in the last 30 days) counts only the orders of the storefronts a location's team works on, by the same rule as its orders list (`orderLocationSql`). Everyone else still sees the whole business.
+- **Customers, for a location's team given "See customers"** (the role doesn't hold it by default; an owner can add it): the list and its Not linked payers open on the first location the person works on and may be switched only to another of theirs. The location picker offers only theirs; another location is a 404; someone on no location is refused. Before, the list showed every location's people, order counts and last storefront.
+- **A booking's refund lines, for someone who reads no money**, say what happened ("Refunded to how they paid", "Refund failed") without the amount, currency or refund id.

@@ -7469,3 +7469,10 @@ field list gets it too, and the route test says the field arrives
 and whether a charge was declined"). A component test with a hand-built
 object doesn't prove the read carries the field.
 **Category**: data · `app.saroh.in`
+
+## A new figure built from orders skipped the location rule (28 Nov 2026)
+
+**Symptom**: the pre-release pentest found a Storefront team member, whose orders list is narrowed to their location (DEC-074), seeing every location's 30-day sales on the products list.
+**Cause**: `soldLately` (`products/catalogue-page.ts`) was a new raw-SQL read over orders that took only the organization. The location rule is a `where` the order reads spread in, so a new read that doesn't call it is wide open, and the permission check (`order:read`) passes.
+**Fix**: `soldLately` takes the caller and adds `orderLocationSql(who, "o")`; a db spec checks a caller on no storefront sees no sales (DEC-282).
+**Rule**: any new read that sums or lists orders (raw SQL or Prisma) takes the caller and applies `orderLocationSql` / `orderLocationWhere`, not just `order:read`. Same pass: refund lines carry money too (`bookings.service.ts` `detailFor`), and a `%00` in a query is now a 400 for every route (`common/pipes/nul.pipe.ts`), not a 500 from Postgres.

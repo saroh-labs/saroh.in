@@ -5,8 +5,12 @@ import { validate } from "class-validator";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { reservedAccountEmail } from "../contacts/contact-email";
 import type { OrgAction } from "../organizations/organization-actions";
+import { STOREFRONT_TEAM_ROLE_KEY } from "../organizations/storefront-team-role";
 import { ListCustomersQueryDto } from "./customers-list.dto";
-import { CustomersListService } from "./customers-list.service";
+import {
+    CustomersListService,
+    ONE_LOCATION_REFUSAL,
+} from "./customers-list.service";
 
 /**
  * The Customers list (C3) with a mocked database: who may open it, what
@@ -329,6 +333,48 @@ describe("CustomersListService.list", () => {
                 where: { id: "theirs", organizationId: "org_1" },
             }),
         );
+    });
+
+    it("keeps a location's team to a location it works on (DEC-282)", async () => {
+        const { service, db } = make();
+        const team = {
+            ...ctx(EVERYTHING),
+            roleKey: STOREFRONT_TEAM_ROLE_KEY,
+        } as OrganizationContext;
+        const own = { members: { some: { userId: "user_1" } } };
+        // Asked for no location: it opens on the first of their own.
+        await service.list(team, {});
+        expect(db.store.findFirst).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                where: { organizationId: "org_1", ...own },
+            }),
+        );
+        // The picker offers only theirs.
+        expect(db.store.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", ...own },
+            }),
+        );
+        // A location they don't work on reads as not there.
+        db.store.findFirst.mockResolvedValue(null);
+        await expect(service.list(team, { store: "not-mine" })).rejects.toThrow(
+            NotFoundException,
+        );
+        expect(db.store.findFirst).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                where: { id: "not-mine", organizationId: "org_1", ...own },
+            }),
+        );
+        // Working at none: refused, never every location's.
+        db.$queryRaw.mockClear();
+        await expect(service.list(team, {})).rejects.toThrow(
+            ONE_LOCATION_REFUSAL,
+        );
+        await expect(service.unlinked(team, {})).rejects.toThrow(
+            ONE_LOCATION_REFUSAL,
+        );
+        expect(db.$queryRaw).not.toHaveBeenCalled();
     });
 
     it("shows a separate contact's account email and says they sign in, never the placeholder", async () => {

@@ -82,6 +82,7 @@ export class OrganizationProductsController {
             // Sales are order money: `order:read`'s alone (finding 17).
             return cataloguePage(this.products, organizationId, query, {
                 sold: allows(ctx, "order:read"),
+                who: ctx,
             });
         }
         return this.products.catalogue(organizationId, {
